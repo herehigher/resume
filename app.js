@@ -368,15 +368,20 @@
   }
 
   function renderHistoryRows(items, category) {
+    const enteredItems = items.filter((item) => item.date || item.detail);
+    if (!enteredItems.length) return '';
     const rows = [`<div class="paper-table-row category-row"><div class="paper-table-date"></div><div class="paper-table-detail">${category}</div></div>`];
-    items.forEach((item) => {
+    enteredItems.forEach((item) => {
       rows.push(`<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(formatMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}</div></div>`);
     });
     return rows.join('');
   }
 
-  function blankRows(count) {
-    return Array.from({ length: count }, () => '<div class="paper-table-row empty-row"><div class="paper-table-date"></div><div class="paper-table-detail"></div></div>').join('');
+  function renderQualificationRows(items) {
+    return items
+      .filter((item) => item.date || item.detail || item.url)
+      .map((item) => `<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(formatMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</div></div>`)
+      .join('');
   }
 
   function credentialLink(value) {
@@ -442,14 +447,12 @@
           <div class="paper-table-header"><div>年月</div><div>学歴・職歴</div></div>
           ${renderHistoryRows(data.education, '学歴')}
           ${renderHistoryRows(data.employment, '職歴')}
-          ${blankRows(Math.max(2, 8 - data.education.length - data.employment.length))}
         </section>
       </article>
       <article class="document-page resume-document">
-        <section class="paper-section" style="border-top:1px solid #374151">
+          <section class="paper-section" style="border-top:1px solid #374151">
           <div class="paper-table-header"><div>年月</div><div>免許・資格</div></div>
-          ${data.qualification.map((item) => `<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(formatMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</div></div>`).join('')}
-          ${blankRows(Math.max(4, 8 - data.qualification.length))}
+          ${renderQualificationRows(data.qualification)}
         </section>
         <section class="paper-text-section"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
         <section class="paper-text-section" style="min-height:145px"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(fields.requests, '貴社規定に従います。')}</div></section>
