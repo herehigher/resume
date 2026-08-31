@@ -1,4 +1,5 @@
 import { STORAGE_KEY } from '../config.js';
+import { cloneData } from './defaults.js';
 import { assertValidState, validateState } from './schema.js';
 
 export function loadStoredState(storage) {
@@ -27,4 +28,20 @@ export function persistState(storage, state) {
 
 export function removeStoredState(storage) {
   storage.removeItem(STORAGE_KEY);
+}
+
+export function serializeState(state) {
+  assertValidState(state);
+  return `${JSON.stringify(state, null, 2)}\n`;
+}
+
+export function parseImportedState(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new TypeError('JSONの形式が正しくありません。');
+  }
+  assertValidState(parsed);
+  return cloneData(parsed);
 }
