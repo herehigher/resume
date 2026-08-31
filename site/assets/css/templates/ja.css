@@ -1,0 +1,78 @@
+.document-page {
+  background: #fff;
+  box-shadow: var(--shadow);
+  color: #111827;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+  margin: 0 auto 28px;
+  min-height: 1074px;
+  padding: 48px 50px;
+  position: relative;
+  width: 760px;
+}
+
+.resume-document-title { font-size: 26px; font-weight: 500; letter-spacing: .36em; margin: 0 0 10px; text-align: center; }
+.resume-current-date { font-size: 10px; margin-bottom: 8px; text-align: right; }
+.resume-profile { border: 1px solid #374151; display: grid; grid-template-columns: 1fr 108px; }
+.profile-text > div { align-items: center; border-bottom: 1px solid #6b7280; display: grid; min-height: 32px; }
+.profile-text > div:last-child { border-bottom: 0; }
+.profile-kana { grid-template-columns: 86px 1fr; }
+.profile-name { grid-template-columns: 86px 1fr; min-height: 67px !important; }
+.profile-birth { grid-template-columns: 86px 1fr auto; }
+.paper-label { font-size: 9px; padding: 0 10px; }
+.paper-value { font-size: 10px; padding: 0 10px; white-space: pre-wrap; }
+.profile-name .paper-value { font-size: 22px; letter-spacing: .1em; }
+.profile-photo { align-items: center; border-left: 1px solid #374151; color: #9ca3af; display: flex; font-family: sans-serif; font-size: 9px; justify-content: center; overflow: hidden; }
+.profile-photo img { height: 100%; object-fit: cover; width: 100%; }
+.resume-contact { border: 1px solid #374151; border-top: 0; }
+.resume-contact > div { align-items: stretch; border-bottom: 1px solid #6b7280; display: grid; grid-template-columns: 86px 1fr 86px 1fr; min-height: 34px; }
+.resume-contact > div:last-child { border-bottom: 0; }
+.resume-contact .paper-label { align-items: center; border-right: 1px solid #6b7280; display: flex; }
+.resume-contact .paper-value { align-items: center; display: flex; }
+.resume-contact .full-contact { grid-column: span 3; }
+.resume-online-profiles { border: 1px solid #374151; border-top: 0; }
+.resume-online-title { background: #f7f7f7; border-bottom: 1px solid #6b7280; font-size: 9px; padding: 6px 10px; }
+.resume-online-row { border-bottom: 1px solid #9ca3af; display: grid; grid-template-columns: 86px 1fr; min-height: 27px; }
+.resume-online-row:last-child { border-bottom: 0; }
+.resume-online-row .paper-label { align-items: center; border-right: 1px solid #9ca3af; display: flex; }
+.profile-url-link { align-items: center; color: #2457a2; display: flex; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 7.5px; line-height: 1.4; overflow-wrap: anywhere; padding: 5px 10px; text-decoration: underline; word-break: break-all; }
+
+.paper-section { border: 1px solid #374151; border-top: 0; }
+.paper-table-header,
+.paper-table-row { display: grid; grid-template-columns: 72px 1fr; }
+.paper-table-header { background: #f7f7f7; border-bottom: 1px solid #374151; font-size: 10px; text-align: center; }
+.paper-table-header > div { padding: 6px; }
+.paper-table-header > div:first-child { border-right: 1px solid #374151; }
+.paper-table-row { border-bottom: 1px solid #9ca3af; min-height: 31px; }
+.paper-table-row:last-child { border-bottom: 0; }
+.paper-table-date { align-items: center; border-right: 1px solid #9ca3af; display: flex; font-size: 9px; justify-content: center; padding: 5px; }
+.paper-table-detail { align-items: center; display: flex; flex-wrap: wrap; font-size: 10px; padding: 6px 12px; white-space: pre-wrap; }
+.qualification-proof { color: #2457a2; display: block; flex-basis: 100%; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 6.5px; line-height: 1.45; margin-top: 3px; overflow-wrap: anywhere; text-decoration: underline; word-break: break-all; }
+.paper-table-row.category-row .paper-table-detail { justify-content: center; letter-spacing: .3em; }
+.paper-text-section { border: 1px solid #374151; border-top: 0; min-height: 130px; }
+.paper-text-title { background: #f7f7f7; border-bottom: 1px solid #374151; font-size: 10px; padding: 6px 10px; }
+.paper-text-content { font-size: 10px; line-height: 1.9; padding: 12px 14px; white-space: pre-wrap; }
+
+.career-document { font-family: "Yu Gothic", "Hiragino Sans", sans-serif; }
+.career-doc-header { border-bottom: 3px solid #1f3f70; padding-bottom: 14px; }
+.career-doc-header h2 { font-family: "Yu Mincho", serif; font-size: 28px; letter-spacing: .18em; margin: 0 0 12px; }
+.career-doc-meta { font-size: 10px; line-height: 1.7; text-align: right; }
+.career-profile-links { display: flex; flex-wrap: wrap; gap: 5px 12px; justify-content: flex-end; margin-top: 6px; }
+.career-profile-links a { color: #2457a2; font-size: 7.5px; overflow-wrap: anywhere; text-decoration: underline; word-break: break-all; }
+.career-section { margin-top: 26px; }
+.career-section-title { align-items: center; border-bottom: 1px solid #9ba9bb; display: flex; font-size: 14px; gap: 9px; margin: 0 0 11px; padding-bottom: 7px; }
+.career-section-title::before { background: #2457a2; content: ""; display: block; height: 18px; width: 4px; }
+.career-body { font-size: 10px; line-height: 1.9; padding: 0 5px; white-space: pre-wrap; }
+.career-company { border: 1px solid #9aa6b5; margin-top: 15px; }
+.career-company-heading { background: #eff4f9; border-bottom: 1px solid #9aa6b5; display: flex; justify-content: space-between; padding: 9px 11px; }
+.career-company-heading strong { font-size: 11px; }
+.career-company-heading span { font-size: 9px; }
+.career-company-info { border-bottom: 1px solid #c3cad3; font-size: 9px; padding: 7px 11px; }
+.career-company-grid { display: grid; grid-template-columns: 105px 1fr; }
+.career-company-grid > div { border-bottom: 1px solid #cbd2da; font-size: 9px; line-height: 1.75; padding: 9px 11px; white-space: pre-wrap; }
+.career-company-grid > div:nth-child(odd) { background: #f8fafc; border-right: 1px solid #cbd2da; font-weight: 700; }
+.career-company-grid > div:nth-last-child(-n+2) { border-bottom: 0; }
+.empty-preview { color: #8a95a4; font-family: sans-serif; font-size: 10px; font-style: italic; }
+
+
+.paper-section-first { border-top: 1px solid #374151; }
+.requests-section { min-height: 145px; }
