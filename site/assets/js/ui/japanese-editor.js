@@ -431,7 +431,7 @@ export function initJapaneseEditor(store) {
   document.getElementById('confirmClearButton').addEventListener('click', () => {
     window.clearTimeout(saveTimer);
     try {
-      store.reset();
+      store.reset(store.getState().settings.locale);
       store.clearPersisted();
       shouldPersistDraft = false;
       sampleMode = false;
@@ -464,7 +464,14 @@ export function initJapaneseEditor(store) {
   });
 
   store.subscribe((_state, event) => {
-    if (['reload', 'reset', 'sample', 'restore'].includes(event.type)) hydrateForm();
+    if (event.type === 'import' && sampleMode) {
+      sampleMode = false;
+      draftBeforeSample = null;
+      draftBeforeSampleWasStored = false;
+      shouldPersistDraft = true;
+      setSampleModeUI(false);
+    }
+    if (['import', 'reload', 'reset', 'sample', 'restore'].includes(event.type)) hydrateForm();
   });
 
   hydrateForm();

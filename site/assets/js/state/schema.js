@@ -1,4 +1,4 @@
-import { PAGE_SIZE, STATE_VERSION } from '../config.js';
+import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createDefaultState } from './defaults.js';
 
 function isPlainObject(value) {
@@ -43,7 +43,15 @@ export function validateState(value) {
   if (value.version !== STATE_VERSION) errors.push(`version must be ${STATE_VERSION}`);
   compareShape(value, createDefaultState(), 'state', errors);
 
-  if (value.settings?.pageSize !== PAGE_SIZE) errors.push(`settings.pageSize must be ${PAGE_SIZE}`);
+  if (!SUPPORTED_LOCALES.includes(value.settings?.locale)) {
+    errors.push('settings.locale is not supported');
+  }
+
+  SUPPORTED_LOCALES.forEach((locale) => {
+    if (!PAGE_SIZES.includes(value.settings?.pageSizeByLocale?.[locale])) {
+      errors.push(`settings.pageSizeByLocale.${locale} is not supported`);
+    }
+  });
 
   if (!['resume', 'career'].includes(value.documents?.ja?.activeDocument)) {
     errors.push('documents.ja.activeDocument is not supported');

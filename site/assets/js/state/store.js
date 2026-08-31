@@ -2,8 +2,10 @@ import { createDefaultState, cloneData } from './defaults.js';
 import {
   hasStoredState,
   loadStoredState,
+  parseImportedState,
   persistState,
-  removeStoredState
+  removeStoredState,
+  serializeState
 } from './storage.js';
 import { assertValidState } from './schema.js';
 
@@ -43,8 +45,8 @@ export function createStore({ storage, initialState }) {
       replace(stored, { type: 'reload' });
       return true;
     },
-    reset() {
-      replace(createDefaultState(), { type: 'reset' });
+    reset(locale = state.settings.locale) {
+      replace(createDefaultState(locale), { type: 'reset' });
     },
     clearPersisted() {
       removeStoredState(storage);
@@ -52,6 +54,14 @@ export function createStore({ storage, initialState }) {
     },
     hasStoredState() {
       return hasStoredState(storage);
+    },
+    exportJson() {
+      return serializeState(state);
+    },
+    importJson(text) {
+      const imported = parseImportedState(text);
+      replace(imported, { persist: true, type: 'import' });
+      return state;
     },
     subscribe(listener) {
       listeners.add(listener);
