@@ -61,6 +61,7 @@
   let zoom = 1;
   let saveTimer;
   let draftMessageTimer;
+  let shouldPersistDraft = hasStoredDraft();
 
   function today() {
     const now = new Date();
@@ -86,8 +87,17 @@
     }
   }
 
+  function hasStoredDraft() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) !== null;
+    } catch {
+      return false;
+    }
+  }
+
   function saveData() {
     clearTimeout(saveTimer);
+    shouldPersistDraft = true;
     saveStatus.classList.add('is-saving');
     saveStatus.textContent = '保存中…';
     saveTimer = setTimeout(() => {
@@ -117,6 +127,7 @@
     clearTimeout(saveTimer);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      shouldPersistDraft = true;
       saveStatus.classList.remove('is-saving');
       saveStatus.textContent = 'この端末に保存済み';
       showDraftMessage('下書きを保存しました');
@@ -127,6 +138,10 @@
 
   function reloadDraft() {
     clearTimeout(saveTimer);
+    if (!hasStoredDraft()) {
+      showDraftMessage('保存された下書きはありません');
+      return;
+    }
     data = loadData();
     hydrateForm();
     showDraftMessage('保存した内容を読み込みました');
@@ -484,10 +499,18 @@
 
   document.getElementById('clearButton').addEventListener('click', () => confirmDialog.showModal());
   document.getElementById('confirmClearButton').addEventListener('click', () => {
-    localStorage.removeItem(STORAGE_KEY);
-    data = defaultData();
-    hydrateForm();
-    saveData();
+    clearTimeout(saveTimer);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      shouldPersistDraft = false;
+      data = defaultData();
+      hydrateForm();
+      saveStatus.classList.remove('is-saving');
+      saveStatus.textContent = '下書きは保存されていません';
+      showDraftMessage('下書きデータを削除しました');
+    } catch {
+      showDraftMessage('下書きデータを削除できませんでした');
+    }
   });
 
   document.getElementById('printButton').addEventListener('click', () => window.print());
@@ -496,6 +519,7 @@
   window.addEventListener('resize', fitPreviewForViewport);
   window.addEventListener('pagehide', () => {
     clearTimeout(saveTimer);
+    if (!shouldPersistDraft) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* 保存容量超過時は既存データを維持 */ }
   });
 
