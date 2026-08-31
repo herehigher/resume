@@ -148,6 +148,12 @@ button { cursor: pointer; }
 .draft-controls .secondary-button { min-height: 32px; }
 .draft-message { color: var(--muted); font-size: 9px; margin-left: 3px; }
 .draft-message.is-success { color: var(--green); font-weight: 700; }
+.sample-mode-panel { align-items: center; background: #fff8e8; border: 1px solid #ecd493; border-radius: 9px; display: grid; gap: 12px; grid-template-columns: 1fr auto auto; margin: -10px 0 22px; padding: 12px 14px; }
+.sample-mode-panel[hidden] { display: none !important; }
+.sample-mode-copy strong { color: #75520a; display: block; font-size: 10px; }
+.sample-mode-copy span { color: #806c3e; display: block; font-size: 8px; line-height: 1.5; margin-top: 2px; }
+.sample-mode-panel .secondary-button,
+.sample-mode-panel .primary-button { min-height: 32px; white-space: nowrap; }
 
 .form-section { border-bottom: 1px solid var(--soft-line); }
 .form-section:first-of-type { border-top: 1px solid var(--soft-line); }
@@ -353,6 +359,7 @@ dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px)
   .repeating-row { grid-template-columns: 104px 1fr 28px; }
   .editor-footer { align-items: start; flex-direction: column; gap: 14px; }
   .editor-footer p { text-align: left; }
+  .sample-mode-panel { grid-template-columns: 1fr; }
 }
 
 @media print {

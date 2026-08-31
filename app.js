@@ -62,6 +62,9 @@
   let saveTimer;
   let draftMessageTimer;
   let shouldPersistDraft = hasStoredDraft();
+  let sampleMode = false;
+  let draftBeforeSample = null;
+  let draftBeforeSampleWasStored = false;
 
   function today() {
     const now = new Date();
@@ -97,6 +100,11 @@
 
   function saveData() {
     clearTimeout(saveTimer);
+    if (sampleMode) {
+      saveStatus.classList.remove('is-saving');
+      saveStatus.textContent = '入力例は保存されません';
+      return;
+    }
     shouldPersistDraft = true;
     saveStatus.classList.add('is-saving');
     saveStatus.textContent = '保存中…';
@@ -145,6 +153,64 @@
     data = loadData();
     hydrateForm();
     showDraftMessage('保存した内容を読み込みました');
+  }
+
+  function cloneData(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function setSampleModeUI(active) {
+    document.querySelector('.draft-controls').hidden = active;
+    document.getElementById('sampleModePanel').hidden = !active;
+    document.getElementById('clearButton').hidden = active;
+    const sampleButton = document.getElementById('loadSampleButton');
+    sampleButton.disabled = active;
+    sampleButton.textContent = active ? '入力例を表示中' : '入力例を表示';
+  }
+
+  function enterSampleMode() {
+    clearTimeout(saveTimer);
+    const currentDraft = cloneData(data);
+    const wasStored = shouldPersistDraft;
+    if (wasStored) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentDraft));
+      } catch {
+        showDraftMessage('現在の下書きを保護できないため、入力例を表示できません');
+        return;
+      }
+    }
+    draftBeforeSample = currentDraft;
+    draftBeforeSampleWasStored = wasStored;
+    sampleMode = true;
+    data = cloneData(sampleData);
+    setSampleModeUI(true);
+    hydrateForm();
+    saveStatus.classList.remove('is-saving');
+    saveStatus.textContent = '入力例は一時表示です';
+  }
+
+  function restoreDraftFromSample() {
+    if (!sampleMode) return;
+    data = cloneData(draftBeforeSample || defaultData());
+    shouldPersistDraft = draftBeforeSampleWasStored;
+    sampleMode = false;
+    draftBeforeSample = null;
+    setSampleModeUI(false);
+    hydrateForm();
+    saveStatus.textContent = shouldPersistDraft ? 'この端末に保存済み' : '下書きは保存されていません';
+    showDraftMessage('元の下書きに戻りました');
+  }
+
+  function adoptSampleAsDraft() {
+    if (!sampleMode) return;
+    sampleMode = false;
+    draftBeforeSample = null;
+    draftBeforeSampleWasStored = false;
+    setSampleModeUI(false);
+    shouldPersistDraft = true;
+    saveDraftNow();
+    showDraftMessage('入力例を下書きとして保存しました');
   }
 
   function hydrateForm() {
@@ -488,11 +554,9 @@
     renderPreview();
   });
 
-  document.getElementById('loadSampleButton').addEventListener('click', () => {
-    data = JSON.parse(JSON.stringify(sampleData));
-    hydrateForm();
-    saveData();
-  });
+  document.getElementById('loadSampleButton').addEventListener('click', enterSampleMode);
+  document.getElementById('restoreDraftButton').addEventListener('click', restoreDraftFromSample);
+  document.getElementById('adoptSampleButton').addEventListener('click', adoptSampleAsDraft);
 
   document.getElementById('saveDraftButton').addEventListener('click', saveDraftNow);
   document.getElementById('reloadDraftButton').addEventListener('click', reloadDraft);
@@ -519,7 +583,7 @@
   window.addEventListener('resize', fitPreviewForViewport);
   window.addEventListener('pagehide', () => {
     clearTimeout(saveTimer);
-    if (!shouldPersistDraft) return;
+    if (sampleMode || !shouldPersistDraft) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* 保存容量超過時は既存データを維持 */ }
   });
 

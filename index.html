@@ -24,11 +24,11 @@
       --shadow: 0 18px 50px rgba(23, 32, 51, .12);
       font-family: Inter, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
     }
-    
+
     * { box-sizing: border-box; }
-    
+
     html { height: 100%; }
-    
+
     body {
       background: var(--canvas);
       color: var(--ink);
@@ -36,10 +36,10 @@
       margin: 0;
       overflow: hidden;
     }
-    
+
     button, input, select, textarea { font: inherit; }
     button { cursor: pointer; }
-    
+
     .app-header {
       align-items: center;
       background: rgba(255, 255, 255, .96);
@@ -51,7 +51,7 @@
       position: relative;
       z-index: 20;
     }
-    
+
     .brand {
       align-items: center;
       color: inherit;
@@ -60,7 +60,7 @@
       justify-self: start;
       text-decoration: none;
     }
-    
+
     .brand-mark {
       align-items: center;
       background: linear-gradient(145deg, #346de8, #1b48bd);
@@ -75,10 +75,10 @@
       justify-content: center;
       width: 36px;
     }
-    
+
     .brand strong { display: block; font-size: 14px; letter-spacing: -.01em; }
     .brand small { color: var(--muted); display: block; font-size: 9px; margin-top: 1px; }
-    
+
     .document-switcher {
       background: #f1f4f8;
       border: 1px solid #e4e8ee;
@@ -87,7 +87,7 @@
       gap: 2px;
       padding: 3px;
     }
-    
+
     .document-tab {
       background: transparent;
       border: 0;
@@ -98,18 +98,18 @@
       min-width: 100px;
       padding: 8px 13px;
     }
-    
+
     .document-tab.is-active {
       background: var(--surface);
       box-shadow: 0 1px 4px rgba(23, 32, 51, .09);
       color: var(--ink);
     }
-    
+
     .header-actions { align-items: center; display: flex; gap: 9px; justify-self: end; }
     .save-status { color: var(--muted); font-size: 10px; margin-right: 4px; }
     .save-status::before { background: var(--green); border-radius: 50%; content: ""; display: inline-block; height: 6px; margin-right: 6px; width: 6px; }
     .save-status.is-saving::before { animation: pulse 1s infinite; background: #d79a22; }
-    
+
     .primary-button,
     .secondary-button,
     .danger-button {
@@ -122,22 +122,22 @@
       min-height: 36px;
       padding: 0 13px;
     }
-    
+
     .primary-button { background: var(--blue); border: 1px solid var(--blue); color: #fff; }
     .primary-button:hover { background: var(--blue-dark); }
     .primary-button svg { fill: none; height: 15px; margin-right: 7px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; width: 15px; }
     .secondary-button { background: #fff; border: 1px solid #ced5df; color: #334056; }
     .secondary-button:hover { background: #f7f9fb; }
     .danger-button { background: var(--danger); border: 1px solid var(--danger); color: white; }
-    
+
     .mobile-view-switch { display: none; }
-    
+
     .workspace {
       display: grid;
       grid-template-columns: minmax(420px, 43%) 1fr;
       height: calc(100vh - 72px);
     }
-    
+
     .editor-panel {
       background: var(--surface);
       border-right: 1px solid var(--line);
@@ -145,7 +145,7 @@
       overflow-y: auto;
       padding: 34px clamp(24px, 3.2vw, 54px) 56px;
     }
-    
+
     .editor-heading { align-items: end; display: flex; justify-content: space-between; }
     .eyebrow { color: var(--blue); font-size: 9px !important; font-weight: 800; letter-spacing: .18em; margin: 0 0 6px !important; }
     .editor-heading h1 { font-size: clamp(23px, 2vw, 30px); letter-spacing: -.03em; margin: 0 0 7px; }
@@ -157,7 +157,13 @@
     .draft-controls .secondary-button { min-height: 32px; }
     .draft-message { color: var(--muted); font-size: 9px; margin-left: 3px; }
     .draft-message.is-success { color: var(--green); font-weight: 700; }
-    
+    .sample-mode-panel { align-items: center; background: #fff8e8; border: 1px solid #ecd493; border-radius: 9px; display: grid; gap: 12px; grid-template-columns: 1fr auto auto; margin: -10px 0 22px; padding: 12px 14px; }
+    .sample-mode-panel[hidden] { display: none !important; }
+    .sample-mode-copy strong { color: #75520a; display: block; font-size: 10px; }
+    .sample-mode-copy span { color: #806c3e; display: block; font-size: 8px; line-height: 1.5; margin-top: 2px; }
+    .sample-mode-panel .secondary-button,
+    .sample-mode-panel .primary-button { min-height: 32px; white-space: nowrap; }
+
     .form-section { border-bottom: 1px solid var(--soft-line); }
     .form-section:first-of-type { border-top: 1px solid var(--soft-line); }
     .form-section summary { align-items: center; cursor: pointer; display: grid; gap: 13px; grid-template-columns: 29px 1fr 18px; list-style: none; padding: 20px 2px; }
@@ -168,7 +174,7 @@
     .form-section[open] summary svg { transform: rotate(180deg); }
     .section-number { align-items: center; background: var(--blue-soft); border-radius: 7px; color: var(--blue); display: flex; font-size: 9px; font-weight: 800; height: 29px; justify-content: center; }
     .section-content { display: grid; gap: 15px; padding: 2px 2px 24px 44px; }
-    
+
     .photo-and-name { display: grid; gap: 18px; grid-template-columns: 94px 1fr; }
     .photo-control { align-items: center; display: flex; flex-direction: column; gap: 7px; }
     .photo-thumbnail { align-items: center; background: #f1f4f7; border: 1px dashed #bcc6d2; border-radius: 6px; color: #8b96a5; display: flex; font-size: 9px; height: 114px; justify-content: center; overflow: hidden; width: 88px; }
@@ -180,7 +186,7 @@
     .two-columns { grid-template-columns: 1fr 1fr; }
     .three-columns { grid-template-columns: 1.2fr .8fr 1.2fr; }
     .postal-grid { grid-template-columns: .8fr 1.6fr; }
-    
+
     .input-field { display: block; min-width: 0; }
     .input-field > span { color: #526076; display: block; font-size: 9px; font-weight: 750; margin: 0 0 6px 1px; }
     .input-field em { color: var(--blue); font-size: 8px; font-style: normal; margin-left: 4px; }
@@ -206,7 +212,7 @@
     .input-field select:focus,
     .input-field textarea:focus { border-color: #6b91ec; box-shadow: 0 0 0 3px rgba(36, 87, 214, .09); }
     .field-help { color: var(--muted); display: block; font-size: 8px; margin-top: 4px; }
-    
+
     .list-heading { align-items: center; display: flex; justify-content: space-between; }
     .list-heading strong { font-size: 11px; }
     .list-heading.has-divider { border-top: 1px dashed #dfe4ea; margin-top: 8px; padding-top: 20px; }
@@ -220,17 +226,17 @@
     .compact-field input { font-size: 11px; height: 36px; padding: 8px 9px; }
     .remove-row-button { background: #f7f8fa; border: 1px solid #d9dfe6; border-radius: 6px; color: #7c8795; height: 30px; margin-bottom: 3px; width: 28px; }
     .empty-list { background: var(--soft-surface); border: 1px dashed #d7dde5; border-radius: 7px; color: var(--muted); font-size: 9px; padding: 14px; text-align: center; }
-    
+
     .career-list { display: grid; gap: 14px; }
     .career-editor-item { background: #fbfcfd; border: 1px solid #dce2e8; border-radius: 9px; display: grid; gap: 13px; padding: 15px; }
     .career-item-header { align-items: center; border-bottom: 1px solid #e6eaef; display: flex; justify-content: space-between; padding-bottom: 11px; }
     .career-item-header strong { font-size: 11px; }
     .remove-career-button { background: none; border: 0; color: var(--danger); font-size: 9px; }
-    
+
     .editor-footer { align-items: center; display: flex; justify-content: space-between; padding-top: 32px; }
     .editor-footer p { color: #8a94a3; font-size: 8px; margin: 0; max-width: 230px; text-align: right; }
     .danger-text-button { background: none; border: 0; color: var(--danger); font-size: 9px; padding: 0; }
-    
+
     .preview-panel { background: #e9edf2; display: grid; grid-template-rows: 49px 1fr; min-width: 0; overflow: hidden; }
     .preview-toolbar { align-items: center; background: #f8fafc; border-bottom: 1px solid #dce2e8; display: flex; justify-content: space-between; padding: 0 20px; }
     .preview-toolbar > div { align-items: center; display: flex; }
@@ -242,7 +248,7 @@
     .zoom-controls span { border-left: 1px solid #e2e6eb; border-right: 1px solid #e2e6eb; color: #647084; font-size: 8px; margin: 0 !important; min-width: 44px; text-align: center; }
     .preview-scroll { overflow: auto; padding: 30px 34px 64px; }
     .document-preview { margin: 0 auto; transform-origin: top center; transition: transform .2s ease; width: min(100%, 760px); }
-    
+
     .document-page {
       background: #fff;
       box-shadow: var(--shadow);
@@ -254,7 +260,7 @@
       position: relative;
       width: 760px;
     }
-    
+
     .resume-document-title { font-size: 26px; font-weight: 500; letter-spacing: .36em; margin: 0 0 10px; text-align: center; }
     .resume-current-date { font-size: 10px; margin-bottom: 8px; text-align: right; }
     .resume-profile { border: 1px solid #374151; display: grid; grid-template-columns: 1fr 108px; }
@@ -274,7 +280,7 @@
     .resume-contact .paper-label { align-items: center; border-right: 1px solid #6b7280; display: flex; }
     .resume-contact .paper-value { align-items: center; display: flex; }
     .resume-contact .full-contact { grid-column: span 3; }
-    
+
     .paper-section { border: 1px solid #374151; border-top: 0; }
     .paper-table-header,
     .paper-table-row { display: grid; grid-template-columns: 72px 1fr; }
@@ -291,7 +297,7 @@
     .paper-text-section { border: 1px solid #374151; border-top: 0; min-height: 130px; }
     .paper-text-title { background: #f7f7f7; border-bottom: 1px solid #374151; font-size: 10px; padding: 6px 10px; }
     .paper-text-content { font-size: 10px; line-height: 1.9; padding: 12px 14px; white-space: pre-wrap; }
-    
+
     .career-document { font-family: "Yu Gothic", "Hiragino Sans", sans-serif; }
     .career-doc-header { border-bottom: 3px solid #1f3f70; padding-bottom: 14px; }
     .career-doc-header h2 { font-family: "Yu Mincho", serif; font-size: 28px; letter-spacing: .18em; margin: 0 0 12px; }
@@ -310,7 +316,7 @@
     .career-company-grid > div:nth-child(odd) { background: #f8fafc; border-right: 1px solid #cbd2da; font-weight: 700; }
     .career-company-grid > div:nth-last-child(-n+2) { border-bottom: 0; }
     .empty-preview { color: #8a95a4; font-family: sans-serif; font-size: 10px; font-style: italic; }
-    
+
     dialog { background: transparent; border: 0; padding: 0; }
     dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px); }
     .dialog-content { background: #fff; border-radius: 12px; box-shadow: 0 24px 80px rgba(12, 20, 35, .25); max-width: 390px; padding: 28px; text-align: center; }
@@ -318,9 +324,9 @@
     .dialog-content h2 { font-size: 17px; margin: 0 0 9px; }
     .dialog-content p { color: var(--muted); font-size: 11px; line-height: 1.7; margin: 0; }
     .dialog-actions { display: grid; gap: 9px; grid-template-columns: 1fr 1fr; margin-top: 22px; }
-    
+
     @keyframes pulse { 50% { opacity: .35; } }
-    
+
     @media (max-width: 1120px) {
       .app-header { grid-template-columns: auto 1fr auto; }
       .document-switcher { justify-self: center; }
@@ -329,7 +335,7 @@
       .document-page { min-height: 927px; padding: 39px 42px; width: 655px; }
       .profile-name { min-height: 57px !important; }
     }
-    
+
     @media (max-width: 820px) {
       body { overflow: hidden; }
       .app-header { height: 62px; padding: 0 14px; }
@@ -349,7 +355,7 @@
       .document-preview { transform-origin: top left; }
       .document-page { min-height: 842px; padding: 34px 37px; width: 595px; }
     }
-    
+
     @media (max-width: 520px) {
       .brand strong { font-size: 12px; }
       .primary-button { font-size: 10px; min-height: 34px; }
@@ -362,8 +368,9 @@
       .repeating-row { grid-template-columns: 104px 1fr 28px; }
       .editor-footer { align-items: start; flex-direction: column; gap: 14px; }
       .editor-footer p { text-align: left; }
+      .sample-mode-panel { grid-template-columns: 1fr; }
     }
-    
+
     @media print {
       @page { margin: 0; size: A4 portrait; }
       html, body { background: white; height: auto; overflow: visible; }
@@ -372,7 +379,6 @@
       .document-page { box-shadow: none; break-after: page; height: 297mm; margin: 0; min-height: 297mm; overflow: hidden; padding: 14mm 15mm; width: 210mm; }
       .document-page:last-child { break-after: auto; }
     }
-    
   </style>
 </head>
 <body>
@@ -420,6 +426,11 @@
         <button class="secondary-button" id="saveDraftButton" type="button">下書きを保存</button>
         <button class="secondary-button" id="reloadDraftButton" type="button">保存内容を再読込</button>
         <span class="draft-message" id="draftMessage" aria-live="polite">入力内容は自動保存されます</span>
+      </div>
+      <div class="sample-mode-panel" id="sampleModePanel" aria-live="polite" hidden>
+        <div class="sample-mode-copy"><strong>入力例を一時表示しています</strong><span>保存済みの下書きは変更されません。</span></div>
+        <button class="secondary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
+        <button class="primary-button" id="adoptSampleButton" type="button">この例を下書きとして使用</button>
       </div>
 
       <form id="resumeForm" autocomplete="on">
@@ -677,7 +688,7 @@
   <script>
   (() => {
     'use strict';
-  
+
     const STORAGE_KEY = 'resume-studio-data-v1';
     const form = document.getElementById('resumeForm');
     const preview = document.getElementById('documentPreview');
@@ -685,7 +696,7 @@
     const completionBar = document.getElementById('completionBar');
     const completionLabel = document.getElementById('completionLabel');
     const confirmDialog = document.getElementById('confirmDialog');
-  
+
     const defaultData = () => ({
       activeDocument: 'resume',
       photo: '',
@@ -699,7 +710,7 @@
       qualification: [{ date: '', detail: '', url: '' }],
       careers: [{ company: '', role: '', startDate: '', endDate: '', companyInfo: '', responsibilities: '', achievements: '' }]
     });
-  
+
     const sampleData = {
       activeDocument: 'resume',
       photo: '',
@@ -723,8 +734,8 @@
         { date: '', detail: '現在に至る' }
       ],
       qualification: [
-      { date: '2014-08', detail: '普通自動車第一種運転免許 取得', url: '' },
-      { date: '2020-12', detail: 'TOEIC Listening & Reading 850点 取得', url: '' }
+        { date: '2014-08', detail: '普通自動車第一種運転免許 取得', url: '' },
+        { date: '2020-12', detail: 'TOEIC Listening & Reading 850点 取得', url: '' }
       ],
       careers: [{
         company: '株式会社サンプル', role: 'プロダクト企画部 マネージャー', startDate: '2015-04', endDate: '',
@@ -733,18 +744,21 @@
         achievements: '・オンボーディング改善により継続率を18ポイント向上\n・新機能の企画・提供により主要指標を前年比125%へ改善\n・開発プロセスの見直しによりリードタイムを30%短縮'
       }]
     };
-  
+
     let data = loadData();
     let zoom = 1;
     let saveTimer;
     let draftMessageTimer;
     let shouldPersistDraft = hasStoredDraft();
-  
+    let sampleMode = false;
+    let draftBeforeSample = null;
+    let draftBeforeSampleWasStored = false;
+
     function today() {
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
-  
+
     function loadData() {
       try {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -771,9 +785,14 @@
         return false;
       }
     }
-  
+
     function saveData() {
       clearTimeout(saveTimer);
+      if (sampleMode) {
+        saveStatus.classList.remove('is-saving');
+        saveStatus.textContent = '入力例は保存されません';
+        return;
+      }
       shouldPersistDraft = true;
       saveStatus.classList.add('is-saving');
       saveStatus.textContent = '保存中…';
@@ -823,7 +842,65 @@
       hydrateForm();
       showDraftMessage('保存した内容を読み込みました');
     }
-  
+
+    function cloneData(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function setSampleModeUI(active) {
+      document.querySelector('.draft-controls').hidden = active;
+      document.getElementById('sampleModePanel').hidden = !active;
+      document.getElementById('clearButton').hidden = active;
+      const sampleButton = document.getElementById('loadSampleButton');
+      sampleButton.disabled = active;
+      sampleButton.textContent = active ? '入力例を表示中' : '入力例を表示';
+    }
+
+    function enterSampleMode() {
+      clearTimeout(saveTimer);
+      const currentDraft = cloneData(data);
+      const wasStored = shouldPersistDraft;
+      if (wasStored) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(currentDraft));
+        } catch {
+          showDraftMessage('現在の下書きを保護できないため、入力例を表示できません');
+          return;
+        }
+      }
+      draftBeforeSample = currentDraft;
+      draftBeforeSampleWasStored = wasStored;
+      sampleMode = true;
+      data = cloneData(sampleData);
+      setSampleModeUI(true);
+      hydrateForm();
+      saveStatus.classList.remove('is-saving');
+      saveStatus.textContent = '入力例は一時表示です';
+    }
+
+    function restoreDraftFromSample() {
+      if (!sampleMode) return;
+      data = cloneData(draftBeforeSample || defaultData());
+      shouldPersistDraft = draftBeforeSampleWasStored;
+      sampleMode = false;
+      draftBeforeSample = null;
+      setSampleModeUI(false);
+      hydrateForm();
+      saveStatus.textContent = shouldPersistDraft ? 'この端末に保存済み' : '下書きは保存されていません';
+      showDraftMessage('元の下書きに戻りました');
+    }
+
+    function adoptSampleAsDraft() {
+      if (!sampleMode) return;
+      sampleMode = false;
+      draftBeforeSample = null;
+      draftBeforeSampleWasStored = false;
+      setSampleModeUI(false);
+      shouldPersistDraft = true;
+      saveDraftNow();
+      showDraftMessage('入力例を下書きとして保存しました');
+    }
+
     function hydrateForm() {
       Object.entries(data.fields).forEach(([name, value]) => {
         const field = form.elements.namedItem(name);
@@ -834,14 +911,14 @@
       switchDocument(data.activeDocument, false);
       renderPreview();
     }
-  
+
     function renderLists() {
       renderSimpleList('education', 'educationList');
       renderSimpleList('employment', 'employmentList');
       renderSimpleList('qualification', 'qualificationList');
       renderCareerList();
     }
-  
+
     function renderSimpleList(type, containerId) {
       const container = document.getElementById(containerId);
       const items = data[type];
@@ -865,7 +942,7 @@
       container.appendChild(row);
       });
     }
-  
+
     function renderCareerList() {
       const container = document.getElementById('careerList');
       container.innerHTML = '';
@@ -881,14 +958,14 @@
         container.appendChild(item);
       });
     }
-  
+
     function updatePhotoUI() {
       const thumbnail = document.getElementById('photoThumbnail');
       const removeButton = document.getElementById('removePhotoButton');
       thumbnail.innerHTML = data.photo ? `<img src="${data.photo}" alt="証明写真のプレビュー">` : '<span>写真</span>';
       removeButton.hidden = !data.photo;
     }
-  
+
     function switchDocument(documentType, shouldSave = true) {
       data.activeDocument = documentType;
       document.querySelectorAll('.document-tab').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.document === documentType));
@@ -903,7 +980,7 @@
       if (shouldSave) saveData();
       renderPreview();
     }
-  
+
     function onFormInput(event) {
       const target = event.target;
       if (!target.name) return;
@@ -911,7 +988,7 @@
       saveData();
       renderPreview();
     }
-  
+
     function onListInput(event) {
       const field = event.target.closest('[data-key]');
       if (!field) return;
@@ -925,7 +1002,7 @@
       saveData();
       renderPreview();
     }
-  
+
     function addItem(type) {
       if (type === 'career') {
         data.careers.push({ company: '', role: '', startDate: '', endDate: '', companyInfo: '', responsibilities: '', achievements: '' });
@@ -936,7 +1013,7 @@
       saveData();
       renderPreview();
     }
-  
+
     function removeItem(button) {
       const simpleRow = button.closest('.repeating-row');
       const careerItem = button.closest('.career-editor-item');
@@ -946,27 +1023,27 @@
       saveData();
       renderPreview();
     }
-  
+
     function escapeHTML(value = '') {
       return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
     }
-  
+
     function displayText(value, fallback = '') {
       return value ? escapeHTML(value) : `<span class="empty-preview">${escapeHTML(fallback)}</span>`;
     }
-  
+
     function formatMonth(value) {
       if (!value) return '';
       const [year, month] = value.split('-');
       return `${year}年 ${Number(month)}月`;
     }
-  
+
     function formatDate(value) {
       if (!value) return '';
       const [year, month, day] = value.split('-');
       return `${year}年${Number(month)}月${Number(day)}日`;
     }
-  
+
     function calculateAge(birthDate) {
       if (!birthDate) return '';
       const birth = new Date(`${birthDate}T00:00:00`);
@@ -976,7 +1053,7 @@
       if (beforeBirthday) age -= 1;
       return Number.isFinite(age) && age >= 0 ? `${age}歳` : '';
     }
-  
+
     function renderHistoryRows(items, category) {
       const rows = [`<div class="paper-table-row category-row"><div class="paper-table-date"></div><div class="paper-table-detail">${category}</div></div>`];
       items.forEach((item) => {
@@ -984,7 +1061,7 @@
       });
       return rows.join('');
     }
-  
+
     function blankRows(count) {
       return Array.from({ length: count }, () => '<div class="paper-table-row empty-row"><div class="paper-table-date"></div><div class="paper-table-detail"></div></div>').join('');
     }
@@ -996,7 +1073,7 @@
       if (!/^https?:\/\//i.test(url)) return `<span class="qualification-proof">確認URL: ${escapeHTML(label)}</span>`;
       return `<a class="qualification-proof" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">確認URL: ${escapeHTML(label)}</a>`;
     }
-  
+
     function renderResume() {
       const fields = data.fields;
       const age = calculateAge(fields.birthDate);
@@ -1029,14 +1106,14 @@
         <article class="document-page resume-document">
           <section class="paper-section" style="border-top:1px solid #374151">
             <div class="paper-table-header"><div>年月</div><div>免許・資格</div></div>
-              ${data.qualification.map((item) => `<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(formatMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</div></div>`).join('')}
+            ${data.qualification.map((item) => `<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(formatMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</div></div>`).join('')}
             ${blankRows(Math.max(4, 8 - data.qualification.length))}
           </section>
           <section class="paper-text-section"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
           <section class="paper-text-section" style="min-height:145px"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(fields.requests, '貴社規定に従います。')}</div></section>
         </article>`;
     }
-  
+
     function renderCareer() {
       const fields = data.fields;
       const careers = data.careers.map((career) => `
@@ -1049,7 +1126,7 @@
             <div>実績・成果</div><div>${displayText(career.achievements, '実績・成果を入力してください')}</div>
           </div>
         </section>`).join('');
-  
+
       return `
         <article class="document-page career-document">
           <header class="career-doc-header">
@@ -1062,13 +1139,13 @@
           <section class="career-section"><h3 class="career-section-title">自己PR</h3><div class="career-body">${displayText(fields.selfPromotion, '自己PRを入力してください')}</div></section>
         </article>`;
     }
-  
+
     function renderPreview() {
       preview.innerHTML = data.activeDocument === 'resume' ? renderResume() : renderCareer();
       updateCompletion();
       requestAnimationFrame(fitPreviewForViewport);
     }
-  
+
     function updateCompletion() {
       const sharedRequired = [data.fields.fullName, data.fields.birthDate, data.fields.address, data.fields.phone, data.fields.email];
       const documentRequired = data.activeDocument === 'resume'
@@ -1079,7 +1156,7 @@
       completionBar.style.width = `${percentage}%`;
       completionLabel.textContent = `${percentage}% 完了`;
     }
-  
+
     function fitPreviewForViewport() {
       if (window.innerWidth > 820) {
         const availableWidth = document.getElementById('previewScroll').clientWidth - 68;
@@ -1092,7 +1169,7 @@
       }
       applyZoom();
     }
-  
+
     function applyZoom() {
       preview.style.transform = `scale(${zoom})`;
       document.getElementById('zoomLabel').textContent = `${Math.round(zoom * 100)}%`;
@@ -1101,7 +1178,7 @@
       preview.parentElement.style.setProperty('--scaled-height', `${naturalHeight * zoom}px`);
       preview.style.marginBottom = `${Math.min(0, naturalHeight * (zoom - 1))}px`;
     }
-  
+
     async function handlePhoto(file) {
       if (!file) return;
       if (!file.type.startsWith('image/')) return;
@@ -1125,7 +1202,7 @@
       saveData();
       renderPreview();
     }
-  
+
     function loadImage(file) {
       return new Promise((resolve, reject) => {
         const image = new Image();
@@ -1134,13 +1211,13 @@
         image.src = URL.createObjectURL(file);
       });
     }
-  
+
     form.addEventListener('input', onFormInput);
     document.getElementById('educationList').addEventListener('input', onListInput);
     document.getElementById('employmentList').addEventListener('input', onListInput);
     document.getElementById('qualificationList').addEventListener('input', onListInput);
     document.getElementById('careerList').addEventListener('input', onListInput);
-  
+
     document.addEventListener('click', (event) => {
       const documentTab = event.target.closest('[data-document]');
       const addButton = event.target.closest('[data-add]');
@@ -1155,7 +1232,7 @@
         if (mobileViewButton.dataset.mobileView === 'preview') requestAnimationFrame(fitPreviewForViewport);
       }
     });
-  
+
     document.getElementById('photoInput').addEventListener('change', (event) => handlePhoto(event.target.files[0]));
     document.getElementById('removePhotoButton').addEventListener('click', () => {
       data.photo = '';
@@ -1164,16 +1241,14 @@
       saveData();
       renderPreview();
     });
-  
-    document.getElementById('loadSampleButton').addEventListener('click', () => {
-      data = JSON.parse(JSON.stringify(sampleData));
-      hydrateForm();
-      saveData();
-    });
+
+    document.getElementById('loadSampleButton').addEventListener('click', enterSampleMode);
+    document.getElementById('restoreDraftButton').addEventListener('click', restoreDraftFromSample);
+    document.getElementById('adoptSampleButton').addEventListener('click', adoptSampleAsDraft);
 
     document.getElementById('saveDraftButton').addEventListener('click', saveDraftNow);
     document.getElementById('reloadDraftButton').addEventListener('click', reloadDraft);
-  
+
     document.getElementById('clearButton').addEventListener('click', () => confirmDialog.showModal());
     document.getElementById('confirmClearButton').addEventListener('click', () => {
       clearTimeout(saveTimer);
@@ -1189,20 +1264,19 @@
         showDraftMessage('下書きデータを削除できませんでした');
       }
     });
-  
+
     document.getElementById('printButton').addEventListener('click', () => window.print());
     document.getElementById('zoomOutButton').addEventListener('click', () => { zoom = Math.max(.4, zoom - .1); applyZoom(); });
     document.getElementById('zoomInButton').addEventListener('click', () => { zoom = Math.min(1.2, zoom + .1); applyZoom(); });
     window.addEventListener('resize', fitPreviewForViewport);
     window.addEventListener('pagehide', () => {
       clearTimeout(saveTimer);
-      if (!shouldPersistDraft) return;
+      if (sampleMode || !shouldPersistDraft) return;
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* 保存容量超過時は既存データを維持 */ }
     });
 
     hydrateForm();
   })();
-  
   </script>
 </body>
 </html>
