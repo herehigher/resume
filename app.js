@@ -14,7 +14,7 @@
     photo: '',
     fields: {
       fullName: '', nameKana: '', birthDate: '', gender: '', createdDate: today(),
-      postalCode: '', addressKana: '', address: '', phone: '', email: '', github: '',
+      postalCode: '', addressKana: '', address: '', phone: '', email: '', github: '', linkedin: '', portfolio: '',
       motivation: '', requests: '', careerSummary: '', skills: '', selfPromotion: ''
     },
     education: [{ date: '', detail: '' }],
@@ -29,7 +29,8 @@
     fields: {
       fullName: '山田 太郎', nameKana: 'やまだ たろう', birthDate: '1992-04-15', gender: '', createdDate: today(),
       postalCode: '100-0001', addressKana: 'とうきょうとちよだくちよだ', address: '東京都千代田区千代田1-1',
-      phone: '090-1234-5678', email: 'taro.yamada@example.jp', github: 'https://github.com/taro-yamada',
+      phone: '090-1234-5678', email: 'taro.yamada@example.jp',
+      github: 'https://github.com/taro-yamada', linkedin: 'https://www.linkedin.com/in/taro-yamada', portfolio: 'https://example.com',
       motivation: 'これまで培った企画力とチームでのプロジェクト推進経験を活かし、貴社のサービス成長に貢献したいと考え志望いたしました。顧客の声とデータの双方から課題を整理し、関係者と合意形成しながら改善を進めることを得意としています。',
       requests: '貴社規定に従います。',
       careerSummary: '大学卒業後、ITサービス企業にて法人向けプロダクトの企画・運営に従事してきました。顧客課題の分析、要件定義、開発チームとの連携、リリース後の改善まで一貫して担当しています。直近では5名のチームをリードし、主要指標を前年比125%まで改善しました。',
@@ -386,6 +387,35 @@
     return `<a class="qualification-proof" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">確認URL: ${escapeHTML(label)}</a>`;
   }
 
+  function profileLink(label, value, className, includeLabel = false) {
+    if (!value) return '';
+    const url = String(value).trim();
+    const displayUrl = url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    const linkText = `${includeLabel ? `${escapeHTML(label)}: ` : ''}${escapeHTML(displayUrl)}`;
+    if (!/^https?:\/\//i.test(url)) return `<span class="${className}">${linkText}</span>`;
+    return `<a class="${className}" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+  }
+
+  function renderResumeProfiles(fields) {
+    const profiles = [
+      ['GitHub', fields.github],
+      ['LinkedIn', fields.linkedin],
+      ['Portfolio', fields.portfolio]
+    ].filter(([, value]) => value);
+    if (!profiles.length) return '';
+    const rows = profiles.map(([label, value]) => `<div class="resume-online-row"><span class="paper-label">${label}</span>${profileLink(label, value, 'profile-url-link')}</div>`).join('');
+    return `<section class="resume-online-profiles"><div class="resume-online-title">オンラインプロフィール</div>${rows}</section>`;
+  }
+
+  function renderCareerProfiles(fields) {
+    const links = [
+      ['GitHub', fields.github],
+      ['LinkedIn', fields.linkedin],
+      ['Portfolio', fields.portfolio]
+    ].map(([label, value]) => profileLink(label, value, 'career-profile-link', true)).filter(Boolean);
+    return links.length ? `<div class="career-profile-links">${links.join('')}</div>` : '';
+  }
+
   function renderResume() {
     const fields = data.fields;
     const age = calculateAge(fields.birthDate);
@@ -406,8 +436,8 @@
           <div><span class="paper-label">ふりがな</span><span class="paper-value full-contact">${displayText(fields.addressKana)}</span></div>
           <div><span class="paper-label">現住所</span><span class="paper-value full-contact">${fields.postalCode ? `〒${escapeHTML(fields.postalCode)}　` : ''}${displayText(fields.address)}</span></div>
           <div><span class="paper-label">電話</span><span class="paper-value">${displayText(fields.phone)}</span><span class="paper-label">E-mail</span><span class="paper-value">${displayText(fields.email)}</span></div>
-          <div><span class="paper-label">GitHub</span><span class="paper-value full-contact">${displayText(fields.github)}</span></div>
         </section>
+        ${renderResumeProfiles(fields)}
         <section class="paper-section">
           <div class="paper-table-header"><div>年月</div><div>学歴・職歴</div></div>
           ${renderHistoryRows(data.education, '学歴')}
@@ -444,6 +474,7 @@
         <header class="career-doc-header">
           <h2>職務経歴書</h2>
           <div class="career-doc-meta">${displayText(formatDate(fields.createdDate), '作成日')}<br>${displayText(fields.fullName, '氏名未入力')}</div>
+          ${renderCareerProfiles(fields)}
         </header>
         <section class="career-section"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>
         <section class="career-section"><h3 class="career-section-title">活かせる経験・知識・技術</h3><div class="career-body">${displayText(fields.skills, '経験・知識・技術を入力してください')}</div></section>

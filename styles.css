@@ -271,6 +271,12 @@ button { cursor: pointer; }
 .resume-contact .paper-label { align-items: center; border-right: 1px solid #6b7280; display: flex; }
 .resume-contact .paper-value { align-items: center; display: flex; }
 .resume-contact .full-contact { grid-column: span 3; }
+.resume-online-profiles { border: 1px solid #374151; border-top: 0; }
+.resume-online-title { background: #f7f7f7; border-bottom: 1px solid #6b7280; font-size: 9px; padding: 6px 10px; }
+.resume-online-row { border-bottom: 1px solid #9ca3af; display: grid; grid-template-columns: 86px 1fr; min-height: 27px; }
+.resume-online-row:last-child { border-bottom: 0; }
+.resume-online-row .paper-label { align-items: center; border-right: 1px solid #9ca3af; display: flex; }
+.profile-url-link { align-items: center; color: #2457a2; display: flex; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 7.5px; line-height: 1.4; overflow-wrap: anywhere; padding: 5px 10px; text-decoration: underline; word-break: break-all; }
 
 .paper-section { border: 1px solid #374151; border-top: 0; }
 .paper-table-header,
@@ -293,6 +299,8 @@ button { cursor: pointer; }
 .career-doc-header { border-bottom: 3px solid #1f3f70; padding-bottom: 14px; }
 .career-doc-header h2 { font-family: "Yu Mincho", serif; font-size: 28px; letter-spacing: .18em; margin: 0 0 12px; }
 .career-doc-meta { font-size: 10px; line-height: 1.7; text-align: right; }
+.career-profile-links { display: flex; flex-wrap: wrap; gap: 5px 12px; justify-content: flex-end; margin-top: 6px; }
+.career-profile-links a { color: #2457a2; font-size: 7.5px; overflow-wrap: anywhere; text-decoration: underline; word-break: break-all; }
 .career-section { margin-top: 26px; }
 .career-section-title { align-items: center; border-bottom: 1px solid #9ba9bb; display: flex; font-size: 14px; gap: 9px; margin: 0 0 11px; padding-bottom: 7px; }
 .career-section-title::before { background: #2457a2; content: ""; display: block; height: 18px; width: 4px; }

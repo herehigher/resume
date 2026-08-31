@@ -280,6 +280,12 @@
     .resume-contact .paper-label { align-items: center; border-right: 1px solid #6b7280; display: flex; }
     .resume-contact .paper-value { align-items: center; display: flex; }
     .resume-contact .full-contact { grid-column: span 3; }
+    .resume-online-profiles { border: 1px solid #374151; border-top: 0; }
+    .resume-online-title { background: #f7f7f7; border-bottom: 1px solid #6b7280; font-size: 9px; padding: 6px 10px; }
+    .resume-online-row { border-bottom: 1px solid #9ca3af; display: grid; grid-template-columns: 86px 1fr; min-height: 27px; }
+    .resume-online-row:last-child { border-bottom: 0; }
+    .resume-online-row .paper-label { align-items: center; border-right: 1px solid #9ca3af; display: flex; }
+    .profile-url-link { align-items: center; color: #2457a2; display: flex; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 7.5px; line-height: 1.4; overflow-wrap: anywhere; padding: 5px 10px; text-decoration: underline; word-break: break-all; }
 
     .paper-section { border: 1px solid #374151; border-top: 0; }
     .paper-table-header,
@@ -302,6 +308,8 @@
     .career-doc-header { border-bottom: 3px solid #1f3f70; padding-bottom: 14px; }
     .career-doc-header h2 { font-family: "Yu Mincho", serif; font-size: 28px; letter-spacing: .18em; margin: 0 0 12px; }
     .career-doc-meta { font-size: 10px; line-height: 1.7; text-align: right; }
+    .career-profile-links { display: flex; flex-wrap: wrap; gap: 5px 12px; justify-content: flex-end; margin-top: 6px; }
+    .career-profile-links a { color: #2457a2; font-size: 7.5px; overflow-wrap: anywhere; text-decoration: underline; word-break: break-all; }
     .career-section { margin-top: 26px; }
     .career-section-title { align-items: center; border-bottom: 1px solid #9ba9bb; display: flex; font-size: 14px; gap: 9px; margin: 0 0 11px; padding-bottom: 7px; }
     .career-section-title::before { background: #2457a2; content: ""; display: block; height: 18px; width: 4px; }
@@ -513,9 +521,27 @@
                   <input name="email" type="email" autocomplete="email" placeholder="name@example.jp">
                 </label>
               </div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span class="section-number">03</span>
+              <span><strong>オンラインプロフィール</strong><small>GitHub・LinkedIn・ポートフォリオ</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
               <label class="input-field">
                 <span>GitHub URL</span>
                 <input name="github" type="url" autocomplete="url" inputmode="url" placeholder="https://github.com/username">
+              </label>
+              <label class="input-field">
+                <span>LinkedIn URL</span>
+                <input name="linkedin" type="url" autocomplete="url" inputmode="url" placeholder="https://www.linkedin.com/in/username">
+              </label>
+              <label class="input-field">
+                <span>ポートフォリオ URL</span>
+                <input name="portfolio" type="url" autocomplete="url" inputmode="url" placeholder="https://example.com">
               </label>
             </div>
           </details>
@@ -524,7 +550,7 @@
         <div id="resumeFields">
           <details class="form-section" open>
             <summary>
-              <span class="section-number">03</span>
+              <span class="section-number">04</span>
               <span><strong>学歴・職歴</strong><small>古いものから順に入力</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
@@ -538,7 +564,7 @@
 
           <details class="form-section">
             <summary>
-              <span class="section-number">04</span>
+              <span class="section-number">05</span>
               <span><strong>免許・資格</strong><small>取得年月と正式名称</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
@@ -550,7 +576,7 @@
 
           <details class="form-section">
             <summary>
-              <span class="section-number">05</span>
+              <span class="section-number">06</span>
               <span><strong>志望動機・本人希望</strong><small>応募先に合わせて調整</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
@@ -570,7 +596,7 @@
         <div id="careerFields" hidden>
           <details class="form-section" open>
             <summary>
-              <span class="section-number">03</span>
+              <span class="section-number">04</span>
               <span><strong>職務要約・スキル</strong><small>経験の全体像を簡潔に</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
@@ -588,7 +614,7 @@
 
           <details class="form-section" open>
             <summary>
-              <span class="section-number">04</span>
+              <span class="section-number">05</span>
               <span><strong>職務経歴</strong><small>会社ごとに担当業務と実績を入力</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
@@ -600,7 +626,7 @@
 
           <details class="form-section">
             <summary>
-              <span class="section-number">05</span>
+              <span class="section-number">06</span>
               <span><strong>自己PR</strong><small>強みを具体的な経験で伝える</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
@@ -702,7 +728,7 @@
       photo: '',
       fields: {
         fullName: '', nameKana: '', birthDate: '', gender: '', createdDate: today(),
-        postalCode: '', addressKana: '', address: '', phone: '', email: '', github: '',
+        postalCode: '', addressKana: '', address: '', phone: '', email: '', github: '', linkedin: '', portfolio: '',
         motivation: '', requests: '', careerSummary: '', skills: '', selfPromotion: ''
       },
       education: [{ date: '', detail: '' }],
@@ -717,7 +743,8 @@
       fields: {
         fullName: '山田 太郎', nameKana: 'やまだ たろう', birthDate: '1992-04-15', gender: '', createdDate: today(),
         postalCode: '100-0001', addressKana: 'とうきょうとちよだくちよだ', address: '東京都千代田区千代田1-1',
-        phone: '090-1234-5678', email: 'taro.yamada@example.jp', github: 'https://github.com/taro-yamada',
+        phone: '090-1234-5678', email: 'taro.yamada@example.jp',
+        github: 'https://github.com/taro-yamada', linkedin: 'https://www.linkedin.com/in/taro-yamada', portfolio: 'https://example.com',
         motivation: 'これまで培った企画力とチームでのプロジェクト推進経験を活かし、貴社のサービス成長に貢献したいと考え志望いたしました。顧客の声とデータの双方から課題を整理し、関係者と合意形成しながら改善を進めることを得意としています。',
         requests: '貴社規定に従います。',
         careerSummary: '大学卒業後、ITサービス企業にて法人向けプロダクトの企画・運営に従事してきました。顧客課題の分析、要件定義、開発チームとの連携、リリース後の改善まで一貫して担当しています。直近では5名のチームをリードし、主要指標を前年比125%まで改善しました。',
@@ -1074,6 +1101,35 @@
       return `<a class="qualification-proof" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">確認URL: ${escapeHTML(label)}</a>`;
     }
 
+    function profileLink(label, value, className, includeLabel = false) {
+      if (!value) return '';
+      const url = String(value).trim();
+      const displayUrl = url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      const linkText = `${includeLabel ? `${escapeHTML(label)}: ` : ''}${escapeHTML(displayUrl)}`;
+      if (!/^https?:\/\//i.test(url)) return `<span class="${className}">${linkText}</span>`;
+      return `<a class="${className}" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+    }
+
+    function renderResumeProfiles(fields) {
+      const profiles = [
+        ['GitHub', fields.github],
+        ['LinkedIn', fields.linkedin],
+        ['Portfolio', fields.portfolio]
+      ].filter(([, value]) => value);
+      if (!profiles.length) return '';
+      const rows = profiles.map(([label, value]) => `<div class="resume-online-row"><span class="paper-label">${label}</span>${profileLink(label, value, 'profile-url-link')}</div>`).join('');
+      return `<section class="resume-online-profiles"><div class="resume-online-title">オンラインプロフィール</div>${rows}</section>`;
+    }
+
+    function renderCareerProfiles(fields) {
+      const links = [
+        ['GitHub', fields.github],
+        ['LinkedIn', fields.linkedin],
+        ['Portfolio', fields.portfolio]
+      ].map(([label, value]) => profileLink(label, value, 'career-profile-link', true)).filter(Boolean);
+      return links.length ? `<div class="career-profile-links">${links.join('')}</div>` : '';
+    }
+
     function renderResume() {
       const fields = data.fields;
       const age = calculateAge(fields.birthDate);
@@ -1094,8 +1150,8 @@
             <div><span class="paper-label">ふりがな</span><span class="paper-value full-contact">${displayText(fields.addressKana)}</span></div>
             <div><span class="paper-label">現住所</span><span class="paper-value full-contact">${fields.postalCode ? `〒${escapeHTML(fields.postalCode)}　` : ''}${displayText(fields.address)}</span></div>
             <div><span class="paper-label">電話</span><span class="paper-value">${displayText(fields.phone)}</span><span class="paper-label">E-mail</span><span class="paper-value">${displayText(fields.email)}</span></div>
-            <div><span class="paper-label">GitHub</span><span class="paper-value full-contact">${displayText(fields.github)}</span></div>
           </section>
+          ${renderResumeProfiles(fields)}
           <section class="paper-section">
             <div class="paper-table-header"><div>年月</div><div>学歴・職歴</div></div>
             ${renderHistoryRows(data.education, '学歴')}
@@ -1132,6 +1188,7 @@
           <header class="career-doc-header">
             <h2>職務経歴書</h2>
             <div class="career-doc-meta">${displayText(formatDate(fields.createdDate), '作成日')}<br>${displayText(fields.fullName, '氏名未入力')}</div>
+            ${renderCareerProfiles(fields)}
           </header>
           <section class="career-section"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>
           <section class="career-section"><h3 class="career-section-title">活かせる経験・知識・技術</h3><div class="career-body">${displayText(fields.skills, '経験・知識・技術を入力してください')}</div></section>
