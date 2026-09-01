@@ -18,7 +18,8 @@ const markdownFiles = [
   'CHANGELOG.md',
   'CONTRIBUTING.md',
   'docs/acceptance-checklist.md',
-  'docs/development-guide.md'
+  'docs/development-guide.md',
+  'docs/release-playbook.md'
 ];
 const requiredFiles = [
   ...markdownFiles,
@@ -52,6 +53,10 @@ function fragmentsIn(markdown) {
 function markdownTargets(markdown) {
   return [...markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g)]
     .map((match) => match[1]);
+}
+
+function literalPattern(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function collectFiles(directory) {
@@ -246,32 +251,88 @@ test('development docs cover localized public entry and machine-readable contrac
   assert.equal(hasAcceptanceItem('Public entry', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
 });
 
-test('release docs cover the tag-only v0.1.0 deployment and recovery contract', () => {
+test('release playbook is canonical and covers publication, evidence, and recovery decisions', () => {
   const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
   const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
+  const contributing = readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8');
+  const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
+  const headings = [...playbook.matchAll(/^##\s+(.+)$/gm)].map((match) => match[1]);
 
-  for (const fact of [
-    '.github/workflows/ci.yml',
-    'vMAJOR.MINOR.PATCH',
-    'v0.1.0 release 手順',
-    'npm run test:acceptance',
-    'main` push では Pages deployment は開始されません',
-    'workflow_dispatch',
-    'deploy 済みだが未受入',
-    'https://herehigher.github.io/resume/',
-    'docs-only follow-up Pull Request'
-  ]) assert.match(guide, new RegExp(fact.replaceAll('.', '\\.')));
+  for (const heading of [
+    '権限と release gate',
+    'RC freeze と screenshot の時点',
+    'Preflight inputs と local gate',
+    'Pull Request、Quality、merge',
+    '初回 Pages と HTTPS 設定',
+    'Annotated immutable tag の作成と push',
+    'Actions の監視と online acceptance',
+    'Evidence 記録 template',
+    'Existing tag の manual redeploy / rollback',
+    '失敗時の判断',
+    '初回成功後の README と Issue close',
+    'English summary'
+  ]) assert.ok(headings.includes(heading), `release playbook is missing ${heading}`);
 
-  for (const fact of [
-    'Source が `GitHub Actions`',
-    'Enforce HTTPS',
-    'Quality / quality',
-    'site/` だけ',
-    'github-pages` environment',
-    'workflow_dispatch',
-    'v0.1.0',
-    'deploy 済み・未受入'
-  ]) assert.match(acceptance, new RegExp(fact.replaceAll('.', '\\.')));
+  assert.match(guide, /\[Version release playbook\]\(release-playbook\.md\).*canonical/);
+  assert.match(acceptance, /\[Version release playbook\]\(release-playbook\.md\)/);
+  assert.match(contributing, /\[Version release playbook\]\(docs\/release-playbook\.md\)/);
+
+  for (const contract of [
+    /owner の明示承認.*Public release|Public release.*owner の明示承認/s,
+    /安定版 `vMAJOR\.MINOR\.PATCH`.*leading zero.*prerelease.*build metadata/s,
+    /version を含むすべての画面内容を確定した.*merge と tag の前.*npm run generate:docs/s,
+    /生成後に `site\/` または public sample が変わった場合は再生成します/,
+    /Workflow \/ Markdown だけの変更では再生成しません/,
+    /`CHANGELOG\.md` の `Unreleased` から `## \[<RELEASE_VERSION>\] - <RELEASE_DATE>`.*release date を確定/s,
+    /`package\.json`、`site\/assets\/js\/config\.js` の `APP_VERSION`、`CHANGELOG\.md`.*同じ `<RELEASE_VERSION>`/s,
+    /npm run test:acceptance/,
+    /git diff --check origin\/main\.\.\.HEAD/,
+    /working tree.*committed Pull Request range/s,
+    /通常の `main` push では Pages deployment が起動しない/,
+    /Source を `GitHub Actions`.*`Enforce HTTPS`/s,
+    /git tag --annotate '<RELEASE_TAG>' '<RELEASE_SHA>'/,
+    /git push origin 'refs\/tags\/<RELEASE_TAG>:refs\/tags\/<RELEASE_TAG>'/,
+    /validate → quality → artifact → deploy → smoke/,
+    /Smoke failure は deploy 後の未受入状態/,
+    /gh workflow run deploy-pages\.yml --ref main --field release_tag='<EXISTING_RELEASE_TAG>'/,
+    /Tag は immutable.*移動・上書き・削除しない/s,
+    /docs-only follow-up Pull Request.*Issue を close/s
+  ]) assert.match(playbook, contract);
+
+  for (const evidenceField of [
+    'Release commit (full SHA)',
+    'Owner approval',
+    'Quality on PR / main',
+    'Working tree `git diff --check`',
+    'Committed PR range `git diff --check origin/main...HEAD`',
+    'Version consistency (`package.json` / `APP_VERSION` / `CHANGELOG.md`)',
+    'CHANGELOG release notes / date',
+    'Screenshot / PDF source SHA',
+    'Pages Source / custom domain / HTTPS',
+    'Deploy workflow',
+    'Online smoke / manual browser',
+    'Final decision'
+  ]) assert.match(playbook, new RegExp(literalPattern(evidenceField)));
+
+  for (const failureStage of [
+    'Pre-deploy / RC gate',
+    'Validate',
+    'Quality',
+    'Artifact',
+    'Deploy',
+    'Post-deploy smoke',
+    'HTTP 200 だが stale CDN content',
+    '同一 origin の content defect'
+  ]) assert.match(playbook, new RegExp(`\\| ${literalPattern(failureStage)} \\|`));
+
+  assert.match(playbook, /`<RELEASE_VERSION>`.*`<RELEASE_DATE>`.*`<RELEASE_TAG>`.*`<RELEASE_SHA>`/s);
+  assert.match(playbook, /`<` または `>` が残る command は実行しません/);
+  assert.ok(
+    playbook.indexOf('git fetch --tags origin main') < playbook.indexOf('git diff --check origin/main...HEAD'),
+    'the committed range check must follow the base fetch'
+  );
+  assert.doesNotMatch(playbook, /一度だけ `npm run generate:docs`/);
+  assert.doesNotMatch(playbook, /gh[pousr]_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|Authorization:\s*Bearer/i);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {

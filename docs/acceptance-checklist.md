@@ -1,6 +1,6 @@
 # v0.1 リリース受入チェックリスト / Release acceptance checklist
 
-自動テストで検出しにくい文字切れ、改ページ、印刷ダイアログ差異を、リリース候補ごとに確認する。個人情報を含む実データは使用せず、テスト用データのみで実施する。
+自動テストで検出しにくい文字切れ、改ページ、印刷ダイアログ差異を、リリース候補ごとに確認する。個人情報を含む実データは使用せず、テスト用データのみで実施する。Version 公開の実行順と証拠 template は [Version release playbook](release-playbook.md) に従う。
 
 ## 自動ゲート
 
@@ -15,6 +15,8 @@
 - Playwright が JavaScript 無効時の public entry と、document tab の `aria-selected` / roving tabindex、三言語 mobile switch の `aria-pressed` を検証する。
 
 ## 初回 Pages / HTTPS 設定
+
+設定と tag 操作の直前確認、Actions 監視、manual redeploy / rollback は [release playbook](release-playbook.md) を使用する。
 
 - [ ] Repository の `Settings` → `Pages` で Source が `GitHub Actions` になっている。
 - [ ] Custom domain を使用しないことと、production URL が `https://herehigher.github.io/resume/` であることを確認した。
@@ -74,4 +76,4 @@ Smoke が失敗した場合、deployment 自体は完了しているため「dep
 
 ## 判定記録
 
-リリース候補の commit SHA、確認日、確認者、OS / Chrome バージョン、各項目の結果、既知の差異と関連issueをPRへ記録する。未確認項目がある場合は理由と影響範囲を明記し、リリース可否を判断する。
+リリース候補の commit SHA、確認日、確認者、OS / Chrome バージョン、各項目の結果、既知の差異と関連issueをPRへ記録する。未確認項目がある場合は理由と影響範囲を明記し、リリース可否を判断する。[Release evidence template](release-playbook.md#evidence-記録-template) の各 field を実値または `該当なし` で埋める。

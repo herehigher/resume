@@ -44,5 +44,6 @@ Issue には再現手順、期待結果、実際の結果、browser/OS を記載
 - Review comment: 必要な technical comment は English を主にしてよい。
 - Secret、credential、access token、実在する履歴書 data を commit しない。標準 Cloudflare Web Analytics の公開 site token は credential ではなく、上記の限定的な analytics 例外に限り commit できる。
 - Public release、tag、Pages 設定、repository visibility の変更は、owner の明示承認なしに行わない。
+- Owner の承認を得た version 公開は [Version release playbook](docs/release-playbook.md) の preflight、gate、証拠記録、失敗時判断に従う。
 
 提出した contribution は [MIT License](LICENSE) の下で配布されます。
