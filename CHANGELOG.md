@@ -6,6 +6,8 @@ English: This file records notable changes. Release dates are added only when th
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-01
+
 ### Added / 追加
 
 - 日本語の履歴書・職務経歴書 editor と A4 template。
@@ -16,6 +18,7 @@ English: This file records notable changes. Release dates are added only when th
 - Desktop/mobile workflow、PDF pagination、network guard の acceptance tests。
 - 三言語 README、privacy、contribution guide、MIT License、reproducible screenshot/PDF samples。
 - 右下の GitHub source link、app version、三言語 Privacy & Security dialog。 / Added a source link, app version, and tri-lingual privacy dialog.
+- Issue #9: stable SemVer tag によってのみ起動する GitHub Pages production deployment、既存 tag の manual redeploy / rollback、version release playbook。
 
 ### Security / Privacy
 

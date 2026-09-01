@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -251,6 +261,38 @@ test('development docs cover localized public entry and machine-readable contrac
   assert.equal(hasAcceptanceItem('Public entry', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
 });
 
+test('v0.1.0 changelog freezes the dated release without losing release notes', () => {
+  const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  const unreleased = '## [Unreleased]';
+  const release = '## [0.1.0] - 2026-09-01';
+  const unreleasedIndex = changelog.indexOf(unreleased);
+  const releaseIndex = changelog.indexOf(release);
+
+  assert.ok(unreleasedIndex >= 0);
+  assert.ok(releaseIndex > unreleasedIndex, 'Unreleased must remain before the latest release');
+  assert.equal(changelog.slice(unreleasedIndex + unreleased.length, releaseIndex).trim(), '');
+  assert.equal((changelog.match(/^## \[0\.1\.0\] - 2026-09-01$/gm) || []).length, 1);
+
+  const releaseNotes = changelog.slice(releaseIndex + release.length);
+  assert.match(releaseNotes, /### Added \/ 追加/);
+  assert.match(releaseNotes, /### Security \/ Privacy/);
+  for (const fact of [
+    '日本語の履歴書・職務経歴書',
+    '简体中文 resume editor',
+    'English ATS-friendly resume',
+    '三言語で共有する profile',
+    'Profile URL の protocol 制限',
+    'Desktop/mobile workflow',
+    'reproducible screenshot/PDF samples',
+    'GitHub source link',
+    'Issue #9',
+    'stable SemVer tag によってのみ起動する GitHub Pages production deployment',
+    'version release playbook',
+    '集計 page view / performance 計測',
+    'standard, cookie-free Cloudflare Web Analytics'
+  ]) assert.match(releaseNotes, new RegExp(literalPattern(fact)));
+});
+
 test('release playbook is canonical and covers publication, evidence, and recovery decisions', () => {
   const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
   const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
@@ -289,12 +331,23 @@ test('release playbook is canonical and covers publication, evidence, and recove
     /git diff --check origin\/main\.\.\.HEAD/,
     /working tree.*committed Pull Request range/s,
     /通常の `main` push では Pages deployment が起動しない/,
+    /gh pr view "\$pr_number" --repo herehigher\/resume.*mergeCommit/s,
+    /reviewed merge commit.*pinned merge SHA/s,
+    /gh run list --repo herehigher\/resume --workflow ci\.yml.*--commit "\$release_sha".*--status success/s,
+    /gh run view "\$quality_run_id".*\.name == "quality".*\.conclusion == "success"/s,
+    /main` push の `Quality` run が成功/s,
     /Source を `GitHub Actions`.*`Enforce HTTPS`/s,
-    /git tag --annotate '<RELEASE_TAG>' '<RELEASE_SHA>'/,
-    /git push origin 'refs\/tags\/<RELEASE_TAG>:refs\/tags\/<RELEASE_TAG>'/,
+    /if ! remote_tag_result="\$\(git ls-remote --tags origin/,
+    /test -z "\$remote_tag_result".*Release tag already exists remotely/s,
+    /local_tag_status.*-eq 1/s,
+    /package_json="\$\(git show.*"\$\{release_sha}:package\.json"\)"/s,
+    /\^v\(0\|\[1-9\]\\d\*\).*expected_tag/s,
+    /test "\$release_tag" = "\$expected_tag".*does not exactly match/s,
+    /git tag --annotate "\$release_tag" "\$release_sha"/,
+    /git push origin "refs\/tags\/\$\{release_tag}:refs\/tags\/\$\{release_tag}"/,
     /validate → quality → artifact → deploy → smoke/,
     /Smoke failure は deploy 後の未受入状態/,
-    /gh workflow run deploy-pages\.yml --ref main --field release_tag='<EXISTING_RELEASE_TAG>'/,
+    /gh workflow run deploy-pages\.yml --ref main --field "release_tag=\$\{existing_tag}"/,
     /Tag は immutable.*移動・上書き・削除しない/s,
     /docs-only follow-up Pull Request.*Issue を close/s
   ]) assert.match(playbook, contract);
@@ -302,7 +355,9 @@ test('release playbook is canonical and covers publication, evidence, and recove
   for (const evidenceField of [
     'Release commit (full SHA)',
     'Owner approval',
-    'Quality on PR / main',
+    'Quality on PR',
+    'Reviewed PR merge SHA pin',
+    'Main `Quality / quality` for pinned SHA',
     'Working tree `git diff --check`',
     'Committed PR range `git diff --check origin/main...HEAD`',
     'Version consistency (`package.json` / `APP_VERSION` / `CHANGELOG.md`)',
@@ -325,14 +380,80 @@ test('release playbook is canonical and covers publication, evidence, and recove
     '同一 origin の content defect'
   ]) assert.match(playbook, new RegExp(`\\| ${literalPattern(failureStage)} \\|`));
 
-  assert.match(playbook, /`<RELEASE_VERSION>`.*`<RELEASE_DATE>`.*`<RELEASE_TAG>`.*`<RELEASE_SHA>`/s);
+  assert.match(playbook, /`<RELEASE_VERSION>`.*`<RELEASE_DATE>`.*`<RELEASE_TAG>`.*`<RELEASE_SHA>`.*`<PR_NUMBER>`/s);
   assert.match(playbook, /`<` または `>` が残る command は実行しません/);
   assert.ok(
     playbook.indexOf('git fetch --tags origin main') < playbook.indexOf('git diff --check origin/main...HEAD'),
     'the committed range check must follow the base fetch'
   );
+  assert.ok(
+    playbook.indexOf('git ls-remote --tags origin') < playbook.indexOf('test -z "$remote_tag_result"'),
+    'remote tag absence must be checked only after a successful query'
+  );
+  assert.doesNotMatch(playbook, /git rev-parse --verify 'origin\/main\^\{commit\}'/);
   assert.doesNotMatch(playbook, /一度だけ `npm run generate:docs`/);
   assert.doesNotMatch(playbook, /gh[pousr]_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|Authorization:\s*Bearer/i);
+});
+
+test('release tag shell preflight fails closed before its success marker', (t) => {
+  const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
+  const block = playbook.match(
+    /```bash\n### RELEASE_TAG_PREFLIGHT_START\n([\s\S]*?)\n### RELEASE_TAG_PREFLIGHT_END\n```/
+  );
+  assert.ok(block, 'executable release tag preflight block is missing');
+
+  const fakeBin = mkdtempSync(path.join(os.tmpdir(), 'resume-release-playbook-'));
+  t.after(() => rmSync(fakeBin, { force: true, recursive: true }));
+  const fakeGit = path.join(fakeBin, 'git');
+  writeFileSync(fakeGit, `#!/bin/sh
+case "$1" in
+  merge-base) exit 0 ;;
+  show) printf '{"version":"%s"}\\n' "\${FAKE_PACKAGE_VERSION:-0.1.0}"; exit 0 ;;
+  rev-parse) exit 1 ;;
+  ls-remote)
+    if [ "\${FAKE_LS_REMOTE_FAIL:-0}" = "1" ]; then exit 2; fi
+    if [ "\${FAKE_REMOTE_TAG_EXISTS:-0}" = "1" ]; then printf 'deadbeef\\trefs/tags/v0.1.0\\n'; fi
+    exit 0
+    ;;
+  *) printf 'Unexpected git command: %s\\n' "$*" >&2; exit 99 ;;
+esac
+`);
+  chmodSync(fakeGit, 0o755);
+
+  const runPreflight = (overrides = {}) => spawnSync('bash', ['-c', block[1]], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      RELEASE_SHA: 'a'.repeat(40),
+      RELEASE_TAG: 'v0.1.0',
+      ...overrides
+    }
+  });
+  const assertRejectedBeforeSuccess = (result, message) => {
+    assert.notEqual(result.status, 0, message);
+    assert.doesNotMatch(result.stdout, /Release tag preflight passed/);
+  };
+
+  const success = runPreflight();
+  assert.equal(success.status, 0, success.stderr);
+  assert.match(success.stdout, /Release tag preflight passed: v0\.1\.0 -> [a-f0-9]{40}/);
+
+  const mismatch = runPreflight({ RELEASE_TAG: 'v0.1.1' });
+  assertRejectedBeforeSuccess(mismatch, 'package/tag mismatch must fail');
+  assert.match(mismatch.stderr, /does not exactly match the pinned package version/);
+
+  const invalidPackageVersion = runPreflight({ FAKE_PACKAGE_VERSION: '01.0.0' });
+  assertRejectedBeforeSuccess(invalidPackageVersion, 'leading-zero package version must fail');
+  assert.match(invalidPackageVersion.stderr, /not stable SemVer/);
+
+  const queryFailure = runPreflight({ FAKE_LS_REMOTE_FAIL: '1' });
+  assertRejectedBeforeSuccess(queryFailure, 'remote tag query failure must fail');
+  assert.match(queryFailure.stderr, /Unable to query remote tags/);
+
+  const existingRemoteTag = runPreflight({ FAKE_REMOTE_TAG_EXISTS: '1' });
+  assertRejectedBeforeSuccess(existingRemoteTag, 'an existing remote tag must fail');
+  assert.match(existingRemoteTag.stderr, /already exists remotely/);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {

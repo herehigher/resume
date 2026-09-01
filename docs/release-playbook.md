@@ -10,7 +10,7 @@
 - Tag は immutable とする。作成済み tag を移動・上書き・削除しない。Release 内容の修正には Pull Request と新しい version を使用する。
 - Command output や記録に token、secret、credential、実在する résumé data を含めない。
 
-この文書の `<RELEASE_VERSION>`、`<RELEASE_DATE>`、`<RELEASE_TAG>`、`<RELEASE_SHA>`、`<PR_URL>`、`<ISSUE_URL>`、`<WORKFLOW_RUN_URL>` は placeholder です。実値を別途確認して置き換え、`<` または `>` が残る command は実行しません。
+この文書の `<RELEASE_VERSION>`、`<RELEASE_DATE>`、`<RELEASE_TAG>`、`<RELEASE_SHA>`、`<PR_NUMBER>`、`<PR_URL>`、`<ISSUE_URL>`、`<WORKFLOW_RUN_URL>` は placeholder です。実値を別途確認して置き換え、`<` または `>` が残る command は実行しません。
 
 ## RC freeze と screenshot の時点
 
@@ -28,17 +28,18 @@ Screenshot に誤りが見つかった場合は tag 前に RC を修正して再
 - Release date: `<RELEASE_DATE>`（例: `2026-09-01`）
 - Release tag: `<RELEASE_TAG>`（例: `v0.1.0`）
 - Release Issue: `<ISSUE_URL>`
+- Pull Request number: `<PR_NUMBER>`（v0.1.0 release PR は `28`）
 - 対象 Pull Request: `<PR_URL>`
 - Owner approval: 承認者と日時
 
 Repository、account、作業 tree を確認します。Tag や deployment を変更しない read-only preflight です。
 
 ```bash
-git remote get-url origin
-gh auth status
-git status --short --branch
-git fetch --tags origin main
-git log -1 --oneline origin/main
+git remote get-url origin || { echo 'Unable to read origin; stop the release.' >&2; exit 1; }
+gh auth status || { echo 'GitHub authentication is unavailable; stop the release.' >&2; exit 1; }
+git status --short --branch || { echo 'Unable to read the working tree; stop the release.' >&2; exit 1; }
+git fetch --tags origin main || { echo 'Unable to refresh origin/main and tags; stop the release.' >&2; exit 1; }
+git log -1 --oneline origin/main || { echo 'Unable to read origin/main; stop the release.' >&2; exit 1; }
 ```
 
 期待する remote が `https://github.com/herehigher/resume.git`、active account が release 権限を持つ owner、作業 tree が意図した状態であることを確認します。認証出力を Issue に貼らず、token や credential は記録しません。
@@ -46,13 +47,20 @@ git log -1 --oneline origin/main
 RC branch で dependency と version / release notes の整合を確認します。`package.json`、`site/assets/js/config.js` の `APP_VERSION`、`CHANGELOG.md` の対象 version は同じ `<RELEASE_VERSION>` でなければなりません。
 
 ```bash
-npm ci
+npm ci || { echo 'Dependency installation failed; stop the release.' >&2; exit 1; }
 release_version='<RELEASE_VERSION>'
 release_date='<RELEASE_DATE>'
-test "$(node -p "require('./package.json').version")" = "$release_version"
-grep --fixed-strings "export const APP_VERSION = '${release_version}';" site/assets/js/config.js
-grep --fixed-strings "## [${release_version}] - ${release_date}" CHANGELOG.md
-sed -n '1,80p' CHANGELOG.md
+case "$release_version$release_date" in *'<'*|*'>'*) echo 'Replace every release placeholder first.' >&2; exit 1 ;; esac
+package_version="$(node -p "require('./package.json').version")" \
+  || { echo 'Unable to read package version; stop the release.' >&2; exit 1; }
+test "$package_version" = "$release_version" \
+  || { echo 'package.json version does not match the release version.' >&2; exit 1; }
+grep --fixed-strings "export const APP_VERSION = '${release_version}';" site/assets/js/config.js \
+  || { echo 'APP_VERSION does not match the release version.' >&2; exit 1; }
+grep --fixed-strings "## [${release_version}] - ${release_date}" CHANGELOG.md \
+  || { echo 'CHANGELOG version or date does not match.' >&2; exit 1; }
+sed -n '1,80p' CHANGELOG.md \
+  || { echo 'Unable to inspect CHANGELOG; stop the release.' >&2; exit 1; }
 ```
 
 `CHANGELOG.md` の対象 section に今回の release notes が入り、日付が実際の release date と一致し、`Unreleased` が将来分として残っていることを確認します。Date が変わる場合は merge / tag 前に Pull Request を更新します。
@@ -60,16 +68,18 @@ sed -n '1,80p' CHANGELOG.md
 `<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。`site/` を変更した場合だけ、RC 上で次を実行して生成物を目視します。
 
 ```bash
-npm run generate:docs
-node --test tests/documentation.test.js
+npm run generate:docs || { echo 'Documentation asset generation failed; stop the release.' >&2; exit 1; }
+node --test tests/documentation.test.js \
+  || { echo 'Documentation verification failed; stop the release.' >&2; exit 1; }
 ```
 
 生成 asset を含む RC の最終状態で full gate を実行します。
 
 ```bash
-npm run test:acceptance
-git diff --check
-git diff --check origin/main...HEAD
+npm run test:acceptance || { echo 'Acceptance gate failed; stop the release.' >&2; exit 1; }
+git diff --check || { echo 'Working tree diff check failed; stop the release.' >&2; exit 1; }
+git diff --check origin/main...HEAD \
+  || { echo 'Committed Pull Request range diff check failed; stop the release.' >&2; exit 1; }
 ```
 
 `git diff --check` は現在の unstaged working tree、`git diff --check origin/main...HEAD` は fetch 済み `origin/main` から HEAD までの committed Pull Request range を検査します。前者が clean でも後者の代わりにはなりません。両方の結果を記録します。
@@ -80,15 +90,62 @@ git diff --check origin/main...HEAD
 2. 同じ Pull Request で `CHANGELOG.md` の対象内容を `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ固化し、`package.json`、`APP_VERSION`、CHANGELOG version の一致と release notes / date を review する。
 3. Review 指摘を解消し、Pull Request の `Quality / quality` が成功していることを確認する。失敗または未確認の gate がある間は merge しない。
 4. Ruleset に従って `main` へ merge する。通常の `main` push では Pages deployment が起動しないことを確認する。
-5. `main` の `Quality / quality` が成功した後、release 対象の full commit SHA を取得する。
+5. Merge 後、review 済み Pull Request の `mergeCommit.oid` を GitHub から取得し、release 対象の full commit SHA として pin する。`origin/main` の当時の tip や PR head SHA から推測しない。
 
 ```bash
-git fetch --tags origin main
-git rev-parse --verify 'origin/main^{commit}'
-git log -1 --oneline origin/main
+git fetch --tags origin main \
+  || { echo 'Unable to refresh origin/main and tags; stop the release.' >&2; exit 1; }
+pr_number='<PR_NUMBER>'
+case "$pr_number" in ''|*[!0-9]*) echo 'PR number must contain digits only.' >&2; exit 1 ;; esac
+if ! release_sha="$(gh pr view "$pr_number" --repo herehigher/resume \
+  --json state,mergeCommit \
+  --jq 'if .state == "MERGED" and .mergeCommit.oid != null then .mergeCommit.oid else empty end')"; then
+  echo 'Unable to read the merged Pull Request; stop the release.' >&2
+  exit 1
+fi
+test -n "$release_sha" || { echo 'Pull Request is not merged or has no merge commit; stop the release.' >&2; exit 1; }
+case "$release_sha" in *[!0-9a-f]*) echo 'GitHub returned an invalid merge commit id.' >&2; exit 1 ;; esac
+case "${#release_sha}" in 40|64) ;; *) echo 'GitHub returned an invalid merge commit length.' >&2; exit 1 ;; esac
+git cat-file -e "${release_sha}^{commit}" \
+  || { echo 'Pinned merge SHA is not a local commit; stop the release.' >&2; exit 1; }
+git merge-base --is-ancestor --end-of-options "$release_sha" origin/main \
+  || { echo 'Pinned merge SHA is not on origin/main; stop the release.' >&2; exit 1; }
+git show --no-patch --oneline --end-of-options "$release_sha" \
+  || { echo 'Unable to inspect the pinned merge SHA; stop the release.' >&2; exit 1; }
 ```
 
-取得した full SHA を `<RELEASE_SHA>` として記録します。PR head SHA ではなく、merge 後の `origin/main` commit を使用します。
+表示された commit が `<PR_URL>` の reviewed merge commit と一致することを確認し、`release_sha` の full value を `<RELEASE_SHA>` として記録します。`main` が後続 commit で ahead になっても `<RELEASE_SHA>` を tip へ置き換えず、この pinned merge SHA を tag 対象にします。
+
+次に、pinned SHA 自身を head SHA とする `main` push の `Quality` run が成功していることを確認します。Query failure、空結果、SHA / conclusion 不一致では停止します。
+
+```bash
+if ! quality_result="$(gh run list --repo herehigher/resume --workflow ci.yml \
+  --branch main --event push --commit "$release_sha" --status success --limit 1 \
+  --json databaseId,headSha,conclusion,url \
+  --jq '.[0] | [.databaseId, .headSha, .conclusion, .url] | @tsv')"; then
+  echo 'Unable to query main Quality; stop the release.' >&2
+  exit 1
+fi
+IFS=$'\t' read -r quality_run_id quality_sha quality_conclusion quality_url <<< "$quality_result"
+test -n "$quality_run_id" \
+  || { echo 'No successful main Quality run exists for the pinned SHA.' >&2; exit 1; }
+test "$quality_sha" = "$release_sha" \
+  || { echo 'Main Quality run SHA does not match the pinned SHA.' >&2; exit 1; }
+test "$quality_conclusion" = 'success' \
+  || { echo 'Main Quality run did not succeed.' >&2; exit 1; }
+test -n "$quality_url" \
+  || { echo 'Main Quality run URL is missing.' >&2; exit 1; }
+if ! quality_job_count="$(gh run view "$quality_run_id" --repo herehigher/resume \
+  --json jobs --jq '[.jobs[] | select(.name == "quality" and .conclusion == "success")] | length')"; then
+  echo 'Unable to query the quality job; stop the release.' >&2
+  exit 1
+fi
+test "$quality_job_count" = '1' \
+  || { echo 'The pinned run does not contain exactly one successful quality job.' >&2; exit 1; }
+printf 'Pinned main Quality: %s\n' "$quality_url"
+```
+
+この Quality URL と pinned `<RELEASE_SHA>` の組を evidence に記録します。
 
 ## 初回 Pages と HTTPS 設定
 
@@ -100,28 +157,66 @@ git log -1 --oneline origin/main
 
 以下は production release を開始する操作です。実行直前に、owner approval、`<RELEASE_TAG>`、`<RELEASE_SHA>`、package version、`origin/main` ancestry を読み上げて照合します。Placeholder が残っていれば停止します。
 
-まず tag が local と remote のどちらにも存在しないことを確認します。既に存在する場合は tag を再作成・移動・削除せず、原因を調査します。
+まず tag が local と remote のどちらにも存在しないことを確認します。既に存在する場合は tag を再作成・移動・削除せず、原因を調査します。Remote query の network、authentication、server error を「tag がない」と解釈してはいけません。
 
 ```bash
-git rev-parse --verify --quiet 'refs/tags/<RELEASE_TAG>'
-git ls-remote --tags origin 'refs/tags/<RELEASE_TAG>'
-git merge-base --is-ancestor '<RELEASE_SHA>' origin/main
-git show '<RELEASE_SHA>:package.json'
+### RELEASE_TAG_PREFLIGHT_START
+release_tag="${RELEASE_TAG:-<RELEASE_TAG>}"
+release_sha="${RELEASE_SHA:-<RELEASE_SHA>}"
+case "$release_tag$release_sha" in *'<'*|*'>'*) echo 'Replace every release placeholder first.' >&2; exit 1 ;; esac
+case "$release_sha" in ''|*[!0-9a-f]*) echo 'Release SHA must be a full lowercase hexadecimal commit id.' >&2; exit 1 ;; esac
+case "${#release_sha}" in 40|64) ;; *) echo 'Release SHA must be a full commit id.' >&2; exit 1 ;; esac
+git merge-base --is-ancestor --end-of-options "$release_sha" origin/main \
+  || { echo 'Pinned release SHA is not on origin/main; stop the release.' >&2; exit 1; }
+package_json="$(git show --no-ext-diff --format= --no-textconv --end-of-options "${release_sha}:package.json")" \
+  || { echo 'Unable to read package.json from the pinned release SHA.' >&2; exit 1; }
+package_version="$(node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")).version; if (typeof value !== "string") process.exit(1); process.stdout.write(value);' <<< "$package_json")" \
+  || { echo 'Pinned package.json has no valid string version.' >&2; exit 1; }
+expected_tag="v${package_version}"
+node -e 'process.exit(/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(process.argv[1]) ? 0 : 1)' "$expected_tag" \
+  || { echo 'Pinned package version is not stable SemVer.' >&2; exit 1; }
+test "$release_tag" = "$expected_tag" \
+  || { echo 'Release tag does not exactly match the pinned package version.' >&2; exit 1; }
+if git rev-parse --verify --quiet --end-of-options "refs/tags/${release_tag}" >/dev/null; then
+  echo 'Release tag already exists locally; stop the release.' >&2
+  exit 1
+else
+  local_tag_status=$?
+  test "$local_tag_status" -eq 1 || { echo 'Unable to query the local tag; stop the release.' >&2; exit 1; }
+fi
+if ! remote_tag_result="$(git ls-remote --tags origin "refs/tags/${release_tag}")"; then
+  echo 'Unable to query remote tags; stop the release.' >&2
+  exit 1
+fi
+test -z "$remote_tag_result" || { echo 'Release tag already exists remotely; stop the release.' >&2; exit 1; }
+printf 'Release tag preflight passed: %s -> %s\n' "$release_tag" "$release_sha"
+### RELEASE_TAG_PREFLIGHT_END
 ```
 
-最初の 2 command は tag が存在しない場合に空または non-zero になります。3 番目が成功し、4 番目の version が `<RELEASE_VERSION>` と一致することを確認してから annotated tag を作成します。
+Pinned SHA の `package.json` から version を読み、workflow validator と同じ stable SemVer 規則で `expected_tag` を導出します。`release_tag` と完全一致しない場合は停止します。Local query は missing tag の status `1` だけを許可します。Remote query は command 自体の成功を先に要求し、その成功 output が空であることを別に検査します。成功 marker、package version、`<RELEASE_VERSION>` が一致することを確認し、同じ shell session で annotated tag を作成します。
 
 ```bash
-git tag --annotate '<RELEASE_TAG>' '<RELEASE_SHA>' --message 'Resume Studio <RELEASE_TAG>'
-git show --no-patch --decorate '<RELEASE_TAG>'
-git rev-parse --verify '<RELEASE_TAG>^{commit}'
-test "$(git rev-parse --verify '<RELEASE_TAG>^{commit}')" = '<RELEASE_SHA>'
+test "$release_tag" = "$expected_tag" \
+  || { echo 'Validated tag state is missing; stop the release.' >&2; exit 1; }
+git tag --annotate "$release_tag" "$release_sha" --message "Resume Studio ${release_tag}" \
+  || { echo 'Annotated tag creation failed; stop the release.' >&2; exit 1; }
+git show --no-patch --decorate --end-of-options "$release_tag" \
+  || { echo 'Unable to inspect the new annotated tag; stop the release.' >&2; exit 1; }
+tag_commit="$(git rev-parse --verify --end-of-options "${release_tag}^{commit}")" \
+  || { echo 'Unable to peel the new tag to a commit; stop the release.' >&2; exit 1; }
+test "$tag_commit" = "$release_sha" \
+  || { echo 'New tag does not resolve to the pinned release SHA; do not push it.' >&2; exit 1; }
 ```
 
 表示された tag、version、full commit SHA を再確認します。正しければ owner の最終承認後、exact tag ref だけを push します。
 
 ```bash
-git push origin 'refs/tags/<RELEASE_TAG>:refs/tags/<RELEASE_TAG>'
+test "$release_tag" = "$expected_tag" \
+  || { echo 'Validated tag state is missing; do not push.' >&2; exit 1; }
+test "$(git rev-parse --verify --end-of-options "${release_tag}^{commit}")" = "$release_sha" \
+  || { echo 'Tag commit changed or cannot be verified; do not push.' >&2; exit 1; }
+git push origin "refs/tags/${release_tag}:refs/tags/${release_tag}" \
+  || { echo 'Exact tag push failed; inspect the remote before retrying.' >&2; exit 1; }
 ```
 
 `--force`、tag update、tag delete は使用しません。
@@ -146,7 +241,9 @@ Issue または Pull Request に次を記録します。Placeholder を実値ま
 - Owner approval: `<APPROVER>` / `<APPROVED_AT>`
 - Pull Request: `<PR_URL>`
 - Release Issue: `<ISSUE_URL>`
-- Quality on PR / main: `<RESULT_AND_RUN_URL>`
+- Quality on PR: `<RESULT_AND_RUN_URL>`
+- Reviewed PR merge SHA pin: `<PR_URL>` / `<RELEASE_SHA>`
+- Main `Quality / quality` for pinned SHA: `<RELEASE_SHA>` / `<RESULT_AND_RUN_URL>`
 - `npm run test:acceptance`: `<RESULT>`
 - Working tree `git diff --check`: `<RESULT>`
 - Committed PR range `git diff --check origin/main...HEAD`: `<RESULT>`
@@ -169,16 +266,30 @@ Manual redeploy は既存の immutable stable tag だけを対象にします。
 実行前に owner approval、default branch、対象 tag の存在、package version、過去の受入記録を確認します。
 
 ```bash
-git fetch --tags origin main
-git rev-parse --verify 'refs/tags/<EXISTING_RELEASE_TAG>^{commit}'
-git show '<EXISTING_RELEASE_TAG>:package.json'
-git merge-base --is-ancestor '<EXISTING_RELEASE_TAG>^{commit}' origin/main
+git fetch --tags origin main \
+  || { echo 'Unable to refresh existing release tags; stop the redeploy.' >&2; exit 1; }
+existing_tag='<EXISTING_RELEASE_TAG>'
+case "$existing_tag" in *'<'*|*'>'*) echo 'Replace the existing tag placeholder first.' >&2; exit 1 ;; esac
+existing_sha="$(git rev-parse --verify --end-of-options "refs/tags/${existing_tag}^{commit}")" \
+  || { echo 'Existing release tag cannot be resolved; stop the redeploy.' >&2; exit 1; }
+existing_package_json="$(git show --no-ext-diff --format= --no-textconv --end-of-options "${existing_sha}:package.json")" \
+  || { echo 'Unable to inspect package.json for the existing tag.' >&2; exit 1; }
+existing_package_version="$(node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")).version; if (typeof value !== "string") process.exit(1); process.stdout.write(value);' <<< "$existing_package_json")" \
+  || { echo 'Existing tag package.json has no valid string version.' >&2; exit 1; }
+expected_existing_tag="v${existing_package_version}"
+node -e 'process.exit(/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(process.argv[1]) ? 0 : 1)' "$expected_existing_tag" \
+  || { echo 'Existing tag package version is not stable SemVer.' >&2; exit 1; }
+test "$existing_tag" = "$expected_existing_tag" \
+  || { echo 'Existing tag does not match its package version; stop the redeploy.' >&2; exit 1; }
+git merge-base --is-ancestor --end-of-options "$existing_sha" origin/main \
+  || { echo 'Existing release tag is not on origin/main; stop the redeploy.' >&2; exit 1; }
 ```
 
 GitHub Actions の `Deploy Pages` → `Run workflow` で branch に default branch を選び、`release_tag` に `<EXISTING_RELEASE_TAG>` を入力します。CLI を使う場合も、実行直前に repository と tag を再確認します。
 
 ```bash
-gh workflow run deploy-pages.yml --ref main --field release_tag='<EXISTING_RELEASE_TAG>'
+gh workflow run deploy-pages.yml --ref main --field "release_tag=${existing_tag}" \
+  || { echo 'Manual redeploy dispatch failed; inspect Actions before retrying.' >&2; exit 1; }
 ```
 
 Manual run も exact tag、version、main ancestry、Quality を再検証します。完了後は Actions、environment URL、online smoke、manual browser の証拠を新しい記録として残します。Rollback は tag を変更する操作ではなく、既存 tag の検証済み `site/` を再 deployment する操作です。
