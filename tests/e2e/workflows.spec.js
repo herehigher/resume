@@ -225,6 +225,36 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   }, STORAGE_KEY)).toBe('読み込んだ氏名');
 });
 
+test('三言語で入力例を草稿操作にまとめ、言語とPDFをヘッダー右端に表示する', async ({ page }) => {
+  const cases = [
+    ['ja', '#japaneseWorkspace', '#loadSampleButton', '入力例を表示'],
+    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '查看填写示例'],
+    ['en', '[data-english-editor]', '[data-en-load-sample]', 'View example']
+  ];
+
+  for (const [locale, workspaceSelector, sampleSelector, sampleLabel] of cases) {
+    await openLocale(page, locale);
+    const workspace = page.locator(workspaceSelector);
+    const sampleButton = workspace.locator(sampleSelector);
+    await expect(sampleButton).toBeVisible();
+    await expect(sampleButton).toHaveText(sampleLabel);
+    await expect(sampleButton.locator('xpath=ancestor::*[contains(@class, "draft-controls")]')).toHaveCount(1);
+    await expect(page.locator('.header-actions').locator(sampleSelector)).toHaveCount(0);
+
+    const layout = await page.locator('.header-actions').evaluate((header) => {
+      const headerBox = header.getBoundingClientRect();
+      const printBox = header.querySelector('#printButton').getBoundingClientRect();
+      return {
+        headerRight: headerBox.right,
+        printRight: printBox.right,
+        viewportWidth: window.innerWidth
+      };
+    });
+    expect(layout.viewportWidth - layout.headerRight).toBeLessThanOrEqual(24);
+    expect(layout.viewportWidth - layout.printRight).toBeLessThanOrEqual(24);
+  }
+});
+
 test('三言語のプロフィールURLはHTTP(S)だけがリンクになる', async ({ page }) => {
   const cases = [
     ['ja', '[name="github"]', '#documentPreview'],

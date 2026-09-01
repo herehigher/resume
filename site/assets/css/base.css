@@ -49,6 +49,7 @@ button { cursor: pointer; }
   color: inherit;
   display: inline-flex;
   gap: 10px;
+  grid-column: 1;
   justify-self: start;
   text-decoration: none;
 }
@@ -77,6 +78,7 @@ button { cursor: pointer; }
   border-radius: 9px;
   display: flex;
   gap: 2px;
+  grid-column: 2;
   padding: 3px;
 }
 
@@ -97,7 +99,7 @@ button { cursor: pointer; }
   color: var(--ink);
 }
 
-.header-actions { align-items: center; display: flex; gap: 9px; justify-self: end; }
+.header-actions { align-items: center; display: flex; gap: 9px; grid-column: 3; justify-self: end; }
 .save-status { color: var(--muted); font-size: 10px; margin-right: 4px; }
 .save-status::before { background: var(--green); border-radius: 50%; content: ""; display: inline-block; height: 6px; margin-right: 6px; width: 6px; }
 .save-status.is-saving::before { animation: pulse 1s infinite; background: #d79a22; }
