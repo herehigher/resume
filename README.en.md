@@ -65,7 +65,7 @@ All assets use fictional sample data. Their source and Chromium version are reco
 - Photos and exported JSON may contain personal information. Neither localStorage nor exported files are encrypted.
 - Clearing browser data, ending a private-browsing session, exceeding the storage quota, or browser storage eviction can remove a draft. Export important drafts as JSON backups.
 - In-app deletion clears the v1 state. It does not delete the legacy `resume-studio-data-v1` key, downloaded JSON/PDF files, or browser download history.
-- In addition to same-origin static assets, the app loads Cloudflare's standard Web Analytics beacon and submits aggregate page-view and display-performance metrics. It uses no cookies, localStorage, user-level IDs, or custom events, and sends no resume input, photo, JSON, or local draft. A user-clicked profile link navigates to its target.
+- The repository `site/`, clones, and forks disable analytics by default and make no analytics requests beyond same-origin static assets. Only a validated stable tag in `herehigher/resume` may have the deployment-only adapter deterministically add standard Cloudflare Web Analytics when its tagged manifest enables it. It uses no cookies, localStorage, user-level IDs, or custom events and sends no resume input, photo, JSON, or on-device draft. The page status and Network panel expose the active mode.
 
 Read [Privacy / English](PRIVACY.md#privacy-en) for the complete policy.
 
@@ -84,7 +84,7 @@ npm ci
 npm run test:acceptance
 ```
 
-Do not add external APIs, CDNs, external fonts, or other analytics to the production runtime. Standard Cloudflare Web Analytics for aggregate page-view and performance metrics is the sole limited exception. See [Contributing](CONTRIBUTING.md) and the [release acceptance checklist](docs/acceptance-checklist.md).
+Do not add external APIs, CDNs, external fonts, or analytics to the `site/` source. The sole exception is the deployment-only adapter adding standard Cloudflare Web Analytics to a validated stable-tag artifact in the official repository when its tagged manifest matches. See [Contributing](CONTRIBUTING.md) and the [release acceptance checklist](docs/acceptance-checklist.md).
 
 ## Repository information
 

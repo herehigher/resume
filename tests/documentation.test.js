@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -18,11 +28,13 @@ const markdownFiles = [
   'CHANGELOG.md',
   'CONTRIBUTING.md',
   'docs/acceptance-checklist.md',
-  'docs/development-guide.md'
+  'docs/development-guide.md',
+  'docs/release-playbook.md'
 ];
 const requiredFiles = [
   ...markdownFiles,
   'LICENSE',
+  '.github/pages-release-manifest.json',
   'docs/assets-manifest.json',
   'docs/screenshots/ja.png',
   'docs/screenshots/zh-CN.png',
@@ -52,6 +64,10 @@ function fragmentsIn(markdown) {
 function markdownTargets(markdown) {
   return [...markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g)]
     .map((match) => match[1]);
+}
+
+function literalPattern(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function collectFiles(directory) {
@@ -202,13 +218,14 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
 test('AGENTS links the canonical development and documentation guide', () => {
   const agents = readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
   assert.match(agents, /\[開発ガイド\]\(docs\/development-guide\.md\)/);
-  assert.match(agents, /Cloudflare Web Analytics の公開 site token/);
-  assert.match(readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8'), /公開 site token は credential ではなく/);
+  assert.match(agents, /Analytics provider token の raw value.*tracked file/s);
+  assert.match(readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8'), /SHA-256 fingerprint.*実値/s);
 });
 
 test('development docs cover localized public entry and machine-readable contracts', () => {
   const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
   const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
+  const contributing = readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8');
   const acceptanceItems = acceptance.split('\n').filter((line) => line.startsWith('- [ ] '));
   const hasAcceptanceItem = (...facts) => acceptanceItems.some((line) => facts.every((fact) => line.includes(fact)));
 
@@ -244,6 +261,271 @@ test('development docs cover localized public entry and machine-readable contrac
   assert.equal(hasAcceptanceItem('Root', 'editor CTA'), false);
   assert.equal(hasAcceptanceItem('Root', 'JSON Schema link'), false);
   assert.equal(hasAcceptanceItem('Public entry', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
+  for (const document of [guide, contributing]) {
+    assert.match(document, /provider.*template.*endpoint.*privacy.*network policy.*Pull Request.*version.*tag/is);
+    assert.match(document, /Manifest structure.*fingerprint.*schemaVersion/is);
+    assert.match(document, /既存 tag.*adapter.*schema.*redeploy/is);
+    assert.match(document, /旧 token.*hard failure|旧 token.*利用不能.*失敗/is);
+  }
+});
+
+test('v0.1.0 changelog freezes the dated release without losing release notes', () => {
+  const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  const unreleased = '## [Unreleased]';
+  const release = '## [0.1.0] - 2026-09-01';
+  const unreleasedIndex = changelog.indexOf(unreleased);
+  const releaseIndex = changelog.indexOf(release);
+
+  assert.ok(unreleasedIndex >= 0);
+  assert.ok(releaseIndex > unreleasedIndex, 'Unreleased must remain before the latest release');
+  assert.equal(changelog.slice(unreleasedIndex + unreleased.length, releaseIndex).trim(), '');
+  assert.equal((changelog.match(/^## \[0\.1\.0\] - 2026-09-01$/gm) || []).length, 1);
+
+  const releaseNotes = changelog.slice(releaseIndex + release.length);
+  assert.match(releaseNotes, /### Added \/ 追加/);
+  assert.match(releaseNotes, /### Security \/ Privacy/);
+  for (const fact of [
+    '日本語の履歴書・職務経歴書',
+    '简体中文 resume editor',
+    'English ATS-friendly resume',
+    '三言語で共有する profile',
+    'Profile URL の protocol 制限',
+    'Desktop/mobile workflow',
+    'reproducible screenshot/PDF samples',
+    'GitHub source link',
+    'Issue #9',
+    'stable SemVer tag によってのみ起動する GitHub Pages production deployment',
+    'version release playbook',
+    '`site/` source、clone、fork は Analytics 無効',
+    'deployment 時に決定的に追加',
+    'no raw provider token'
+  ]) assert.match(releaseNotes, new RegExp(literalPattern(fact)));
+});
+
+test('release playbook is canonical and covers publication, evidence, and recovery decisions', () => {
+  const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
+  const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
+  const contributing = readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8');
+  const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
+  const headings = [...playbook.matchAll(/^##\s+(.+)$/gm)].map((match) => match[1]);
+
+  for (const heading of [
+    '権限と release gate',
+    'RC freeze と screenshot の時点',
+    'Preflight inputs と local gate',
+    'Pull Request、Quality、merge',
+    '初回 Pages と HTTPS 設定',
+    'Annotated immutable tag の作成と push',
+    'Actions の監視と online acceptance',
+    'Evidence 記録 template',
+    'Existing tag の manual redeploy / rollback',
+    '失敗時の判断',
+    '初回成功後の README と Issue close',
+    'English summary'
+  ]) assert.ok(headings.includes(heading), `release playbook is missing ${heading}`);
+
+  assert.match(guide, /\[Version release playbook\]\(release-playbook\.md\).*canonical/);
+  assert.match(acceptance, /\[Version release playbook\]\(release-playbook\.md\)/);
+  assert.match(contributing, /\[Version release playbook\]\(docs\/release-playbook\.md\)/);
+
+  for (const contract of [
+    /owner の明示承認.*Public release|Public release.*owner の明示承認/s,
+    /安定版 `vMAJOR\.MINOR\.PATCH`.*leading zero.*prerelease.*build metadata/s,
+    /version を含むすべての画面内容を確定した.*merge と tag の前.*npm run generate:docs/s,
+    /生成後に `site\/` または public sample が変わった場合は再生成します/,
+    /Workflow \/ Markdown だけの変更では再生成しません/,
+    /`CHANGELOG\.md` の `Unreleased` から `## \[<RELEASE_VERSION>\] - <RELEASE_DATE>`.*release date を確定/s,
+    /`package\.json`、`site\/assets\/js\/config\.js` の `APP_VERSION`、`CHANGELOG\.md`.*同じ `<RELEASE_VERSION>`/s,
+    /npm run test:acceptance/,
+    /git diff --check origin\/main\.\.\.HEAD/,
+    /working tree.*committed Pull Request range/s,
+    /通常の `main` push では Pages deployment が起動しない/,
+    /gh pr view "\$pr_number" --repo herehigher\/resume.*mergeCommit/s,
+    /reviewed merge commit.*pinned merge SHA/s,
+    /gh run list --repo herehigher\/resume --workflow ci\.yml.*--commit "\$release_sha".*--status success/s,
+    /gh run view "\$quality_run_id".*\.name == "quality".*\.conclusion == "success"/s,
+    /main` push の `Quality` run が成功/s,
+    /Pages Analytics manifest の PR 前開発検証/,
+    /Pinned release SHA の最終 artifact gate/,
+    /gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher\/resume/,
+    /derive-cloudflare --source site/,
+    /owner の明示承認後、PR 前にも.*token を表示・記録せず/s,
+    /Enabled のまま先に tag を作ることは禁止/,
+    /Source を `GitHub Actions`.*`Enforce HTTPS`/s,
+    /if ! remote_tag_result="\$\(git ls-remote --tags origin/,
+    /test -z "\$remote_tag_result".*Release tag already exists remotely/s,
+    /local_tag_status.*-eq 1/s,
+    /package_json="\$\(git show.*"\$\{release_sha}:package\.json"\)"/s,
+    /\^v\(0\|\[1-9\]\\d\*\).*expected_tag/s,
+    /test "\$release_tag" = "\$expected_tag".*does not exactly match/s,
+    /git tag --annotate "\$release_tag" "\$release_sha"/,
+    /git push origin "refs\/tags\/\$\{release_tag}:refs\/tags\/\$\{release_tag}"/,
+    /validate → quality → artifact → deploy → smoke/,
+    /Smoke failure は deploy 後の未受入状態/,
+    /gh workflow run deploy-pages\.yml --ref main --field "release_tag=\$\{existing_tag}"/,
+    /Tag は immutable.*移動・上書き・削除しない/s,
+    /docs-only follow-up Pull Request.*Issue を close/s
+  ]) assert.match(playbook, contract);
+
+  for (const evidenceField of [
+    'Release commit (full SHA)',
+    'Owner approval',
+    'Quality on PR',
+    'Reviewed PR merge SHA pin',
+    'Main `Quality / quality` for pinned SHA',
+    'Working tree `git diff --check`',
+    'Committed PR range `git diff --check origin/main...HEAD`',
+    'Version consistency (`package.json` / `APP_VERSION` / `CHANGELOG.md`)',
+    'CHANGELOG release notes / date',
+    'Pages Analytics mode / provider / fingerprint',
+    'Pages source / adapter / final artifact digest',
+    'Final pinned artifact gate',
+    'Screenshot / PDF source SHA',
+    'Pages Source / custom domain / HTTPS',
+    'Deploy workflow',
+    'Online smoke / manual browser',
+    'Final decision'
+  ]) assert.match(playbook, new RegExp(literalPattern(evidenceField)));
+
+  for (const failureStage of [
+    'Pre-deploy / RC gate',
+    'Validate',
+    'Quality',
+    'Artifact',
+    'Deploy',
+    'Post-deploy smoke',
+    'HTTP 200 だが stale CDN content',
+    '同一 origin の content defect'
+  ]) assert.match(playbook, new RegExp(`\\| ${literalPattern(failureStage)} \\|`));
+
+  assert.match(playbook, /`<RELEASE_VERSION>`.*`<RELEASE_DATE>`.*`<RELEASE_TAG>`.*`<RELEASE_SHA>`.*`<PR_NUMBER>`/s);
+  assert.match(playbook, /`<` または `>` が残る command は実行しません/);
+  assert.ok(
+    playbook.indexOf('git fetch --tags origin main') < playbook.indexOf('git diff --check origin/main...HEAD'),
+    'the committed range check must follow the base fetch'
+  );
+  assert.ok(
+    playbook.indexOf('git ls-remote --tags origin') < playbook.indexOf('test -z "$remote_tag_result"'),
+    'remote tag absence must be checked only after a successful query'
+  );
+  const finalGate = playbook.match(
+    /```bash\n### FINAL_RELEASE_ARTIFACT_GATE_START\n([\s\S]*?)\n### FINAL_RELEASE_ARTIFACT_GATE_END\n```/
+  );
+  assert.ok(finalGate, 'final release artifact gate is missing');
+  const finalGateStart = playbook.indexOf('### FINAL_RELEASE_ARTIFACT_GATE_START');
+  assert.ok(
+    playbook.indexOf('この Quality URL と pinned `<RELEASE_SHA>` の組を evidence に記録します。') < finalGateStart,
+    'the final artifact gate must follow pinned main Quality verification'
+  );
+  assert.ok(
+    finalGateStart < playbook.indexOf('### RELEASE_TAG_PREFLIGHT_START'),
+    'the final artifact gate must precede tag preflight'
+  );
+  for (const contract of [
+    /git worktree add --detach "\$final_gate_tree" "\$release_sha"/,
+    /rev-parse HEAD.*"\$release_sha"/s,
+    /symbolic-ref --quiet HEAD/,
+    /status --porcelain=v1 --untracked-files=all/,
+    /prepare-pages-artifact\.mjs" validate/,
+    /gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher\/resume/,
+    /derive-cloudflare/,
+    /source digest mismatch/,
+    /provider fingerprint mismatch/,
+    /final artifact digest mismatch/,
+    /cleanup_final_gate.*Final verification cleanup failed/s
+  ]) assert.match(finalGate[1], contract);
+  assert.ok(
+    finalGate[1].indexOf('prepare-pages-artifact.mjs" validate')
+      < finalGate[1].indexOf('gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN'),
+    'manifest validation must fail before provider variable access'
+  );
+  assert.doesNotMatch(playbook, /git rev-parse --verify 'origin\/main\^\{commit\}'/);
+  assert.doesNotMatch(playbook, /一度だけ `npm run generate:docs`/);
+  assert.doesNotMatch(playbook, /gh[pousr]_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|Authorization:\s*Bearer/i);
+});
+
+test('tracked text tree contains no migrated raw analytics token', () => {
+  const releaseManifest = JSON.parse(readFileSync(path.join(root, '.github/pages-release-manifest.json'), 'utf8'));
+  const providerFingerprint = releaseManifest.providerTokenSha256;
+  assert.match(providerFingerprint, /^[0-9a-f]{64}$/);
+  const ignoredRoots = new Set(['.git', 'node_modules', 'output']);
+  const textExtensions = new Set(['.html', '.js', '.json', '.md', '.mjs', '.yml', '.yaml']);
+  function textFiles(directory) {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      if (ignoredRoots.has(entry.name) || (entry.name === 'screenshots' && path.basename(directory) === 'docs')) return [];
+      const absolutePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) return textFiles(absolutePath);
+      return textExtensions.has(path.extname(entry.name)) ? [absolutePath] : [];
+    });
+  }
+  for (const file of textFiles(root)) {
+    const contents = readFileSync(file, 'utf8');
+    for (const match of contents.matchAll(/(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/g)) {
+      const candidateFingerprint = createHash('sha256').update(match[0]).digest('hex');
+      assert.notEqual(candidateFingerprint, providerFingerprint, path.relative(root, file));
+    }
+  }
+});
+
+test('release tag shell preflight fails closed before its success marker', (t) => {
+  const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
+  const block = playbook.match(
+    /```bash\n### RELEASE_TAG_PREFLIGHT_START\n([\s\S]*?)\n### RELEASE_TAG_PREFLIGHT_END\n```/
+  );
+  assert.ok(block, 'executable release tag preflight block is missing');
+
+  const fakeBin = mkdtempSync(path.join(os.tmpdir(), 'resume-release-playbook-'));
+  t.after(() => rmSync(fakeBin, { force: true, recursive: true }));
+  const fakeGit = path.join(fakeBin, 'git');
+  writeFileSync(fakeGit, `#!/bin/sh
+case "$1" in
+  merge-base) exit 0 ;;
+  show) printf '{"version":"%s"}\\n' "\${FAKE_PACKAGE_VERSION:-0.1.0}"; exit 0 ;;
+  rev-parse) exit 1 ;;
+  ls-remote)
+    if [ "\${FAKE_LS_REMOTE_FAIL:-0}" = "1" ]; then exit 2; fi
+    if [ "\${FAKE_REMOTE_TAG_EXISTS:-0}" = "1" ]; then printf 'deadbeef\\trefs/tags/v0.1.0\\n'; fi
+    exit 0
+    ;;
+  *) printf 'Unexpected git command: %s\\n' "$*" >&2; exit 99 ;;
+esac
+`);
+  chmodSync(fakeGit, 0o755);
+
+  const runPreflight = (overrides = {}) => spawnSync('bash', ['-c', block[1]], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      RELEASE_SHA: 'a'.repeat(40),
+      RELEASE_TAG: 'v0.1.0',
+      ...overrides
+    }
+  });
+  const assertRejectedBeforeSuccess = (result, message) => {
+    assert.notEqual(result.status, 0, message);
+    assert.doesNotMatch(result.stdout, /Release tag preflight passed/);
+  };
+
+  const success = runPreflight();
+  assert.equal(success.status, 0, success.stderr);
+  assert.match(success.stdout, /Release tag preflight passed: v0\.1\.0 -> [a-f0-9]{40}/);
+
+  const mismatch = runPreflight({ RELEASE_TAG: 'v0.1.1' });
+  assertRejectedBeforeSuccess(mismatch, 'package/tag mismatch must fail');
+  assert.match(mismatch.stderr, /does not exactly match the pinned package version/);
+
+  const invalidPackageVersion = runPreflight({ FAKE_PACKAGE_VERSION: '01.0.0' });
+  assertRejectedBeforeSuccess(invalidPackageVersion, 'leading-zero package version must fail');
+  assert.match(invalidPackageVersion.stderr, /not stable SemVer/);
+
+  const queryFailure = runPreflight({ FAKE_LS_REMOTE_FAIL: '1' });
+  assertRejectedBeforeSuccess(queryFailure, 'remote tag query failure must fail');
+  assert.match(queryFailure.stderr, /Unable to query remote tags/);
+
+  const existingRemoteTag = runPreflight({ FAKE_REMOTE_TAG_EXISTS: '1' });
+  assertRejectedBeforeSuccess(existingRemoteTag, 'an existing remote tag must fail');
+  assert.match(existingRemoteTag.stderr, /already exists remotely/);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {
@@ -264,6 +546,8 @@ test('privacy has stable tri-lingual anchors and one effective version', () => {
     'application backend',
     'Cloudflare Web Analytics',
     'cloudflareinsights.com',
+    'data-analytics-mode',
+    'configuration error',
     'fingerprinting',
     'custom event'
   ]) {

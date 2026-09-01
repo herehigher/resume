@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "analyticsMode": "enabled",
+  "analyticsProvider": "cloudflare-web-analytics",
+  "providerTokenSha256": "8a1bd3491d2b1100e92a33a5efec9c976923e131b50c326a9172d9dc6650c38e",
+  "sourceTreeSha256": "928ae0af54b53ea7f6c2c5767e1c21c15caa5cf4bbe9770ad407e9e12cfda89e",
+  "artifactTreeSha256": "512b950e77a115c53ad7317ad5f5de2f8f5f9288ad1a95021f8580046fd9db07"
+}

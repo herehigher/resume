@@ -1,12 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { installNetworkGuard } from './fixtures.js';
 
-test('ネットワークガードは標準 Cloudflare Analytics だけを許可する', async ({ baseURL, context, page }) => {
+test('source build は analytics を含むすべての外部 runtime request を拒否する', async ({ baseURL, context, page }) => {
   const guard = await installNetworkGuard(context, baseURL);
   await page.goto('/');
 
-  await expect.poll(() => guard.analyticsRequests).toContain('GET https://static.cloudflareinsights.com/beacon.min.js');
-  await expect.poll(() => guard.analyticsRequests).toContain('POST https://cloudflareinsights.com/cdn-cgi/rum');
   expect(guard.unexpectedRequests).toEqual([]);
 
   await page.evaluate(() => {
@@ -19,7 +17,7 @@ test('ネットワークガードは標準 Cloudflare Analytics だけを許可�
       body: JSON.stringify({
         location: `${window.location.href}?personal-data`,
         resume: 'personal-data',
-        siteToken: '0b02ba35d9bc4d4d8dd63b42d6d51241'
+        siteToken: 'a'.repeat(32)
       })
     }).catch(() => {});
     const socket = new WebSocket('ws://127.0.0.1:9/leak');

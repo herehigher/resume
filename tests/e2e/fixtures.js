@@ -2,12 +2,6 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
-import {
-  CLOUDFLARE_BEACON_URL,
-  CLOUDFLARE_RUM_URL,
-  cloudflareAnalyticsMockScript,
-  isAllowedCloudflareAnalyticsRequest
-} from '../../scripts/cloudflare-analytics.mjs';
 
 const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
 
@@ -26,7 +20,6 @@ export async function installNetworkGuard(context, baseURL) {
   const unexpectedRequests = [];
   const pageErrors = [];
   const webSockets = [];
-  const analyticsRequests = [];
   const observedPages = new Set();
 
   function observePage(page) {
@@ -55,40 +48,20 @@ export async function installNetworkGuard(context, baseURL) {
     const isAllowedSameOrigin = url.origin === expectedOrigin
       && request.method() === 'GET'
       && (isDocument || isStaticAsset);
-    const isAllowedAnalytics = isAllowedCloudflareAnalyticsRequest({
-      expectedOrigin,
-      headers: request.headers(),
-      method: request.method(),
-      postData: request.postData(),
-      resourceType,
-      url: request.url()
-    });
-
-    if (isAllowedAnalytics) analyticsRequests.push(`${request.method()} ${request.url()}`);
-    if (!isAllowedSameOrigin && !isAllowedAnalytics) unexpectedRequests.push(`${request.method()} ${request.url()}`);
+    if (!isAllowedSameOrigin) unexpectedRequests.push(`${request.method()} ${request.url()}`);
   }
-
-  await context.route(CLOUDFLARE_BEACON_URL, (route) => route.fulfill({
-    body: cloudflareAnalyticsMockScript(),
-    contentType: 'text/javascript; charset=utf-8',
-    status: 200
-  }));
-  await context.route(CLOUDFLARE_RUM_URL, (route) => route.fulfill({ status: 204 }));
 
   context.pages().forEach(observePage);
   context.on('page', observePage);
   context.on('request', observeRequest);
 
   return {
-    analyticsRequests,
     unexpectedRequests,
     pageErrors,
     webSockets,
     async dispose() {
       context.off('page', observePage);
       context.off('request', observeRequest);
-      await context.unroute(CLOUDFLARE_BEACON_URL);
-      await context.unroute(CLOUDFLARE_RUM_URL);
     }
   };
 }
