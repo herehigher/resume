@@ -1,68 +1,22 @@
 # Resume Studio
 
-ブラウザ上で履歴書・職務経歴書を作成し、PDFとして保存するWebアプリです。
+ブラウザだけで日本語・简体中文・English の履歴書を作成し、PDF と JSON に保存できる、個人利用向けの静的 Web アプリです。
 
-v0.1では、日本語の編集・プレビュー機能をモジュール化し、中国語と英語の独立したデータ領域を追加しています。中国語・英語の正式な編集画面とPDFテンプレートは後続の実装で追加します。
+日本語: 三言語の履歴書を browser 内だけで編集・保存できます。
 
-## 現在の機能
+简体中文：可仅在浏览器内编辑和保存三种语言的简历。
 
-- 日本語の履歴書・職務経歴書の切り替え
-- 入力内容のリアルタイムプレビュー
-- 学歴、職歴、資格、勤務先の追加と削除
-- GitHub、LinkedIn、ポートフォリオ、資格確認URL
-- 証明写真の登録とトリミング
-- ブラウザへの自動保存、手動保存、再読み込み
-- 保存済み下書きを変更しない入力例
-- 新形式データのJSON書き出し・読み込み
-- 日本語、簡体中文、English の言語選択と独立した文書データ
-- A4 PDF出力とスマートフォン向け表示
+English: Edit and save resumes in three languages entirely in the browser.
 
-## 起動方法
+## Project overview
 
-ES Modulesを使用するため、`site/` を静的Webサーバーから配信します。
+- [Project overview / このページ](#project-overview)
+- [日本語](README.ja.md)
+- [简体中文](README.zh-CN.md)
+- [English](README.en.md)
 
-```bash
-python3 -m http.server 8000 --directory site
-```
+## Online Demo
 
-ブラウザで `http://localhost:8000/` を開きます。正式な公開環境はGitHub Pagesです。
+公開 Demo は準備中です（Issue #9）。検証済みの公開 URL が利用可能になるまで、推測した URL や未公開 URL は掲載しません。
 
-## データとプライバシー
-
-- 入力情報は外部へ送信されません。
-- 下書きはブラウザの `localStorage` に保存されます。
-- 保存キーは `resume-studio-web-v1` です。
-- 旧版の `resume-studio-data-v1` は読み込み、移行、削除を行いません。
-- 言語ごとの文書データは独立して保存されます。
-- ブラウザデータを消去すると下書きも削除されます。
-- JSON書き出しファイルには個人情報が含まれるため、利用者自身で安全に管理してください。
-
-## プロジェクト構成
-
-```text
-resume/
-├── site/
-│   ├── index.html
-│   └── assets/
-│       ├── css/
-│       └── js/
-├── tests/
-├── scripts/
-├── package.json
-├── README.md
-└── AGENTS.md
-```
-
-`site/` はビルドなしでそのまま静的ホスティングできます。本番コードに外部API、CDN、外部フォント、アクセス解析は使用していません。
-
-## テスト
-
-```bash
-npm test
-```
-
-状態モデル、言語解決、保存、JSON入出力、旧版データの無視、危険な写真URLの拒否、JavaScript構文、HTMLシェルと参照アセットを確認します。
-
-## 対応環境
-
-最新版のGoogle Chromeを推奨します。PDFの仕上がりは印刷プレビューで確認してください。
+The online demo is pending Issue #9. A URL will be added only after the deployed site has been verified.
