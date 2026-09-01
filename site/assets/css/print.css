@@ -1,7 +1,7 @@
 @media print {
   @page { margin: 14mm 15mm; }
   html, body { background: white; height: auto; overflow: visible; }
-  .app-header, .mobile-view-switch, .editor-panel, .preview-toolbar { display: none !important; }
+  .app-header, .mobile-view-switch, .editor-panel, .preview-toolbar, .trust-capsule, #privacySecurityDialog { display: none !important; }
   .locale-pending, .workspace[hidden] { display: none !important; }
   .workspace, .preview-panel, .preview-scroll, .document-preview { background: #fff !important; display: block !important; height: auto !important; margin: 0 !important; overflow: visible !important; padding: 0 !important; transform: none !important; width: auto !important; }
   .document-page { box-shadow: none; break-after: page; height: auto; margin: 0; min-height: 0; overflow: visible; padding: 0; width: auto; }
