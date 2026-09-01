@@ -37,7 +37,8 @@ export function initLocaleController(store, {
   const select = document.getElementById('localeSelect');
   const workspaces = {
     ja: document.getElementById('japaneseWorkspace'),
-    'zh-CN': document.getElementById('chineseWorkspace')
+    'zh-CN': document.getElementById('chineseWorkspace'),
+    en: document.querySelector('[data-english-editor]')
   };
   const pending = document.getElementById('localePending');
   const mobileSwitch = document.querySelector('.mobile-view-switch');
@@ -56,7 +57,6 @@ export function initLocaleController(store, {
     renderedLocale = locale;
     const copy = getMessages(locale);
     const isJapanese = locale === 'ja';
-    const hasWorkspace = Boolean(workspaces[locale]);
 
     document.documentElement.lang = copy.htmlLang;
     document.title = copy.pageTitle;
@@ -74,10 +74,10 @@ export function initLocaleController(store, {
     Object.entries(workspaces).forEach(([workspaceLocale, workspace]) => {
       workspace.hidden = workspaceLocale !== locale;
     });
-    pending.hidden = hasWorkspace;
+    pending.hidden = true;
     mobileSwitch.hidden = !isJapanese;
     documentSwitcher.hidden = !isJapanese;
-    printButton.hidden = !hasWorkspace;
+    printButton.hidden = false;
     sampleButton.hidden = !isJapanese;
     saveStatus.hidden = !isJapanese;
     onLocaleApplied(locale);

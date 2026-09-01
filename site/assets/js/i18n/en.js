@@ -2,7 +2,7 @@ export default {
   localeName: 'English',
   htmlLang: 'en',
   pageTitle: 'Resume Studio — English Resume',
-  brandSubtitle: 'English Resume',
+  brandSubtitle: 'ATS-friendly English Resume',
   localeLabel: 'Display language',
   dataManagement: 'Data management',
   brandHome: 'Resume Studio home',
@@ -14,6 +14,26 @@ export default {
   importSuccess: 'Your data was imported.',
   importError: 'This data could not be imported.',
   localeSaveError: 'The display language could not be saved.',
-  pendingTitle: 'The English editor is being prepared',
-  pendingBody: 'The English data space is ready. The ATS-friendly editor and A4/Letter templates will be added in a follow-up task.'
+  pendingTitle: 'Create an English resume',
+  pendingBody: 'Build a single-column, ATS-friendly resume for A4 or US Letter paper.',
+  editor: {
+    title: 'Create your resume',
+    description: 'Your changes appear in the preview as you type.',
+    contact: 'Contact details',
+    contactHint: 'Name, phone, email, and professional profiles',
+    summary: 'Professional summary',
+    experience: 'Experience',
+    projects: 'Projects',
+    education: 'Education',
+    skills: 'Skills',
+    certifications: 'Certifications',
+    add: 'Add',
+    remove: 'Remove',
+    present: 'Present',
+    pageSize: 'Paper size',
+    preview: 'Live preview',
+    emptyList: 'No entries yet. Select Add to create one.',
+    saveStatus: 'Saved on this device',
+    saveError: 'Your changes could not be saved on this device.'
+  }
 };
