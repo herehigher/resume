@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./assets/css/base.css">
   <link rel="stylesheet" href="./assets/css/editor.css">
   <link rel="stylesheet" href="./assets/css/templates/ja.css">
+  <link rel="stylesheet" href="./assets/css/templates/zh-CN.css">
   <link rel="stylesheet" href="./assets/css/responsive.css">
   <link rel="stylesheet" href="./assets/css/print.css">
 </head>
@@ -48,7 +49,7 @@
       <button class="secondary-button desktop-only" id="loadSampleButton" type="button">入力例を表示</button>
       <button class="primary-button" id="printButton" type="button">
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
-        PDF出力
+        <span id="printButtonLabel">PDF出力</span>
       </button>
     </div>
   </header>
@@ -310,6 +311,8 @@
       </div>
     </section>
   </main>
+
+  <main id="chineseWorkspace" hidden></main>
 
   <dialog id="confirmDialog">
     <form method="dialog" class="dialog-content">
