@@ -1,0 +1,167 @@
+import { readFile } from 'node:fs/promises';
+import { expect, openLocale, revealField, test } from './fixtures.js';
+
+const STORAGE_KEY = 'resume-studio-web-v1';
+
+test('日本語: 入力・保存復元・例示保護・削除・安全なプレビュー', async ({ page }) => {
+  await openLocale(page, 'ja');
+
+  const name = page.locator('[name="fullName"]');
+  const motivation = page.locator('[name="motivation"]');
+  const github = page.locator('[name="github"]');
+  const portfolio = page.locator('[name="portfolio"]');
+  await revealField(motivation);
+  await revealField(github);
+
+  const maliciousName = '<img data-e2e-malicious src=x onerror=alert(1)> 山田';
+  await name.fill(maliciousName);
+  await motivation.fill('顧客課題を整理し、改善を最後まで推進します。');
+  await github.fill('https://github.com/resume-studio-test');
+  await portfolio.fill('javascript:alert(1)');
+  await page.locator('[data-add="education"]').click();
+  const education = page.locator('#educationList .repeating-row').last();
+  await education.locator('[data-key="date"]').fill('2020-04');
+  await education.locator('[data-key="detail"]').fill('E2E大学 入学');
+
+  const preview = page.locator('#documentPreview');
+  await expect(preview).toContainText(maliciousName);
+  await expect(preview.locator('[data-e2e-malicious]')).toHaveCount(0);
+  await expect(preview.locator('a[href="https://github.com/resume-studio-test"]')).toHaveCount(1);
+  await expect(preview.locator('a[href^="javascript:"]')).toHaveCount(0);
+  await expect(preview).toContainText('E2E大学 入学');
+
+  await page.locator('#saveDraftButton').click();
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+  await name.fill('一時変更');
+  await page.locator('#reloadDraftButton').click();
+  await expect(name).toHaveValue(maliciousName);
+
+  await page.locator('#loadSampleButton').click();
+  await expect(preview).toContainText('山田 太郎');
+  await page.locator('#restoreDraftButton').click();
+  await expect(name).toHaveValue(maliciousName);
+
+  await education.locator('.remove-row-button').click();
+  await expect(preview).not.toContainText('E2E大学 入学');
+
+  await page.locator('#clearButton').click();
+  await expect(page.locator('#confirmDialog')).toBeVisible();
+  await page.locator('#confirmClearButton').click();
+  await expect(name).toHaveValue('');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
+});
+
+test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除条目', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  const workspace = page.locator('#chineseWorkspace');
+  const name = workspace.locator('[data-profile="fullName"]');
+
+  await name.fill('林晓宇 E2E');
+  await workspace.locator('[data-resume="headline"]').fill('高级产品经理');
+  await workspace.locator('[data-resume="summary"]').fill('负责企业服务产品规划与交付。');
+  const skills = workspace.locator('[data-resume="skills"]');
+  await revealField(skills);
+  await skills.fill('产品策略、数据分析、团队协作');
+  await workspace.locator('[data-zh-add="experience"]').click();
+  const experience = workspace.locator('[data-zh-type="experience"]').last();
+  await experience.locator('[data-zh-key="company"]').fill('E2E科技');
+  await experience.locator('[data-zh-key="role"]').fill('产品负责人');
+  await experience.locator('[data-zh-key="details"]').fill('将交付周期缩短30%');
+  await expect(workspace.locator('[data-zh-preview]')).toContainText('将交付周期缩短30%');
+
+  await workspace.locator('[data-zh-action="save"]').click();
+  await name.fill('临时姓名');
+  await workspace.locator('[data-zh-action="reload"]').click();
+  await expect(name).toHaveValue('林晓宇 E2E');
+
+  await workspace.locator('[data-zh-action="sample"]').click();
+  await expect(workspace.locator('[data-zh-sample-panel]')).toBeVisible();
+  await workspace.locator('[data-zh-action="restore"]').click();
+  await expect(name).toHaveValue('林晓宇 E2E');
+
+  await experience.locator('[data-zh-remove]').click();
+  await expect(workspace.locator('[data-zh-preview]')).not.toContainText('E2E科技');
+});
+
+test('English: complete editing flow saves, restores, protects samples, and removes entries', async ({ page }) => {
+  await openLocale(page, 'en');
+  const workspace = page.locator('[data-english-editor]');
+  const name = workspace.locator('[data-profile-field="fullName"]');
+
+  await name.fill('Alex E2E');
+  await workspace.locator('[data-resume-field="headline"]').fill('Product Engineering Lead');
+  await workspace.locator('[data-resume-field="summary"]').fill('Builds accessible products with measurable outcomes.');
+  const skills = workspace.locator('[data-resume-field="skills"]');
+  await revealField(skills);
+  await skills.fill('Product strategy, JavaScript, Accessibility');
+  await workspace.locator('[data-en-add="experience"]').click();
+  const experience = workspace.locator('[data-en-item="experience"]').last();
+  await experience.locator('[data-en-item-field="company"]').fill('E2E Labs');
+  await experience.locator('[data-en-item-field="role"]').fill('Lead');
+  await experience.locator('[data-en-item-field="details"]').fill('Improved activation by 25%.');
+  await expect(workspace.locator('[data-en-preview]')).toContainText('Improved activation by 25%.');
+
+  await workspace.locator('[data-en-save]').click();
+  await name.fill('Temporary Name');
+  await workspace.locator('[data-en-reload]').click();
+  await expect(name).toHaveValue('Alex E2E');
+
+  await workspace.locator('[data-en-load-sample]').click();
+  await expect(workspace.locator('[data-en-sample-panel]')).toBeVisible();
+  await workspace.locator('[data-en-restore-sample]').click();
+  await expect(name).toHaveValue('Alex E2E');
+
+  await experience.locator('[data-en-remove]').click();
+  await expect(workspace.locator('[data-en-preview]')).not.toContainText('E2E Labs');
+});
+
+test('JSON の書き出し・読込が往復し、不正データは既存下書きを壊さない', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const name = page.locator('[name="fullName"]');
+  await name.fill('書き出し前の氏名');
+  await page.locator('#saveDraftButton').click();
+  await page.locator('#dataMenuSummary').click();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  const download = await downloadPromise;
+  const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(exported.version).toBe(1);
+  expect(exported.profile.fields.fullName).toBe('書き出し前の氏名');
+
+  exported.profile.fields.fullName = '読み込んだ氏名';
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'resume-studio-valid.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(exported))
+  });
+  await expect(name).toHaveValue('読み込んだ氏名');
+
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'resume-studio-invalid.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"version":999}')
+  });
+  await expect(page.locator('#globalMessage')).toContainText('読み込めませんでした');
+  await expect(name).toHaveValue('読み込んだ氏名');
+  await expect.poll(() => page.evaluate((key) => {
+    const stored = JSON.parse(localStorage.getItem(key));
+    return stored.profile.fields.fullName;
+  }, STORAGE_KEY)).toBe('読み込んだ氏名');
+});
+
+test('@mobile 主要なスマートフォン表示で三言語の編集・プレビューを切り替えられる', async ({ page }) => {
+  const cases = [
+    ['ja', '#japaneseWorkspace', '[data-mobile-view="preview"]', '#documentPreview'],
+    ['zh-CN', '#chineseWorkspace', '[data-zh-mobile-view="preview"]', '[data-zh-preview]'],
+    ['en', '[data-english-editor]', '[data-en-mobile-view="preview"]', '[data-en-preview]']
+  ];
+
+  for (const [locale, workspaceSelector, switchSelector, previewSelector] of cases) {
+    await openLocale(page, locale);
+    const workspace = page.locator(workspaceSelector);
+    await page.locator(switchSelector).click();
+    await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
+    await expect(workspace.locator(previewSelector)).toBeVisible();
+  }
+});
