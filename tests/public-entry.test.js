@@ -8,10 +8,10 @@ import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const base = 'https://herehigher.github.io/resume/';
 const routes = Object.freeze([
-  { file: 'site/index.html', lang: 'ja', canonical: base, h1: '履歴書を作成' },
-  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成' },
-  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历' },
-  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume' }
+  { file: 'site/index.html', lang: 'ja', canonical: base, h1: '履歴書を作成', icon: './assets/favicon/resume-studio.png' },
+  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成', icon: '../assets/favicon/resume-studio.png' },
+  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历', icon: '../assets/favicon/resume-studio.png' },
+  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume', icon: '../assets/favicon/resume-studio.png' }
 ]);
 const alternateLinks = Object.freeze({
   ja: `${base}ja/`,
@@ -56,6 +56,8 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /<meta\s+name="description"\s+content="[^"]+"/i);
     assert.match(html, /<title>[^<]+<\/title>/i);
     assert.match(html, new RegExp(`<h1[^>]*>${route.h1}</h1>`));
+    assert.equal(linkTarget(html, 'icon'), route.icon);
+    assert.equal(existsSync(new URL(route.icon, new URL(`../${route.file}`, import.meta.url))), true);
     assert.equal(linkTarget(html, 'canonical'), route.canonical);
     for (const [locale, url] of Object.entries(alternateLinks)) {
       assert.equal(linkTarget(html, 'alternate', locale), url, `${route.file} must link to ${locale}`);
