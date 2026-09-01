@@ -73,7 +73,7 @@ Chrome で editor の `http://localhost:8000/`、public entry の `http://localh
 
 | Command | 確認内容 |
 | --- | --- |
-| `npm test` | Node unit / document test、`tests/public-entry.test.js` による canonical / hreflang / sitemap / JSON Schema contract、`scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、全公開 HTML の external runtime asset check |
+| `npm test` | Node unit / document test、`tests/public-entry.test.js` による canonical / hreflang / sitemap と代表的な JSON Schema / import case、`scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、全公開 HTML の external runtime asset check |
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
 | `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、privacy / network guard、PDF page size・pagination・抽出 text の Playwright acceptance |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |

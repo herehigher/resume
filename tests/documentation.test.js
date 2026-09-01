@@ -207,6 +207,8 @@ test('AGENTS links the canonical development and documentation guide', () => {
 test('development docs cover localized public entry and machine-readable contracts', () => {
   const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
   const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
+  const acceptanceItems = acceptance.split('\n').filter((line) => line.startsWith('- [ ] '));
+  const hasAcceptanceItem = (...facts) => acceptanceItems.some((line) => facts.every((fact) => line.includes(fact)));
 
   for (const fact of [
     '/ja/',
@@ -233,6 +235,13 @@ test('development docs cover localized public entry and machine-readable contrac
   ]) {
     assert.match(acceptance, new RegExp(fact.replaceAll('.', '\\.')));
   }
+
+  assert.equal(hasAcceptanceItem('/ja/', '/zh-cn/', '/en/', 'public entry', '正しい言語の公開内容'), true);
+  assert.equal(hasAcceptanceItem('Root editor', 'JavaScript', 'H1', 'editor content'), true);
+  assert.equal(hasAcceptanceItem('三言語 public entry', 'JavaScript', 'editor CTA', 'JSON Schema link'), true);
+  assert.equal(hasAcceptanceItem('Root', 'editor CTA'), false);
+  assert.equal(hasAcceptanceItem('Root', 'JSON Schema link'), false);
+  assert.equal(hasAcceptanceItem('Public entry', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {

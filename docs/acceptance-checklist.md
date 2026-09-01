@@ -10,14 +10,14 @@
 - 利用可能になった時点で `Quality / quality` を main の必須ステータスチェック（required status check）に設定し、失敗したPRのマージも禁止する。
 - Playwright の失敗時は GitHub Actions の `playwright-results` artifact で trace と screenshot を確認する。
 - PDF ゲートは short（英語1ページ）、standard（日本語2ページ）、long（英語複数ページ）について、ページ数、用紙寸法、先頭・末尾の抽出テキストを確認する。
-- `tests/public-entry.test.js` が三言語 public entry、canonical / hreflang、`sitemap.xml`、`resume-studio-web-v1.schema.json` と import example の契約を検証する。
+- `tests/public-entry.test.js` が三言語 public entry の metadata、canonical / hreflang、`sitemap.xml`、`resume-studio-web-v1.schema.json` と import example の代表的な正常・異常 case を検証する。
 - Playwright が JavaScript 無効時の public entry と、document tab の `aria-selected` / roving tabindex、三言語 mobile switch の `aria-pressed` を検証する。
 
 ## ブラウザ表示
 
 対象: 最新の Chrome/Chromium、デスクトップ 1440 × 1000、スマートフォン相当 390 × 844。
 
-- [ ] `/?lang=ja`、`/?lang=zh-CN`、`/?lang=en` の editor URLを直接開き、正しい言語と入力データが表示される。
+- [ ] `/ja/`、`/zh-cn/`、`/en/` の public entry を直接開き、正しい言語の公開内容が表示される。
 - [ ] デスクトップで入力欄とプレビューが同時に読め、横スクロールや操作不能なボタンがない。
 - [ ] スマートフォンで三言語の代表入力、保存・再読込、「入力 / プレビュー」切替を実行し、データ書き出しを含む主要操作に到達できる。
 - [ ] 日本語の履歴書 / 職務経歴書 tab で visual state、`aria-selected`、focusable tab が一致し、ArrowLeft / ArrowRight / Home / End で切り替えられる。
@@ -32,7 +32,8 @@
 
 対象: GitHub Pages へ deploy した release candidate の実 URL。Project site の場合は `/resume/` subpath を含めて確認する。
 
-- [ ] Root、`/ja/`、`/zh-cn/`、`/en/` が直接開け、JavaScript を無効にしても対応する `lang`、title、description、H1、主要説明、editor CTA、JSON Schema link を読める。
+- [ ] Root editor を直接開き、JavaScript を無効にしても `lang`、title、description、H1 と基本的な editor content を読める。
+- [ ] 三言語 public entry は JavaScript を無効にしても対応する `lang`、title、description、H1、主要説明、editor CTA、JSON Schema link を読める。
 - [ ] Root と三言語 public entry の canonical が実 deployment URL と一致し、`ja`、`zh-CN`、`en`、`x-default` の hreflang が全 page で reciprocal になっている。
 - [ ] `sitemap.xml` が HTTP 200 と XML content type で取得でき、root と三言語の canonical URL だけを含む。
 - [ ] `schema/resume-studio-web-v1.schema.json` と架空 example JSON が HTTP 200 で取得でき、example を editor へ import できる。
