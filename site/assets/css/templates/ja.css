@@ -76,3 +76,14 @@
 
 .paper-section-first { border-top: 1px solid #374151; }
 .requests-section { min-height: 145px; }
+
+@media print {
+  #japaneseWorkspace .document-page {
+    height: auto;
+    overflow: visible;
+  }
+  #japaneseWorkspace .empty-preview { display: none; }
+  #japaneseWorkspace .paper-table-row,
+  #japaneseWorkspace .career-company,
+  #japaneseWorkspace .paper-text-section { break-inside: avoid; }
+}
