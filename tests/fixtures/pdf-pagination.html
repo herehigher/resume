@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PDF pagination fixture</title>
+  <link rel="stylesheet" href="../../site/assets/css/base.css">
+  <link rel="stylesheet" href="../../site/assets/css/editor.css">
+  <link rel="stylesheet" href="../../site/assets/css/templates/ja.css">
+  <link rel="stylesheet" href="../../site/assets/css/templates/zh-CN.css">
+  <link rel="stylesheet" href="../../site/assets/css/templates/en.css">
+  <link rel="stylesheet" href="../../site/assets/css/print.css">
+</head>
+<body>
+  <main class="workspace" id="pdfFixtureWorkspace">
+    <div class="preview-panel">
+      <div class="preview-scroll">
+        <div class="document-preview" id="pdfFixturePreview"></div>
+      </div>
+    </div>
+  </main>
+  <script type="module">
+    import { createPdfFixture } from './pdf-pagination.mjs';
+    import { renderEnglishResume } from '../../site/assets/js/templates/en.js';
+    import { renderJapaneseDocument } from '../../site/assets/js/templates/ja.js';
+    import { renderChineseResume } from '../../site/assets/js/templates/zh-CN.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const options = {
+      locale: params.get('locale') || 'ja',
+      length: params.get('length') || 'standard',
+      documentType: params.get('document') || 'resume',
+      pageSize: params.get('pageSize') || 'A4'
+    };
+    const { state, endMarker } = createPdfFixture(options);
+    const workspace = document.getElementById('pdfFixtureWorkspace');
+    const render = options.locale === 'ja'
+      ? renderJapaneseDocument
+      : options.locale === 'zh-CN' ? renderChineseResume : renderEnglishResume;
+
+    workspace.id = options.locale === 'ja'
+      ? 'japaneseWorkspace'
+      : options.locale === 'zh-CN' ? 'chineseWorkspace' : 'englishWorkspace';
+    document.documentElement.lang = options.locale;
+    document.getElementById('pdfFixturePreview').innerHTML = render(state);
+    document.title = endMarker;
+    window.__pdfFixtureReady = { endMarker, options };
+  </script>
+</body>
+</html>

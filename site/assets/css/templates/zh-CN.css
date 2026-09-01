@@ -81,7 +81,7 @@
 
 .zh-section > h2 {
   align-items: center;
-  break-after: avoid;
+  break-after: avoid-page;
   color: #173f6f;
   display: flex;
   font-size: 13px;
@@ -115,7 +115,7 @@
 .zh-timeline { display: grid; gap: 14px; }
 
 .zh-timeline-item {
-  break-inside: avoid;
+  break-inside: avoid-page;
   display: grid;
   gap: 15px;
   grid-template-columns: 88px 1fr;
@@ -183,7 +183,7 @@
 .zh-project {
   background: #fafbfd;
   border: 1px solid #dce4ec;
-  break-inside: avoid;
+  break-inside: avoid-page;
   padding: 11px 13px;
 }
 
@@ -300,6 +300,11 @@
   .zh-skills .zh-section-body { columns: auto; }
 }
 
+@page chinese-a4 {
+  margin: 13mm 15mm 14mm;
+  size: A4 portrait;
+}
+
 @media print {
   .zh-mobile-view-switch,
   .zh-workspace > .editor-panel,
@@ -321,9 +326,17 @@
   .zh-resume-document {
     break-after: auto;
     height: auto;
-    min-height: 297mm;
+    min-height: 0;
     overflow: visible;
-    padding: 13mm 15mm 14mm;
-    width: 210mm;
+    page: chinese-a4;
+    padding: 0;
+    width: auto;
   }
+
+  .zh-section > h2,
+  .zh-timeline-content > h3,
+  .zh-project-heading { break-after: avoid-page; }
+
+  .zh-achievement-list li,
+  .zh-certifications li { break-inside: avoid-page; }
 }

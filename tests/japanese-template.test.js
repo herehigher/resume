@@ -105,12 +105,18 @@ test('Japanese sample data is isolated from the current draft', () => {
   assert.notEqual(sample.documents.ja.fields.motivation, draft.documents.ja.fields.motivation);
 });
 
-test('Japanese template keeps A4 print dimensions and suppresses preview placeholders', () => {
+test('Japanese template keeps A4 print dimensions without clipping long content', () => {
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
   const printCss = readFileSync(new URL('../site/assets/css/print.css', import.meta.url), 'utf8');
 
-  assert.match(printCss, /@page\s*\{[^}]*size:\s*A4 portrait;/s);
-  assert.match(printCss, /\.document-page\s*\{[^}]*height:\s*297mm;[^}]*width:\s*210mm;/s);
-  assert.match(japaneseCss, /#japaneseWorkspace \.document-page\s*\{[^}]*height:\s*auto;[^}]*overflow:\s*visible;/s);
+  assert.match(japaneseCss, /@page japanese-a4\s*\{[^}]*margin:\s*14mm 15mm;[^}]*size:\s*A4 portrait;/s);
+  assert.match(printCss, /@page\s*\{[^}]*margin:\s*14mm 15mm;[^}]*\}/s);
+  assert.doesNotMatch(printCss, /@page\s*\{[^}]*size:/s);
+  assert.match(printCss, /\.document-page\s*\{[^}]*height:\s*auto;[^}]*min-height:\s*0;[^}]*overflow:\s*visible;[^}]*padding:\s*0;[^}]*width:\s*auto;/s);
+  const documentPageRule = printCss.match(/\.document-page\s*\{([^}]*)\}/s)?.[1] || '';
+  assert.doesNotMatch(documentPageRule, /(?:^|;)\s*(?:height:\s*297mm|overflow:\s*hidden)/s);
+  assert.match(japaneseCss, /#japaneseWorkspace \.document-page\s*\{[^}]*height:\s*auto;[^}]*overflow:\s*visible;[^}]*page:\s*japanese-a4;/s);
+  assert.match(japaneseCss, /\.paper-table-row,[\s\S]*\.career-company\s*\{\s*break-inside:\s*avoid-page;/);
+  assert.match(japaneseCss, /\.paper-text-section\s*\{\s*break-inside:\s*auto;/);
   assert.match(japaneseCss, /#japaneseWorkspace \.empty-preview\s*\{\s*display:\s*none;/s);
 });
