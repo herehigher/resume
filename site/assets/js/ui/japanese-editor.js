@@ -40,14 +40,21 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     return store.getState().documents.ja;
   }
 
-  function showDraftMessage(message) {
-    const draftMessage = document.getElementById('draftMessage');
+  function setDraftStatus(message, tone = '') {
     window.clearTimeout(draftMessageTimer);
-    draftMessage.textContent = message;
-    draftMessage.classList.add('is-success');
+    saveStatus.textContent = message;
+    saveStatus.classList.toggle('is-success', tone === 'success');
+    saveStatus.classList.toggle('is-error', tone === 'error');
+  }
+
+  function showDraftMessage(message, {
+    fallback = '入力内容は自動保存されます',
+    fallbackTone = '',
+    tone = 'success'
+  } = {}) {
+    setDraftStatus(message, tone);
     draftMessageTimer = window.setTimeout(() => {
-      draftMessage.textContent = '入力内容は自動保存されます';
-      draftMessage.classList.remove('is-success');
+      setDraftStatus(fallback, fallbackTone);
     }, 3000);
   }
 
@@ -56,34 +63,26 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     try {
       store.save();
       shouldPersistDraft = true;
-      saveStatus.classList.remove('is-saving');
-      saveStatus.textContent = 'この端末に保存済み';
-      showDraftMessage(message);
+      showDraftMessage(message, {
+        fallback: 'この端末に保存済み',
+        fallbackTone: 'success'
+      });
     } catch {
-      saveStatus.classList.remove('is-saving');
-      saveStatus.textContent = '保存容量を超えました';
-      showDraftMessage('保存できませんでした');
+      setDraftStatus('保存容量を超えたため、下書きを保存できませんでした', 'error');
     }
   }
 
   function scheduleSave() {
     window.clearTimeout(saveTimer);
-    if (sampleMode) {
-      saveStatus.classList.remove('is-saving');
-      saveStatus.textContent = '入力例は保存されません';
-      return;
-    }
+    if (sampleMode) return;
     shouldPersistDraft = true;
-    saveStatus.classList.add('is-saving');
-    saveStatus.textContent = '保存中…';
+    setDraftStatus('保存中…');
     saveTimer = window.setTimeout(() => {
       try {
         store.save();
-        saveStatus.classList.remove('is-saving');
-        saveStatus.textContent = 'この端末に保存済み';
+        setDraftStatus('この端末に保存済み', 'success');
       } catch {
-        saveStatus.classList.remove('is-saving');
-        saveStatus.textContent = '保存容量を超えました';
+        setDraftStatus('保存容量を超えたため、下書きを保存できませんでした', 'error');
       }
     }, 300);
   }
@@ -96,11 +95,18 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   function reloadDraft() {
     window.clearTimeout(saveTimer);
     if (!store.reload()) {
-      showDraftMessage('保存された下書きはありません');
+      showDraftMessage('保存された下書きはありません', {
+        fallback: shouldPersistDraft ? 'この端末に保存済み' : '入力内容は自動保存されます',
+        fallbackTone: shouldPersistDraft ? 'success' : '',
+        tone: ''
+      });
       return;
     }
     shouldPersistDraft = true;
-    showDraftMessage('保存した内容を読み込みました');
+    showDraftMessage('保存した内容を読み込みました', {
+      fallback: 'この端末に保存済み',
+      fallbackTone: 'success'
+    });
   }
 
   function setSampleModeUI(active) {
@@ -118,9 +124,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     try {
       currentDraft = protectDraftBeforeSample(store, shouldPersistDraft);
     } catch {
-      saveStatus.classList.remove('is-saving');
-      saveStatus.textContent = '保存できませんでした';
-      showDraftMessage('現在の下書きを保護できないため、入力例を表示できません');
+      setDraftStatus('現在の下書きを保護できないため、入力例を表示できません', 'error');
       return;
     }
     draftBeforeSample = currentDraft;
@@ -128,8 +132,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     sampleMode = true;
     store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
     setSampleModeUI(true);
-    saveStatus.classList.remove('is-saving');
-    saveStatus.textContent = '入力例は一時表示です';
   }
 
   function restoreDraftFromSample({ announce = true } = {}) {
@@ -139,8 +141,13 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     sampleMode = false;
     draftBeforeSample = null;
     setSampleModeUI(false);
-    saveStatus.textContent = shouldPersistDraft ? 'この端末に保存済み' : '下書きは保存されていません';
-    if (announce) showDraftMessage('元の下書きに戻りました');
+    const fallback = shouldPersistDraft ? 'この端末に保存済み' : '下書きは保存されていません';
+    const fallbackTone = shouldPersistDraft ? 'success' : '';
+    if (announce) {
+      showDraftMessage('元の下書きに戻りました', { fallback, fallbackTone });
+    } else {
+      setDraftStatus(fallback, fallbackTone);
+    }
     return true;
   }
 
@@ -467,11 +474,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       shouldPersistDraft = false;
       sampleMode = false;
       setSampleModeUI(false);
-      saveStatus.classList.remove('is-saving');
-      saveStatus.textContent = '下書きは保存されていません';
-      showDraftMessage('下書きデータを削除しました');
+      showDraftMessage('下書きデータを削除しました', {
+        fallback: '下書きは保存されていません'
+      });
     } catch {
-      showDraftMessage('下書きデータを削除できませんでした');
+      setDraftStatus('下書きデータを削除できませんでした', 'error');
     }
   });
   document.getElementById('printButton').addEventListener('click', () => window.print());

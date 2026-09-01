@@ -1,7 +1,6 @@
 @media (max-width: 1120px) {
   .app-header { grid-template-columns: auto 1fr auto; }
   .document-switcher { justify-self: center; }
-  .save-status { display: none; }
   .workspace { grid-template-columns: minmax(390px, 48%) 1fr; }
   .document-page { min-height: 927px; padding: 39px 42px; width: 655px; }
   .profile-name { min-height: 57px !important; }
@@ -13,6 +12,8 @@
   .brand small, .desktop-only { display: none; }
   .brand-mark { height: 32px; width: 32px; }
   .document-switcher { display: none; }
+  .data-menu-label { display: none; }
+  .data-menu-short-label { display: inline; }
   .primary-button { padding: 0 11px; }
   .mobile-view-switch { background: #fff; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; height: 44px; padding: 5px 14px; }
   .mobile-view-switch button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 11px; font-weight: 700; }
@@ -29,6 +30,10 @@
 
 @media (max-width: 520px) {
   .brand strong { font-size: 12px; }
+  .data-menu summary { padding: 0; width: 38px; }
+  .data-menu-short-label,
+  .data-menu-chevron { display: none; }
+  .data-menu-icon { display: block; }
   .primary-button { font-size: 10px; min-height: 34px; }
   .editor-heading { align-items: start; }
   .editor-heading h1 { font-size: 24px; }
