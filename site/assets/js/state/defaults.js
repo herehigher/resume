@@ -1,4 +1,4 @@
-import { PAGE_SIZE, STATE_VERSION } from '../config.js';
+import { DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 
 function today() {
   const now = new Date();
@@ -55,15 +55,53 @@ export function createJapaneseDocument() {
   };
 }
 
-export function createDefaultState() {
+export function createChineseDocument() {
+  return {
+    activeDocument: 'resume',
+    resume: {
+      headline: '',
+      summary: '',
+      education: [{ startDate: '', endDate: '', school: '', degree: '', details: '' }],
+      experience: [{ startDate: '', endDate: '', company: '', role: '', details: '' }],
+      projects: [{ startDate: '', endDate: '', name: '', role: '', details: '', url: '' }],
+      skills: '',
+      certifications: [{ date: '', name: '', url: '' }]
+    }
+  };
+}
+
+export function createEnglishDocument() {
+  return {
+    activeDocument: 'resume',
+    resume: {
+      headline: '',
+      summary: '',
+      education: [{ startDate: '', endDate: '', school: '', degree: '', details: '' }],
+      experience: [{ startDate: '', endDate: '', company: '', role: '', details: '' }],
+      projects: [{ startDate: '', endDate: '', name: '', role: '', details: '', url: '' }],
+      skills: '',
+      certifications: [{ date: '', name: '', url: '' }]
+    }
+  };
+}
+
+export function createDefaultState(locale = DEFAULT_LOCALE) {
+  const safeLocale = SUPPORTED_LOCALES.includes(locale) ? locale : DEFAULT_LOCALE;
   return {
     version: STATE_VERSION,
     settings: {
-      pageSize: PAGE_SIZE
+      locale: safeLocale,
+      pageSizeByLocale: {
+        ja: 'A4',
+        'zh-CN': 'A4',
+        en: 'LETTER'
+      }
     },
     profile: createDefaultProfile(),
     documents: {
-      ja: createJapaneseDocument()
+      ja: createJapaneseDocument(),
+      'zh-CN': createChineseDocument(),
+      en: createEnglishDocument()
     }
   };
 }

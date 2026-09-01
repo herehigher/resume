@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { STORAGE_KEY } from '../site/assets/js/config.js';
+import { resolveLocale } from '../site/assets/js/i18n/index.js';
 import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { loadStoredState } from '../site/assets/js/state/storage.js';
 import { createStore } from '../site/assets/js/state/store.js';
 import { protectDraftBeforeSample } from '../site/assets/js/ui/japanese-editor.js';
+import { persistLocaleChange } from '../site/assets/js/ui/locale-controller.js';
 
 function createMemoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -23,11 +25,28 @@ function createMemoryStorage(initial = {}) {
   };
 }
 
-test('default Japanese state matches the versioned schema', () => {
-  const state = createDefaultState();
+test('default state contains independent locale documents', () => {
+  const state = createDefaultState('zh-CN');
   assert.equal(validateState(state).valid, true);
-  assert.equal(state.settings.pageSize, 'A4');
-  assert.deepEqual(Object.keys(state.documents), ['ja']);
+  assert.equal(state.settings.locale, 'zh-CN');
+  assert.notEqual(state.documents.ja, state.documents['zh-CN']);
+  assert.notEqual(state.documents['zh-CN'], state.documents.en);
+});
+
+test('locale resolution follows URL, saved setting, browser, default order', () => {
+  assert.equal(resolveLocale({
+    search: '?lang=en',
+    storedLocale: 'ja',
+    browserLanguages: ['zh-CN']
+  }), 'en');
+  assert.equal(resolveLocale({
+    storedLocale: 'zh-CN',
+    browserLanguages: ['en-US']
+  }), 'zh-CN');
+  assert.equal(resolveLocale({ browserLanguages: ['en-GB'] }), 'en');
+  assert.equal(resolveLocale({ browserLanguages: ['zh-Hans'] }), 'zh-CN');
+  assert.equal(resolveLocale({ browserLanguages: ['zh'] }), 'zh-CN');
+  assert.equal(resolveLocale({ browserLanguages: ['fr-FR'] }), 'ja');
 });
 
 test('new storage ignores the legacy key', () => {
@@ -37,36 +56,54 @@ test('new storage ignores the legacy key', () => {
   assert.equal(loadStoredState(storage), null);
 });
 
-test('Japanese document and shared profile persist together', () => {
+test('locale documents persist without overwriting each other', () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState() });
+  const store = createStore({ storage, initialState: createDefaultState('ja') });
 
   store.update((state) => {
-    state.profile.fields.fullName = '山田 太郎';
-    state.documents.ja.fields.motivation = '志望動機';
+    state.documents.ja.fields.motivation = '日本語';
+    state.documents['zh-CN'].resume.summary = '中文';
+    state.documents.en.resume.summary = 'English';
   });
   store.save();
 
   const restored = loadStoredState(storage);
-  assert.equal(restored.profile.fields.fullName, '山田 太郎');
-  assert.equal(restored.documents.ja.fields.motivation, '志望動機');
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY)).version, 1);
+  assert.equal(restored.documents.ja.fields.motivation, '日本語');
+  assert.equal(restored.documents['zh-CN'].resume.summary, '中文');
+  assert.equal(restored.documents.en.resume.summary, 'English');
 });
 
-test('invalid stored state is ignored', () => {
-  const storage = createMemoryStorage({
-    [STORAGE_KEY]: JSON.stringify({ version: 999 })
+test('export and import round trip preserves all locale data', () => {
+  const storage = createMemoryStorage();
+  const source = createStore({ storage, initialState: createDefaultState('en') });
+  source.update((state) => {
+    state.profile.fields.fullName = 'Sample Person';
+    state.documents.ja.fields.selfPromotion = '自己PR';
+    state.documents['zh-CN'].resume.skills = '产品设计';
+    state.documents.en.resume.skills = 'Product design';
   });
-  assert.equal(loadStoredState(storage), null);
+
+  const targetStorage = createMemoryStorage();
+  const target = createStore({ storage: targetStorage, initialState: createDefaultState() });
+  target.importJson(source.exportJson());
+
+  assert.deepEqual(target.getState(), source.getState());
+  assert.equal(JSON.parse(targetStorage.getItem(STORAGE_KEY)).profile.fields.fullName, 'Sample Person');
 });
 
-test('sample state does not mutate the source draft', () => {
-  const source = createDefaultState();
-  source.profile.fields.fullName = '保存する氏名';
-  const sample = createJapaneseSampleState(source);
+test('invalid import does not change current or persisted data', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  store.update((state) => {
+    state.profile.fields.fullName = '守るデータ';
+  });
+  store.save();
+  const beforeState = JSON.stringify(store.getState());
+  const beforeStored = storage.getItem(STORAGE_KEY);
 
-  assert.equal(source.profile.fields.fullName, '保存する氏名');
-  assert.equal(sample.profile.fields.fullName, '山田 太郎');
+  assert.throws(() => store.importJson('{"version":999}'));
+  assert.equal(JSON.stringify(store.getState()), beforeState);
+  assert.equal(storage.getItem(STORAGE_KEY), beforeStored);
 });
 
 test('entering sample mode synchronously persists pending draft changes', () => {
@@ -97,9 +134,49 @@ test('sample draft protection propagates storage failures without changing state
   assert.equal(loadStoredState(storage), null);
 });
 
-test('schema rejects remote and unsupported photo sources', () => {
-  const state = createDefaultState();
-  state.profile.photo = 'https://example.com/tracker.png';
+test('changing locale from sample mode persists the protected draft, not sample data', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  store.update((state) => {
+    state.profile.fields.fullName = '保存する氏名';
+  });
+  store.save();
+  const protectedDraft = protectDraftBeforeSample(store, true);
+  store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
 
-  assert.equal(validateState(state).valid, false);
+  persistLocaleChange(store, 'zh-CN', () => {
+    store.replace(protectedDraft, { type: 'restore' });
+  });
+
+  assert.equal(store.getState().profile.fields.fullName, '保存する氏名');
+  assert.equal(store.getState().settings.locale, 'zh-CN');
+  assert.equal(loadStoredState(storage).profile.fields.fullName, '保存する氏名');
+  assert.equal(loadStoredState(storage).settings.locale, 'zh-CN');
+});
+
+test('failed locale persistence leaves state and stored data unchanged', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  store.update((state) => {
+    state.profile.fields.fullName = '保持する氏名';
+  });
+  store.save();
+  const storedBefore = storage.getItem(STORAGE_KEY);
+  storage.setItem = () => {
+    throw new Error('quota exceeded');
+  };
+
+  assert.throws(() => persistLocaleChange(store, 'en'), /quota exceeded/);
+  assert.equal(store.getState().settings.locale, 'ja');
+  assert.equal(storage.getItem(STORAGE_KEY), storedBefore);
+});
+
+test('import rejects remote and unsupported photo sources', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState() });
+  const unsafe = createDefaultState();
+  unsafe.profile.photo = 'https://example.com/tracker.png';
+
+  assert.throws(() => store.importJson(JSON.stringify(unsafe)));
+  assert.equal(store.getState().profile.photo, '');
 });
