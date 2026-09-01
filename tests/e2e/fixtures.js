@@ -1,23 +1,51 @@
 import { expect, test as base } from '@playwright/test';
 
-export const test = base.extend({
-  page: async ({ baseURL, page }, use) => {
-    const expectedOrigin = new URL(baseURL).origin;
-    const externalRequests = [];
-    const pageErrors = [];
+export function installNetworkGuard(context, baseURL) {
+  const expectedOrigin = new URL(baseURL).origin;
+  const externalRequests = [];
+  const pageErrors = [];
+  const webSockets = [];
+  const observedPages = new Set();
 
-    page.on('request', (request) => {
-      const url = new URL(request.url());
-      if (['http:', 'https:'].includes(url.protocol) && url.origin !== expectedOrigin) {
-        externalRequests.push(`${request.method()} ${request.url()}`);
-      }
-    });
+  function observePage(page) {
+    if (observedPages.has(page)) return;
+    observedPages.add(page);
     page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('websocket', (socket) => webSockets.push(socket.url()));
+  }
 
-    await use(page);
+  function observeRequest(request) {
+    const url = new URL(request.url());
+    if (['http:', 'https:'].includes(url.protocol) && url.origin !== expectedOrigin) {
+      externalRequests.push(`${request.method()} ${request.url()}`);
+    }
+  }
 
-    expect(externalRequests, '個人データを送信し得る外部ネットワーク要求がないこと').toEqual([]);
-    expect(pageErrors, 'ブラウザ実行中に未処理エラーがないこと').toEqual([]);
+  context.pages().forEach(observePage);
+  context.on('page', observePage);
+  context.on('request', observeRequest);
+
+  return {
+    externalRequests,
+    pageErrors,
+    webSockets,
+    dispose() {
+      context.off('page', observePage);
+      context.off('request', observeRequest);
+    }
+  };
+}
+
+export const test = base.extend({
+  context: async ({ baseURL, context }, use) => {
+    const guard = installNetworkGuard(context, baseURL);
+
+    await use(context);
+
+    guard.dispose();
+    expect(guard.externalRequests, '個人データを送信し得る外部ネットワーク要求がないこと').toEqual([]);
+    expect(guard.webSockets, 'WebSocket接続で個人データを送信しないこと').toEqual([]);
+    expect(guard.pageErrors, 'ブラウザ実行中に未処理エラーがないこと').toEqual([]);
   }
 });
 
@@ -34,4 +62,10 @@ export async function revealField(locator) {
     const details = field.closest('details');
     if (details) details.open = true;
   });
+}
+
+export async function expectNoPageOverflow(page) {
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  ))).toBe(true);
 }

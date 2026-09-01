@@ -1,7 +1,16 @@
 import { readFile } from 'node:fs/promises';
-import { expect, openLocale, revealField, test } from './fixtures.js';
+import { expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
 
 const STORAGE_KEY = 'resume-studio-web-v1';
+const PROFILE_URL_CASES = [
+  ['http://example.test/profile', true],
+  ['https://example.test/profile', true],
+  ['javascript:alert(1)', false],
+  ['data:text/html,profile', false],
+  ['/relative-profile', false],
+  ['mailto:profile@example.test', false],
+  ['ftp://example.test/profile', false]
+];
 
 test('日本語: 入力・保存復元・例示保護・削除・安全なプレビュー', async ({ page }) => {
   await openLocale(page, 'ja');
@@ -150,18 +159,84 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   }, STORAGE_KEY)).toBe('読み込んだ氏名');
 });
 
-test('@mobile 主要なスマートフォン表示で三言語の編集・プレビューを切り替えられる', async ({ page }) => {
+test('三言語のプロフィールURLはHTTP(S)だけがリンクになる', async ({ page }) => {
   const cases = [
-    ['ja', '#japaneseWorkspace', '[data-mobile-view="preview"]', '#documentPreview'],
-    ['zh-CN', '#chineseWorkspace', '[data-zh-mobile-view="preview"]', '[data-zh-preview]'],
-    ['en', '[data-english-editor]', '[data-en-mobile-view="preview"]', '[data-en-preview]']
+    ['ja', '[name="github"]', '#documentPreview'],
+    ['zh-CN', '[data-profile="github"]', '[data-zh-preview]'],
+    ['en', '[data-profile-field="github"]', '[data-en-preview]']
   ];
 
-  for (const [locale, workspaceSelector, switchSelector, previewSelector] of cases) {
+  for (const [locale, fieldSelector, previewSelector] of cases) {
     await openLocale(page, locale);
-    const workspace = page.locator(workspaceSelector);
-    await page.locator(switchSelector).click();
-    await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
-    await expect(workspace.locator(previewSelector)).toBeVisible();
+    const field = page.locator(fieldSelector);
+    const preview = page.locator(previewSelector);
+    await revealField(field);
+
+    for (const [url, clickable] of PROFILE_URL_CASES) {
+      await field.fill(url);
+      if (clickable) {
+        await expect(preview.locator(`a[href="${url}"]`)).toHaveCount(1);
+      } else {
+        await expect(preview.locator('a')).toHaveCount(0);
+      }
+    }
   }
+});
+
+test('@mobile 日本語: 編集・保存復元・書き出し・プレビューが操作できる', async ({ page }) => {
+  await openLocale(page, 'ja');
+  expect(page.viewportSize()).toEqual({ width: 390, height: 844 });
+  const workspace = page.locator('#japaneseWorkspace');
+  const name = page.locator('[name="fullName"]');
+  await expect(name).toBeVisible();
+  await name.fill('モバイル 山田');
+  await page.locator('#saveDraftButton').click();
+  await name.fill('一時変更');
+  await page.locator('#reloadDraftButton').click();
+  await expect(name).toHaveValue('モバイル 山田');
+
+  await page.locator('#dataMenuSummary').click();
+  await expect(page.locator('#exportDataButton')).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  await downloadPromise;
+
+  await page.locator('[data-mobile-view="preview"]').click();
+  await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
+  await expect(page.locator('#documentPreview')).toContainText('モバイル 山田');
+  await expectNoPageOverflow(page);
+});
+
+test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  const workspace = page.locator('#chineseWorkspace');
+  const name = workspace.locator('[data-profile="fullName"]');
+  await expect(name).toBeVisible();
+  await name.fill('移动端 林晓宇');
+  await workspace.locator('[data-zh-action="save"]').click();
+  await name.fill('临时姓名');
+  await workspace.locator('[data-zh-action="reload"]').click();
+  await expect(name).toHaveValue('移动端 林晓宇');
+
+  await workspace.locator('[data-zh-mobile-view="preview"]').click();
+  await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
+  await expect(workspace.locator('[data-zh-preview]')).toContainText('移动端 林晓宇');
+  await expectNoPageOverflow(page);
+});
+
+test('@mobile English: editing, save/restore, and preview remain operable', async ({ page }) => {
+  await openLocale(page, 'en');
+  const workspace = page.locator('[data-english-editor]');
+  const name = workspace.locator('[data-profile-field="fullName"]');
+  await expect(name).toBeVisible();
+  await name.fill('Mobile Alex');
+  await workspace.locator('[data-en-save]').click();
+  await name.fill('Temporary Name');
+  await workspace.locator('[data-en-reload]').click();
+  await expect(name).toHaveValue('Mobile Alex');
+
+  await workspace.locator('[data-en-mobile-view="preview"]').click();
+  await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
+  await expect(workspace.locator('[data-en-preview]')).toContainText('Mobile Alex');
+  await expectNoPageOverflow(page);
 });

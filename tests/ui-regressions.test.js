@@ -41,3 +41,15 @@ test('all locale editors and template styles are connected to the page', () => {
   assert.match(localeController, /'zh-CN': document\.getElementById\('chineseWorkspace'\)/);
   assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
 });
+
+test('tagged Pages releases depend on the reusable quality workflow', () => {
+  const quality = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
+  const deploy = readFileSync(new URL('../.github/workflows/deploy-pages.yml', import.meta.url), 'utf8');
+
+  assert.match(quality, /workflow_call:/);
+  assert.match(deploy, /tags:\s*\n\s*- 'v\*'/);
+  assert.match(deploy, /quality:\s*\n\s*uses: \.\/\.github\/workflows\/quality\.yml/);
+  assert.match(deploy, /deploy:\s*\n\s*needs: quality/);
+  assert.match(deploy, /git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/);
+  assert.match(deploy, /uses: actions\/deploy-pages@v4/);
+});

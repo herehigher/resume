@@ -5,7 +5,9 @@
 ## 自動ゲート
 
 - `npm ci`、`npm test`、`npm run lint`、`npx playwright install chromium`、`npm run test:e2e` が成功する。
-- GitHub の `Quality / quality` を main の必須ステータスチェック（required status check）に設定する。PR と main 更新の両方で失敗した場合、マージ・公開を続行しない。
+- Tag（`v*`）の Pages リリースは、再利用可能な `Quality` workflow が成功し、対象commitが main の履歴に含まれる場合だけ deploy job へ進む。失敗したリリース候補は公開しない。
+- 現在の非公開リポジトリで Pages を利用できない場合、公開または対応プランへの変更後に Pages の Source を GitHub Actions に設定する。それまでは deploy が成功しないため、サイトは公開されない。
+- 利用可能になった時点で `Quality / quality` を main の必須ステータスチェック（required status check）に設定し、失敗したPRのマージも禁止する。
 - Playwright の失敗時は GitHub Actions の `playwright-results` artifact で trace と screenshot を確認する。
 - PDF ゲートは short（英語1ページ）、standard（日本語2ページ）、long（英語複数ページ）について、ページ数、用紙寸法、先頭・末尾の抽出テキストを確認する。
 
@@ -15,11 +17,11 @@
 
 - [ ] `ja`、`zh-CN`、`en` の各URLを直接開き、正しい言語と入力データが表示される。
 - [ ] デスクトップで入力欄とプレビューが同時に読め、横スクロールや操作不能なボタンがない。
-- [ ] スマートフォンで「入力 / プレビュー」を切り替え、すべての主要入力とデータ管理操作に到達できる。
+- [ ] スマートフォンで三言語の代表入力、保存・再読込、「入力 / プレビュー」切替を実行し、データ書き出しを含む主要操作に到達できる。
 - [ ] 保存・再読込、入力例からの復元、項目削除、JSON書き出し・読込後も三言語のデータが混ざらない。
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
-- [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URLはクリックできない。
-- [ ] Developer Tools の Network で、同一オリジンの静的ファイル以外の要求がない。
+- [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
+- [ ] Developer Tools の Network で、同一オリジンの静的ファイル以外のHTTP(S)要求およびWebSocket接続がない。
 
 ## PDF 目視確認
 
