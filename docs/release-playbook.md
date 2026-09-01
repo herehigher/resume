@@ -16,7 +16,7 @@
 
 Release candidate（RC）は application version、`site/`、public sample、release notes、release 対象の文書と workflow が確定した時点で freeze します。Tag 前の Pull Request で、対象項目を `CHANGELOG.md` の `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ移し、release date を確定します。将来の変更を記録する空の `Unreleased` section は残します。Freeze 後は release 判定に必要な修正以外を混ぜません。
 
-`site/` または public sample を変更した release では、version を含むすべての画面内容を確定した最終 RC で、merge と tag の前に `npm run generate:docs` を実行します。三言語 screenshot、PDF、`docs/assets-manifest.json` を同じ RC commit に含め、目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。Workflow / Markdown だけの変更では再生成しません。
+新 version の release では、version を含むすべての画面内容を確定した最終 RC で、merge と tag の前に `npm run release:assets` を実行します。三言語 screenshot、PDF、`docs/assets-manifest.json` を同じ RC commit に含め、Git LFS object として commit して目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では再生成しません。
 
 Screenshot に誤りが見つかった場合は tag 前に RC を修正して再生成します。Tag 後は tag を動かさず、修正を新しい version として release します。
 
@@ -68,11 +68,15 @@ sed -n '1,80p' CHANGELOG.md \
 
 `CHANGELOG.md` の対象 section に今回の release notes が入り、日付が実際の release date と一致し、`Unreleased` が将来分として残っていることを確認します。Date が変わる場合は merge / tag 前に Pull Request を更新します。
 
-`<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。`site/` を変更した場合だけ、RC 上で次を実行して生成物を目視します。
+`<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。新 version の最終 RC 上で次を実行し、生成物と Git LFS tracking を目視します。
 
 ```bash
-npm run generate:docs || { echo 'Documentation asset generation failed; stop the release.' >&2; exit 1; }
-node --test tests/documentation.test.js \
+npm run release:assets || { echo 'Release asset generation failed; stop the release.' >&2; exit 1; }
+git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf \
+  || { echo 'Unable to stage release assets; stop the release.' >&2; exit 1; }
+git lfs ls-files \
+  || { echo 'Unable to verify Git LFS assets; stop the release.' >&2; exit 1; }
+npm run test:release-assets \
   || { echo 'Documentation verification failed; stop the release.' >&2; exit 1; }
 ```
 

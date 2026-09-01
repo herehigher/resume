@@ -5,6 +5,8 @@
 ## 開発環境
 
 ```bash
+git lfs install --local
+git lfs pull
 npm ci
 python3 -m http.server 8000 --directory site
 ```
@@ -36,6 +38,8 @@ npm run test:acceptance
 ```
 
 PDF や responsive layout を変更した場合は [release acceptance checklist](docs/acceptance-checklist.md) に従い、全対象 page を目視確認します。
+
+README の screenshot と PDF sample は通常の feature Pull Request では更新しません。新 version の最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ `npm run release:assets` と `npm run test:release-assets` を実行し、Git LFS object として commit します。
 
 ## Issue と Pull Request
 
