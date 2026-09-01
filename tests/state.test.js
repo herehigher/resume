@@ -81,6 +81,7 @@ test('export and import round trip preserves all locale data', () => {
     state.documents.ja.fields.selfPromotion = '自己PR';
     state.documents['zh-CN'].resume.skills = '产品设计';
     state.documents.en.resume.skills = 'Product design';
+    state.documents.en.resume.location = 'Tokyo, Japan';
   });
 
   const targetStorage = createMemoryStorage();
@@ -179,4 +180,26 @@ test('import rejects remote and unsupported photo sources', () => {
 
   assert.throws(() => store.importJson(JSON.stringify(unsafe)));
   assert.equal(store.getState().profile.photo, '');
+});
+
+test('Chinese and English documents reject unsupported document modes', () => {
+  const state = createDefaultState('en');
+  state.documents.en.activeDocument = 'career';
+  state.documents['zh-CN'].activeDocument = 'portfolio';
+
+  const result = validateState(state);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes('documents.en.activeDocument is not supported'));
+  assert.ok(result.errors.includes('documents.zh-CN.activeDocument is not supported'));
+});
+
+test('English location is part of the validated document model', () => {
+  const state = createDefaultState('en');
+  assert.equal(state.documents.en.resume.location, '');
+  assert.equal(validateState(state).valid, true);
+
+  state.documents.en.resume.location = { city: 'Tokyo' };
+  const result = validateState(state);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes('state.documents.en.resume.location must be string'));
 });

@@ -58,6 +58,11 @@ export function validateState(value) {
   if (!['resume', 'career'].includes(value.documents?.ja?.activeDocument)) {
     errors.push('documents.ja.activeDocument is not supported');
   }
+  for (const locale of ['zh-CN', 'en']) {
+    if (value.documents?.[locale]?.activeDocument !== 'resume') {
+      errors.push(`documents.${locale}.activeDocument is not supported`);
+    }
+  }
 
   if (value.profile?.photo && !/^data:image\/(?:jpeg|png|webp);base64,/i.test(value.profile.photo)) {
     errors.push('profile.photo must be an embedded JPEG, PNG, or WebP image');

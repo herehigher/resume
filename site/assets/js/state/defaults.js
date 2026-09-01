@@ -75,6 +75,7 @@ export function createEnglishDocument() {
     activeDocument: 'resume',
     resume: {
       headline: '',
+      location: '',
       summary: '',
       education: [{ startDate: '', endDate: '', school: '', degree: '', details: '' }],
       experience: [{ startDate: '', endDate: '', company: '', role: '', details: '' }],

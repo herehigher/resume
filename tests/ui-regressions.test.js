@@ -23,7 +23,7 @@ test('every locale has distinct import, export, and locale-save error messages',
   }
 });
 
-test('Chinese editor and template style are connected to the page', () => {
+test('all locale editors and template styles are connected to the page', () => {
   const html = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
   const main = readFileSync(new URL('../site/assets/js/main.js', import.meta.url), 'utf8');
   const localeController = readFileSync(
@@ -32,8 +32,12 @@ test('Chinese editor and template style are connected to the page', () => {
   );
 
   assert.match(html, /assets\/css\/templates\/zh-CN\.css/);
+  assert.match(html, /assets\/css\/templates\/en\.css/);
   assert.match(html, /id="chineseWorkspace" hidden/);
   assert.match(main, /initChineseEditor\(store\)/);
+  assert.match(main, /initEnglishEditor\(store\)/);
+  assert.match(main, /renderEnglishWorkspace\(\)/);
   assert.match(main, /japaneseEditor\.refresh\(\)/);
   assert.match(localeController, /'zh-CN': document\.getElementById\('chineseWorkspace'\)/);
+  assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
 });
