@@ -47,7 +47,7 @@ const variants = Object.freeze([
     pdfPath: 'output/pdf/zh-CN-a4.pdf',
     previewSelector: '[data-zh-preview]',
     sampleSelector: '[data-zh-action="sample"]',
-    sampleIdentity: '林晓宇',
+    sampleIdentity: '简立',
     screenshotPath: 'docs/screenshots/zh-CN.png'
   },
   {
@@ -147,7 +147,7 @@ async function waitForSample(page, variant) {
 }
 
 async function generateVariant(browser, baseURL, siteHash, variant) {
-  const marker = `RESUME-STUDIO-SAMPLE-${variant.locale.toUpperCase()}-${siteHash.slice(0, 12)}`;
+  const marker = `RESUME-STUDIO-SAMPLE-${variant.locale.toUpperCase()}-${siteHash.slice(0, 12).toUpperCase()}`;
   const context = await browser.newContext({
     colorScheme: 'light',
     locale: variant.browserLocale,

@@ -5,16 +5,16 @@ export function createChineseSampleState(sourceState) {
   state.profile = {
     photo: '',
     fields: {
-      fullName: '林晓宇',
+      fullName: '简立',
       birthDate: '',
       gender: '',
       postalCode: '200000',
       address: '上海市',
       phone: '138 0000 0000',
-      email: 'xiaoyu.lin@example.com',
-      github: 'https://github.com/xiaoyu-lin',
-      linkedin: 'https://www.linkedin.com/in/xiaoyu-lin',
-      portfolio: 'https://example.com/xiaoyu'
+      email: 'jian.li@example.com',
+      github: 'https://example.com/jian-li/github',
+      linkedin: 'https://example.com/jian-li/linkedin',
+      portfolio: 'https://example.com/jian-li'
     }
   };
   state.documents['zh-CN'] = {
@@ -26,14 +26,14 @@ export function createChineseSampleState(sourceState) {
         {
           startDate: '2018-07',
           endDate: '2022-03',
-          company: '云启科技有限公司',
+          company: '八经网络科技有限公司',
           role: '产品经理',
           details: '• 负责客户数据平台的需求分析、产品规划与版本迭代\n• 建立用户反馈闭环，使重点客户续约率提升 12 个百分点\n• 协同研发和实施团队交付 20 余个企业客户项目'
         },
         {
           startDate: '2022-04',
           endDate: '',
-          company: '星河数字科技有限公司',
+          company: '正儿数字科技有限公司',
           role: '高级产品经理',
           details: '• 主导企业分析产品的年度路线图与核心指标设计\n• 带领 6 人跨职能小组完成智能报表模块，发布半年内月活提升 35%\n• 通过访谈和行为数据重构新手引导，试用转化率提升 18%'
         }
@@ -60,7 +60,7 @@ export function createChineseSampleState(sourceState) {
         {
           startDate: '2012-09',
           endDate: '2016-06',
-          school: '华东理工大学',
+          school: '国子监理工大学',
           degree: '信息管理与信息系统 · 本科',
           details: '主修数据分析、管理信息系统与项目管理。'
         }

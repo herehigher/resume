@@ -75,7 +75,7 @@ export function renderChineseEditorShell() {
                 <button class="text-button" type="button" data-zh-action="remove-photo" hidden>删除照片</button>
               </div>
               <div class="field-stack">
-                <label class="input-field"><span>姓名 <em>${zhCN.requiredLabel}</em></span><input data-profile="fullName" autocomplete="name" required placeholder="例：林晓宇"></label>
+                <label class="input-field"><span>姓名 <em>${zhCN.requiredLabel}</em></span><input data-profile="fullName" autocomplete="name" required placeholder="例：简立"></label>
                 <label class="input-field"><span>求职方向 / 职业定位</span><input data-resume="headline" placeholder="例：高级产品经理｜企业服务"></label>
               </div>
             </div>

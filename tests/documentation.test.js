@@ -239,7 +239,7 @@ test('asset manifest matches the site, output files, and screenshot dimensions',
     assert.equal(manifest.source.markerHashLength, 12);
     assert.equal(
       output.marker,
-      `RESUME-STUDIO-SAMPLE-${output.locale.toUpperCase()}-${manifest.source.siteHash.slice(0, 12)}`
+      `RESUME-STUDIO-SAMPLE-${output.locale.toUpperCase()}-${manifest.source.siteHash.slice(0, 12).toUpperCase()}`
     );
     assert.equal(output.screenshot.sha256, fileHash(path.join(root, screenshotPath)));
     assert.equal(output.pdf.sha256, fileHash(path.join(root, pdfPath)));
