@@ -1,5 +1,9 @@
 # 開発規約
 
+## 関連ドキュメント
+
+開発環境、repository / 文書構成、test、公開 asset 生成、release の説明は [開発ガイド](docs/development-guide.md) を参照してください。実装時の mandatory rules はこの `AGENTS.md` を正とし、内容が競合する場合は本ファイルを優先します。
+
 ## プロジェクト方針
 
 - 個人利用を前提とした、中日英対応の履歴書・職務経歴書作成Webアプリです。

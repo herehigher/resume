@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/check-site.mjs",
+    "generate:docs": "node scripts/generate-doc-assets.mjs",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "test": "node --test tests/*.test.js && npm run check",

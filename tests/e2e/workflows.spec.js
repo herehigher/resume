@@ -65,7 +65,7 @@ test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除
   const workspace = page.locator('#chineseWorkspace');
   const name = workspace.locator('[data-profile="fullName"]');
 
-  await name.fill('林晓宇 E2E');
+  await name.fill('简立 E2E');
   await workspace.locator('[data-resume="headline"]').fill('高级产品经理');
   await workspace.locator('[data-resume="summary"]').fill('负责企业服务产品规划与交付。');
   const skills = workspace.locator('[data-resume="skills"]');
@@ -81,12 +81,12 @@ test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除
   await workspace.locator('[data-zh-action="save"]').click();
   await name.fill('临时姓名');
   await workspace.locator('[data-zh-action="reload"]').click();
-  await expect(name).toHaveValue('林晓宇 E2E');
+  await expect(name).toHaveValue('简立 E2E');
 
   await workspace.locator('[data-zh-action="sample"]').click();
   await expect(workspace.locator('[data-zh-sample-panel]')).toBeVisible();
   await workspace.locator('[data-zh-action="restore"]').click();
-  await expect(name).toHaveValue('林晓宇 E2E');
+  await expect(name).toHaveValue('简立 E2E');
 
   await experience.locator('[data-zh-remove]').click();
   await expect(workspace.locator('[data-zh-preview]')).not.toContainText('E2E科技');
@@ -214,11 +214,11 @@ test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async (
   const workspace = page.locator('#chineseWorkspace');
   const name = workspace.locator('[data-profile="fullName"]');
   await expect(name).toBeVisible();
-  await name.fill('移动端 林晓宇');
+  await name.fill('移动端 简立');
   await workspace.locator('[data-zh-action="save"]').click();
   await name.fill('临时姓名');
   await workspace.locator('[data-zh-action="reload"]').click();
-  await expect(name).toHaveValue('移动端 林晓宇');
+  await expect(name).toHaveValue('移动端 简立');
   await expectNoPageOverflow(page);
 
   await page.locator('#dataMenuSummary').click();
@@ -230,7 +230,7 @@ test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async (
 
   await workspace.locator('[data-zh-mobile-view="preview"]').click();
   await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
-  await expect(workspace.locator('[data-zh-preview]')).toContainText('移动端 林晓宇');
+  await expect(workspace.locator('[data-zh-preview]')).toContainText('移动端 简立');
   await expectNoPageOverflow(page);
 });
 

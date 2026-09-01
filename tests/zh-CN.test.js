@@ -86,12 +86,25 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
 
   assert.equal(validateState(sample).valid, true);
   assert.equal(source.profile.fields.fullName, '');
-  assert.ok(sample.profile.fields.fullName);
+  assert.equal(sample.profile.fields.fullName, '简立');
+  assert.equal(sample.profile.fields.email, 'jian.li@example.com');
+  assert.deepEqual(
+    [sample.profile.fields.github, sample.profile.fields.linkedin, sample.profile.fields.portfolio],
+    [
+      'https://example.com/jian-li/github',
+      'https://example.com/jian-li/linkedin',
+      'https://example.com/jian-li'
+    ]
+  );
   assert.ok(resume.headline);
   assert.ok(resume.summary);
   assert.ok(resume.experience.length >= 2);
+  assert.deepEqual(
+    resume.experience.map((item) => item.company),
+    ['八经网络科技有限公司', '正儿数字科技有限公司']
+  );
   assert.ok(resume.projects.length >= 2);
-  assert.ok(resume.education[0].school);
+  assert.equal(resume.education[0].school, '国子监理工大学');
   assert.ok(resume.skills);
   assert.ok(resume.certifications.length >= 2);
   assert.equal(calculateChineseCompletion(sample), 100);
@@ -115,7 +128,7 @@ test('opening the Chinese sample protects the existing persisted draft', () => {
 test('Chinese sample renders current experience first and valid PDF links', () => {
   const html = renderChineseResume(createChineseSampleState(createDefaultState('zh-CN')));
 
-  assert.ok(html.indexOf('星河数字科技有限公司') < html.indexOf('云启科技有限公司'));
+  assert.ok(html.indexOf('正儿数字科技有限公司') < html.indexOf('八经网络科技有限公司'));
   assert.match(html, /2022\.04 — 至今/);
   assert.match(html, /href="https:\/\/example\.com\/projects\/analytics"/);
   assert.match(html, /rel="noopener noreferrer"/);
