@@ -30,7 +30,7 @@ Official deployment で Analytics が enabled であることを示す screensho
 - Release date: `<RELEASE_DATE>`（例: `2026-09-01`）
 - Release tag: `<RELEASE_TAG>`（例: `v0.1.0`）
 - Release Issue: `<ISSUE_URL>`
-- Pull Request number: `<PR_NUMBER>`（v0.1.0 release PR は `33`）
+- Pull Request number: `<PR_NUMBER>`（v0.1.0 release PR は `34`）
 - 対象 Pull Request: `<PR_URL>`
 - Owner approval: 承認者と日時
 - Pages Analytics manifest: `.github/pages-release-manifest.json` の mode / provider / fingerprint / source / artifact digest
