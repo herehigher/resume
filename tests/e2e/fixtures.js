@@ -1,8 +1,23 @@
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
+
+const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
+
+function collectStaticPaths(directory = siteRoot) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collectStaticPaths(absolutePath);
+    return [`/${path.relative(siteRoot, absolutePath).split(path.sep).join('/')}`];
+  });
+}
+
+const staticPaths = new Set(collectStaticPaths());
 
 export function installNetworkGuard(context, baseURL) {
   const expectedOrigin = new URL(baseURL).origin;
-  const externalRequests = [];
+  const unexpectedRequests = [];
   const pageErrors = [];
   const webSockets = [];
   const observedPages = new Set();
@@ -16,9 +31,25 @@ export function installNetworkGuard(context, baseURL) {
 
   function observeRequest(request) {
     const url = new URL(request.url());
-    if (['http:', 'https:'].includes(url.protocol) && url.origin !== expectedOrigin) {
-      externalRequests.push(`${request.method()} ${request.url()}`);
-    }
+    if (!['http:', 'https:'].includes(url.protocol)) return;
+
+    const resourceType = request.resourceType();
+    const query = [...url.searchParams.entries()];
+    const isDocument = resourceType === 'document'
+      && ['/', '/index.html'].includes(url.pathname)
+      && (query.length === 0 || (
+        query.length === 1
+        && query[0][0] === 'lang'
+        && ['ja', 'zh-CN', 'en'].includes(query[0][1])
+      ));
+    const isStaticAsset = ['font', 'image', 'script', 'stylesheet'].includes(resourceType)
+      && staticPaths.has(url.pathname)
+      && !url.search;
+    const isAllowed = url.origin === expectedOrigin
+      && request.method() === 'GET'
+      && (isDocument || isStaticAsset);
+
+    if (!isAllowed) unexpectedRequests.push(`${request.method()} ${request.url()}`);
   }
 
   context.pages().forEach(observePage);
@@ -26,7 +57,7 @@ export function installNetworkGuard(context, baseURL) {
   context.on('request', observeRequest);
 
   return {
-    externalRequests,
+    unexpectedRequests,
     pageErrors,
     webSockets,
     dispose() {
@@ -43,7 +74,7 @@ export const test = base.extend({
     await use(context);
 
     guard.dispose();
-    expect(guard.externalRequests, '個人データを送信し得る外部ネットワーク要求がないこと').toEqual([]);
+    expect(guard.unexpectedRequests, '静的ファイル以外のネットワーク要求で個人データを送信しないこと').toEqual([]);
     expect(guard.webSockets, 'WebSocket接続で個人データを送信しないこと').toEqual([]);
     expect(guard.pageErrors, 'ブラウザ実行中に未処理エラーがないこと').toEqual([]);
   }

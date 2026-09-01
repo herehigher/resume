@@ -21,7 +21,7 @@
 - [ ] 保存・再読込、入力例からの復元、項目削除、JSON書き出し・読込後も三言語のデータが混ざらない。
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
 - [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
-- [ ] Developer Tools の Network で、同一オリジンの静的ファイル以外のHTTP(S)要求およびWebSocket接続がない。
+- [ ] Developer Tools の Network で、許可された同一オリジン静的ファイル以外のHTTP(S)要求およびWebSocket接続がない。同一オリジンのPOST、fetch/XHR、未知のpathも許可しない。
 
 ## PDF 目視確認
 

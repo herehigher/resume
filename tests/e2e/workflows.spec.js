@@ -194,9 +194,11 @@ test('@mobile 日本語: 編集・保存復元・書き出し・プレビュー�
   await name.fill('一時変更');
   await page.locator('#reloadDraftButton').click();
   await expect(name).toHaveValue('モバイル 山田');
+  await expectNoPageOverflow(page);
 
   await page.locator('#dataMenuSummary').click();
   await expect(page.locator('#exportDataButton')).toBeVisible();
+  await expectNoPageOverflow(page);
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#exportDataButton').click();
   await downloadPromise;
@@ -217,6 +219,14 @@ test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async (
   await name.fill('临时姓名');
   await workspace.locator('[data-zh-action="reload"]').click();
   await expect(name).toHaveValue('移动端 林晓宇');
+  await expectNoPageOverflow(page);
+
+  await page.locator('#dataMenuSummary').click();
+  await expect(page.locator('#exportDataButton')).toBeVisible();
+  await expectNoPageOverflow(page);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  await downloadPromise;
 
   await workspace.locator('[data-zh-mobile-view="preview"]').click();
   await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
@@ -234,6 +244,14 @@ test('@mobile English: editing, save/restore, and preview remain operable', asyn
   await name.fill('Temporary Name');
   await workspace.locator('[data-en-reload]').click();
   await expect(name).toHaveValue('Mobile Alex');
+  await expectNoPageOverflow(page);
+
+  await page.locator('#dataMenuSummary').click();
+  await expect(page.locator('#exportDataButton')).toBeVisible();
+  await expectNoPageOverflow(page);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  await downloadPromise;
 
   await workspace.locator('[data-en-mobile-view="preview"]').click();
   await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
