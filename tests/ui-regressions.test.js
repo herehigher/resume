@@ -128,6 +128,12 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
     "fetch_and_check 'schema/resume-studio-web-v1.example.json'",
     "fetch_and_check 'assets/js/config.js'"
   ]) assert.match(deploy, new RegExp(publicPath.replaceAll('.', '\\.')));
+  for (const [path, locale] of [['ja/', 'ja'], ['zh-cn/', 'zh-CN'], ['en/', 'en']]) {
+    assert.match(
+      deploy,
+      new RegExp(`fetch_and_check '${path}' .*lang=\\\\"${locale}\\\\".*ANALYTICS_MODE.*ANALYTICS_PROVIDER`)
+    );
+  }
 });
 
 test('Pages analytics smoke rejects duplicate beacons even when they share one line', (t) => {

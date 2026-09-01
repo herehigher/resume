@@ -276,9 +276,9 @@ jobs:
           # ANALYTICS_SMOKE_FUNCTION_END
 
           fetch_and_check '' root.html '<title>Resume Studio'
-          fetch_and_check 'ja/' ja.html '<html lang="ja">'
-          fetch_and_check 'zh-cn/' zh-cn.html '<html lang="zh-CN">'
-          fetch_and_check 'en/' en.html '<html lang="en">'
+          fetch_and_check 'ja/' ja.html "<html lang=\"ja\" data-analytics-mode=\"${ANALYTICS_MODE}\" data-analytics-provider=\"${ANALYTICS_PROVIDER}\">"
+          fetch_and_check 'zh-cn/' zh-cn.html "<html lang=\"zh-CN\" data-analytics-mode=\"${ANALYTICS_MODE}\" data-analytics-provider=\"${ANALYTICS_PROVIDER}\">"
+          fetch_and_check 'en/' en.html "<html lang=\"en\" data-analytics-mode=\"${ANALYTICS_MODE}\" data-analytics-provider=\"${ANALYTICS_PROVIDER}\">"
           fetch_and_check 'sitemap.xml' sitemap.xml '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
           fetch_and_check 'schema/resume-studio-web-v1.schema.json' schema.json '"title": "Resume Studio web v1 export"'
           fetch_and_check 'schema/resume-studio-web-v1.example.json' example.json '"version": 1'
