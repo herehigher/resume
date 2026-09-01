@@ -30,9 +30,15 @@ export function persistLocaleChange(store, locale, beforePersist = () => {}) {
   }, { persist: true, type: 'locale' });
 }
 
-export function initLocaleController(store, { beforeLocalePersist = () => {} } = {}) {
+export function initLocaleController(store, {
+  beforeLocalePersist = () => {},
+  onLocaleApplied = () => {}
+} = {}) {
   const select = document.getElementById('localeSelect');
-  const workspace = document.getElementById('japaneseWorkspace');
+  const workspaces = {
+    ja: document.getElementById('japaneseWorkspace'),
+    'zh-CN': document.getElementById('chineseWorkspace')
+  };
   const pending = document.getElementById('localePending');
   const mobileSwitch = document.querySelector('.mobile-view-switch');
   const documentSwitcher = document.querySelector('.document-switcher');
@@ -50,25 +56,31 @@ export function initLocaleController(store, { beforeLocalePersist = () => {} } =
     renderedLocale = locale;
     const copy = getMessages(locale);
     const isJapanese = locale === 'ja';
+    const hasWorkspace = Boolean(workspaces[locale]);
 
     document.documentElement.lang = copy.htmlLang;
     document.title = copy.pageTitle;
+    document.querySelector('.brand').setAttribute('aria-label', copy.brandHome);
     document.getElementById('brandSubtitle').textContent = copy.brandSubtitle;
     document.getElementById('localeLabel').textContent = copy.localeLabel;
     document.getElementById('dataMenuSummary').setAttribute('aria-label', copy.dataManagement);
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
+    document.getElementById('printButtonLabel').textContent = copy.printDocument;
     document.getElementById('pendingTitle').textContent = copy.pendingTitle;
     document.getElementById('pendingBody').textContent = copy.pendingBody;
     select.value = locale;
 
-    workspace.hidden = !isJapanese;
-    pending.hidden = isJapanese;
+    Object.entries(workspaces).forEach(([workspaceLocale, workspace]) => {
+      workspace.hidden = workspaceLocale !== locale;
+    });
+    pending.hidden = hasWorkspace;
     mobileSwitch.hidden = !isJapanese;
     documentSwitcher.hidden = !isJapanese;
-    printButton.hidden = !isJapanese;
+    printButton.hidden = !hasWorkspace;
     sampleButton.hidden = !isJapanese;
     saveStatus.hidden = !isJapanese;
+    onLocaleApplied(locale);
   }
 
   select.addEventListener('change', () => {

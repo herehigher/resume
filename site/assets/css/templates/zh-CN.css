@@ -1,0 +1,329 @@
+.zh-resume-document {
+  background: #fff;
+  color: #172033;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-size: 10px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  padding: 44px 50px 52px;
+  word-break: break-word;
+}
+
+.zh-resume-header {
+  border-bottom: 2px solid #173f6f;
+  padding-bottom: 18px;
+}
+
+.zh-resume-header.has-photo {
+  align-items: start;
+  display: grid;
+  gap: 28px;
+  grid-template-columns: 1fr 86px;
+}
+
+.zh-identity h1 {
+  color: #102a4c;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.zh-identity > p {
+  color: #31547d;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  margin: 7px 0 0;
+}
+
+.zh-profile-photo {
+  border-radius: 2px;
+  height: 108px;
+  object-fit: cover;
+  width: 86px;
+}
+
+.zh-contact,
+.zh-profile-links,
+.zh-optional-details {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 10px;
+}
+
+.zh-contact > *,
+.zh-profile-links > *,
+.zh-optional-details > * {
+  color: #4e5e72;
+  font-size: 8.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.zh-contact a,
+.zh-link,
+.zh-project-link,
+.zh-certification-link {
+  color: #2457a2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.zh-resume-content { padding-top: 5px; }
+
+.zh-section {
+  margin-top: 22px;
+}
+
+.zh-section > h2 {
+  align-items: center;
+  break-after: avoid;
+  color: #173f6f;
+  display: flex;
+  font-size: 13px;
+  gap: 9px;
+  letter-spacing: .12em;
+  line-height: 1.3;
+  margin: 0 0 11px;
+}
+
+.zh-section > h2::before {
+  background: #2f6da5;
+  content: "";
+  display: block;
+  height: 15px;
+  width: 3px;
+}
+
+.zh-section-body,
+.zh-timeline-details,
+.zh-project-details {
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.zh-summary .zh-section-body {
+  background: #f5f8fb;
+  border-left: 2px solid #b7cce0;
+  padding: 10px 13px;
+}
+
+.zh-timeline { display: grid; gap: 14px; }
+
+.zh-timeline-item {
+  break-inside: avoid;
+  display: grid;
+  gap: 15px;
+  grid-template-columns: 88px 1fr;
+}
+
+.zh-timeline-date {
+  color: #56677b;
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+  white-space: nowrap;
+}
+
+.zh-timeline-content {
+  border-left: 1px solid #ccd6e1;
+  min-width: 0;
+  padding-left: 14px;
+  position: relative;
+}
+
+.zh-timeline-content::before {
+  background: #2f6da5;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #2f6da5;
+  content: "";
+  height: 6px;
+  left: -5px;
+  position: absolute;
+  top: 4px;
+  width: 6px;
+}
+
+.zh-timeline-content h3,
+.zh-project-heading h3 {
+  font-size: 10.5px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.zh-timeline-role,
+.zh-project-heading span {
+  color: #496079;
+  font-size: 9px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.zh-timeline-details,
+.zh-project-details { margin-top: 6px; }
+
+.zh-achievement-list {
+  line-height: 1.8;
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.zh-achievement-list li {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.zh-project-list { display: grid; gap: 11px; }
+
+.zh-project {
+  background: #fafbfd;
+  border: 1px solid #dce4ec;
+  break-inside: avoid;
+  padding: 11px 13px;
+}
+
+.zh-project-heading {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.zh-project-heading time {
+  color: #607186;
+  flex: none;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.zh-project-link {
+  display: inline-block;
+  font-size: 7.5px;
+  margin-top: 6px;
+  max-width: 100%;
+}
+
+.zh-skills .zh-section-body { columns: 2; column-gap: 28px; }
+
+.zh-certifications ul {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.zh-certifications li {
+  align-items: baseline;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 62px 1fr auto;
+}
+
+.zh-certifications time { color: #607186; font-size: 8.5px; }
+.zh-certification-link { font-size: 7.5px; }
+
+.zh-mobile-view-switch { display: none; }
+.zh-entry-list { display: grid; gap: 13px; }
+
+.zh-entry-editor {
+  background: #fbfcfd;
+  border: 1px solid #dce2e8;
+  border-radius: 9px;
+  padding: 14px;
+}
+
+.zh-entry-editor-header {
+  align-items: center;
+  border-bottom: 1px solid #e7ebf0;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.zh-entry-editor-header strong { font-size: 11px; }
+
+.zh-entry-editor-header button {
+  background: none;
+  border: 0;
+  color: var(--danger);
+  font-size: 9px;
+}
+
+.zh-entry-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.zh-entry-field-details,
+.zh-entry-field-url { grid-column: 1 / -1; }
+
+@media (max-width: 820px) {
+  .zh-workspace { height: calc(100vh - 62px); }
+
+  .zh-mobile-view-switch {
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 44px;
+    padding: 5px 14px;
+  }
+
+  .zh-mobile-view-switch button {
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .zh-mobile-view-switch button.is-active { border-color: var(--blue); color: var(--blue); }
+  .zh-workspace > .editor-panel,
+  .zh-workspace > .preview-panel { height: calc(100% - 44px); }
+  .zh-workspace[data-mobile-mode="editor"] > .preview-panel { display: none; }
+  .zh-workspace[data-mobile-mode="preview"] > .editor-panel { display: none; }
+}
+
+@media (max-width: 520px) {
+  .zh-entry-grid { grid-template-columns: 1fr; }
+  .zh-entry-field-details,
+  .zh-entry-field-url { grid-column: auto; }
+  .zh-skills .zh-section-body { columns: auto; }
+}
+
+@media print {
+  .zh-mobile-view-switch,
+  .zh-workspace > .editor-panel,
+  .zh-workspace > .preview-panel > .preview-toolbar { display: none !important; }
+
+  .zh-workspace,
+  .zh-workspace > .preview-panel,
+  .zh-workspace .preview-scroll,
+  .zh-workspace .document-preview {
+    display: block !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    transform: none !important;
+    width: auto !important;
+  }
+
+  .zh-resume-document {
+    break-after: auto;
+    height: auto;
+    min-height: 297mm;
+    overflow: visible;
+    padding: 13mm 15mm 14mm;
+    width: 210mm;
+  }
+}

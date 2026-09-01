@@ -477,6 +477,7 @@ export function initJapaneseEditor(store) {
 
   hydrateForm();
   return {
+    refresh: hydrateForm,
     restoreDraftBeforePersistence() {
       window.clearTimeout(saveTimer);
       return restoreDraftFromSample({ announce: false });
