@@ -7,7 +7,10 @@
 - Production は browser 標準の HTML、CSS、ES Modules で動作し、build や runtime framework を必要としません。
 - 正式な配布先は GitHub Pages です。Local development でも `file://` ではなく static server を使用します。
 - 公開用 application file は `site/` に集約し、履歴書の入力 data は browser 内で扱います。
+- `site/index.html` は editor と `x-default` の入口です。`/ja/`、`/zh-cn/`、`/en/` は JavaScript が無効でも読める locale-specific public entry で、既存の `/?lang=ja`、`/?lang=zh-CN`、`/?lang=en` editor へ案内します。
+- Root と三言語 public entry は canonical / reciprocal hreflang で関係を宣言し、`site/sitemap.xml` は index 対象の canonical URL だけを列挙します。
 - 保存形式は `resume-studio-web-v1` です。日本語・简体中文・English の document section は独立し、profile・連絡先・写真は三言語で共有します。
+- 公開 export contract は `site/schema/resume-studio-web-v1.schema.json`、架空の import example は同 directory の JSON file です。Application の runtime validator と public JSON Schema の契約を一致させます。
 
 実装時の privacy、network、storage compatibility、escape、locale、release authority の制約は [AGENTS.md](../AGENTS.md#mandatory-rules) を参照してください。
 
@@ -16,9 +19,14 @@
 ```text
 resume/
 ├── site/                       # GitHub Pages へ配信する static application
-│   ├── index.html              # HTML shell
+│   ├── index.html              # Editor shell と x-default entry
+│   ├── ja/index.html           # 日本語 public entry
+│   ├── zh-cn/index.html        # 简体中文 public entry
+│   ├── en/index.html           # English public entry
+│   ├── sitemap.xml             # Canonical public URL 一覧
+│   ├── schema/                 # v1 JSON Schema と架空 import example
 │   └── assets/
-│       ├── css/                # 基本、editor、responsive、print、locale template
+│       ├── css/                # 基本、editor、public entry、responsive、print、locale template
 │       └── js/                 # state、UI、template、i18n、utility
 ├── tests/                      # Node unit/document test と Playwright E2E/PDF test
 ├── scripts/                    # Static check と公開文書 asset generator
@@ -55,7 +63,7 @@ npm ci
 python3 -m http.server 8000 --directory site
 ```
 
-Chrome で `http://localhost:8000/` を開きます。Production code に build step はありません。
+Chrome で editor の `http://localhost:8000/`、public entry の `http://localhost:8000/ja/`、`http://localhost:8000/zh-cn/`、`http://localhost:8000/en/` を開けます。Production code に build step はありません。
 
 ## 変更に応じた検証
 
@@ -65,9 +73,9 @@ Chrome で `http://localhost:8000/` を開きます。Production code に build 
 
 | Command | 確認内容 |
 | --- | --- |
-| `npm test` | Node unit / document test と `scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、HTML asset の static check |
+| `npm test` | Node unit / document test、`tests/public-entry.test.js` による canonical / hreflang / sitemap / JSON Schema contract、`scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、全公開 HTML の external runtime asset check |
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
-| `npm run test:e2e` | Desktop / mobile workflow、privacy / network guard、PDF page size・pagination・抽出 text の Playwright acceptance |
+| `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、privacy / network guard、PDF page size・pagination・抽出 text の Playwright acceptance |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run generate:docs` | 三言語 screenshot、PDF sample、provenance manifest の再生成 |
 
@@ -76,12 +84,13 @@ Chrome で `http://localhost:8000/` を開きます。Production code に build 
 | 変更種別 | 開発中と統合後の確認 |
 | --- | --- |
 | Markdown / repository metadata | 関連する Node test、`npm test`、`npm run lint`、`git diff --check` |
+| Public entry、canonical / hreflang、sitemap、JSON Schema | `node --test tests/public-entry.test.js`、関連 E2E、`npm run test:acceptance`、[受入チェックリスト](acceptance-checklist.md) の online smoke |
 | State、template、UI、i18n、import / export、privacy / network | 関連する Node test と E2E の後、`npm run test:acceptance` |
 | CSS、responsive、print、PDF | 関連する Node / E2E test、`npm run test:acceptance`、[受入チェックリスト](acceptance-checklist.md) の対象 page |
 | Script、dependency、workflow、release gate | 変更対象の focused check、`npm run test:acceptance`、実際の CI / release dependency の review |
 | `site/` または公開 sample data | 上記に加えて公開文書 asset の再生成と次節の provenance / visual check |
 
-CI の `Quality` workflow も `npm test`、lint、Playwright E2E を実行します。Locale resolution、locale data isolation、invalid import protection、escape / URL protocol、mobile operation、network guard、PDF の詳細な release 判定は [受入チェックリスト](acceptance-checklist.md) に集約します。
+CI の `Quality` workflow も `npm test`、lint、Playwright E2E を実行します。Public entry と machine-readable contract、locale resolution、locale data isolation、invalid import protection、escape / URL protocol、mobile operation、network guard、PDF の詳細な release 判定は [受入チェックリスト](acceptance-checklist.md) に集約します。
 
 ## 公開文書 asset の更新
 
@@ -104,4 +113,5 @@ node --test tests/documentation.test.js
 - Pull Request と `main` の quality check は `.github/workflows/quality.yml` で実行します。
 - Tag-based GitHub Pages release は `.github/workflows/deploy-pages.yml` で quality 成功、version 一致、main 履歴への包含を確認してから deploy します。
 - Public release、tag、Pages settings、repository visibility を変更するには、owner の明示承認が必要です。
+- Deploy 後は GitHub Pages の project path `/resume/` で root、三言語 public entry、`sitemap.xml`、JSON Schema が取得でき、canonical / hreflang と editor CTA が実 URL に一致することを online smoke で確認します。
 - README の Web 版 URL は、実 deployment と HTTP / browser check が成功した URL だけを掲載します。
