@@ -131,15 +131,16 @@ export function initJapaneseEditor(store) {
     saveStatus.textContent = '入力例は一時表示です';
   }
 
-  function restoreDraftFromSample() {
-    if (!sampleMode) return;
+  function restoreDraftFromSample({ announce = true } = {}) {
+    if (!sampleMode) return false;
     store.replace(draftBeforeSample, { type: 'restore' });
     shouldPersistDraft = draftBeforeSampleWasStored;
     sampleMode = false;
     draftBeforeSample = null;
     setSampleModeUI(false);
     saveStatus.textContent = shouldPersistDraft ? 'この端末に保存済み' : '下書きは保存されていません';
-    showDraftMessage('元の下書きに戻りました');
+    if (announce) showDraftMessage('元の下書きに戻りました');
+    return true;
   }
 
   function adoptSampleAsDraft() {
@@ -423,7 +424,7 @@ export function initJapaneseEditor(store) {
     renderPreview();
   });
   document.getElementById('loadSampleButton').addEventListener('click', enterSampleMode);
-  document.getElementById('restoreDraftButton').addEventListener('click', restoreDraftFromSample);
+  document.getElementById('restoreDraftButton').addEventListener('click', () => restoreDraftFromSample());
   document.getElementById('adoptSampleButton').addEventListener('click', adoptSampleAsDraft);
   document.getElementById('saveDraftButton').addEventListener('click', () => saveNow());
   document.getElementById('reloadDraftButton').addEventListener('click', reloadDraft);
@@ -475,4 +476,10 @@ export function initJapaneseEditor(store) {
   });
 
   hydrateForm();
+  return {
+    restoreDraftBeforePersistence() {
+      window.clearTimeout(saveTimer);
+      return restoreDraftFromSample({ announce: false });
+    }
+  };
 }
