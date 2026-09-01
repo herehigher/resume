@@ -12,6 +12,17 @@ function walk(directory) {
   });
 }
 
+export function findExternalRuntimeAssets(html) {
+  const externalElements = [...html.matchAll(/<(?:script|img)\b[^>]*\b(?:src|href)=(?:(["'])https?:\/\/[^"']+\1|https?:\/\/[^\s>]+)[^>]*>/gi)];
+  const externalLinks = [...html.matchAll(/<link\b[^>]*\bhref=(?:(["'])https?:\/\/[^"']+\1|https?:\/\/[^\s>]+)[^>]*>/gi)]
+    .filter(([tag]) => {
+      const relationMatch = tag.match(/\brel=(?:(["'])([^"']*)\1|([^\s>]+))/i);
+      const relation = (relationMatch?.[2] || relationMatch?.[3] || '').trim().toLowerCase();
+      return !['alternate', 'canonical'].includes(relation);
+    });
+  return [...externalElements, ...externalLinks];
+}
+
 const files = walk(root);
 const javascriptFiles = files.filter((file) => extname(file) === '.js');
 
@@ -39,10 +50,11 @@ referencedAssets.forEach((file) => {
   if (!files.includes(file)) failures.push(`Missing referenced asset: ${file}`);
 });
 
-const externalRuntimeAssets = [
-  ...html.matchAll(/<(?:script|link|img)[^>]+(?:src|href)="https?:\/\//gi)
-];
-if (externalRuntimeAssets.length) failures.push('External runtime assets are not allowed');
+files.filter((file) => extname(file) === '.html').forEach((file) => {
+  if (findExternalRuntimeAssets(readFileSync(file, 'utf8')).length) {
+    failures.push(`${file}: external runtime assets are not allowed`);
+  }
+});
 
 if (failures.length) {
   console.error(failures.join('\n'));

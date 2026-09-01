@@ -19,8 +19,8 @@ export function createEnglishItem(type) {
 export function renderEnglishWorkspace() {
   return `<main class="workspace english-workspace" data-english-editor data-mobile-mode="editor" hidden>
     <div class="en-mobile-view-switch" aria-label="Mobile view">
-      <button class="is-active" data-en-mobile-view="editor" type="button">Edit</button>
-      <button data-en-mobile-view="preview" type="button">Preview</button>
+      <button class="is-active" aria-pressed="true" data-en-mobile-view="editor" type="button">Edit</button>
+      <button aria-pressed="false" data-en-mobile-view="preview" type="button">Preview</button>
     </div>
     <section class="editor-panel" aria-label="English resume editor">
       <div class="editor-heading">
@@ -300,7 +300,19 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     });
     Object.keys(ITEM_SHAPES).forEach(renderList);
     pageSizeSelect.value = state.settings.pageSizeByLocale.en;
+    setMobileView(root.dataset.mobileMode || 'editor');
     renderPreview();
+  }
+
+  function setMobileView(view) {
+    if (!['editor', 'preview'].includes(view)) return;
+    root.dataset.mobileMode = view;
+    root.querySelectorAll('[data-en-mobile-view]').forEach((button) => {
+      const selected = button.dataset.enMobileView === view;
+      button.classList.toggle('is-active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    if (view === 'preview') window.requestAnimationFrame(fitPreview);
   }
 
   function setSampleUI(active) {
@@ -388,11 +400,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   function onClick(event) {
     const mobileViewButton = event.target.closest('[data-en-mobile-view]');
     if (mobileViewButton) {
-      root.dataset.mobileMode = mobileViewButton.dataset.enMobileView;
-      root.querySelectorAll('[data-en-mobile-view]').forEach((button) => {
-        button.classList.toggle('is-active', button === mobileViewButton);
-      });
-      if (mobileViewButton.dataset.enMobileView === 'preview') window.requestAnimationFrame(fitPreview);
+      setMobileView(mobileViewButton.dataset.enMobileView);
       return;
     }
     const addButton = event.target.closest('[data-en-add]');

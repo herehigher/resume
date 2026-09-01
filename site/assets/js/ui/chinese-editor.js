@@ -44,8 +44,8 @@ export function protectChineseDraftBeforeSample(store, shouldPersistDraft) {
 export function renderChineseEditorShell() {
   return `
     <div class="zh-mobile-view-switch" aria-label="移动端视图切换">
-      <button class="is-active" type="button" data-zh-mobile-view="editor">${zhCN.inputView}</button>
-      <button type="button" data-zh-mobile-view="preview">${zhCN.previewView}</button>
+      <button class="is-active" type="button" aria-pressed="true" data-zh-mobile-view="editor">${zhCN.inputView}</button>
+      <button type="button" aria-pressed="false" data-zh-mobile-view="preview">${zhCN.previewView}</button>
     </div>
     <section class="editor-panel zh-editor-panel" aria-label="${zhCN.editorAriaLabel}">
       <div class="editor-heading">
@@ -313,7 +313,19 @@ export function initChineseEditor(store, { root = '#chineseWorkspace' } = {}) {
     });
     updatePhoto();
     renderLists();
+    setMobileView(rootElement.dataset.mobileMode || 'editor');
     renderPreview();
+  }
+
+  function setMobileView(view) {
+    if (!['editor', 'preview'].includes(view)) return;
+    rootElement.dataset.mobileMode = view;
+    rootElement.querySelectorAll('[data-zh-mobile-view]').forEach((button) => {
+      const selected = button.dataset.zhMobileView === view;
+      button.classList.toggle('is-active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    if (view === 'preview') window.requestAnimationFrame(fitPreview);
   }
 
   function setSampleMode(active) {
@@ -436,11 +448,7 @@ export function initChineseEditor(store, { root = '#chineseWorkspace' } = {}) {
       renderPreview();
     }
     if (mobileView) {
-      rootElement.dataset.mobileMode = mobileView.dataset.zhMobileView;
-      rootElement.querySelectorAll('[data-zh-mobile-view]').forEach((button) => {
-        button.classList.toggle('is-active', button === mobileView);
-      });
-      if (mobileView.dataset.zhMobileView === 'preview') window.requestAnimationFrame(fitPreview);
+      setMobileView(mobileView.dataset.zhMobileView);
     }
     if (!action) return;
     if (action.dataset.zhAction === 'save') saveNow();
