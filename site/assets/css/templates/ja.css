@@ -77,13 +77,26 @@
 .paper-section-first { border-top: 1px solid #374151; }
 .requests-section { min-height: 145px; }
 
+@page japanese-a4 {
+  margin: 14mm 15mm;
+  size: A4 portrait;
+}
+
 @media print {
   #japaneseWorkspace .document-page {
     height: auto;
     overflow: visible;
+    page: japanese-a4;
   }
   #japaneseWorkspace .empty-preview { display: none; }
+  #japaneseWorkspace .paper-table-header,
+  #japaneseWorkspace .paper-text-title,
+  #japaneseWorkspace .career-section-title,
+  #japaneseWorkspace .career-company-heading { break-after: avoid-page; }
+  #japaneseWorkspace .resume-profile,
+  #japaneseWorkspace .resume-contact > div,
+  #japaneseWorkspace .resume-online-row,
   #japaneseWorkspace .paper-table-row,
-  #japaneseWorkspace .career-company,
-  #japaneseWorkspace .paper-text-section { break-inside: avoid; }
+  #japaneseWorkspace .career-company { break-inside: avoid-page; }
+  #japaneseWorkspace .paper-text-section { break-inside: auto; }
 }

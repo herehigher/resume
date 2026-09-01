@@ -151,8 +151,10 @@ test('Chinese A4 styles allow long content to paginate without clipping', () => 
 
   assert.match(css, /\.zh-resume-document\s*\{/);
   assert.match(css, /overflow-wrap:\s*anywhere/);
+  assert.match(css, /@page chinese-a4\s*\{[^}]*margin:\s*13mm 15mm 14mm;[^}]*size:\s*A4 portrait;/s);
   assert.match(css, /@media print/);
-  assert.match(css, /min-height:\s*297mm/);
+  assert.match(css, /min-height:\s*0/);
   assert.match(css, /height:\s*auto/);
   assert.match(css, /overflow:\s*visible/);
+  assert.match(css, /page:\s*chinese-a4/);
 });
