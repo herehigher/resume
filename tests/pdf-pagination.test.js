@@ -37,6 +37,7 @@ test('print styles use physical page sizes without a clipping container', () => 
 
   assert.match(printCss, /@page\s*\{[^}]*margin:\s*14mm 15mm;[^}]*\}/s);
   assert.doesNotMatch(printCss, /@page\s*\{[^}]*size:/s);
+  assert.match(printCss, /\.workspace, \.preview-panel, \.preview-scroll, \.document-preview\s*\{[^}]*background:\s*#fff !important;/s);
   assert.match(printCss, /\.document-page\s*\{[^}]*height:\s*auto;[^}]*min-height:\s*0;[^}]*overflow:\s*visible;[^}]*padding:\s*0;[^}]*width:\s*auto;/s);
   const documentPageRule = printCss.match(/\.document-page\s*\{([^}]*)\}/s)?.[1] || '';
   assert.doesNotMatch(documentPageRule, /(?:^|;)\s*(?:height:\s*297mm|overflow:\s*hidden)/s);
