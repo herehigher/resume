@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "generator": {
-    "command": "npm run generate:docs",
+    "command": "npm run release:assets",
     "path": "scripts/generate-doc-assets.mjs",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "source": {
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
-    "siteHash": "fbd0aa1ffa1ef88b3ee324cacf651fba8df94bea80ba1ae25b7c68733264ae62",
+    "siteHash": "49951c155301118e78cdeb12ffc4a625cdb5b7b3ba767e66fd0dab5def2a3eb5",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -24,14 +24,14 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-FBD0AA1FFA1E",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-49951C155301",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-FBD0AA1FFA1E",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-49951C155301",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "83cf8dd0d853bc8010ca56177078182ce560a127a480fbd60bcd030a6881f959"
+        "sha256": "365bba332070147406a1779f56d3c35f9dbd1e401f0d932b9367cae658ddd190"
       },
       "screenshot": {
         "fixture": "built-in-example",
@@ -44,14 +44,14 @@
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-FBD0AA1FFA1E",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-49951C155301",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-FBD0AA1FFA1E",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-49951C155301",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "02cc2d5d71a4559c7ca4660e6cda6d1230609b08073de3702fb2533a3b668d5a"
+        "sha256": "61b025f62f2b1ab2697ad4ec16249e2753f4a55f89a9bcf9dc2779b7e6ef75f5"
       },
       "screenshot": {
         "fixture": "built-in-example",
@@ -64,14 +64,14 @@
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-FBD0AA1FFA1E",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-49951C155301",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-FBD0AA1FFA1E",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-49951C155301",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "2062d3ed0a62b901814ec433b68a8d84024c18c753847713e596d01a854db168"
+        "sha256": "d7273bfeeeb7fb02ed838ae6c13b5e1e8c73b03d2517a5a77cee084e3616fdd8"
       },
       "screenshot": {
         "fixture": "built-in-example",
