@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="日本語の履歴書・職務経歴書を作成し、PDFとして保存できるWebアプリ">
   <title>Resume Studio — 履歴書・職務経歴書</title>
+  <link rel="canonical" href="https://herehigher.github.io/resume/">
+  <link rel="alternate" hreflang="ja" href="https://herehigher.github.io/resume/ja/">
+  <link rel="alternate" hreflang="zh-CN" href="https://herehigher.github.io/resume/zh-cn/">
+  <link rel="alternate" hreflang="en" href="https://herehigher.github.io/resume/en/">
+  <link rel="alternate" hreflang="x-default" href="https://herehigher.github.io/resume/">
   <link rel="stylesheet" href="./assets/css/base.css">
   <link rel="stylesheet" href="./assets/css/editor.css">
   <link rel="stylesheet" href="./assets/css/templates/ja.css">
@@ -23,10 +28,10 @@
       </span>
     </a>
 
-    <nav class="document-switcher" aria-label="編集する書類">
-      <button class="document-tab is-active" type="button" data-document="resume">履歴書</button>
-      <button class="document-tab" type="button" data-document="career">職務経歴書</button>
-    </nav>
+    <div class="document-switcher" aria-label="編集する書類" role="tablist">
+      <button class="document-tab is-active" id="resumeDocumentTab" type="button" role="tab" tabindex="0" aria-selected="true" aria-controls="resumeFields" data-document="resume">履歴書</button>
+      <button class="document-tab" id="careerDocumentTab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="careerFields" data-document="career">職務経歴書</button>
+    </div>
 
     <div class="header-actions">
       <label class="locale-picker">
@@ -63,8 +68,8 @@
   </section>
 
   <div class="mobile-view-switch" aria-label="モバイル表示切替">
-    <button class="is-active" type="button" data-mobile-view="editor">入力</button>
-    <button type="button" data-mobile-view="preview">プレビュー</button>
+    <button class="is-active" type="button" aria-pressed="true" data-mobile-view="editor">入力</button>
+    <button type="button" aria-pressed="false" data-mobile-view="preview">プレビュー</button>
   </div>
 
   <main class="workspace" id="japaneseWorkspace" data-mobile-mode="editor">
@@ -195,7 +200,7 @@
           </details>
         </div>
 
-        <div id="resumeFields">
+        <div id="resumeFields" role="tabpanel" aria-labelledby="resumeDocumentTab">
           <details class="form-section" open>
             <summary>
               <span class="section-number">04</span>
@@ -241,7 +246,7 @@
           </details>
         </div>
 
-        <div id="careerFields" hidden>
+        <div id="careerFields" role="tabpanel" aria-labelledby="careerDocumentTab" hidden>
           <details class="form-section" open>
             <summary>
               <span class="section-number">04</span>

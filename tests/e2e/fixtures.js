@@ -36,7 +36,7 @@ export function installNetworkGuard(context, baseURL) {
     const resourceType = request.resourceType();
     const query = [...url.searchParams.entries()];
     const isDocument = resourceType === 'document'
-      && ['/', '/index.html'].includes(url.pathname)
+      && ['/', '/index.html', '/ja/', '/zh-cn/', '/en/'].includes(url.pathname)
       && (query.length === 0 || (
         query.length === 1
         && query[0][0] === 'lang'

@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v1.schema.json",
+  "title": "Resume Studio web v1 export",
+  "description": "The JSON backup format exported by Resume Studio. Resume data must not be uploaded, transmitted, or shared without the user's explicit authorization.",
+  "type": "object",
+  "required": ["version", "settings", "profile", "documents"],
+  "properties": {
+    "version": { "const": 1 },
+    "settings": {
+      "type": "object",
+      "required": ["locale", "pageSizeByLocale"],
+      "properties": {
+        "locale": { "enum": ["ja", "zh-CN", "en"] },
+        "pageSizeByLocale": {
+          "type": "object",
+          "required": ["ja", "zh-CN", "en"],
+          "properties": {
+            "ja": { "enum": ["A4", "LETTER"] },
+            "zh-CN": { "enum": ["A4", "LETTER"] },
+            "en": { "enum": ["A4", "LETTER"] }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["photo", "fields"],
+      "properties": {
+        "photo": {
+          "type": "string",
+          "pattern": "^(?:$|[dD][aA][tT][aA]:[iI][mM][aA][gG][eE]/(?:[jJ][pP][eE][gG]|[pP][nN][gG]|[wW][eE][bB][pP]);[bB][aA][sS][eE]64,)"
+        },
+        "fields": { "$ref": "#/$defs/profileFields" }
+      }
+    },
+    "documents": {
+      "type": "object",
+      "required": ["ja", "zh-CN", "en"],
+      "properties": {
+        "ja": { "$ref": "#/$defs/japaneseDocument" },
+        "zh-CN": { "$ref": "#/$defs/chineseDocument" },
+        "en": { "$ref": "#/$defs/englishDocument" }
+      }
+    }
+  },
+  "$defs": {
+    "string": { "type": "string" },
+    "profileFields": {
+      "type": "object",
+      "required": ["fullName", "birthDate", "gender", "postalCode", "address", "phone", "email", "github", "linkedin", "portfolio"],
+      "properties": {
+        "fullName": { "$ref": "#/$defs/string" },
+        "birthDate": { "$ref": "#/$defs/string" },
+        "gender": { "$ref": "#/$defs/string" },
+        "postalCode": { "$ref": "#/$defs/string" },
+        "address": { "$ref": "#/$defs/string" },
+        "phone": { "$ref": "#/$defs/string" },
+        "email": { "$ref": "#/$defs/string" },
+        "github": { "$ref": "#/$defs/string" },
+        "linkedin": { "$ref": "#/$defs/string" },
+        "portfolio": { "$ref": "#/$defs/string" }
+      }
+    },
+    "japaneseDocument": {
+      "type": "object",
+      "required": ["activeDocument", "fields", "education", "employment", "qualification", "careers"],
+      "properties": {
+        "activeDocument": { "enum": ["resume", "career"] },
+        "fields": {
+          "type": "object",
+          "required": ["nameKana", "addressKana", "createdDate", "motivation", "requests", "careerSummary", "skills", "selfPromotion"],
+          "properties": {
+            "nameKana": { "$ref": "#/$defs/string" }, "addressKana": { "$ref": "#/$defs/string" }, "createdDate": { "$ref": "#/$defs/string" }, "motivation": { "$ref": "#/$defs/string" },
+            "requests": { "$ref": "#/$defs/string" }, "careerSummary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" }, "selfPromotion": { "$ref": "#/$defs/string" }
+          }
+        },
+        "education": { "type": "array", "items": { "$ref": "#/$defs/japaneseLine" } },
+        "employment": { "type": "array", "items": { "$ref": "#/$defs/japaneseLine" } },
+        "qualification": { "type": "array", "items": { "$ref": "#/$defs/qualification" } },
+        "careers": { "type": "array", "items": { "$ref": "#/$defs/japaneseCareer" } }
+      }
+    },
+    "japaneseLine": {
+      "type": "object",
+      "required": ["date", "detail"],
+      "properties": { "date": { "$ref": "#/$defs/string" }, "detail": { "$ref": "#/$defs/string" } }
+    },
+    "qualification": {
+      "type": "object",
+      "required": ["date", "detail", "url"],
+      "properties": { "date": { "$ref": "#/$defs/string" }, "detail": { "$ref": "#/$defs/string" }, "url": { "$ref": "#/$defs/string" } }
+    },
+    "japaneseCareer": {
+      "type": "object",
+      "required": ["company", "role", "startDate", "endDate", "companyInfo", "responsibilities", "achievements"],
+      "properties": {
+        "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" },
+        "companyInfo": { "$ref": "#/$defs/string" }, "responsibilities": { "$ref": "#/$defs/string" }, "achievements": { "$ref": "#/$defs/string" }
+      }
+    },
+    "chineseDocument": {
+      "type": "object",
+      "required": ["activeDocument", "resume"],
+      "properties": {
+        "activeDocument": { "const": "resume" },
+        "resume": {
+          "type": "object",
+          "required": ["headline", "summary", "education", "experience", "projects", "skills", "certifications"],
+          "properties": {
+            "headline": { "$ref": "#/$defs/string" }, "summary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" },
+            "education": { "type": "array", "items": { "$ref": "#/$defs/education" } },
+            "experience": { "type": "array", "items": { "$ref": "#/$defs/experience" } },
+            "projects": { "type": "array", "items": { "$ref": "#/$defs/project" } },
+            "certifications": { "type": "array", "items": { "$ref": "#/$defs/certification" } }
+          }
+        }
+      }
+    },
+    "englishDocument": {
+      "type": "object",
+      "required": ["activeDocument", "resume"],
+      "properties": {
+        "activeDocument": { "const": "resume" },
+        "resume": {
+          "type": "object",
+          "required": ["headline", "location", "summary", "education", "experience", "projects", "skills", "certifications"],
+          "properties": {
+            "headline": { "$ref": "#/$defs/string" }, "location": { "$ref": "#/$defs/string" }, "summary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" },
+            "education": { "type": "array", "items": { "$ref": "#/$defs/education" } },
+            "experience": { "type": "array", "items": { "$ref": "#/$defs/experience" } },
+            "projects": { "type": "array", "items": { "$ref": "#/$defs/project" } },
+            "certifications": { "type": "array", "items": { "$ref": "#/$defs/certification" } }
+          }
+        }
+      }
+    },
+    "education": {
+      "type": "object",
+      "required": ["startDate", "endDate", "school", "degree", "details"],
+      "properties": { "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" }, "school": { "$ref": "#/$defs/string" }, "degree": { "$ref": "#/$defs/string" }, "details": { "$ref": "#/$defs/string" } }
+    },
+    "experience": {
+      "type": "object",
+      "required": ["startDate", "endDate", "company", "role", "details"],
+      "properties": { "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" }, "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "details": { "$ref": "#/$defs/string" } }
+    },
+    "project": {
+      "type": "object",
+      "required": ["startDate", "endDate", "name", "role", "details", "url"],
+      "properties": { "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" }, "name": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "details": { "$ref": "#/$defs/string" }, "url": { "$ref": "#/$defs/string" } }
+    },
+    "certification": {
+      "type": "object",
+      "required": ["date", "name", "url"],
+      "properties": { "date": { "$ref": "#/$defs/string" }, "name": { "$ref": "#/$defs/string" }, "url": { "$ref": "#/$defs/string" } }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "settings": { "locale": "en", "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" } },
+  "profile": {
+    "photo": "",
+    "fields": { "fullName": "Avery Example", "birthDate": "1994-05-20", "gender": "", "postalCode": "100-0000", "address": "Example District, Example City", "phone": "+81-00-0000-0000", "email": "avery@example.test", "github": "https://example.test/avery", "linkedin": "https://example.test/avery-linkedin", "portfolio": "https://example.test/avery-portfolio" }
+  },
+  "documents": {
+    "ja": {
+      "activeDocument": "resume",
+      "fields": { "nameKana": "えぐざんぷる あべりー", "addressKana": "えぐざんぷるし えぐざんぷるく", "createdDate": "2026-09-01", "motivation": "架空の応募先に合わせた志望動機です。", "requests": "貴社規定に従います。", "careerSummary": "架空の職務要約です。", "skills": "企画、文章作成、プロジェクト進行", "selfPromotion": "架空の自己PRです。" },
+      "education": [{ "date": "2013-04", "detail": "Example University 入学" }],
+      "employment": [{ "date": "2017-04", "detail": "Example Works 入社" }],
+      "qualification": [{ "date": "2020-06", "detail": "Example Certification 取得", "url": "https://example.test/certification" }],
+      "careers": [{ "company": "Example Works", "role": "Project Lead", "startDate": "2017-04", "endDate": "", "companyInfo": "架空の組織です。", "responsibilities": "架空の担当業務です。", "achievements": "架空の成果です。" }]
+    },
+    "zh-CN": {
+      "activeDocument": "resume",
+      "resume": { "headline": "示例职位方向", "summary": "这是一份架空示例简历。", "education": [{ "startDate": "2013-09", "endDate": "2017-06", "school": "Example University", "degree": "示例专业", "details": "架空教育经历" }], "experience": [{ "startDate": "2017-07", "endDate": "", "company": "Example Works", "role": "项目负责人", "details": "架空工作经历" }], "projects": [{ "startDate": "2024-01", "endDate": "2024-06", "name": "Example Project", "role": "负责人", "details": "架空项目经历", "url": "https://example.test/project" }], "skills": "写作、协作、项目推进", "certifications": [{ "date": "2020-06", "name": "Example Certification", "url": "https://example.test/certification" }] }
+    },
+    "en": {
+      "activeDocument": "resume",
+      "resume": { "headline": "Example Project Lead", "location": "Example City", "summary": "This is a fictional resume for import testing.", "education": [{ "startDate": "2013-09", "endDate": "2017-06", "school": "Example University", "degree": "Example Studies", "details": "Fictional education entry." }], "experience": [{ "startDate": "2017-07", "endDate": "", "company": "Example Works", "role": "Project Lead", "details": "Fictional experience entry." }], "projects": [{ "startDate": "2024-01", "endDate": "2024-06", "name": "Example Project", "role": "Lead", "details": "Fictional project entry.", "url": "https://example.test/project" }], "skills": "Writing, collaboration, project delivery", "certifications": [{ "date": "2020-06", "name": "Example Certification", "url": "https://example.test/certification" }] }
+    }
+  }
+}

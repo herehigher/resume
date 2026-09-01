@@ -222,7 +222,10 @@ export function initJapaneseEditor(store) {
   function renderDocumentControls() {
     const documentType = japaneseDocument().activeDocument;
     document.querySelectorAll('.document-tab').forEach((tab) => {
-      tab.classList.toggle('is-active', tab.dataset.document === documentType);
+      const selected = tab.dataset.document === documentType;
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.setAttribute('tabindex', selected ? '0' : '-1');
     });
     document.getElementById('resumeFields').hidden = documentType !== 'resume';
     document.getElementById('careerFields').hidden = documentType !== 'career';
@@ -232,6 +235,17 @@ export function initJapaneseEditor(store) {
       ? '入力内容は右側の書類にすぐ反映されます。'
       : '経験と実績を、読みやすい書類に整えます。';
     document.getElementById('previewDocumentName').textContent = documentType === 'resume' ? '履歴書' : '職務経歴書';
+  }
+
+  function setMobileView(view) {
+    if (!['editor', 'preview'].includes(view)) return;
+    document.querySelectorAll('[data-mobile-view]').forEach((button) => {
+      const selected = button.dataset.mobileView === view;
+      button.classList.toggle('is-active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    document.getElementById('japaneseWorkspace').dataset.mobileMode = view;
+    if (view === 'preview') window.requestAnimationFrame(fitPreviewForViewport);
   }
 
   function updateCompletion() {
@@ -283,6 +297,7 @@ export function initJapaneseEditor(store) {
     updatePhotoUI();
     renderLists();
     renderDocumentControls();
+    setMobileView(document.getElementById('japaneseWorkspace').dataset.mobileMode || 'editor');
     renderPreview();
   }
 
@@ -406,12 +421,22 @@ export function initJapaneseEditor(store) {
     if (addButton) addItem(addButton.dataset.add);
     if (removeButton) removeItem(removeButton);
     if (mobileViewButton) {
-      document.querySelectorAll('[data-mobile-view]').forEach((button) => {
-        button.classList.toggle('is-active', button === mobileViewButton);
-      });
-      document.getElementById('japaneseWorkspace').dataset.mobileMode = mobileViewButton.dataset.mobileView;
-      if (mobileViewButton.dataset.mobileView === 'preview') window.requestAnimationFrame(fitPreviewForViewport);
+      setMobileView(mobileViewButton.dataset.mobileView);
     }
+  });
+
+  document.querySelector('.document-switcher').addEventListener('keydown', (event) => {
+    const currentTab = event.target.closest('[data-document]');
+    if (!currentTab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = [...document.querySelectorAll('[data-document]')];
+    const currentIndex = tabs.indexOf(currentTab);
+    const nextIndex = event.key === 'Home' ? 0
+      : event.key === 'End' ? tabs.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    nextTab.focus();
+    switchDocument(nextTab.dataset.document);
   });
 
   document.getElementById('photoInput').addEventListener('change', (event) => handlePhoto(event.target.files?.[0]));
