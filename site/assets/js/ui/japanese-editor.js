@@ -14,6 +14,12 @@ const PROFILE_FIELD_NAMES = new Set([
   'portfolio'
 ]);
 
+export function protectDraftBeforeSample(store, shouldPersistDraft) {
+  const currentDraft = cloneData(store.getState());
+  if (shouldPersistDraft) store.save();
+  return currentDraft;
+}
+
 export function initJapaneseEditor(store) {
   const form = document.getElementById('resumeForm');
   const preview = document.getElementById('documentPreview');
@@ -107,7 +113,16 @@ export function initJapaneseEditor(store) {
 
   function enterSampleMode() {
     window.clearTimeout(saveTimer);
-    draftBeforeSample = cloneData(store.getState());
+    let currentDraft;
+    try {
+      currentDraft = protectDraftBeforeSample(store, shouldPersistDraft);
+    } catch {
+      saveStatus.classList.remove('is-saving');
+      saveStatus.textContent = '保存できませんでした';
+      showDraftMessage('現在の下書きを保護できないため、入力例を表示できません');
+      return;
+    }
+    draftBeforeSample = currentDraft;
     draftBeforeSampleWasStored = shouldPersistDraft;
     sampleMode = true;
     store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });

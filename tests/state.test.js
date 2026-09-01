@@ -6,6 +6,7 @@ import { createDefaultState, createJapaneseSampleState } from '../site/assets/js
 import { validateState } from '../site/assets/js/state/schema.js';
 import { loadStoredState } from '../site/assets/js/state/storage.js';
 import { createStore } from '../site/assets/js/state/store.js';
+import { protectDraftBeforeSample } from '../site/assets/js/ui/japanese-editor.js';
 
 function createMemoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -66,6 +67,34 @@ test('sample state does not mutate the source draft', () => {
 
   assert.equal(source.profile.fields.fullName, '保存する氏名');
   assert.equal(sample.profile.fields.fullName, '山田 太郎');
+});
+
+test('entering sample mode synchronously persists pending draft changes', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState() });
+  store.update((state) => {
+    state.profile.fields.fullName = '保存直前の氏名';
+  });
+
+  const snapshot = protectDraftBeforeSample(store, true);
+
+  assert.equal(snapshot.profile.fields.fullName, '保存直前の氏名');
+  assert.equal(loadStoredState(storage).profile.fields.fullName, '保存直前の氏名');
+});
+
+test('sample draft protection propagates storage failures without changing state', () => {
+  const storage = createMemoryStorage();
+  storage.setItem = () => {
+    throw new Error('quota exceeded');
+  };
+  const store = createStore({ storage, initialState: createDefaultState() });
+  store.update((state) => {
+    state.profile.fields.fullName = '画面に残す氏名';
+  });
+
+  assert.throws(() => protectDraftBeforeSample(store, true), /quota exceeded/);
+  assert.equal(store.getState().profile.fields.fullName, '画面に残す氏名');
+  assert.equal(loadStoredState(storage), null);
 });
 
 test('schema rejects remote and unsupported photo sources', () => {
