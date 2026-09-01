@@ -98,4 +98,4 @@ node --test tests/documentation.test.js
 
 - Pull Request と `main` の quality check は `.github/workflows/` で実行します。
 - GitHub Pages の公開、repository visibility、SemVer tag、online smoke test は release 作業として扱います。
-- README の Online Demo URL は、実 deployment と HTTP/browser check が成功した URL だけを掲載します。
+- README の Web版 URL は、実 deployment と HTTP/browser check が成功した URL だけを掲載します。

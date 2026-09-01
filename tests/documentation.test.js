@@ -177,8 +177,9 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
     /LICENSE/
   ];
   const localeFacts = {
-    'README.md': [/入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
+    'README.md': [/## Web版/, /入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
     'README.en.md': [
+      /## Web App/,
       /Example mode|example/i,
       /Autosave|saved automatically/i,
       /manual save/i,
@@ -186,10 +187,11 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
       /delete/i,
       /profile, contact details, and photo are shared across locales/i
     ],
-    'README.zh-CN.md': [/示例/, /自动保存/, /手动保存/, /重新载入/, /删除/, /profile、联系方式和照片由三种语言共享/]
+    'README.zh-CN.md': [/## 在线版/, /示例/, /自动保存/, /手动保存/, /重新载入/, /删除/, /profile、联系方式和照片由三种语言共享/]
   };
   for (const relativePath of detailedReadmes) {
     const markdown = readFileSync(path.join(root, relativePath), 'utf8');
+    assert.doesNotMatch(markdown, /\bDemo\b/, `${relativePath} must describe the production Web App, not a demo`);
     for (const pattern of [...commonFacts, ...localeFacts[relativePath]]) {
       assert.match(markdown, pattern, `${relativePath} is missing ${pattern}`);
     }
