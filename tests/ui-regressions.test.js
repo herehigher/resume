@@ -65,16 +65,49 @@ test('all locale editors and template styles are connected to the page', () => {
   assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
 });
 
-test('tagged Pages releases depend on the reusable quality workflow', () => {
-  const quality = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
+test('Pages releases use the validated commit and cannot bypass the reusable quality workflow', () => {
+  const quality = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
   const deploy = readFileSync(new URL('../.github/workflows/deploy-pages.yml', import.meta.url), 'utf8');
 
+  assert.match(quality, /name: Quality/);
+  assert.match(quality, /pull_request:/);
+  assert.match(quality, /push:\s*\n\s*branches:\s*\n\s*- main/);
   assert.match(quality, /workflow_call:/);
-  assert.match(deploy, /tags:\s*\n\s*- 'v\*'/);
-  assert.match(deploy, /quality:\s*\n\s*uses: \.\/\.github\/workflows\/quality\.yml/);
-  assert.match(deploy, /deploy:\s*\n\s*needs: quality/);
-  assert.match(deploy, /git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/);
-  assert.match(deploy, /package_version="\$\(node -p "require\('\.\/package\.json'\)\.version"\)"/);
-  assert.match(deploy, /test "\$GITHUB_REF_NAME" = "v\$\{package_version\}"/);
+  assert.match(quality, /checkout_ref:\s*\n\s*description:[^\n]+\n\s*required: true\s*\n\s*type: string/);
+  assert.match(quality, /ref: \$\{\{ inputs\.checkout_ref \|\| github\.sha \}\}/);
+  assert.match(quality, /permissions: \{\}/);
+  assert.match(quality, /quality:\s*\n\s*runs-on:[\s\S]*?permissions:\s*\n\s*contents: read/);
+
+  assert.match(deploy, /tags:\s*\n\s*- 'v\*\.\*\.\*'/);
+  assert.match(deploy, /workflow_dispatch:\s*\n\s*inputs:\s*\n\s*release_tag:/);
+  assert.doesNotMatch(deploy, /^\s+branches:/m);
+  assert.match(deploy, /permissions: \{\}/);
+  assert.match(deploy, /group: pages-production\s*\n\s*cancel-in-progress: false/);
+  assert.match(deploy, /run: node scripts\/validate-release-ref\.mjs/);
+  assert.match(deploy, /quality:\s*\n\s*needs: validate\s*\n\s*uses: \.\/\.github\/workflows\/ci\.yml/);
+  assert.match(deploy, /checkout_ref: \$\{\{ needs\.validate\.outputs\.release_sha \}\}/);
+  assert.match(deploy, /artifact:\s*\n\s*needs: \[validate, quality\]/);
+  assert.match(deploy, /ref: \$\{\{ needs\.validate\.outputs\.release_sha \}\}/);
+  assert.match(deploy, /uses: actions\/upload-pages-artifact@v3\s*\n\s*with:\s*\n\s*path: site/);
+  assert.match(deploy, /deploy:\s*\n\s*needs: \[validate, artifact\]/);
+  assert.match(deploy, /name: github-pages\s*\n\s*url: \$\{\{ steps\.deployment\.outputs\.page_url \}\}/);
+  assert.match(deploy, /id-token: write\s*\n\s*pages: write/);
+  assert.match(deploy, /uses: actions\/configure-pages@v5/);
   assert.match(deploy, /uses: actions\/deploy-pages@v4/);
+  assert.match(deploy, /smoke:\s*\n\s*needs: \[validate, deploy\][\s\S]*?permissions: \{\}/);
+  assert.match(deploy, /local attempts=4[\s\S]*?for \(\(attempt = 1; attempt <= attempts; attempt \+= 1\)\); do/);
+  assert.match(deploy, /if response_metadata="\$\(curl[\s\S]*?if grep --fixed-strings --quiet[\s\S]*?return 0/);
+  assert.match(deploy, /if \(\(attempt < attempts\)\); then\s*\n\s*sleep 3/);
+  assert.match(deploy, /Pages smoke failed for[\s\S]*?return 1/);
+  assert.doesNotMatch(deploy, /--retry(?:\s|$)/);
+  for (const publicPath of [
+    "fetch_and_check '' root.html",
+    "fetch_and_check 'ja/'",
+    "fetch_and_check 'zh-cn/'",
+    "fetch_and_check 'en/'",
+    "fetch_and_check 'sitemap.xml'",
+    "fetch_and_check 'schema/resume-studio-web-v1.schema.json'",
+    "fetch_and_check 'schema/resume-studio-web-v1.example.json'",
+    "fetch_and_check 'assets/js/config.js'"
+  ]) assert.match(deploy, new RegExp(publicPath.replaceAll('.', '\\.')));
 });

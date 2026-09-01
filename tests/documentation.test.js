@@ -246,6 +246,34 @@ test('development docs cover localized public entry and machine-readable contrac
   assert.equal(hasAcceptanceItem('Public entry', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
 });
 
+test('release docs cover the tag-only v0.1.0 deployment and recovery contract', () => {
+  const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
+  const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
+
+  for (const fact of [
+    '.github/workflows/ci.yml',
+    'vMAJOR.MINOR.PATCH',
+    'v0.1.0 release 手順',
+    'npm run test:acceptance',
+    'main` push では Pages deployment は開始されません',
+    'workflow_dispatch',
+    'deploy 済みだが未受入',
+    'https://herehigher.github.io/resume/',
+    'docs-only follow-up Pull Request'
+  ]) assert.match(guide, new RegExp(fact.replaceAll('.', '\\.')));
+
+  for (const fact of [
+    'Source が `GitHub Actions`',
+    'Enforce HTTPS',
+    'Quality / quality',
+    'site/` だけ',
+    'github-pages` environment',
+    'workflow_dispatch',
+    'v0.1.0',
+    'deploy 済み・未受入'
+  ]) assert.match(acceptance, new RegExp(fact.replaceAll('.', '\\.')));
+});
+
 test('privacy has stable tri-lingual anchors and one effective version', () => {
   const privacy = readFileSync(path.join(root, 'PRIVACY.md'), 'utf8');
   for (const fragment of ['privacy-ja', 'privacy-zh-cn', 'privacy-en']) {

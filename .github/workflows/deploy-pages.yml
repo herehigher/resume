@@ -3,53 +3,152 @@ name: Deploy Pages
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing stable release tag to redeploy, for example v0.1.0
+        required: true
+        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: pages
+  group: pages-production
   cancel-in-progress: false
 
 jobs:
-  quality:
-    uses: ./.github/workflows/quality.yml
-    permissions:
-      contents: read
-
-  deploy:
-    needs: quality
+  validate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
-      id-token: write
-      pages: write
+    outputs:
+      package_version: ${{ steps.release.outputs.package_version }}
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
     steps:
-      - name: Checkout
+      - name: Checkout release metadata
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
 
-      - name: Verify release commit is on main
-        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Validate exact release tag and commit
+        id: release
+        env:
+          RELEASE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_EVENT_REF: ${{ github.ref }}
+          RELEASE_EVENT_SHA: ${{ github.sha }}
+          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag }}
+        run: node scripts/validate-release-ref.mjs
 
-      - name: Verify release tag matches package version
-        run: |
-          package_version="$(node -p "require('./package.json').version")"
-          test "$GITHUB_REF_NAME" = "v${package_version}"
+  quality:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      checkout_ref: ${{ needs.validate.outputs.release_sha }}
+    permissions:
+      contents: read
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+  artifact:
+    needs: [validate, quality]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout validated release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
+  deploy:
+    needs: [validate, artifact]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      id-token: write
+      pages: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke:
+    needs: [validate, deploy]
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      EXPECTED_PAGE_URL: https://herehigher.github.io/resume/
+      PACKAGE_VERSION: ${{ needs.validate.outputs.package_version }}
+      PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+      RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+    steps:
+      - name: Verify deployed public paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="${PAGE_URL%/}/"
+          test "$base_url" = "$EXPECTED_PAGE_URL"
+
+          smoke_dir="${RUNNER_TEMP}/resume-pages-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -p "$smoke_dir"
+
+          fetch_and_check() {
+            local path="$1"
+            local output="$2"
+            local marker="$3"
+            local attempts=4
+            local attempt response_metadata
+            local last_result='request did not complete'
+
+            for ((attempt = 1; attempt <= attempts; attempt += 1)); do
+              if response_metadata="$(curl --fail --silent --show-error \
+                --proto '=https' \
+                --connect-timeout 10 \
+                --max-time 30 \
+                --output "${smoke_dir}/${output}" \
+                --write-out 'HTTP %{http_code}; type=%{content_type}; url=%{url_effective}' \
+                "${base_url}${path}?release=${RELEASE_SHA}&attempt=${attempt}")"; then
+                if grep --fixed-strings --quiet "$marker" "${smoke_dir}/${output}"; then
+                  return 0
+                fi
+                last_result="${response_metadata}; expected marker not found"
+              else
+                last_result='HTTPS request failed'
+              fi
+
+              if ((attempt < attempts)); then
+                sleep 3
+              fi
+            done
+
+            echo "Pages smoke failed for '${path:-/}' after ${attempts} attempts: ${last_result}." >&2
+            if [[ -f "${smoke_dir}/${output}" ]]; then
+              echo "Last public response: bytes=$(wc -c < "${smoke_dir}/${output}"), sha256=$(sha256sum "${smoke_dir}/${output}" | cut -d ' ' -f 1)." >&2
+            fi
+            return 1
+          }
+
+          fetch_and_check '' root.html '<title>Resume Studio'
+          fetch_and_check 'ja/' ja.html '<html lang="ja">'
+          fetch_and_check 'zh-cn/' zh-cn.html '<html lang="zh-CN">'
+          fetch_and_check 'en/' en.html '<html lang="en">'
+          fetch_and_check 'sitemap.xml' sitemap.xml '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+          fetch_and_check 'schema/resume-studio-web-v1.schema.json' schema.json '"title": "Resume Studio web v1 export"'
+          fetch_and_check 'schema/resume-studio-web-v1.example.json' example.json '"version": 1'
+          fetch_and_check 'assets/js/config.js' config.js "APP_VERSION = '${PACKAGE_VERSION}'"

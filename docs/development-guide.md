@@ -111,8 +111,33 @@ node --test tests/documentation.test.js
 
 ## Release と責任範囲
 
-- Pull Request と `main` の quality check は `.github/workflows/quality.yml` で実行します。
-- Tag-based GitHub Pages release は `.github/workflows/deploy-pages.yml` で quality 成功、version 一致、main 履歴への包含を確認してから deploy します。
-- Public release、tag、Pages settings、repository visibility を変更するには、owner の明示承認が必要です。
-- Deploy 後は GitHub Pages の project path `/resume/` で root、三言語 public entry、`sitemap.xml`、JSON Schema が取得でき、canonical / hreflang と editor CTA が実 URL に一致することを online smoke で確認します。
-- README の Web 版 URL は、実 deployment と HTTP / browser check が成功した URL だけを掲載します。
+- Pull Request と `main` の quality check は `.github/workflows/ci.yml` で実行します。通常の `main` push は application を deploy しません。
+- Production release tag は leading zero、prerelease、build metadata を含まない安定版 `vMAJOR.MINOR.PATCH` だけを使用します。Tag と `package.json` の version は一致させ、tag の commit は `main` の履歴に含めます。
+- `.github/workflows/deploy-pages.yml` は tag の exact ref を commit まで解決し、同じ full commit SHA を reusable `Quality` workflow と Pages artifact checkout に渡します。Quality が失敗した場合は artifact 作成と deploy を実行しません。Artifact は `site/` だけを含みます。
+- Public release、tag、Pages settings、repository visibility を変更するには、owner の明示承認が必要です。Release tag は移動または削除せず、修正が必要な場合は新しい version を発行します。
+
+### 初回 GitHub Pages 設定
+
+Owner は最初の tag を push する前に、GitHub の `Settings` → `Pages` で Build and deployment の Source を `GitHub Actions` に設定します。Custom domain を使わない project site の production URL は `https://herehigher.github.io/resume/` です。最初の deployment 後に同 URL が HTTPS で取得できることと、`Enforce HTTPS` の状態を確認します。
+
+設定変更時は Issue または Pull Request に、設定者、確認日時、Source、custom domain の有無、HTTPS の状態を記録します。Secret や access token は記録しません。初回 deployment の workflow run URL、environment に表示された Pages URL、online smoke の結果も同じ記録へ追記します。
+
+English summary: configure Pages to use GitHub Actions, record the non-secret settings and evidence, and verify the project URL over HTTPS after the first deployment.
+
+### v0.1.0 release 手順
+
+1. `site/` と version を release candidate として確定します。`site/` を変更した場合は tag 前に `npm run generate:docs` を実行し、screenshot、PDF、manifest を同じ candidate commit に含めます。Workflow や文書だけの変更では生成 asset を更新しません。
+2. [受入チェックリスト](acceptance-checklist.md) の目視項目を確認し、`npm run test:acceptance` と `git diff --check` の結果、candidate の full commit SHA を Pull Request に記録します。
+3. Pull Request を `main` へ merge し、`main` の `Quality / quality` 成功を確認します。この通常の `main` push では Pages deployment は開始されません。
+4. Owner の承認後、candidate を含む `main` commit に annotated tag `v0.1.0` を作成して push します。Tag の update / delete や force push は行いません。
+5. `Deploy Pages` の validate、quality、artifact、deploy、smoke が順に成功したことを確認します。GitHub Actions の `github-pages` environment に表示された deployment URL と workflow run URL を判定記録へ残します。
+6. 実 URLを private window でも確認し、online smoke と目視確認に合格した後で release 完了とします。
+7. 三言語 README の Web 版 URL は、初回 deployment と HTTP / browser check が成功した後の docs-only follow-up Pull Request で掲載します。この `main` commit は再 deployment を起動しません。
+
+### Online smoke と再 deployment
+
+Deploy 後の smoke job は action が返した URL を `https://herehigher.github.io/resume/` に正規化して一致を確認し、cache-busting query を付けて root、`/ja/`、`/zh-cn/`、`/en/`、`sitemap.xml`、JSON Schema、import example、version config を HTTPS で取得します。HTML を browser で実行しないため、Cloudflare Web Analytics の script / RUM endpoint の一時障害は smoke の対象外です。
+
+Smoke の失敗は「deploy 済みだが未受入」であり、「未公開」を意味しません。CDN 反映などの一時的な失敗は同じ run の rerun、または `workflow_dispatch` に既存の安定版 tag を入力して再確認します。Manual dispatch は default branch からだけ実行でき、指定 tag の exact ref、version、`main` ancestry を自動 release と同じ条件で再検証します。
+
+同一 origin の file 欠落、version 不一致など release 内容の欠陥では tag を移動せず、修正 Pull Request と新しい version を発行します。直前の正常な既存 tag を `workflow_dispatch` で指定すると、その immutable commit の quality を再実行して rollback deployment できます。

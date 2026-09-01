@@ -6,16 +6,25 @@ on:
     branches:
       - main
   workflow_call:
+    inputs:
+      checkout_ref:
+        description: Full commit SHA to test when called by another workflow
+        required: true
+        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   quality:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
