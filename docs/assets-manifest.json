@@ -9,7 +9,7 @@
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
-    "siteHash": "66f19e3edbabc51852e0f57bd8fbf2ed1b905ce5eda1ce977ba585048d29f708",
+    "siteHash": "19c8af7235462e1f014fd83059a63bdbfa0f17896d2f72ebb4abf321c6a45b02",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -24,14 +24,14 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-66F19E3EDBAB",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-19C8AF723546",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-66F19E3EDBAB",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-19C8AF723546",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "8c1c9398f92221eed5a04eaf8c3d51482155e5dfa42866fdc9cd12acbb20a35c"
+        "sha256": "1b193f98a1cc9f037c1fa9d596c32bd2195f6b06de9435fa802b404a5626bb6f"
       },
       "screenshot": {
         "fixture": "built-in-example",
@@ -44,14 +44,14 @@
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-66F19E3EDBAB",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-19C8AF723546",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-66F19E3EDBAB",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-19C8AF723546",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "43646f827ff5d150eacb7fa0b253522d777ed362d334f747e26250061e4e8111"
+        "sha256": "083cbe53473b07223ccf114cccbe4da52e45b1301fecce23786f5a9a93a71819"
       },
       "screenshot": {
         "fixture": "built-in-example",
@@ -64,14 +64,14 @@
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-66F19E3EDBAB",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-19C8AF723546",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-66F19E3EDBAB",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-19C8AF723546",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "b8a45ff16f23dcda0ab4b7bd4b720943d725f63971512e79db279f32f1d67808"
+        "sha256": "b3fa5e21ae2ed29b3510139e3fbf8c4fa7938ad0da5764b2572f9b2700cd5ef9"
       },
       "screenshot": {
         "fixture": "built-in-example",

@@ -1,17 +1,32 @@
 # v0.1 リリース受入チェックリスト / Release acceptance checklist
 
-自動テストで検出しにくい文字切れ、改ページ、印刷ダイアログ差異を、リリース候補ごとに確認する。個人情報を含む実データは使用せず、テスト用データのみで実施する。
+自動テストで検出しにくい文字切れ、改ページ、印刷ダイアログ差異を、リリース候補ごとに確認する。個人情報を含む実データは使用せず、テスト用データのみで実施する。Version 公開の実行順と証拠 template は [Version release playbook](release-playbook.md) に従う。
 
 ## 自動ゲート
 
 - `npm ci`、`npm test`、`npm run lint`、`npx playwright install chromium`、`npm run test:e2e` が成功する。
-- Tag（`v*`）の Pages リリースは、tag が `v${package.json version}` と一致し、再利用可能な `Quality` workflow が成功し、対象commitが main の履歴に含まれる場合だけ deploy job へ進む。失敗したリリース候補は公開しない。
-- 現在の非公開リポジトリで Pages を利用できない場合、公開または対応プランへの変更後に Pages の Source を GitHub Actions に設定する。それまでは deploy が成功しないため、サイトは公開されない。
-- 利用可能になった時点で `Quality / quality` を main の必須ステータスチェック（required status check）に設定し、失敗したPRのマージも禁止する。
+- 安定版 Tag（`vMAJOR.MINOR.PATCH`）の Pages release は、tag が `v${package.json version}` と一致し、再利用可能な `Quality` workflow が成功し、対象 commit が `main` の履歴に含まれる場合だけ deploy job へ進む。Leading zero、prerelease、build metadata、不正な ref 形式は拒否する。
+- `main` の通常 push は `.github/workflows/ci.yml` の Quality だけを実行し、Pages を deploy しない。`Quality / quality` を main の必須 status check とし、失敗した Pull Request の merge を禁止する。
+- Pages artifact は検証済み full commit SHA の `site/` だけを含み、deploy は artifact と Quality の両方に依存する。GitHub Actions の `github-pages` environment に結果と URL が表示される。
+- Manual rollback / redeploy は default branch の `Deploy Pages` workflow へ既存 tag を入力し、自動 release と同じ exact tag、version、main ancestry、Quality gate を通す。
 - Playwright の失敗時は GitHub Actions の `playwright-results` artifact で trace と screenshot を確認する。
 - PDF ゲートは short（英語1ページ）、standard（日本語2ページ）、long（英語複数ページ）について、ページ数、用紙寸法、先頭・末尾の抽出テキストを確認する。
 - `tests/public-entry.test.js` が三言語 public entry の metadata、canonical / hreflang、`sitemap.xml`、`resume-studio-web-v1.schema.json` と import example の代表的な正常・異常 case を検証する。
 - Playwright が JavaScript 無効時の public entry と、document tab の `aria-selected` / roving tabindex、三言語 mobile switch の `aria-pressed` を検証する。
+
+## 初回 Pages / HTTPS 設定
+
+設定と tag 操作の直前確認、Actions 監視、manual redeploy / rollback は [release playbook](release-playbook.md) を使用する。
+
+- [ ] Repository の `Settings` → `Pages` で Source が `GitHub Actions` になっている。
+- [ ] Custom domain を使用しないことと、production URL が `https://herehigher.github.io/resume/` であることを確認した。
+- [ ] 初回 deployment 後に HTTPS で接続でき、`Enforce HTTPS` の状態を確認した。
+- [ ] 設定者、確認日時、Source、custom domain、HTTPS 状態を Issue または Pull Request に記録した。Secret / token は記録していない。
+- [ ] `Deploy Pages` の workflow run URL、environment に表示された Pages URL、online smoke の結果を記録した。
+- [ ] `main` の通常 commit で `Deploy Pages` が起動せず、`v0.1.0` tag で validate → quality → artifact → deploy → smoke が起動した。
+- [ ] `workflow_dispatch` で既存 tag `v0.1.0` を指定し、同じ tag commit を再検証・再 deployment できることを確認した。
+
+Smoke が失敗した場合、deployment 自体は完了しているため「deploy 済み・未受入」と記録する。CDN 反映など一時的な失敗は rerun または同じ既存 tag の manual redeploy で再確認する。同一 origin の file 欠落や version 不一致では tag を移動せず、修正版を新しい version として release する。
 
 ## ブラウザ表示
 
@@ -25,8 +40,9 @@
 - [ ] 保存・再読込、入力例からの復元、項目削除、JSON書き出し・読込後も三言語のデータが混ざらない。
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
 - [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
-- [ ] Developer Tools の Network で、同一 origin の公開 static file に加え、`https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST だけが発生する。その他の外部 runtime asset / request、同一 origin の POST / fetch / XHR、未知の path、WebSocket はない。
-- [ ] Cloudflare RUM request の URL と payload を確認し、履歴書入力、氏名・連絡先、写真、import / export JSON、localStorage の下書き、custom event、利用者単位 ID が含まれない。Page URL の query は `lang=ja`、`lang=zh-CN`、`lang=en` 以外を含まない。
+- [ ] Clone / fork または source build では、4 HTML が `data-analytics-mode="disabled" data-analytics-provider="none"` を示し、Developer Tools の Network に同一 origin の公開 static file 以外の analytics / external runtime request、同一 origin POST、未知 path、WebSocket がない。
+- [ ] 公式 Pages release では、4 HTML の status tuple が tagged manifest と一致する。`disabled/none` なら beacon がなく、`enabled/cloudflare-web-analytics` なら `https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST が各 page で確認できる。未対応 tuple は configuration error として不合格にする。
+- [ ] Enabled の Cloudflare RUM request の URL と payload を確認し、履歴書入力、氏名・連絡先、写真、import / export JSON、localStorage の下書き、custom event、利用者単位 ID が含まれない。Page URL の query は `lang=ja`、`lang=zh-CN`、`lang=en` 以外を含まない。
 - [ ] Repository を public にした後、未ログインまたは private window から右下の GitHub source link と三言語の privacy notice link を開ける。
 
 ## Public entry・SEO・Agent contract
@@ -61,4 +77,4 @@
 
 ## 判定記録
 
-リリース候補の commit SHA、確認日、確認者、OS / Chrome バージョン、各項目の結果、既知の差異と関連issueをPRへ記録する。未確認項目がある場合は理由と影響範囲を明記し、リリース可否を判断する。
+リリース候補の commit SHA、確認日、確認者、OS / Chrome バージョン、各項目の結果、既知の差異と関連issueをPRへ記録する。未確認項目がある場合は理由と影響範囲を明記し、リリース可否を判断する。[Release evidence template](release-playbook.md#evidence-記録-template) の各 field を実値または `該当なし` で埋める。

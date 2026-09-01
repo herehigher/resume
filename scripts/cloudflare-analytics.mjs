@@ -1,72 +1,44 @@
-export const CLOUDFLARE_ANALYTICS_TOKEN = '0b02ba35d9bc4d4d8dd63b42d6d51241';
-export const CLOUDFLARE_BEACON_URL = 'https://static.cloudflareinsights.com/beacon.min.js';
-export const CLOUDFLARE_RUM_URL = 'https://cloudflareinsights.com/cdn-cgi/rum';
+import {
+  CLOUDFLARE_BEACON_URL,
+  CLOUDFLARE_RUM_URL
+} from './prepare-pages-artifact.mjs';
 
 const DOCUMENT_PATHS = new Set([
-  '/',
-  '/index.html',
-  '/ja/',
-  '/zh-cn/',
-  '/en/',
-  '/resume/',
-  '/resume/index.html',
-  '/resume/ja/',
-  '/resume/zh-cn/',
-  '/resume/en/'
+  '/', '/index.html', '/ja/', '/zh-cn/', '/en/',
+  '/resume/', '/resume/index.html', '/resume/ja/', '/resume/zh-cn/', '/resume/en/'
 ]);
 const LOCALES = new Set(['ja', 'zh-CN', 'en']);
 const RUM_KEYS = new Set([
-  'cls',
-  'deliveryType',
-  'eventType',
-  'fid',
-  'firstContentfulPaint',
-  'firstPaint',
-  'inp',
-  'lcp',
-  'location',
-  'memory',
-  'navigationType',
-  'nt',
-  'pageloadId',
-  'referrer',
-  'resources',
-  'serverTimings',
-  'siteToken',
-  'startTime',
-  'st',
-  'timingsV2',
-  'ttfb',
-  'versions'
+  'cls', 'deliveryType', 'eventType', 'fid', 'firstContentfulPaint', 'firstPaint', 'inp', 'lcp',
+  'location', 'memory', 'navigationType', 'nt', 'pageloadId', 'referrer', 'resources',
+  'serverTimings', 'siteToken', 'startTime', 'st', 'timingsV2', 'ttfb', 'versions'
 ]);
 
 function attributesIn(tag) {
   const attributes = new Map();
   const openingTag = tag.match(/^<script\b([\s\S]*?)>/i)?.[1] || '';
   for (const match of openingTag.matchAll(/([^\s=]+)\s*=\s*(["'])(.*?)\2/g)) {
-    attributes.set(match[1].toLowerCase(), match[3]);
+    attributes.set(match[1].toLowerCase(), match[3].replaceAll('&quot;', '"'));
   }
   return attributes;
 }
 
-export function isCloudflareAnalyticsScriptTag(tag) {
+export function isCloudflareAnalyticsScriptTag(tag, expectedToken) {
   const attributes = attributesIn(tag);
-  if (attributes.size !== 3) return false;
-  if (attributes.get('type') !== 'module') return false;
-  if (attributes.get('src') !== CLOUDFLARE_BEACON_URL) return false;
+  if (attributes.size !== 3 || !/^[0-9a-f]{32}$/.test(expectedToken || '')) return false;
+  if (attributes.get('type') !== 'module' || attributes.get('src') !== CLOUDFLARE_BEACON_URL) return false;
   try {
     const configuration = JSON.parse(attributes.get('data-cf-beacon') || '');
-    return Object.keys(configuration).length === 1
-      && configuration.token === CLOUDFLARE_ANALYTICS_TOKEN;
+    return Object.keys(configuration).length === 1 && configuration.token === expectedToken;
   } catch {
     return false;
   }
 }
 
-export function cloudflareAnalyticsScriptTags(html) {
+export function cloudflareAnalyticsScriptTags(html, expectedToken) {
   return [...html.matchAll(/<script\b[^>]*\bsrc=(["'])https?:\/\/[^"']+\1[^>]*><\/script>/gi)]
     .map((match) => match[0])
-    .filter(isCloudflareAnalyticsScriptTag);
+    .filter((tag) => isCloudflareAnalyticsScriptTag(tag, expectedToken));
 }
 
 function isAllowedDocumentUrl(value, expectedOrigin) {
@@ -77,9 +49,7 @@ function isAllowedDocumentUrl(value, expectedOrigin) {
       && DOCUMENT_PATHS.has(url.pathname)
       && !url.hash
       && (query.length === 0 || (
-        query.length === 1
-        && query[0][0] === 'lang'
-        && LOCALES.has(query[0][1])
+        query.length === 1 && query[0][0] === 'lang' && LOCALES.has(query[0][1])
       ));
   } catch {
     return false;
@@ -108,12 +78,14 @@ function hasBoundedValues(value) {
 
 export function isAllowedCloudflareAnalyticsRequest({
   expectedOrigin,
+  expectedToken,
   headers = {},
   method,
   postData = null,
   resourceType,
   url: requestUrl
 }) {
+  if (!/^[0-9a-f]{32}$/.test(expectedToken || '')) return false;
   if (method === 'GET' && resourceType === 'script' && requestUrl === CLOUDFLARE_BEACON_URL) {
     return postData === null;
   }
@@ -127,9 +99,8 @@ export function isAllowedCloudflareAnalyticsRequest({
     const payload = JSON.parse(postData);
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
     if (Object.keys(payload).some((key) => !RUM_KEYS.has(key))) return false;
-    if (payload.siteToken !== CLOUDFLARE_ANALYTICS_TOKEN) return false;
-    const expectedTransport = resourceType === 'xhr' ? 2 : 1;
-    if (payload.st !== expectedTransport) return false;
+    if (payload.siteToken !== expectedToken) return false;
+    if (payload.st !== (resourceType === 'xhr' ? 2 : 1)) return false;
     if (!isAllowedDocumentUrl(payload.location, expectedOrigin)) return false;
     if (!isAllowedReferrer(payload.referrer ?? '', expectedOrigin)) return false;
     return hasBoundedValues(payload);
@@ -138,20 +109,17 @@ export function isAllowedCloudflareAnalyticsRequest({
   }
 }
 
-export function cloudflareAnalyticsMockScript() {
+export function cloudflareAnalyticsMockScript(expectedToken) {
+  if (!/^[0-9a-f]{32}$/.test(expectedToken || '')) throw new Error('A valid test token is required');
   const payload = {
     eventType: 1,
     firstContentfulPaint: 0,
     firstPaint: 0,
     location: '__LOCATION__',
-    memory: {
-      jsHeapSizeLimit: 0,
-      totalJSHeapSize: 0,
-      usedJSHeapSize: 0
-    },
+    memory: { jsHeapSizeLimit: 0, totalJSHeapSize: 0, usedJSHeapSize: 0 },
     nt: 'navigate',
     pageloadId: 'playwright-page-load',
-    siteToken: CLOUDFLARE_ANALYTICS_TOKEN,
+    siteToken: expectedToken,
     st: 2,
     startTime: 0,
     timingsV2: {},
@@ -159,3 +127,5 @@ export function cloudflareAnalyticsMockScript() {
   };
   return `const payload=${JSON.stringify(payload)};payload.location=window.location.href;const request=new XMLHttpRequest();request.open('POST',${JSON.stringify(CLOUDFLARE_RUM_URL)});request.setRequestHeader('content-type','application/json');request.send(JSON.stringify(payload));`;
 }
+
+export { CLOUDFLARE_BEACON_URL, CLOUDFLARE_RUM_URL };

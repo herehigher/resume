@@ -2,11 +2,6 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import {
-  CLOUDFLARE_ANALYTICS_TOKEN,
-  CLOUDFLARE_BEACON_URL,
-  cloudflareAnalyticsScriptTags
-} from '../scripts/cloudflare-analytics.mjs';
 import { findExternalRuntimeAssets } from '../scripts/check-site.mjs';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { parseImportedState } from '../site/assets/js/state/storage.js';
@@ -69,15 +64,14 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
 
   for (const route of routes) {
     const html = source(route.file);
-    assert.equal(cloudflareAnalyticsScriptTags(html).length, 1);
-    assert.match(html, new RegExp(CLOUDFLARE_BEACON_URL.replaceAll('.', '\\.').replaceAll('/', '\\/')));
-    assert.match(html, new RegExp(CLOUDFLARE_ANALYTICS_TOKEN));
+    assert.match(html, /<html\b[^>]*data-analytics-mode="disabled"[^>]*data-analytics-provider="none"/i);
+    assert.doesNotMatch(html, /data-cf-beacon|cloudflareinsights\.com/i);
     assert.deepEqual(findExternalRuntimeAssets(html), []);
   }
 
   for (const route of routes.slice(1)) {
     const html = source(route.file);
-    assert.match(html, /Cloudflare Web Analytics/);
+    assert.match(html, /source build|official release/);
     assert.match(html, /PDF/i);
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/\?lang=/);
@@ -92,9 +86,9 @@ test('static guard permits only canonical and alternate external link metadata',
     '<link rel="alternate" hreflang="en" href="https://herehigher.github.io/resume/en/">'
   ].join('')), []);
   for (const tag of [
-    '<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js?unexpected=1" data-cf-beacon=\'{"token":"0b02ba35d9bc4d4d8dd63b42d6d51241"}\'></script>',
+    `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js?unexpected=1" data-cf-beacon='{"token":"${'a'.repeat(32)}"}'></script>`,
     '<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"wrong"}\'></script>',
-    '<script type="module" src="https://example.test/beacon.min.js" data-cf-beacon=\'{"token":"0b02ba35d9bc4d4d8dd63b42d6d51241"}\'></script>',
+    `<script type="module" src="https://example.test/beacon.min.js" data-cf-beacon='{"token":"${'a'.repeat(32)}"}'></script>`,
     '<link rel="preconnect" href="https://example.test">',
     '<link rel="icon" href="https://example.test/icon.svg">',
     '<link rel="stylesheet" href="https://example.test/style.css">',
