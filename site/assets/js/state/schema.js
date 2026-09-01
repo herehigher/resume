@@ -12,7 +12,9 @@ function compareShape(value, template, path, errors) {
       return;
     }
     if (template.length) {
-      value.forEach((item, index) => compareShape(item, template[0], `${path}[${index}]`, errors));
+      value.forEach((item, index) => {
+        compareShape(item, template[0], `${path}[${index}]`, errors);
+      });
     }
     return;
   }
