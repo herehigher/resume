@@ -12,7 +12,9 @@ export function createStore({ storage, initialState }) {
   const listeners = new Set();
 
   function notify(type) {
-    listeners.forEach((listener) => listener(state, { type }));
+    listeners.forEach((listener) => {
+      listener(state, { type });
+    });
   }
 
   function replace(nextState, { persist = false, type = 'replace' } = {}) {

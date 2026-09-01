@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/check-site.mjs",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "test": "node --test tests/*.test.js && npm run check"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.11"
   }
 }
-
