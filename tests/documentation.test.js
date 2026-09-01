@@ -17,6 +17,7 @@ const markdownFiles = [
   'PRIVACY.md',
   'CHANGELOG.md',
   'CONTRIBUTING.md',
+  'docs/acceptance-checklist.md',
   'docs/development-guide.md'
 ];
 const requiredFiles = [
@@ -201,6 +202,46 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
 test('AGENTS links the canonical development and documentation guide', () => {
   const agents = readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
   assert.match(agents, /\[開発ガイド\]\(docs\/development-guide\.md\)/);
+});
+
+test('development docs cover localized public entry and machine-readable contracts', () => {
+  const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
+  const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
+  const acceptanceItems = acceptance.split('\n').filter((line) => line.startsWith('- [ ] '));
+  const hasAcceptanceItem = (...facts) => acceptanceItems.some((line) => facts.every((fact) => line.includes(fact)));
+
+  for (const fact of [
+    '/ja/',
+    '/zh-cn/',
+    '/en/',
+    'canonical',
+    'hreflang',
+    'sitemap.xml',
+    'resume-studio-web-v1.schema.json',
+    'tests/public-entry.test.js'
+  ]) {
+    assert.match(guide, new RegExp(fact.replaceAll('.', '\\.')));
+  }
+
+  for (const fact of [
+    '/ja/',
+    '/zh-cn/',
+    '/en/',
+    'x-default',
+    'sitemap.xml',
+    'resume-studio-web-v1.schema.json',
+    'aria-selected',
+    'aria-pressed'
+  ]) {
+    assert.match(acceptance, new RegExp(fact.replaceAll('.', '\\.')));
+  }
+
+  assert.equal(hasAcceptanceItem('/ja/', '/zh-cn/', '/en/', 'public entry', '正しい言語の公開内容'), true);
+  assert.equal(hasAcceptanceItem('Root editor', 'JavaScript', 'H1', 'editor content'), true);
+  assert.equal(hasAcceptanceItem('三言語 public entry', 'JavaScript', 'editor CTA', 'JSON Schema link'), true);
+  assert.equal(hasAcceptanceItem('Root', 'editor CTA'), false);
+  assert.equal(hasAcceptanceItem('Root', 'JSON Schema link'), false);
+  assert.equal(hasAcceptanceItem('Public entry', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {
