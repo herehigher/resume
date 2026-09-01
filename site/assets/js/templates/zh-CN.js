@@ -154,10 +154,9 @@ function renderCertifications(certifications) {
   return `<section class="zh-section zh-certifications"><h2>证书与资质</h2><ul>${rows}</ul></section>`;
 }
 
-export function renderChineseResume(state) {
+export function renderChineseResume(state, { photoUrl = '' } = {}) {
   const fields = getChineseFields(state);
-  const photo = state.profile.photo;
-  const headerClass = photo ? 'zh-resume-header has-photo' : 'zh-resume-header';
+  const headerClass = photoUrl ? 'zh-resume-header has-photo' : 'zh-resume-header';
   return `
     <article class="document-page zh-resume-document" lang="zh-CN">
       <header class="${headerClass}">
@@ -168,7 +167,7 @@ export function renderChineseResume(state) {
           ${renderProfiles(fields)}
           ${renderOptionalDetails(fields)}
         </div>
-        ${photo ? `<img class="zh-profile-photo" src="${escapeHTML(photo)}" alt="">` : ''}
+        ${photoUrl ? `<img class="zh-profile-photo" src="${escapeHTML(photoUrl)}" alt="">` : ''}
       </header>
       <div class="zh-resume-content">
         ${renderSection('个人概述', fields.summary, 'zh-summary')}
@@ -187,6 +186,6 @@ export function renderChineseResume(state) {
     </article>`;
 }
 
-export function renderChineseDocument(state) {
-  return renderChineseResume(state);
+export function renderChineseDocument(state, options = {}) {
+  return renderChineseResume(state, options);
 }

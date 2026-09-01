@@ -20,7 +20,8 @@ export function protectDraftBeforeSample(store, shouldPersistDraft) {
   return currentDraft;
 }
 
-export function initJapaneseEditor(store) {
+export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
+  if (!embeddedPhotoUrl) throw new TypeError('Embedded photo URL helper is required');
   const form = document.getElementById('resumeForm');
   const preview = document.getElementById('documentPreview');
   const saveStatus = document.getElementById('saveStatus');
@@ -204,11 +205,12 @@ export function initJapaneseEditor(store) {
 
   function updatePhotoUI() {
     const photo = store.getState().profile.photo;
+    const displayUrl = embeddedPhotoUrl.resolve(photo);
     const thumbnail = document.getElementById('photoThumbnail');
     thumbnail.replaceChildren();
-    if (photo) {
+    if (displayUrl) {
       const image = document.createElement('img');
-      image.src = photo;
+      image.src = displayUrl;
       image.alt = '証明写真のプレビュー';
       thumbnail.appendChild(image);
     } else {
@@ -283,7 +285,10 @@ export function initJapaneseEditor(store) {
   }
 
   function renderPreview() {
-    preview.innerHTML = renderJapaneseDocument(store.getState());
+    const state = store.getState();
+    preview.innerHTML = renderJapaneseDocument(state, {
+      photoUrl: embeddedPhotoUrl.resolve(state.profile.photo)
+    });
     updateCompletion();
     window.requestAnimationFrame(fitPreviewForViewport);
   }

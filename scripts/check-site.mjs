@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { cloudflareAnalyticsScriptTags, isCloudflareAnalyticsScriptTag } from './cloudflare-analytics.mjs';
 
 const root = resolve('site');
 const failures = [];
@@ -20,7 +21,8 @@ export function findExternalRuntimeAssets(html) {
       const relation = (relationMatch?.[2] || relationMatch?.[3] || '').trim().toLowerCase();
       return !['alternate', 'canonical'].includes(relation);
     });
-  return [...externalElements, ...externalLinks];
+  return [...externalElements, ...externalLinks]
+    .filter(([tag]) => !isCloudflareAnalyticsScriptTag(tag));
 }
 
 const files = walk(root);
@@ -51,8 +53,12 @@ referencedAssets.forEach((file) => {
 });
 
 files.filter((file) => extname(file) === '.html').forEach((file) => {
-  if (findExternalRuntimeAssets(readFileSync(file, 'utf8')).length) {
+  const pageHtml = readFileSync(file, 'utf8');
+  if (findExternalRuntimeAssets(pageHtml).length) {
     failures.push(`${file}: external runtime assets are not allowed`);
+  }
+  if (cloudflareAnalyticsScriptTags(pageHtml).length !== 1) {
+    failures.push(`${file}: exactly one standard Cloudflare Web Analytics beacon is required`);
   }
 });
 

@@ -94,14 +94,14 @@ function renderCareerPeriod(career) {
   return escapeHTML(end);
 }
 
-export function renderJapaneseResume(state) {
+export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
   const fields = getJapaneseFields(state);
   const document = state.documents.ja;
   const age = calculateAge(
     String(fields.birthDate ?? '').trim(),
     String(fields.createdDate ?? '').trim()
   );
-  const photo = state.profile.photo ? `<img src="${escapeHTML(state.profile.photo)}" alt="">` : '証明写真';
+  const photo = photoUrl ? `<img src="${escapeHTML(photoUrl)}" alt="">` : '証明写真';
   return `
     <article class="document-page resume-document">
       <h2 class="resume-document-title">履 歴 書</h2>
@@ -176,8 +176,8 @@ export function renderJapaneseCareer(state) {
     </article>`;
 }
 
-export function renderJapaneseDocument(state) {
+export function renderJapaneseDocument(state, options = {}) {
   return state.documents.ja.activeDocument === 'resume'
-    ? renderJapaneseResume(state)
+    ? renderJapaneseResume(state, options)
     : renderJapaneseCareer(state);
 }

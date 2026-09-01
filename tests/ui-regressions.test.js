@@ -55,7 +55,9 @@ test('all locale editors and template styles are connected to the page', () => {
   assert.match(html, /assets\/css\/templates\/zh-CN\.css/);
   assert.match(html, /assets\/css\/templates\/en\.css/);
   assert.match(html, /id="chineseWorkspace" hidden/);
-  assert.match(main, /initChineseEditor\(store\)/);
+  assert.match(main, /const embeddedPhotoUrl = createEmbeddedPhotoUrl\(\)/);
+  assert.match(main, /initJapaneseEditor\(store, \{ embeddedPhotoUrl \}\)/);
+  assert.match(main, /initChineseEditor\(store, \{ embeddedPhotoUrl \}\)/);
   assert.match(main, /initEnglishEditor\(store\)/);
   assert.match(main, /renderEnglishWorkspace\(\)/);
   assert.match(main, /japaneseEditor\.refresh\(\)/);

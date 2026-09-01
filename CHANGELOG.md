@@ -19,5 +19,5 @@ English: This file records notable changes. Release dates are added only when th
 
 ### Security / Privacy
 
-- 本番 runtime は外部 API、CDN、外部 font、analytics を使用せず、履歴書入力を application backend へ自動送信しません。
-- Production runtime uses no external APIs, CDNs, external fonts, or analytics and does not automatically submit resume input to an application backend.
+- Cookie や利用者単位 ID を使わない標準 Cloudflare Web Analytics を、集計 page view / performance 計測の限定的な例外として追加。履歴書入力、写真、JSON、local draft は送信しません。
+- Added standard, cookie-free Cloudflare Web Analytics as the sole exception for aggregate page-view and performance metrics. Resume input, photos, JSON, and local drafts are not sent.

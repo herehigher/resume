@@ -1,6 +1,6 @@
 # Privacy / 隐私 / プライバシー
 
-Version 1.0 - Effective 2026-09-01
+Version 1.1 - Effective 2026-09-01
 
 - [日本語](#privacy-ja)
 - [简体中文](#privacy-zh-cn)
@@ -16,7 +16,9 @@ Resume Studio は、現在の browser origin の `localStorage` に `resume-stud
 
 ### Network と外部送信
 
-アプリの HTML、CSS、JavaScript、画像などを表示するため、同一 origin の静的 asset request は発生します。利用者が preview 内の `http://` または `https://` profile link を選んだ場合は、その link 先へ移動します。これらを除き、アプリは履歴書入力、写真、JSON を backend、analytics、外部 API、CDN、外部 font service へ自動送信しません。静的 hosting provider は接続時の通常の request 情報を自身の規約に従って扱う場合がありますが、履歴書本文を受け取る application backend はありません。
+アプリの HTML、CSS、JavaScript、画像などを表示するため、同一 origin の静的 asset request が発生します。また、サイトの利用状況と表示性能を把握する目的で Cloudflare Web Analytics を利用し、`static.cloudflareinsights.com` から外部 beacon script を読み込み、`cloudflareinsights.com` へ集計 page view と performance 情報を送信します。この標準構成は Cookie、localStorage、利用者単位の ID、fingerprinting、user profile、custom event、form 操作 tracking を使用しません。
+
+Cloudflare Web Analytics へ履歴書入力、写真、import / export JSON、端末上の下書きを送信する application code はありません。Cloudflare は通常の接続情報（IP address や user agent など）と page / referrer / performance に関する統計情報を、自身の規約に従って処理する場合があります。提供者による説明は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) を確認してください。利用者が preview 内の `http://` または `https://` profile link を選んだ場合は、その link 先へ移動します。これら以外の analytics、外部 API、CDN、外部 font service は使用せず、履歴書本文を受け取る application backend はありません。
 
 ### 保持、削除、損失リスク
 
@@ -36,7 +38,9 @@ Resume Studio 使用 key `resume-studio-web-v1`，把草稿保存在当前 brows
 
 ### 网络与外部提交
 
-为了显示应用的 HTML、CSS、JavaScript 和图片，会产生同一 origin 的静态 asset request。用户主动点击 preview 中的 `http://` 或 `https://` profile link 时会访问目标网站。除此之外，应用不会自动把简历输入、照片或 JSON 提交到 backend、analytics、外部 API、CDN 或外部 font service。静态 hosting provider 可能按其规则处理普通连接 request 信息，但本应用没有接收简历正文的 application backend。
+为了显示应用的 HTML、CSS、JavaScript 和图片，会产生同一 origin 的静态 asset request。为了了解网站使用情况与显示性能，本应用使用 Cloudflare Web Analytics：从 `static.cloudflareinsights.com` 加载外部 beacon script，并向 `cloudflareinsights.com` 发送汇总页面访问量和 performance 信息。该标准配置不使用 Cookie、localStorage、用户级 ID、fingerprinting、用户画像、custom event 或表单操作 tracking。
+
+应用中没有把简历输入、照片、import / export JSON 或设备草稿发送给 Cloudflare Web Analytics 的代码。Cloudflare 可能按其自身条款处理普通连接信息（例如 IP address、user agent）以及 page、referrer 和 performance 统计信息。提供方的说明请参阅 [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/)。用户主动点击 preview 中的 `http://` 或 `https://` profile link 时会访问目标网站。除此之外，本应用不使用其他 analytics、外部 API、CDN 或外部 font service，也没有接收简历正文的 application backend。
 
 ### 保留、删除与丢失风险
 
@@ -56,7 +60,9 @@ Resume Studio stores the draft in `localStorage` for the current browser origin 
 
 ### Network and external submission
 
-Same-origin static asset requests occur to display the app's HTML, CSS, JavaScript, and images. If the user selects an `http://` or `https://` profile link in the preview, the browser navigates to that target. Apart from those actions, the app does not automatically submit resume input, photos, or JSON to a backend, analytics service, external API, CDN, or external font service. A static hosting provider may process ordinary connection request information under its own terms, but there is no application backend that receives resume content.
+Same-origin static asset requests occur to display the app's HTML, CSS, JavaScript, and images. To understand site usage and display performance, the app uses Cloudflare Web Analytics: it loads an external beacon script from `static.cloudflareinsights.com` and sends aggregate page-view and performance information to `cloudflareinsights.com`. This standard configuration uses no cookies, localStorage, user-level IDs, fingerprinting, user profiles, custom events, or form-interaction tracking.
+
+There is no application code that sends resume input, photos, imported or exported JSON, or on-device drafts to Cloudflare Web Analytics. Cloudflare may process ordinary connection information (such as IP address and user agent) and page, referrer, and performance statistics under its own terms. See [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) for the provider's description. If the user selects an `http://` or `https://` profile link in the preview, the browser navigates to that target. The app uses no other analytics, external APIs, CDNs, or external font services, and there is no application backend that receives resume content.
 
 ### Retention, deletion, and loss risks
 

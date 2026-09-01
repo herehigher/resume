@@ -295,7 +295,7 @@
 
       <div class="editor-footer">
         <button class="danger-text-button" id="clearButton" type="button">保存した下書きを削除</button>
-        <p>履歴書データはこのブラウザ内で処理・保存され、backend、analytics、外部サービスへ自動送信されません。</p>
+        <p>履歴書データはこのブラウザ内で処理・保存され、Cloudflare の集計アクセス解析へ送信されません。</p>
       </div>
     </section>
 
@@ -411,5 +411,6 @@
   </template>
 
   <script type="module" src="./assets/js/main.js"></script>
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"0b02ba35d9bc4d4d8dd63b42d6d51241"}'></script>
 </body>
 </html>

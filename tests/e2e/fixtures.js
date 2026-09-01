@@ -2,6 +2,12 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
+import {
+  CLOUDFLARE_BEACON_URL,
+  CLOUDFLARE_RUM_URL,
+  cloudflareAnalyticsMockScript,
+  isAllowedCloudflareAnalyticsRequest
+} from '../../scripts/cloudflare-analytics.mjs';
 
 const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
 
@@ -15,11 +21,12 @@ function collectStaticPaths(directory = siteRoot) {
 
 const staticPaths = new Set(collectStaticPaths());
 
-export function installNetworkGuard(context, baseURL) {
+export async function installNetworkGuard(context, baseURL) {
   const expectedOrigin = new URL(baseURL).origin;
   const unexpectedRequests = [];
   const pageErrors = [];
   const webSockets = [];
+  const analyticsRequests = [];
   const observedPages = new Set();
 
   function observePage(page) {
@@ -45,35 +52,54 @@ export function installNetworkGuard(context, baseURL) {
     const isStaticAsset = ['font', 'image', 'script', 'stylesheet'].includes(resourceType)
       && staticPaths.has(url.pathname)
       && !url.search;
-    const isAllowed = url.origin === expectedOrigin
+    const isAllowedSameOrigin = url.origin === expectedOrigin
       && request.method() === 'GET'
       && (isDocument || isStaticAsset);
+    const isAllowedAnalytics = isAllowedCloudflareAnalyticsRequest({
+      expectedOrigin,
+      headers: request.headers(),
+      method: request.method(),
+      postData: request.postData(),
+      resourceType,
+      url: request.url()
+    });
 
-    if (!isAllowed) unexpectedRequests.push(`${request.method()} ${request.url()}`);
+    if (isAllowedAnalytics) analyticsRequests.push(`${request.method()} ${request.url()}`);
+    if (!isAllowedSameOrigin && !isAllowedAnalytics) unexpectedRequests.push(`${request.method()} ${request.url()}`);
   }
+
+  await context.route(CLOUDFLARE_BEACON_URL, (route) => route.fulfill({
+    body: cloudflareAnalyticsMockScript(),
+    contentType: 'text/javascript; charset=utf-8',
+    status: 200
+  }));
+  await context.route(CLOUDFLARE_RUM_URL, (route) => route.fulfill({ status: 204 }));
 
   context.pages().forEach(observePage);
   context.on('page', observePage);
   context.on('request', observeRequest);
 
   return {
+    analyticsRequests,
     unexpectedRequests,
     pageErrors,
     webSockets,
-    dispose() {
+    async dispose() {
       context.off('page', observePage);
       context.off('request', observeRequest);
+      await context.unroute(CLOUDFLARE_BEACON_URL);
+      await context.unroute(CLOUDFLARE_RUM_URL);
     }
   };
 }
 
 export const test = base.extend({
   context: async ({ baseURL, context }, use) => {
-    const guard = installNetworkGuard(context, baseURL);
+    const guard = await installNetworkGuard(context, baseURL);
 
     await use(context);
 
-    guard.dispose();
+    await guard.dispose();
     expect(guard.unexpectedRequests, '静的ファイル以外のネットワーク要求で個人データを送信しないこと').toEqual([]);
     expect(guard.webSockets, 'WebSocket接続で個人データを送信しないこと').toEqual([]);
     expect(guard.pageErrors, 'ブラウザ実行中に未処理エラーがないこと').toEqual([]);

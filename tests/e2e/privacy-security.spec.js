@@ -25,6 +25,9 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityTitle')).toBeFocused();
   await expect(dialog).toHaveAttribute('aria-labelledby', 'privacySecurityTitle');
   await expect(dialog).toHaveAttribute('aria-describedby', 'privacySecuritySummary');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('履歴書の内容、写真、JSON、端末上の下書き');
+  await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('標準 RUM endpoint');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS.ja);
   await expect(page.locator('#privacyRepositoryLink')).toHaveAttribute('href', REPOSITORY_URL);
   for (const link of [page.locator('#privacyRepositoryLink'), page.locator('#privacyNoticeLink')]) {
@@ -40,6 +43,8 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityBadgeLabel')).toHaveText('本地处理');
   await badge.click();
   await expect(page.locator('#privacySecurityTitle')).toHaveText('隐私与安全');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('简历内容、照片、JSON 和设备上的草稿');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS['zh-CN']);
   await page.keyboard.press('Escape');
   await expect(dialog).not.toHaveAttribute('open', '');
@@ -49,6 +54,8 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityBadgeLabel')).toHaveText('Processed locally');
   await badge.click();
   await expect(page.locator('#privacySecurityTitle')).toHaveText('Privacy & Security');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('resume content, photo, JSON, and on-device draft');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS.en);
 });
 
