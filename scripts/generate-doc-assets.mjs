@@ -6,6 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
+import {
+  CLOUDFLARE_BEACON_URL,
+  CLOUDFLARE_RUM_URL,
+  cloudflareAnalyticsMockScript
+} from './cloudflare-analytics.mjs';
+
 import { createEnglishSampleState } from '../site/assets/js/data/en-sample.js';
 import {
   createDefaultState,
@@ -155,6 +161,12 @@ async function generateVariant(browser, baseURL, siteHash, variant) {
     viewport
   });
   try {
+    await context.route(CLOUDFLARE_BEACON_URL, (route) => route.fulfill({
+      body: cloudflareAnalyticsMockScript(),
+      contentType: 'text/javascript; charset=utf-8',
+      status: 200
+    }));
+    await context.route(CLOUDFLARE_RUM_URL, (route) => route.fulfill({ status: 204 }));
     const fixedTimestamp = Date.parse(`${fixedDate}T00:00:00+09:00`);
     await context.addInitScript(({ timestamp }) => {
       const NativeDate = Date;

@@ -7,6 +7,7 @@
 - Production は browser 標準の HTML、CSS、ES Modules で動作し、build や runtime framework を必要としません。
 - 正式な配布先は GitHub Pages です。Local development でも `file://` ではなく static server を使用します。
 - 公開用 application file は `site/` に集約し、履歴書の入力 data は browser 内で扱います。
+- Runtime の外部通信は、同一 origin の static asset、利用者が選択した profile link、標準 Cloudflare Web Analytics の固定 beacon script / RUM endpoint に限定します。Analytics は集計 page view と performance のみに使い、custom event や履歴書 data を送信しません。
 - 保存形式は `resume-studio-web-v1` です。日本語・简体中文・English の document section は独立し、profile・連絡先・写真は三言語で共有します。
 
 実装時の privacy、network、storage compatibility、escape、locale、release authority の制約は [AGENTS.md](../AGENTS.md#mandatory-rules) を参照してください。
@@ -65,9 +66,9 @@ Chrome で `http://localhost:8000/` を開きます。Production code に build 
 
 | Command | 確認内容 |
 | --- | --- |
-| `npm test` | Node unit / document test と `scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、HTML asset の static check |
+| `npm test` | Node unit / document test と `scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、HTML asset / Cloudflare beacon 構成の static check |
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
-| `npm run test:e2e` | Desktop / mobile workflow、privacy / network guard、PDF page size・pagination・抽出 text の Playwright acceptance |
+| `npm run test:e2e` | Desktop / mobile workflow、privacy / network guard、Cloudflare request allowlist、PDF page size・pagination・抽出 text の Playwright acceptance。Cloudflare は test 内で固定 response に置換し、live service に依存しない |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run generate:docs` | 三言語 screenshot、PDF sample、provenance manifest の再生成 |
 

@@ -65,7 +65,7 @@ Chrome で `http://localhost:8000/` を開きます。
 - 写真も JSON export も個人情報を含みます。localStorage と export file は暗号化されません。
 - browser data の消去、private browsing の終了、保存容量不足、browser による storage eviction で下書きを失うことがあります。重要な下書きは JSON で backup してください。
 - アプリ内削除は v1 state を消しますが、旧 `resume-studio-data-v1`、download 済み JSON/PDF、browser の download 履歴までは削除しません。
-- アプリは同一 origin の静的 asset を取得します。利用者が preview 内の profile link を選ぶと、その link 先へ移動します。それ以外に履歴書入力を backend や外部サービスへ自動送信しません。
+- アプリは同一 origin の静的 asset に加え、Cloudflare から標準 Web Analytics beacon を読み込み、集計 page view と表示性能を送信します。Cookie、localStorage、利用者単位 ID、custom event は使わず、履歴書入力、写真、JSON、local draft は送信しません。利用者が preview 内の profile link を選ぶと、その link 先へ移動します。
 
 詳細は [Privacy / 日本語](PRIVACY.md#privacy-ja) を確認してください。
 
@@ -84,7 +84,7 @@ npm ci
 npm run test:acceptance
 ```
 
-本番 runtime に外部 API、CDN、外部 font、analytics を追加しないでください。詳しくは [開発ガイド](docs/development-guide.md)、[Contributing](CONTRIBUTING.md)、[release acceptance checklist](docs/acceptance-checklist.md) を参照してください。
+本番 runtime に外部 API、CDN、外部 font、別の analytics を追加しないでください。標準 Cloudflare Web Analytics の集計 page view / performance 計測だけが限定的な例外です。詳しくは [開発ガイド](docs/development-guide.md)、[Contributing](CONTRIBUTING.md)、[release acceptance checklist](docs/acceptance-checklist.md) を参照してください。
 
 ## Repository information
 

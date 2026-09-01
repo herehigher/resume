@@ -7,6 +7,7 @@ import { initJapaneseEditor } from './ui/japanese-editor.js';
 import { initChineseEditor } from './ui/chinese-editor.js';
 import { initLocaleController } from './ui/locale-controller.js';
 import { initPrivacySecurity } from './ui/privacy-security.js';
+import { createEmbeddedPhotoUrl } from './utils/embedded-photo-url.js';
 
 const storedState = loadStoredState(window.localStorage);
 const locale = resolveLocale({
@@ -24,8 +25,9 @@ const store = createStore({
 
 document.getElementById('chineseWorkspace').insertAdjacentHTML('afterend', renderEnglishWorkspace());
 
-const japaneseEditor = initJapaneseEditor(store);
-const chineseEditor = initChineseEditor(store);
+const embeddedPhotoUrl = createEmbeddedPhotoUrl();
+const japaneseEditor = initJapaneseEditor(store, { embeddedPhotoUrl });
+const chineseEditor = initChineseEditor(store, { embeddedPhotoUrl });
 const englishEditor = initEnglishEditor(store);
 const privacySecurity = initPrivacySecurity(locale);
 initLocaleController(store, {

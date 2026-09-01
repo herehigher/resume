@@ -18,6 +18,16 @@ test('Japanese document renderer switches between resume and career templates', 
   assert.doesNotMatch(renderJapaneseDocument(state), /履 歴 書/);
 });
 
+test('Japanese template renders photos only from an explicit display URL', () => {
+  const state = createDefaultState('ja');
+  state.profile.photo = 'data:image/png;base64,private-photo-bytes';
+
+  assert.doesNotMatch(renderJapaneseDocument(state), /data:image|<img/);
+  const html = renderJapaneseDocument(state, { photoUrl: 'blob:https://example.test/photo-id' });
+  assert.match(html, /<img src="blob:https:\/\/example\.test\/photo-id" alt="">/);
+  assert.doesNotMatch(html, /data:image/);
+});
+
 test('Japanese dates, age, and current employment use conventional labels', () => {
   assert.equal(formatJapaneseMonth('2026-09'), '2026年 9月');
   assert.equal(formatJapaneseDate('2026-09-01'), '2026年9月1日');

@@ -21,7 +21,8 @@
 - [ ] 保存・再読込、入力例からの復元、項目削除、JSON書き出し・読込後も三言語のデータが混ざらない。
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
 - [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
-- [ ] Developer Tools の Network で、許可された同一オリジン静的ファイル以外のHTTP(S)要求およびWebSocket接続がない。同一オリジンのPOST、fetch/XHR、未知のpathも許可しない。
+- [ ] Developer Tools の Network で、同一 origin の公開 static file に加え、`https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST だけが発生する。その他の外部 runtime asset / request、同一 origin の POST / fetch / XHR、未知の path、WebSocket はない。
+- [ ] Cloudflare RUM request の URL と payload を確認し、履歴書入力、氏名・連絡先、写真、import / export JSON、localStorage の下書き、custom event、利用者単位 ID が含まれない。Page URL の query は `lang=ja`、`lang=zh-CN`、`lang=en` 以外を含まない。
 - [ ] Repository を public にした後、未ログインまたは private window から右下の GitHub source link と三言語の privacy notice link を開ける。
 
 ## PDF 目視確認

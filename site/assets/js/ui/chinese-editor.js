@@ -207,7 +207,8 @@ function renderEntry(documentObject, type, item, index) {
   return article;
 }
 
-export function initChineseEditor(store, { root = '#chineseWorkspace' } = {}) {
+export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWorkspace' } = {}) {
+  if (!embeddedPhotoUrl) throw new TypeError('Embedded photo URL helper is required');
   const rootElement = typeof root === 'string' ? document.querySelector(root) : root;
   if (!rootElement) throw new TypeError('Chinese editor root element is required');
   rootElement.innerHTML = renderChineseEditorShell();
@@ -280,7 +281,10 @@ export function initChineseEditor(store, { root = '#chineseWorkspace' } = {}) {
   }
 
   function renderPreview() {
-    preview.innerHTML = renderChineseDocument(store.getState());
+    const state = store.getState();
+    preview.innerHTML = renderChineseDocument(state, {
+      photoUrl: embeddedPhotoUrl.resolve(state.profile.photo)
+    });
     const completion = calculateChineseCompletion(store.getState());
     rootElement.querySelector('[data-zh-completion-bar]').style.width = `${completion}%`;
     rootElement.querySelector('[data-zh-completion-label]').textContent = `${completion}% ${zhCN.completion}`;
@@ -288,11 +292,13 @@ export function initChineseEditor(store, { root = '#chineseWorkspace' } = {}) {
   }
 
   function updatePhoto() {
+    const photo = store.getState().profile.photo;
+    const displayUrl = embeddedPhotoUrl.resolve(photo);
     const thumbnail = rootElement.querySelector('[data-zh-photo-thumbnail]');
     thumbnail.replaceChildren();
-    if (store.getState().profile.photo) {
+    if (displayUrl) {
       const image = document.createElement('img');
-      image.src = store.getState().profile.photo;
+      image.src = displayUrl;
       image.alt = zhCN.photoPreviewAlt;
       thumbnail.append(image);
     } else {
@@ -300,7 +306,7 @@ export function initChineseEditor(store, { root = '#chineseWorkspace' } = {}) {
       placeholder.textContent = '照片';
       thumbnail.append(placeholder);
     }
-    rootElement.querySelector('[data-zh-action="remove-photo"]').hidden = !store.getState().profile.photo;
+    rootElement.querySelector('[data-zh-action="remove-photo"]').hidden = !photo;
   }
 
   function hydrate() {

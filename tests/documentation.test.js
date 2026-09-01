@@ -201,6 +201,8 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
 test('AGENTS links the canonical development and documentation guide', () => {
   const agents = readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
   assert.match(agents, /\[開発ガイド\]\(docs\/development-guide\.md\)/);
+  assert.match(agents, /Cloudflare Web Analytics の公開 site token/);
+  assert.match(readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8'), /公開 site token は credential ではなく/);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {
@@ -208,7 +210,8 @@ test('privacy has stable tri-lingual anchors and one effective version', () => {
   for (const fragment of ['privacy-ja', 'privacy-zh-cn', 'privacy-en']) {
     assert.equal(fragmentsIn(privacy).has(fragment), true);
   }
-  assert.equal((privacy.match(/Version 1\.0 - Effective 2026-09-01/g) || []).length, 1);
+  assert.equal((privacy.match(/Version 1\.1 - Effective 2026-09-01/g) || []).length, 1);
+  assert.equal((privacy.match(/https:\/\/www\.cloudflare\.com\/web-analytics\//g) || []).length, 3);
   for (const fact of [
     'resume-studio-web-v1',
     'resume-studio-data-v1',
@@ -217,7 +220,11 @@ test('privacy has stable tri-lingual anchors and one effective version', () => {
     'storage eviction',
     'JSON/PDF',
     'profile link',
-    'application backend'
+    'application backend',
+    'Cloudflare Web Analytics',
+    'cloudflareinsights.com',
+    'fingerprinting',
+    'custom event'
   ]) {
     assert.match(privacy, new RegExp(fact.replace('/', '\\/'), 'g'));
   }

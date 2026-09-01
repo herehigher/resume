@@ -24,8 +24,8 @@ python3 -m http.server 8000 --directory site
 
 1. ES Modules は責務ごとに分割し、循環依存を作らない。
 2. `site/` は build なしで static server から配信できる状態を維持する。
-3. Production runtime に外部 API、CDN、外部 font、analytics を追加しない。履歴書の入力 data を network へ送信しない。
-4. 実在する résumé / application の personal data と secret / token を log、test fixture、sample、screenshot、PDF、公開文書、commit に含めない。Fixture、sample、生成 asset には、実在する個人・organization・account と誤認されない架空 data だけを使用する。この制約は repository owner 名や公開 source URL など、正当な公開 repository metadata を禁止するものではない。
+3. Production runtime に外部 API、CDN、外部 font、analytics を追加しない。ただし、固定 site token を設定した標準 Cloudflare Web Analytics beacon による Cookie・localStorage・利用者単位 ID・fingerprinting・custom event を伴わない集計 page view / performance 計測だけを例外とする。履歴書の入力、写真、import / export JSON、local draft を analytics payload その他の network request へ含めない。
+4. 実在する résumé / application の personal data と、secret、credential、access token などの秘密情報を log、test fixture、sample、screenshot、PDF、公開文書、commit に含めない。Fixture、sample、生成 asset には、実在する個人・organization・account と誤認されない架空 data だけを使用する。この制約は repository owner 名、公開 source URL、rule 3 で許可された Cloudflare Web Analytics の公開 site token など、正当な公開 repository metadata を禁止するものではない。
 5. 保存形式は `resume-studio-web-v1` を使用する。旧 `resume-studio-data-v1` は読み込み・移行・削除しない。
 6. User input を HTML へ表示するときは必ず escape する。Clickable link は `http://` または `https://` のみにする。
 7. 正式な locale identifier は `ja`、`zh-CN`、`en` とする。Locale-specific document section は独立して保存し、profile・連絡先・写真は三言語で共有する。

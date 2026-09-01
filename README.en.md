@@ -65,7 +65,7 @@ All assets use fictional sample data. Their source and Chromium version are reco
 - Photos and exported JSON may contain personal information. Neither localStorage nor exported files are encrypted.
 - Clearing browser data, ending a private-browsing session, exceeding the storage quota, or browser storage eviction can remove a draft. Export important drafts as JSON backups.
 - In-app deletion clears the v1 state. It does not delete the legacy `resume-studio-data-v1` key, downloaded JSON/PDF files, or browser download history.
-- The app requests same-origin static assets. A user-clicked profile link navigates to its target. Apart from those actions, it does not automatically submit resume input to a backend or external service.
+- In addition to same-origin static assets, the app loads Cloudflare's standard Web Analytics beacon and submits aggregate page-view and display-performance metrics. It uses no cookies, localStorage, user-level IDs, or custom events, and sends no resume input, photo, JSON, or local draft. A user-clicked profile link navigates to its target.
 
 Read [Privacy / English](PRIVACY.md#privacy-en) for the complete policy.
 
@@ -84,7 +84,7 @@ npm ci
 npm run test:acceptance
 ```
 
-Do not add external APIs, CDNs, external fonts, or analytics to the production runtime. See [Contributing](CONTRIBUTING.md) and the [release acceptance checklist](docs/acceptance-checklist.md).
+Do not add external APIs, CDNs, external fonts, or other analytics to the production runtime. Standard Cloudflare Web Analytics for aggregate page-view and performance metrics is the sole limited exception. See [Contributing](CONTRIBUTING.md) and the [release acceptance checklist](docs/acceptance-checklist.md).
 
 ## Repository information
 

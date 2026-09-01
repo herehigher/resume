@@ -63,6 +63,16 @@ test('empty optional sensitive fields do not reserve markup in the Chinese templ
   assert.match(html, /zh-resume-document/);
 });
 
+test('Chinese template renders photos only from an explicit display URL', () => {
+  const state = createDefaultState('zh-CN');
+  state.profile.photo = 'data:image/png;base64,private-photo-bytes';
+
+  assert.doesNotMatch(renderChineseResume(state), /data:image|zh-profile-photo/);
+  const html = renderChineseResume(state, { photoUrl: 'blob:https://example.test/photo-id' });
+  assert.match(html, /class="zh-profile-photo" src="blob:https:\/\/example\.test\/photo-id"/);
+  assert.doesNotMatch(html, /data:image/);
+});
+
 test('Chinese template escapes text and only makes HTTP(S) profile links clickable', () => {
   const state = createDefaultState('zh-CN');
   state.profile.fields.fullName = '<img src=x onerror=alert(1)>';

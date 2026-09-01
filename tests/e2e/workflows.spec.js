@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
+import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
 
 const STORAGE_KEY = 'resume-studio-web-v1';
+const PHOTO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const PHOTO_DATA_URL = `data:image/png;base64,${PHOTO_BASE64}`;
 const PROFILE_URL_CASES = [
   ['http://example.test/profile', true],
   ['https://example.test/profile', true],
@@ -90,6 +93,69 @@ test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除
 
   await experience.locator('[data-zh-remove]').click();
   await expect(workspace.locator('[data-zh-preview]')).not.toContainText('E2E科技');
+});
+
+test('embedded photos stay as data URLs in storage but render only through revocable Blob URLs', async ({ page }) => {
+  const state = createDefaultState('ja');
+  state.profile.photo = PHOTO_DATA_URL;
+  await page.addInitScript(({ key, storedState }) => {
+    localStorage.setItem(key, JSON.stringify(storedState));
+  }, { key: STORAGE_KEY, storedState: state });
+  await openLocale(page, 'ja');
+
+  const japaneseImages = page.locator('#photoThumbnail img, #documentPreview .profile-photo img');
+  await expect(japaneseImages).toHaveCount(2);
+  for (const image of await japaneseImages.all()) {
+    await expect(image).toHaveAttribute('src', /^blob:/);
+    await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0)).toBe(true);
+  }
+  await expect(page.locator('img[src^="data:image"]')).toHaveCount(0);
+  await expect.poll(() => page.evaluate((key) => (
+    JSON.parse(localStorage.getItem(key)).profile.photo
+  ), STORAGE_KEY)).toBe(PHOTO_DATA_URL);
+
+  const initialBlobUrl = await japaneseImages.first().getAttribute('src');
+  await page.locator('#photoInput').setInputFiles({
+    buffer: Buffer.from(PHOTO_BASE64, 'base64'),
+    mimeType: 'image/png',
+    name: 'replacement.png'
+  });
+  await expect.poll(() => japaneseImages.first().getAttribute('src')).not.toBe(initialBlobUrl);
+  const replacementBlobUrl = await japaneseImages.first().getAttribute('src');
+  await expect.poll(() => page.evaluate(async (url) => {
+    try {
+      await fetch(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }, initialBlobUrl)).toBe(false);
+  await expect.poll(() => page.evaluate((key) => (
+    JSON.parse(localStorage.getItem(key)).profile.photo.startsWith('data:image/jpeg;base64,')
+  ), STORAGE_KEY)).toBe(true);
+
+  await page.locator('#localeSelect').selectOption('zh-CN');
+  const chineseImages = page.locator('[data-zh-photo-thumbnail] img, [data-zh-preview] .zh-profile-photo');
+  await expect(chineseImages).toHaveCount(2);
+  for (const image of await chineseImages.all()) {
+    await expect(image).toHaveAttribute('src', replacementBlobUrl);
+    await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0)).toBe(true);
+  }
+  await expect(page.locator('img[src^="data:image"]')).toHaveCount(0);
+
+  await page.locator('[data-zh-action="remove-photo"]').click();
+  await expect(chineseImages).toHaveCount(0);
+  await expect.poll(() => page.evaluate((key) => (
+    JSON.parse(localStorage.getItem(key)).profile.photo
+  ), STORAGE_KEY)).toBe('');
+  await expect.poll(() => page.evaluate(async (url) => {
+    try {
+      await fetch(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }, replacementBlobUrl)).toBe(false);
 });
 
 test('English: complete editing flow saves, restores, protects samples, and removes entries', async ({ page }) => {
