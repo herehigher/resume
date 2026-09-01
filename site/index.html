@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="日本語の履歴書・職務経歴書を作成し、PDFとして保存できるWebアプリ">
+  <title>Resume Studio — 履歴書・職務経歴書</title>
+  <link rel="stylesheet" href="./assets/css/base.css">
+  <link rel="stylesheet" href="./assets/css/editor.css">
+  <link rel="stylesheet" href="./assets/css/templates/ja.css">
+  <link rel="stylesheet" href="./assets/css/responsive.css">
+  <link rel="stylesheet" href="./assets/css/print.css">
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="#" aria-label="Resume Studio ホーム">
+      <span class="brand-mark">R</span>
+      <span>
+        <strong>Resume Studio</strong>
+        <small>履歴書・職務経歴書</small>
+      </span>
+    </a>
+
+    <nav class="document-switcher" aria-label="編集する書類">
+      <button class="document-tab is-active" type="button" data-document="resume">履歴書</button>
+      <button class="document-tab" type="button" data-document="career">職務経歴書</button>
+    </nav>
+
+    <div class="header-actions">
+      <span class="save-status" id="saveStatus" aria-live="polite">この端末に自動保存</span>
+      <button class="secondary-button desktop-only" id="loadSampleButton" type="button">入力例を表示</button>
+      <button class="primary-button" id="printButton" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
+        PDF出力
+      </button>
+    </div>
+  </header>
+
+  <div class="mobile-view-switch" aria-label="モバイル表示切替">
+    <button class="is-active" type="button" data-mobile-view="editor">入力</button>
+    <button type="button" data-mobile-view="preview">プレビュー</button>
+  </div>
+
+  <main class="workspace" id="japaneseWorkspace" data-mobile-mode="editor">
+    <section class="editor-panel" aria-label="入力フォーム">
+      <div class="editor-heading">
+        <div>
+          <p class="eyebrow" id="editorEyebrow">RÉSUMÉ</p>
+          <h1 id="editorTitle">履歴書を作成</h1>
+          <p id="editorDescription">入力内容は右側の書類にすぐ反映されます。</p>
+        </div>
+        <span class="completion-label" id="completionLabel">0% 完了</span>
+      </div>
+      <div class="completion-track" aria-hidden="true"><span id="completionBar"></span></div>
+      <div class="draft-controls" aria-label="下書きの保存">
+        <button class="secondary-button" id="saveDraftButton" type="button">下書きを保存</button>
+        <button class="secondary-button" id="reloadDraftButton" type="button">保存内容を再読込</button>
+        <span class="draft-message" id="draftMessage" aria-live="polite">入力内容は自動保存されます</span>
+      </div>
+      <div class="sample-mode-panel" id="sampleModePanel" aria-live="polite" hidden>
+        <div class="sample-mode-copy"><strong>入力例を一時表示しています</strong><span>保存済みの下書きは変更されません。</span></div>
+        <button class="secondary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
+        <button class="primary-button" id="adoptSampleButton" type="button">この例を下書きとして使用</button>
+      </div>
+
+      <form id="resumeForm" autocomplete="on">
+        <div id="sharedFields">
+          <details class="form-section" open>
+            <summary>
+              <span class="section-number">01</span>
+              <span><strong>基本情報</strong><small>氏名・生年月日・証明写真</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <div class="photo-and-name">
+                <div class="photo-control">
+                  <div class="photo-thumbnail" id="photoThumbnail"><span>写真</span></div>
+                  <label class="upload-button" for="photoInput">写真を選択</label>
+                  <input id="photoInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+                  <button class="text-button" id="removePhotoButton" type="button" hidden>削除</button>
+                </div>
+                <div class="field-stack">
+                  <label class="input-field">
+                    <span>氏名 <em>必須</em></span>
+                    <input name="fullName" autocomplete="name" placeholder="例：山田 太郎" required>
+                  </label>
+                  <label class="input-field">
+                    <span>ふりがな</span>
+                    <input name="nameKana" placeholder="例：やまだ たろう">
+                  </label>
+                </div>
+              </div>
+              <div class="field-grid three-columns">
+                <label class="input-field">
+                  <span>生年月日</span>
+                  <input name="birthDate" type="date">
+                </label>
+                <label class="input-field">
+                  <span>性別</span>
+                  <select name="gender">
+                    <option value="">記載しない</option>
+                    <option>男性</option>
+                    <option>女性</option>
+                    <option>その他</option>
+                  </select>
+                </label>
+                <label class="input-field">
+                  <span>作成日</span>
+                  <input name="createdDate" type="date">
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span class="section-number">02</span>
+              <span><strong>連絡先</strong><small>住所・電話番号・メール</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <div class="field-grid two-columns postal-grid">
+                <label class="input-field">
+                  <span>郵便番号</span>
+                  <input name="postalCode" inputmode="numeric" autocomplete="postal-code" placeholder="000-0000">
+                </label>
+                <label class="input-field">
+                  <span>住所（ふりがな）</span>
+                  <input name="addressKana" placeholder="とうきょうと…">
+                </label>
+              </div>
+              <label class="input-field">
+                <span>住所</span>
+                <input name="address" autocomplete="street-address" placeholder="東京都○○区…">
+              </label>
+              <div class="field-grid two-columns">
+                <label class="input-field">
+                  <span>電話番号</span>
+                  <input name="phone" type="tel" autocomplete="tel" placeholder="090-0000-0000">
+                </label>
+                <label class="input-field">
+                  <span>メールアドレス</span>
+                  <input name="email" type="email" autocomplete="email" placeholder="name@example.jp">
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span class="section-number">03</span>
+              <span><strong>オンラインプロフィール</strong><small>GitHub・LinkedIn・ポートフォリオ</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <label class="input-field">
+                <span>GitHub URL</span>
+                <input name="github" type="url" autocomplete="url" inputmode="url" placeholder="https://github.com/username">
+              </label>
+              <label class="input-field">
+                <span>LinkedIn URL</span>
+                <input name="linkedin" type="url" autocomplete="url" inputmode="url" placeholder="https://www.linkedin.com/in/username">
+              </label>
+              <label class="input-field">
+                <span>ポートフォリオ URL</span>
+                <input name="portfolio" type="url" autocomplete="url" inputmode="url" placeholder="https://example.com">
+              </label>
+            </div>
+          </details>
+        </div>
+
+        <div id="resumeFields">
+          <details class="form-section" open>
+            <summary>
+              <span class="section-number">04</span>
+              <span><strong>学歴・職歴</strong><small>古いものから順に入力</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <div class="list-heading"><strong>学歴</strong><button class="small-add-button" type="button" data-add="education">＋ 追加</button></div>
+              <div class="repeating-list" id="educationList"></div>
+              <div class="list-heading has-divider"><strong>職歴</strong><button class="small-add-button" type="button" data-add="employment">＋ 追加</button></div>
+              <div class="repeating-list" id="employmentList"></div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span class="section-number">05</span>
+              <span><strong>免許・資格</strong><small>取得年月と正式名称</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <div class="list-heading"><strong>免許・資格</strong><button class="small-add-button" type="button" data-add="qualification">＋ 追加</button></div>
+              <div class="repeating-list" id="qualificationList"></div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span class="section-number">06</span>
+              <span><strong>志望動機・本人希望</strong><small>応募先に合わせて調整</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <label class="input-field">
+                <span>志望動機・自己PR</span>
+                <textarea name="motivation" rows="6" placeholder="応募理由、活かせる経験、入社後に貢献したいことを入力します。"></textarea>
+              </label>
+              <label class="input-field">
+                <span>本人希望記入欄</span>
+                <textarea name="requests" rows="3" placeholder="特に希望がない場合は「貴社規定に従います」と入力します。"></textarea>
+              </label>
+            </div>
+          </details>
+        </div>
+
+        <div id="careerFields" hidden>
+          <details class="form-section" open>
+            <summary>
+              <span class="section-number">04</span>
+              <span><strong>職務要約・スキル</strong><small>経験の全体像を簡潔に</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <label class="input-field">
+                <span>職務要約</span>
+                <textarea name="careerSummary" rows="6" placeholder="これまでの経験・専門領域・強みを3〜5行でまとめます。"></textarea>
+              </label>
+              <label class="input-field">
+                <span>活かせる経験・知識・技術</span>
+                <textarea name="skills" rows="5" placeholder="例：プロジェクト管理、データ分析、チームマネジメント"></textarea>
+              </label>
+            </div>
+          </details>
+
+          <details class="form-section" open>
+            <summary>
+              <span class="section-number">05</span>
+              <span><strong>職務経歴</strong><small>会社ごとに担当業務と実績を入力</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <div class="list-heading"><strong>勤務先</strong><button class="small-add-button" type="button" data-add="career">＋ 追加</button></div>
+              <div class="career-list" id="careerList"></div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span class="section-number">06</span>
+              <span><strong>自己PR</strong><small>強みを具体的な経験で伝える</small></span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+            </summary>
+            <div class="section-content">
+              <label class="input-field">
+                <span>自己PR</span>
+                <textarea name="selfPromotion" rows="8" placeholder="強み、根拠となる経験、応募先での活かし方を入力します。"></textarea>
+              </label>
+            </div>
+          </details>
+        </div>
+      </form>
+
+      <div class="editor-footer">
+        <button class="danger-text-button" id="clearButton" type="button">保存した下書きを削除</button>
+        <p>データは外部へ送信されず、このブラウザ内に保存されます。</p>
+      </div>
+    </section>
+
+    <section class="preview-panel" aria-label="書類プレビュー">
+      <div class="preview-toolbar">
+        <div>
+          <span class="preview-dot"></span>
+          <strong>ライブプレビュー</strong>
+          <span id="previewDocumentName">履歴書</span>
+        </div>
+        <div class="zoom-controls" aria-label="プレビュー倍率">
+          <button type="button" id="zoomOutButton" aria-label="縮小">−</button>
+          <span id="zoomLabel">100%</span>
+          <button type="button" id="zoomInButton" aria-label="拡大">＋</button>
+        </div>
+      </div>
+      <div class="preview-scroll" id="previewScroll">
+        <div class="document-preview" id="documentPreview"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="confirmDialog">
+    <form method="dialog" class="dialog-content">
+      <div class="dialog-icon">!</div>
+      <h2>下書きデータを削除しますか？</h2>
+      <p>この操作は取り消せません。このブラウザに保存されている履歴書・職務経歴書の下書きと、画面上の入力内容がすべて削除されます。</p>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel">キャンセル</button>
+        <button class="danger-button" id="confirmClearButton" value="confirm">消去する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="simpleRowTemplate">
+    <div class="repeating-row">
+      <label class="input-field compact-field">
+        <span>年月</span>
+        <input type="month" data-key="date">
+      </label>
+      <label class="input-field compact-field row-main-field">
+        <span>内容</span>
+        <input type="text" data-key="detail" placeholder="正式名称を入力">
+      </label>
+      <label class="input-field compact-field credential-link-field">
+        <span>確認URL（任意）</span>
+        <input type="url" inputmode="url" data-key="url" placeholder="https://www.credly.com/badges/…">
+      </label>
+      <button class="remove-row-button" type="button" aria-label="この項目を削除">×</button>
+    </div>
+  </template>
+
+  <template id="careerRowTemplate">
+    <article class="career-editor-item">
+      <div class="career-item-header"><strong>勤務先 <span data-career-number></span></strong><button class="remove-career-button" type="button">削除</button></div>
+      <div class="field-grid two-columns">
+        <label class="input-field"><span>会社名</span><input type="text" data-key="company" placeholder="株式会社○○"></label>
+        <label class="input-field"><span>部署・役職</span><input type="text" data-key="role" placeholder="○○部 / マネージャー"></label>
+        <label class="input-field"><span>入社年月</span><input type="month" data-key="startDate"></label>
+        <label class="input-field"><span>退社年月</span><input type="month" data-key="endDate"><small class="field-help">在職中は空欄</small></label>
+      </div>
+      <label class="input-field"><span>事業内容・会社概要</span><textarea data-key="companyInfo" rows="2" placeholder="事業内容、従業員数など"></textarea></label>
+      <label class="input-field"><span>担当業務</span><textarea data-key="responsibilities" rows="5" placeholder="担当した業務、役割、プロジェクト内容"></textarea></label>
+      <label class="input-field"><span>実績・成果</span><textarea data-key="achievements" rows="4" placeholder="数値や具体例を交えて記載"></textarea></label>
+    </article>
+  </template>
+
+  <script type="module" src="./assets/js/main.js"></script>
+</body>
+</html>
