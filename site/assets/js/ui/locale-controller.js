@@ -45,7 +45,9 @@ export function initLocaleController(store, {
   const documentSwitcher = document.querySelector('.document-switcher');
   const printButton = document.getElementById('printButton');
   const sampleButton = document.getElementById('loadSampleButton');
-  const saveStatus = document.getElementById('saveStatus');
+  const dataMenuSummary = document.getElementById('dataMenuSummary');
+  const dataMenuLabel = document.getElementById('dataMenuLabel');
+  const dataMenuShortLabel = document.getElementById('dataMenuShortLabel');
   const exportButton = document.getElementById('exportDataButton');
   const importButton = document.getElementById('importDataButton');
   const importInput = document.getElementById('importDataInput');
@@ -63,7 +65,9 @@ export function initLocaleController(store, {
     document.querySelector('.brand').setAttribute('aria-label', copy.brandHome);
     document.getElementById('brandSubtitle').textContent = copy.brandSubtitle;
     document.getElementById('localeLabel').textContent = copy.localeLabel;
-    document.getElementById('dataMenuSummary').setAttribute('aria-label', copy.dataManagement);
+    dataMenuSummary.setAttribute('aria-label', copy.backupMenuLabel);
+    dataMenuLabel.textContent = copy.backupMenuLabel;
+    dataMenuShortLabel.textContent = copy.backupMenuShortLabel;
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
     document.getElementById('printButtonLabel').textContent = copy.printDocument;
@@ -79,7 +83,6 @@ export function initLocaleController(store, {
     documentSwitcher.hidden = !isJapanese;
     printButton.hidden = false;
     sampleButton.hidden = !isJapanese;
-    saveStatus.hidden = !isJapanese;
     onLocaleApplied(locale);
   }
 

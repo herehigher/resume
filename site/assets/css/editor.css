@@ -23,6 +23,7 @@
 .draft-controls .secondary-button { min-height: 32px; }
 .draft-message { color: var(--muted); font-size: 9px; margin-left: 3px; }
 .draft-message.is-success { color: var(--green); font-weight: 700; }
+.draft-message.is-error { color: var(--danger); font-weight: 700; }
 .sample-mode-panel { align-items: center; background: #fff8e8; border: 1px solid #ecd493; border-radius: 9px; display: grid; gap: 12px; grid-template-columns: 1fr auto auto; margin: -10px 0 22px; padding: 12px 14px; }
 .sample-mode-panel[hidden] { display: none !important; }
 .sample-mode-copy strong { color: #75520a; display: block; font-size: 10px; }
