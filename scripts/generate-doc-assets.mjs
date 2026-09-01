@@ -18,7 +18,7 @@ const siteRoot = path.join(root, 'site');
 const manifestPath = path.join(root, 'docs/assets-manifest.json');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
-const generatorVersion = '1.0.0';
+const generatorVersion = '1.1.0';
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -256,7 +256,7 @@ async function main() {
     const manifest = {
       schemaVersion: 1,
       generator: {
-        command: 'npm run generate:docs',
+        command: 'npm run release:assets',
         path: 'scripts/generate-doc-assets.mjs',
         version: generatorVersion
       },

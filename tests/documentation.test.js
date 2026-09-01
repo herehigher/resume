@@ -34,6 +34,7 @@ const markdownFiles = [
 const requiredFiles = [
   ...markdownFiles,
   'LICENSE',
+  '.gitattributes',
   '.github/pages-release-manifest.json',
   'docs/assets-manifest.json',
   'docs/screenshots/ja.png',
@@ -68,27 +69,6 @@ function markdownTargets(markdown) {
 
 function literalPattern(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function collectFiles(directory) {
-  return readdirSync(directory, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .flatMap((entry) => {
-      const absolutePath = path.join(directory, entry.name);
-      return entry.isDirectory() ? collectFiles(absolutePath) : [absolutePath];
-    });
-}
-
-function computeSiteHash() {
-  const siteRoot = path.join(root, 'site');
-  const hash = createHash('sha256');
-  for (const file of collectFiles(siteRoot)) {
-    hash.update(path.relative(siteRoot, file).split(path.sep).join('/'));
-    hash.update('\0');
-    hash.update(readFileSync(file));
-    hash.update('\0');
-  }
-  return hash.digest('hex');
 }
 
 function fileHash(file) {
@@ -222,6 +202,15 @@ test('AGENTS links the canonical development and documentation guide', () => {
   assert.match(readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8'), /SHA-256 fingerprint.*実値/s);
 });
 
+test('release screenshots and PDF samples are assigned to Git LFS', () => {
+  const attributes = readFileSync(path.join(root, '.gitattributes'), 'utf8');
+  assert.match(attributes, /^docs\/screenshots\/\*\.png filter=lfs diff=lfs merge=lfs -text$/m);
+  assert.match(attributes, /^output\/pdf\/\*\.pdf filter=lfs diff=lfs merge=lfs -text$/m);
+
+  const workflow = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+  assert.match(workflow, /uses: actions\/checkout@v4[\s\S]*?lfs: true/);
+});
+
 test('development docs cover localized public entry and machine-readable contracts', () => {
   const guide = readFileSync(path.join(root, 'docs/development-guide.md'), 'utf8');
   const acceptance = readFileSync(path.join(root, 'docs/acceptance-checklist.md'), 'utf8');
@@ -331,7 +320,7 @@ test('release playbook is canonical and covers publication, evidence, and recove
   for (const contract of [
     /owner の明示承認.*Public release|Public release.*owner の明示承認/s,
     /安定版 `vMAJOR\.MINOR\.PATCH`.*leading zero.*prerelease.*build metadata/s,
-    /version を含むすべての画面内容を確定した.*merge と tag の前.*npm run generate:docs/s,
+    /version を含むすべての画面内容を確定した.*merge と tag の前.*npm run release:assets/s,
     /生成後に `site\/` または public sample が変わった場合は再生成します/,
     /Workflow \/ Markdown だけの変更では再生成しません/,
     /`CHANGELOG\.md` の `Unreleased` から `## \[<RELEASE_VERSION>\] - <RELEASE_DATE>`.*release date を確定/s,
@@ -555,11 +544,11 @@ test('privacy has stable tri-lingual anchors and one effective version', () => {
   }
 });
 
-test('asset manifest matches the site, output files, and screenshot dimensions', () => {
+test('asset manifest describes the committed release outputs and screenshot dimensions', () => {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.generator.path, 'scripts/generate-doc-assets.mjs');
-  assert.equal(manifest.source.siteHash, computeSiteHash());
+  assert.match(manifest.source.siteHash, /^[0-9a-f]{64}$/);
   assert.equal(manifest.source.markerPrefix, 'RESUME-STUDIO-SAMPLE');
   assert.deepEqual(manifest.browser.viewport, { height: 1000, width: 1440 });
 

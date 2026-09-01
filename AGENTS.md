@@ -44,8 +44,9 @@ python3 -m http.server 8000 --directory site
 | すべての変更 | Focused test、`npm test`、`npm run lint`、`git diff --check` |
 | Application behavior、state、UI、i18n、import / export、privacy / network、PDF | `npm run test:e2e` |
 | Pull Request 前 | `npm run test:acceptance` |
-| `site/` または公開 sample data | `npm run generate:docs`、`node --test tests/documentation.test.js`、生成物の目視確認 |
-| PDF / responsive layout または release candidate | [受入チェックリスト](docs/acceptance-checklist.md) による対象 page の目視確認 |
+| `site/` または公開 sample data | 通常の focused test と full gate。Screenshot / PDF sample は日常開発では更新しない |
+| 新 version の最終 release candidate | Tag 作成前に `npm run release:assets`、`npm run test:release-assets`、生成物の目視確認 |
+| PDF / responsive layout | [受入チェックリスト](docs/acceptance-checklist.md) による対象 page の目視確認 |
 
 生成 command の役割と確認記録の残し方は [開発ガイド](docs/development-guide.md#変更に応じた検証) に従います。
 
@@ -54,3 +55,4 @@ python3 -m http.server 8000 --directory site
 - 依頼と無関係な design、input data、dependency を変更しない。
 - 保存 data を意図的に削除する変更は、事前に利用者へ確認する。
 - Public sample や生成 asset を変更するときは、Mandatory rule 4 の禁止対象を含まないことと provenance が更新されることを確認する。
+- `docs/screenshots/*.png` と `output/pdf/*.pdf` は Git LFS で管理し、新 version の最終 release candidate を準備するときだけ更新する。

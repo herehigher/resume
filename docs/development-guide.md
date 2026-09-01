@@ -34,7 +34,7 @@ resume/
 ├── scripts/                    # Static check と公開文書 asset generator
 ├── docs/                       # 開発・受入資料、asset manifest、screenshot
 │   └── release-playbook.md     # Version release と rollback の canonical 手順
-├── output/pdf/                 # README から参照する生成済み PDF sample
+├── output/pdf/                 # README から参照する release PDF sample（Git LFS）
 ├── .github/workflows/          # CI と tag-based GitHub Pages deployment
 ├── README*.md                  # 日本語・简体中文・English の公開利用 guide
 ├── PRIVACY.md                  # 三言語 privacy notice
@@ -63,9 +63,13 @@ resume/
 Dependency を導入し、`site/` を static server から配信します。
 
 ```bash
+git lfs install --local
+git lfs pull
 npm ci
 python3 -m http.server 8000 --directory site
 ```
+
+Git LFS client が未導入の場合は先にインストールします。`git lfs pull` により release screenshot と PDF sample の実体を取得します。
 
 Chrome で editor の `http://localhost:8000/`、public entry の `http://localhost:8000/ja/`、`http://localhost:8000/zh-cn/`、`http://localhost:8000/en/` を開けます。Production code に build step はありません。
 
@@ -81,7 +85,8 @@ Chrome で editor の `http://localhost:8000/`、public entry の `http://localh
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
 | `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、source の外部通信拒否、disabled / enabled / configuration error の privacy status、合成 token で作る enabled artifact の固定 Cloudflare request、PDF page size・pagination・抽出 text の Playwright acceptance。Live provider には依存しない |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
-| `npm run generate:docs` | 三言語 screenshot、PDF sample、provenance manifest の再生成 |
+| `npm run release:assets` | 新 version の最終 RC で三言語 screenshot、PDF sample、provenance manifest を再生成 |
+| `npm run test:release-assets` | Release asset が最終 RC の `site/` と一致し、既存の文書・画像・PDF 検査を通ることを確認 |
 
 ### 変更種別ごとの route
 
@@ -92,18 +97,23 @@ Chrome で editor の `http://localhost:8000/`、public entry の `http://localh
 | State、template、UI、i18n、import / export、privacy / network | 関連する Node test と E2E の後、`npm run test:acceptance` |
 | CSS、responsive、print、PDF | 関連する Node / E2E test、`npm run test:acceptance`、[受入チェックリスト](acceptance-checklist.md) の対象 page |
 | Script、dependency、workflow、release gate | 変更対象の focused check、`npm run test:acceptance`、実際の CI / release dependency の review |
-| `site/` または公開 sample data | 上記に加えて公開文書 asset の再生成と次節の provenance / visual check |
+| `site/` または公開 sample data | 上記の test を実行する。日常開発と通常の Pull Request では screenshot / PDF sample を更新しない |
+| 新 version の最終 release candidate | Tag 作成前の release Pull Request で公開文書 asset を再生成し、次節の provenance / visual check を実行 |
 
 CI の `Quality` workflow も `npm test`、lint、Playwright E2E を実行します。Public entry と machine-readable contract、locale resolution、locale data isolation、invalid import protection、escape / URL protocol、mobile operation、network guard、PDF の詳細な release 判定は [受入チェックリスト](acceptance-checklist.md) に集約します。
 
 ## 公開文書 asset の更新
 
-`site/` または公開 sample data を変更した場合は、screenshot、PDF、manifest を同じ commit で再生成します。開発文書だけの変更では再生成しません。
+Screenshot と PDF sample は release の snapshot として扱い、日常開発、通常の feature Pull Request、`main` push では更新しません。新 version の `site/`、public sample、version 表示を確定して最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ screenshot、PDF、manifest を同じ commit に更新します。Tag workflow は immutable な tag から deploy するだけで、生成物を repository へ書き戻しません。
 
 ```bash
-npm run generate:docs
-node --test tests/documentation.test.js
+npm run release:assets
+git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf
+npm run test:release-assets
+git lfs ls-files
 ```
+
+`docs/screenshots/*.png` と `output/pdf/*.pdf` は `.gitattributes` により Git LFS で管理します。Clone 後に実体を取得するには Git LFS client が必要です。過去 commit の binary blob は履歴を書き換えず、LFS 設定を導入する commit 以降を LFS object とします。
 
 生成後は次を確認します。
 

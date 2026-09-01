@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/check-site.mjs",
-    "generate:docs": "node scripts/generate-doc-assets.mjs",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
+    "release:assets": "node scripts/generate-doc-assets.mjs",
     "test": "node --test tests/*.test.js && npm run check",
+    "test:release-assets": "node scripts/check-release-assets.mjs && node --test tests/documentation.test.js",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:acceptance": "npm test && npm run lint && npm run test:e2e"
