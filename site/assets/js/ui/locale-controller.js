@@ -23,7 +23,14 @@ function downloadState(store, locale) {
   URL.revokeObjectURL(url);
 }
 
-export function initLocaleController(store) {
+export function persistLocaleChange(store, locale, beforePersist = () => {}) {
+  beforePersist();
+  return store.update((state) => {
+    state.settings.locale = locale;
+  }, { persist: true, type: 'locale' });
+}
+
+export function initLocaleController(store, { beforeLocalePersist = () => {} } = {}) {
   const select = document.getElementById('localeSelect');
   const workspace = document.getElementById('japaneseWorkspace');
   const pending = document.getElementById('localePending');
@@ -66,11 +73,18 @@ export function initLocaleController(store) {
 
   select.addEventListener('change', () => {
     if (!SUPPORTED_LOCALES.includes(select.value)) return;
-    store.update((state) => {
-      state.settings.locale = select.value;
-    }, { persist: true, type: 'locale' });
+    const nextLocale = select.value;
+    const previousLocale = store.getState().settings.locale;
+    try {
+      persistLocaleChange(store, nextLocale, beforeLocalePersist);
+    } catch {
+      select.value = store.getState().settings.locale;
+      applyLocale(true);
+      showMessage(getMessages(previousLocale).localeSaveError, true);
+      return;
+    }
     const url = new URL(window.location.href);
-    url.searchParams.set('lang', select.value);
+    url.searchParams.set('lang', nextLocale);
     window.history.replaceState(null, '', url);
     applyLocale(true);
   });
@@ -82,7 +96,7 @@ export function initLocaleController(store) {
       downloadState(store, locale);
       showMessage(copy.exportSuccess);
     } catch {
-      showMessage(copy.importError, true);
+      showMessage(copy.exportError, true);
     }
   });
 

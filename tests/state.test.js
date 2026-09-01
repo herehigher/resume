@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 
 import { STORAGE_KEY } from '../site/assets/js/config.js';
 import { resolveLocale } from '../site/assets/js/i18n/index.js';
-import { createDefaultState } from '../site/assets/js/state/defaults.js';
+import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { loadStoredState } from '../site/assets/js/state/storage.js';
 import { createStore } from '../site/assets/js/state/store.js';
 import { protectDraftBeforeSample } from '../site/assets/js/ui/japanese-editor.js';
+import { persistLocaleChange } from '../site/assets/js/ui/locale-controller.js';
 
 function createMemoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -131,6 +132,43 @@ test('sample draft protection propagates storage failures without changing state
   assert.throws(() => protectDraftBeforeSample(store, true), /quota exceeded/);
   assert.equal(store.getState().profile.fields.fullName, '画面に残す氏名');
   assert.equal(loadStoredState(storage), null);
+});
+
+test('changing locale from sample mode persists the protected draft, not sample data', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  store.update((state) => {
+    state.profile.fields.fullName = '保存する氏名';
+  });
+  store.save();
+  const protectedDraft = protectDraftBeforeSample(store, true);
+  store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
+
+  persistLocaleChange(store, 'zh-CN', () => {
+    store.replace(protectedDraft, { type: 'restore' });
+  });
+
+  assert.equal(store.getState().profile.fields.fullName, '保存する氏名');
+  assert.equal(store.getState().settings.locale, 'zh-CN');
+  assert.equal(loadStoredState(storage).profile.fields.fullName, '保存する氏名');
+  assert.equal(loadStoredState(storage).settings.locale, 'zh-CN');
+});
+
+test('failed locale persistence leaves state and stored data unchanged', () => {
+  const storage = createMemoryStorage();
+  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  store.update((state) => {
+    state.profile.fields.fullName = '保持する氏名';
+  });
+  store.save();
+  const storedBefore = storage.getItem(STORAGE_KEY);
+  storage.setItem = () => {
+    throw new Error('quota exceeded');
+  };
+
+  assert.throws(() => persistLocaleChange(store, 'en'), /quota exceeded/);
+  assert.equal(store.getState().settings.locale, 'ja');
+  assert.equal(storage.getItem(STORAGE_KEY), storedBefore);
 });
 
 test('import rejects remote and unsupported photo sources', () => {

@@ -19,5 +19,7 @@ const store = createStore({
   initialState
 });
 
-initJapaneseEditor(store);
-initLocaleController(store);
+const japaneseEditor = initJapaneseEditor(store);
+initLocaleController(store, {
+  beforeLocalePersist: japaneseEditor.restoreDraftBeforePersistence
+});
