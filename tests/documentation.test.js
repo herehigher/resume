@@ -10,13 +10,14 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const manifestPath = path.join(root, 'docs/assets-manifest.json');
 const markdownFiles = [
+  'AGENTS.md',
   'README.md',
-  'README.ja.md',
   'README.zh-CN.md',
   'README.en.md',
   'PRIVACY.md',
   'CHANGELOG.md',
-  'CONTRIBUTING.md'
+  'CONTRIBUTING.md',
+  'docs/development-guide.md'
 ];
 const requiredFiles = [
   ...markdownFiles,
@@ -29,7 +30,7 @@ const requiredFiles = [
   'output/pdf/zh-CN-a4.pdf',
   'output/pdf/en-letter.pdf'
 ];
-const detailedReadmes = ['README.ja.md', 'README.zh-CN.md', 'README.en.md'];
+const detailedReadmes = ['README.md', 'README.zh-CN.md', 'README.en.md'];
 
 function markdownSlug(heading) {
   return heading
@@ -142,15 +143,16 @@ test('every relative Markdown link, image, and fragment resolves', () => {
   }
 });
 
-test('root landing and detailed README fact matrix stay complete', () => {
+test('root Japanese guide and localized README fact matrix stay complete', () => {
   const rootReadme = readFileSync(path.join(root, 'README.md'), 'utf8');
-  const landingTargets = markdownTargets(rootReadme);
-  assert.deepEqual(landingTargets, [
-    '#project-overview',
-    'README.ja.md',
-    'README.zh-CN.md',
-    'README.en.md'
-  ]);
+  assert.equal(existsSync(path.join(root, 'README.ja.md')), false, 'README.md is the only Japanese guide');
+  const rootTargets = markdownTargets(rootReadme);
+  for (const target of ['README.zh-CN.md', 'README.en.md']) {
+    assert.ok(rootTargets.includes(target), `README.md must link ${target}`);
+  }
+  assert.match(rootReadme, /日本語（このページ）/);
+  assert.doesNotMatch(rootReadme, /#project-overview|README\.ja\.md/);
+  assert.match(rootReadme, /README だけで使い始める/);
   assert.match(rootReadme, /Issue #9/);
   assert.doesNotMatch(rootReadme, /https:\/\/herehigher\.github\.io/);
 
@@ -175,6 +177,7 @@ test('root landing and detailed README fact matrix stay complete', () => {
     /LICENSE/
   ];
   const localeFacts = {
+    'README.md': [/入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
     'README.en.md': [
       /Example mode|example/i,
       /Autosave|saved automatically/i,
@@ -183,7 +186,6 @@ test('root landing and detailed README fact matrix stay complete', () => {
       /delete/i,
       /profile, contact details, and photo are shared across locales/i
     ],
-    'README.ja.md': [/入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
     'README.zh-CN.md': [/示例/, /自动保存/, /手动保存/, /重新载入/, /删除/, /profile、联系方式和照片由三种语言共享/]
   };
   for (const relativePath of detailedReadmes) {
@@ -192,6 +194,11 @@ test('root landing and detailed README fact matrix stay complete', () => {
       assert.match(markdown, pattern, `${relativePath} is missing ${pattern}`);
     }
   }
+});
+
+test('AGENTS links the canonical development and documentation guide', () => {
+  const agents = readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
+  assert.match(agents, /\[開発ガイド\]\(docs\/development-guide\.md\)/);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {

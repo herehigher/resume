@@ -1,6 +1,6 @@
 # Resume Studio - 简体中文指南
 
-[Project overview](README.md) | [日本語](README.ja.md) | [English](README.en.md)
+[日本語](README.md) | [English](README.en.md)
 
 Resume Studio 是一款个人使用的静态 Web 应用，可在浏览器中编辑日本語、简体中文和 English 简历，并保存为 PDF 或 JSON。正式代码由静态 HTML、CSS 和 ES Modules 组成，不会自动把简历输入提交到 backend 或外部服务。
 

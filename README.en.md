@@ -1,6 +1,6 @@
 # Resume Studio - English Guide
 
-[Project overview](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+[日本語](README.md) | [简体中文](README.zh-CN.md)
 
 Resume Studio is a personal, static web app for editing Japanese, Simplified Chinese, and English resumes in the browser and saving them as PDF or JSON. Its production code is static HTML, CSS, and ES Modules. It does not automatically submit resume input to a backend or external service.
 
