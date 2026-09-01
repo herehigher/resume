@@ -28,6 +28,8 @@ test('every locale has distinct import, export, and locale-save error messages',
     assert.ok(messages.exportError);
     assert.ok(messages.localeSaveError);
     assert.ok(messages.printDocument);
+    assert.ok(messages.backupMenuLabel);
+    assert.ok(messages.backupMenuShortLabel);
     assert.notEqual(messages.exportError, messages.importError);
   }
 });

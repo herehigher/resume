@@ -17,6 +17,8 @@ const PROFILE_URL_CASES = [
 
 test('日本語: 入力・保存復元・例示保護・削除・安全なプレビュー', async ({ page }) => {
   await openLocale(page, 'ja');
+  await expect(page.locator('.header-actions #saveStatus')).toHaveCount(0);
+  await expect(page.locator('#japaneseWorkspace .draft-controls #saveStatus')).toBeVisible();
 
   const name = page.locator('[name="fullName"]');
   const motivation = page.locator('[name="motivation"]');
@@ -50,6 +52,8 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   await page.locator('#loadSampleButton').click();
   await expect(preview).toContainText('山田 太郎');
+  await expect(page.locator('#sampleModePanel')).toContainText('入力例を一時表示しています');
+  await expect(page.locator('.header-actions')).not.toContainText('入力例は一時表示です');
   await page.locator('#restoreDraftButton').click();
   await expect(name).toHaveValue(maliciousName);
 
@@ -225,6 +229,41 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   }, STORAGE_KEY)).toBe('読み込んだ氏名');
 });
 
+test('三言語で入力例を草稿操作にまとめ、言語とPDFをヘッダー右端に表示する', async ({ page }) => {
+  const cases = [
+    ['ja', '#japaneseWorkspace', '#loadSampleButton', '入力例を表示', 'バックアップと復元'],
+    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '查看填写示例', '备份与恢复'],
+    ['en', '[data-english-editor]', '[data-en-load-sample]', 'View example', 'Backup & restore']
+  ];
+
+  for (const [locale, workspaceSelector, sampleSelector, sampleLabel, backupLabel] of cases) {
+    await openLocale(page, locale);
+    const workspace = page.locator(workspaceSelector);
+    const sampleButton = workspace.locator(sampleSelector);
+    const backupMenu = page.locator('#dataMenuSummary');
+    await expect(sampleButton).toBeVisible();
+    await expect(sampleButton).toHaveText(sampleLabel);
+    await expect(sampleButton.locator('xpath=ancestor::*[contains(@class, "draft-controls")]')).toHaveCount(1);
+    await expect(page.locator('.header-actions').locator(sampleSelector)).toHaveCount(0);
+    await expect(backupMenu).toHaveAttribute('aria-label', backupLabel);
+    await expect(backupMenu.locator('#dataMenuLabel')).toHaveText(backupLabel);
+    await expect(backupMenu.locator('#dataMenuLabel')).toBeVisible();
+    await expect(backupMenu.locator('#dataMenuShortLabel')).toBeHidden();
+
+    const layout = await page.locator('.header-actions').evaluate((header) => {
+      const headerBox = header.getBoundingClientRect();
+      const printBox = header.querySelector('#printButton').getBoundingClientRect();
+      return {
+        headerRight: headerBox.right,
+        printRight: printBox.right,
+        viewportWidth: window.innerWidth
+      };
+    });
+    expect(layout.viewportWidth - layout.headerRight).toBeLessThanOrEqual(24);
+    expect(layout.viewportWidth - layout.printRight).toBeLessThanOrEqual(24);
+  }
+});
+
 test('三言語のプロフィールURLはHTTP(S)だけがリンクになる', async ({ page }) => {
   const cases = [
     ['ja', '[name="github"]', '#documentPreview'],
@@ -252,6 +291,10 @@ test('三言語のプロフィールURLはHTTP(S)だけがリンクになる', a
 test('@mobile 日本語: 編集・保存復元・書き出し・プレビューが操作できる', async ({ page }) => {
   await openLocale(page, 'ja');
   expect(page.viewportSize()).toEqual({ width: 390, height: 844 });
+  await expect(page.locator('#dataMenuSummary')).toHaveAttribute('aria-label', 'バックアップと復元');
+  await expect(page.locator('#dataMenuLabel')).toBeHidden();
+  await expect(page.locator('#dataMenuShortLabel')).toBeHidden();
+  await expect(page.locator('#dataMenuSummary .data-menu-icon')).toBeVisible();
   const workspace = page.locator('#japaneseWorkspace');
   const name = page.locator('[name="fullName"]');
   await expect(name).toBeVisible();
