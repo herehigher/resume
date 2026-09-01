@@ -36,7 +36,7 @@ export default {
   previewView: '预览',
   zoomOut: '缩小预览',
   zoomIn: '放大预览',
-  privacyNotice: '数据仅保存在当前浏览器中，不会发送到外部服务。',
+  privacyNotice: '简历数据在当前浏览器内处理和保存，不会自动提交到 backend、analytics 或外部服务。',
   editorAriaLabel: '中文简历填写表单',
   previewAriaLabel: '中文简历预览',
   photoPreviewAlt: '个人照片预览',
@@ -44,5 +44,22 @@ export default {
   removeItem: '删除此项',
   currentEmploymentHelp: '在职请留空，将显示为“至今”',
   optionalLabel: '选填',
-  requiredLabel: '必填'
+  requiredLabel: '必填',
+  privacySecurity: {
+    badgeLabel: '本地处理',
+    badgeAria: '打开隐私与安全说明。本地处理，版本 {version}',
+    sourceLink: 'GitHub 源代码',
+    sourceLinkAria: '在 GitHub 中打开 Resume Studio 源代码（新标签页）',
+    title: '隐私与安全',
+    summary: '了解 Resume Studio 如何处理数据，以及如何自行核查。',
+    userHeading: '普通用户',
+    userBody: '简历内容只在当前浏览器中处理，不会自动提交到 backend、analytics 或外部服务。当前页面完整加载并保持打开后，即使断开网络，仍可继续编辑、保存到此设备、导出 JSON 和输出 PDF。刷新或重新打开页面仍需要网络。',
+    technicalHeading: '技术用户',
+    technicalBody: '可按 F12 查看开发者工具中的 Network 请求，也可以访问 GitHub repository 审计源代码。',
+    storageHeading: '设备上的数据',
+    storageBody: 'localStorage 中的草稿和导出文件均未加密。使用共享设备以及保管或共享文件时请注意安全。',
+    repositoryLink: '在 GitHub 查看源代码',
+    privacyNoticeLink: '阅读完整隐私声明',
+    close: '关闭'
+  }
 };

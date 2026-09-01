@@ -35,5 +35,22 @@ export default {
     emptyList: 'No entries yet. Select Add to create one.',
     saveStatus: 'Saved on this device',
     saveError: 'Your changes could not be saved on this device.'
+  },
+  privacySecurity: {
+    badgeLabel: 'Processed locally',
+    badgeAria: 'Open Privacy & Security. Processed locally, version {version}',
+    sourceLink: 'GitHub source code',
+    sourceLinkAria: 'Open the Resume Studio source code on GitHub (new tab)',
+    title: 'Privacy & Security',
+    summary: 'How Resume Studio handles data and how you can verify its behavior.',
+    userHeading: 'For everyone',
+    userBody: 'Your resume content is processed in this browser and is not automatically submitted to a backend, analytics provider, or external service. After this page has fully loaded and remains open, you can disconnect from the network and continue editing, saving on this device, exporting JSON, and creating a PDF. Refreshing or reopening the page still requires a network connection.',
+    technicalHeading: 'For technical users',
+    technicalBody: 'Press F12 to inspect Network requests in developer tools, or audit the source code in the GitHub repository.',
+    storageHeading: 'Data on your device',
+    storageBody: 'Drafts in localStorage and exported files are not encrypted. Take care when using a shared device and when storing or sharing exported files.',
+    repositoryLink: 'View source code on GitHub',
+    privacyNoticeLink: 'Read the full privacy notice',
+    close: 'Close'
   }
 };

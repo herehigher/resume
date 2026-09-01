@@ -5,7 +5,7 @@
 ## 自動ゲート
 
 - `npm ci`、`npm test`、`npm run lint`、`npx playwright install chromium`、`npm run test:e2e` が成功する。
-- Tag（`v*`）の Pages リリースは、再利用可能な `Quality` workflow が成功し、対象commitが main の履歴に含まれる場合だけ deploy job へ進む。失敗したリリース候補は公開しない。
+- Tag（`v*`）の Pages リリースは、tag が `v${package.json version}` と一致し、再利用可能な `Quality` workflow が成功し、対象commitが main の履歴に含まれる場合だけ deploy job へ進む。失敗したリリース候補は公開しない。
 - 現在の非公開リポジトリで Pages を利用できない場合、公開または対応プランへの変更後に Pages の Source を GitHub Actions に設定する。それまでは deploy が成功しないため、サイトは公開されない。
 - 利用可能になった時点で `Quality / quality` を main の必須ステータスチェック（required status check）に設定し、失敗したPRのマージも禁止する。
 - Playwright の失敗時は GitHub Actions の `playwright-results` artifact で trace と screenshot を確認する。
@@ -22,6 +22,7 @@
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
 - [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
 - [ ] Developer Tools の Network で、許可された同一オリジン静的ファイル以外のHTTP(S)要求およびWebSocket接続がない。同一オリジンのPOST、fetch/XHR、未知のpathも許可しない。
+- [ ] Repository を public にした後、未ログインまたは private window から右下の GitHub source link と三言語の privacy notice link を開ける。
 
 ## PDF 目視確認
 

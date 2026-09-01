@@ -6,6 +6,7 @@ import { renderEnglishWorkspace, initEnglishEditor } from './ui/english-editor.j
 import { initJapaneseEditor } from './ui/japanese-editor.js';
 import { initChineseEditor } from './ui/chinese-editor.js';
 import { initLocaleController } from './ui/locale-controller.js';
+import { initPrivacySecurity } from './ui/privacy-security.js';
 
 const storedState = loadStoredState(window.localStorage);
 const locale = resolveLocale({
@@ -26,6 +27,7 @@ document.getElementById('chineseWorkspace').insertAdjacentHTML('afterend', rende
 const japaneseEditor = initJapaneseEditor(store);
 const chineseEditor = initChineseEditor(store);
 const englishEditor = initEnglishEditor(store);
+const privacySecurity = initPrivacySecurity(locale);
 initLocaleController(store, {
   beforeLocalePersist() {
     japaneseEditor.restoreDraftBeforePersistence();
@@ -33,6 +35,7 @@ initLocaleController(store, {
     englishEditor.restoreDraftBeforePersistence();
   },
   onLocaleApplied(locale) {
+    privacySecurity.applyLocale(locale);
     if (locale === 'ja') japaneseEditor.refresh();
     if (locale === 'zh-CN') chineseEditor.refresh();
     if (locale === 'en') englishEditor.render();

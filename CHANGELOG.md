@@ -15,6 +15,7 @@ English: This file records notable changes. Release dates are added only when th
 - Profile URL の protocol 制限と入力 escaping。
 - Desktop/mobile workflow、PDF pagination、network guard の acceptance tests。
 - 三言語 README、privacy、contribution guide、MIT License、reproducible screenshot/PDF samples。
+- 右下の GitHub source link、app version、三言語 Privacy & Security dialog。 / Added a source link, app version, and tri-lingual privacy dialog.
 
 ### Security / Privacy
 

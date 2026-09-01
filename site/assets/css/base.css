@@ -210,3 +210,55 @@ button { cursor: pointer; }
 
 .locale-pending-card h1 { font-size: 24px; margin: 0 0 12px; }
 .locale-pending-card p { color: var(--muted); font-size: 13px; line-height: 1.8; margin: 0; }
+
+.trust-capsule {
+  align-items: stretch;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid #cfd7e1;
+  border-radius: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  box-shadow: 0 8px 28px rgba(23, 32, 51, .16);
+  display: flex;
+  max-width: calc(100vw - 28px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  overflow: hidden;
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  z-index: 40;
+}
+
+.trust-source-link,
+.trust-privacy-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #344158;
+  display: inline-flex;
+  min-height: 40px;
+}
+
+.trust-source-link {
+  border-right: 1px solid var(--line);
+  justify-content: center;
+  width: 40px;
+}
+
+.trust-source-link:hover,
+.trust-privacy-button:hover { background: #f5f8fb; }
+
+.trust-source-link:focus-visible,
+.trust-privacy-button:focus-visible {
+  box-shadow: inset 0 0 0 3px rgba(36, 87, 214, .24);
+  outline: 0;
+}
+
+.trust-source-link svg { fill: currentColor; height: 19px; width: 19px; }
+
+.trust-privacy-button {
+  gap: 7px;
+  padding: 0 11px 0 10px;
+  white-space: nowrap;
+}
+
+.trust-privacy-button svg { fill: currentColor; height: 18px; width: 18px; }
+.trust-privacy-button span { font-size: 10px; font-weight: 750; }
+.trust-privacy-button .trust-version { color: var(--muted); font-size: 9px; font-weight: 650; }

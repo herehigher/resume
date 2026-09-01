@@ -15,5 +15,22 @@ export default {
   importError: 'データを読み込めませんでした。',
   localeSaveError: '表示言語を保存できませんでした。',
   pendingTitle: 'この言語のテンプレートは準備中です',
-  pendingBody: '言語別データ領域は利用できます。編集画面とPDFテンプレートは次の実装段階で追加します。'
+  pendingBody: '言語別データ領域は利用できます。編集画面とPDFテンプレートは次の実装段階で追加します。',
+  privacySecurity: {
+    badgeLabel: 'ローカル処理',
+    badgeAria: 'プライバシーとセキュリティを開く。ローカル処理、バージョン {version}',
+    sourceLink: 'GitHub ソースコード',
+    sourceLinkAria: 'GitHub で Resume Studio のソースコードを開く（新しいタブ）',
+    title: 'プライバシーとセキュリティ',
+    summary: 'Resume Studio でのデータ処理と、利用者自身で確認する方法を説明します。',
+    userHeading: '一般の方へ',
+    userBody: '履歴書の内容は現在のブラウザ内で処理され、backend、analytics、外部サービスへ自動送信されません。現在のページを完全に読み込み、開いたままにしていれば、ネットワークを切断した後も編集、この端末への保存、JSON 書き出し、PDF 出力を続けられます。ページの再読み込みや開き直しにはネットワークが必要です。',
+    technicalHeading: '技術的に確認する方へ',
+    technicalBody: 'F12 で開発者ツールの Network を確認するか、GitHub repository でソースコードを監査できます。',
+    storageHeading: '端末上のデータについて',
+    storageBody: 'localStorage の下書きと書き出したファイルは暗号化されません。共有端末での利用やファイルの保管・共有には注意してください。',
+    repositoryLink: 'GitHub でソースコードを見る',
+    privacyNoticeLink: 'プライバシー声明の全文',
+    close: '閉じる'
+  }
 };

@@ -40,5 +40,17 @@
   .editor-footer { align-items: start; flex-direction: column; gap: 14px; }
   .editor-footer p { text-align: left; }
   .sample-mode-panel { grid-template-columns: 1fr; }
+  .trust-capsule {
+    bottom: calc(9px + env(safe-area-inset-bottom));
+    right: calc(9px + env(safe-area-inset-right));
+  }
+  .trust-source-link { width: 38px; }
+  .trust-source-link,
+  .trust-privacy-button { min-height: 38px; }
+  .trust-privacy-button { gap: 5px; padding: 0 9px 0 8px; }
+  .trust-privacy-button #privacySecurityBadgeLabel { display: none; }
+  .privacy-security-content { max-height: calc(100vh - 20px); max-width: calc(100vw - 20px); padding: 20px; }
+  .privacy-security-heading { gap: 11px; }
+  .privacy-security-heading h2 { font-size: 17px; }
+  .privacy-security-icon { height: 36px; width: 36px; }
 }
-

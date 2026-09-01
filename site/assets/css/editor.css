@@ -123,5 +123,27 @@ dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px)
 .dialog-content p { color: var(--muted); font-size: 11px; line-height: 1.7; margin: 0; }
 .dialog-actions { display: grid; gap: 9px; grid-template-columns: 1fr 1fr; margin-top: 22px; }
 
-@keyframes pulse { 50% { opacity: .35; } }
+#privacySecurityDialog { max-height: none; max-width: none; }
+.privacy-security-content {
+  max-height: calc(100vh - 36px);
+  max-width: min(600px, calc(100vw - 32px));
+  overflow-y: auto;
+  padding: clamp(22px, 4vw, 34px);
+  text-align: left;
+  width: 600px;
+}
+.privacy-security-heading { align-items: flex-start; display: grid; gap: 15px; grid-template-columns: auto 1fr; }
+.privacy-security-heading h2 { font-size: 20px; margin: 1px 0 7px; }
+.privacy-security-heading p,
+.privacy-security-section p { color: var(--muted); font-size: 11px; line-height: 1.75; margin: 0; text-align: left; }
+.privacy-security-icon { align-items: center; background: #eaf8f3; border-radius: 10px; color: var(--green); display: flex; height: 42px; justify-content: center; width: 42px; }
+.privacy-security-icon svg { fill: currentColor; height: 23px; width: 23px; }
+.privacy-security-section { border-top: 1px solid var(--soft-line); margin-top: 20px; padding-top: 17px; }
+.privacy-security-section h3 { font-size: 12px; margin: 0 0 6px; }
+.privacy-security-warning { background: #fff9ea; border: 1px solid #f0dfac; border-radius: 8px; padding: 13px 14px; }
+.privacy-security-links { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 18px; }
+.privacy-security-links a { color: var(--blue); font-size: 10px; font-weight: 700; }
+.privacy-security-actions { display: flex; justify-content: flex-end; margin-top: 24px; }
+.privacy-security-actions .primary-button { min-width: 112px; }
 
+@keyframes pulse { 50% { opacity: .35; } }
