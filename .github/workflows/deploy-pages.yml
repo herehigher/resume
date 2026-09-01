@@ -57,6 +57,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      adapter_digest: ${{ steps.manifest.outputs.adapter_digest }}
+      analytics_mode: ${{ steps.manifest.outputs.analytics_mode }}
+      analytics_provider: ${{ steps.manifest.outputs.analytics_provider }}
+      final_digest: ${{ steps.final.outputs.final_digest }}
+      provider_fingerprint: ${{ steps.manifest.outputs.provider_fingerprint }}
+      source_digest: ${{ steps.manifest.outputs.source_digest }}
     steps:
       - name: Checkout validated release commit
         uses: actions/checkout@v4
@@ -64,10 +71,65 @@ jobs:
           ref: ${{ needs.validate.outputs.release_sha }}
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate tagged Pages manifest without provider token
+        id: manifest
+        run: >-
+          node scripts/prepare-pages-artifact.mjs validate
+          --source site
+          --manifest .github/pages-release-manifest.json
+
+      - name: Reject enabled analytics outside the official repository
+        if: ${{ github.repository != 'herehigher/resume' && steps.manifest.outputs.analytics_mode == 'enabled' }}
+        run: |
+          echo 'Enabled analytics artifacts are restricted to herehigher/resume.' >&2
+          exit 1
+
+      - name: Prepare official Cloudflare-enabled artifact
+        if: ${{ github.repository == 'herehigher/resume' && steps.manifest.outputs.analytics_mode == 'enabled' && steps.manifest.outputs.analytics_provider == 'cloudflare-web-analytics' }}
+        env:
+          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
+        run: >-
+          node scripts/prepare-pages-artifact.mjs prepare
+          --source site
+          --output "${RUNNER_TEMP}/resume-pages-site"
+          --manifest .github/pages-release-manifest.json
+          --repository "${GITHUB_REPOSITORY}"
+
+      - name: Prepare analytics-disabled artifact
+        if: ${{ steps.manifest.outputs.analytics_mode == 'disabled' && steps.manifest.outputs.analytics_provider == 'none' }}
+        run: >-
+          node scripts/prepare-pages-artifact.mjs prepare
+          --source site
+          --output "${RUNNER_TEMP}/resume-pages-site"
+          --manifest .github/pages-release-manifest.json
+          --repository "${GITHUB_REPOSITORY}"
+
+      - name: Verify source checkout stayed unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- site
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- site)"
+          node scripts/prepare-pages-artifact.mjs validate \
+            --source site \
+            --manifest .github/pages-release-manifest.json
+
+      - name: Verify final artifact digest
+        id: final
+        run: >-
+          node scripts/prepare-pages-artifact.mjs verify
+          --directory "${RUNNER_TEMP}/resume-pages-site"
+          --manifest .github/pages-release-manifest.json
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: ${{ runner.temp }}/resume-pages-site
 
   deploy:
     needs: [validate, artifact]
@@ -89,13 +151,17 @@ jobs:
         uses: actions/deploy-pages@v4
 
   smoke:
-    needs: [validate, deploy]
+    needs: [validate, artifact, deploy]
     runs-on: ubuntu-latest
     permissions: {}
     env:
       EXPECTED_PAGE_URL: https://herehigher.github.io/resume/
+      ANALYTICS_MODE: ${{ needs.artifact.outputs.analytics_mode }}
+      ANALYTICS_PROVIDER: ${{ needs.artifact.outputs.analytics_provider }}
+      PROVIDER_FINGERPRINT: ${{ needs.artifact.outputs.provider_fingerprint }}
       PACKAGE_VERSION: ${{ needs.validate.outputs.package_version }}
       PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+      REPOSITORY: ${{ github.repository }}
       RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
     steps:
       - name: Verify deployed public paths
@@ -103,7 +169,32 @@ jobs:
         run: |
           set -euo pipefail
           base_url="${PAGE_URL%/}/"
-          test "$base_url" = "$EXPECTED_PAGE_URL"
+          page_authority="${base_url#https://}"
+          page_authority="${page_authority%%/*}"
+          if [[ "$base_url" != https://*
+            || -z "$page_authority"
+            || "$page_authority" == *'@'*
+            || "$base_url" == *'?'*
+            || "$base_url" == *'#'* ]]; then
+            echo 'Pages returned an unsafe deployment URL.' >&2
+            exit 1
+          fi
+          if [[ "$REPOSITORY" == 'herehigher/resume' ]]; then
+            test "$base_url" = "$EXPECTED_PAGE_URL"
+          fi
+
+          if [[ "$ANALYTICS_MODE" == 'disabled'
+            && "$ANALYTICS_PROVIDER" == 'none'
+            && "$PROVIDER_FINGERPRINT" == 'none' ]]; then
+            :
+          elif [[ "$ANALYTICS_MODE" == 'enabled'
+            && "$ANALYTICS_PROVIDER" == 'cloudflare-web-analytics'
+            && "$PROVIDER_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
+            :
+          else
+            echo 'Unsupported deployed analytics configuration.' >&2
+            exit 1
+          fi
 
           smoke_dir="${RUNNER_TEMP}/resume-pages-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           mkdir -p "$smoke_dir"
@@ -144,6 +235,46 @@ jobs:
             return 1
           }
 
+          # ANALYTICS_SMOKE_FUNCTION_START
+          count_occurrences() {
+            local needle="$1"
+            local file="$2"
+            { grep --only-matching --fixed-strings -- "$needle" "$file" || true; } \
+              | wc -l \
+              | tr -d '[:space:]'
+          }
+
+          check_analytics() {
+            local output="$1"
+            local file="${smoke_dir}/${output}"
+            if [[ "$ANALYTICS_MODE" == 'disabled' ]]; then
+              grep --fixed-strings --quiet 'data-analytics-mode="disabled" data-analytics-provider="none"' "$file"
+              if grep --extended-regexp --quiet 'data-cf-beacon|cloudflareinsights\.com' "$file"; then
+                echo "Analytics runtime unexpectedly present in ${output}." >&2
+                return 1
+              fi
+              return 0
+            fi
+
+            grep --fixed-strings --quiet 'data-analytics-mode="enabled" data-analytics-provider="cloudflare-web-analytics"' "$file"
+            local beacon_count attribute_count token_attribute_count token
+            beacon_count="$(count_occurrences 'https://static.cloudflareinsights.com/beacon.min.js' "$file")"
+            attribute_count="$(count_occurrences 'data-cf-beacon' "$file")"
+            token_attribute_count="$(
+              { grep --only-matching --extended-regexp \
+                'data-cf-beacon="\{&quot;token&quot;:&quot;[0-9a-f]{32}&quot;\}"' "$file" || true; } \
+                | wc -l \
+                | tr -d '[:space:]'
+            )"
+            test "$beacon_count" -eq 1
+            test "$attribute_count" -eq 1
+            test "$token_attribute_count" -eq 1
+            token="$(sed -n 's/.*data-cf-beacon="{&quot;token&quot;:&quot;\([0-9a-f]\{32\}\)&quot;}".*/\1/p' "$file")"
+            test "${#token}" -eq 32
+            test "$(printf '%s' "$token" | sha256sum | cut -d ' ' -f 1)" = "$PROVIDER_FINGERPRINT"
+          }
+          # ANALYTICS_SMOKE_FUNCTION_END
+
           fetch_and_check '' root.html '<title>Resume Studio'
           fetch_and_check 'ja/' ja.html '<html lang="ja">'
           fetch_and_check 'zh-cn/' zh-cn.html '<html lang="zh-CN">'
@@ -152,3 +283,7 @@ jobs:
           fetch_and_check 'schema/resume-studio-web-v1.schema.json' schema.json '"title": "Resume Studio web v1 export"'
           fetch_and_check 'schema/resume-studio-web-v1.example.json' example.json '"version": 1'
           fetch_and_check 'assets/js/config.js' config.js "APP_VERSION = '${PACKAGE_VERSION}'"
+          check_analytics root.html
+          check_analytics ja.html
+          check_analytics zh-cn.html
+          check_analytics en.html

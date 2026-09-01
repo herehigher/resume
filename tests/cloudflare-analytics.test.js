@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  CLOUDFLARE_ANALYTICS_TOKEN,
   CLOUDFLARE_BEACON_URL,
   CLOUDFLARE_RUM_URL,
   cloudflareAnalyticsScriptTags,
   isAllowedCloudflareAnalyticsRequest
 } from '../scripts/cloudflare-analytics.mjs';
+
+const TEST_ANALYTICS_TOKEN = 'a'.repeat(32);
 
 const expectedOrigin = 'https://herehigher.github.io';
 
@@ -25,7 +26,7 @@ function rumRequest(overrides = {}) {
     nt: 'navigate',
     pageloadId: 'page-load-id',
     referrer: '',
-    siteToken: CLOUDFLARE_ANALYTICS_TOKEN,
+    siteToken: TEST_ANALYTICS_TOKEN,
     st: 2,
     startTime: 0,
     timingsV2: { domComplete: 248, loadEventEnd: 248 },
@@ -45,15 +46,16 @@ function rumRequest(overrides = {}) {
 }
 
 test('Cloudflare beacon configuration permits only the fixed standard script and token', () => {
-  const valid = `<script type="module" src="${CLOUDFLARE_BEACON_URL}" data-cf-beacon='{"token":"${CLOUDFLARE_ANALYTICS_TOKEN}"}'></script>`;
-  assert.equal(cloudflareAnalyticsScriptTags(valid).length, 1);
-  assert.equal(cloudflareAnalyticsScriptTags(valid.replace(CLOUDFLARE_ANALYTICS_TOKEN, 'wrong')).length, 0);
-  assert.equal(cloudflareAnalyticsScriptTags(valid.replace('></script>', ' data-user-id="1"></script>')).length, 0);
-  assert.equal(cloudflareAnalyticsScriptTags(valid.replace(CLOUDFLARE_BEACON_URL, `${CLOUDFLARE_BEACON_URL}?v=1`)).length, 0);
+  const valid = `<script type="module" src="${CLOUDFLARE_BEACON_URL}" data-cf-beacon='{"token":"${TEST_ANALYTICS_TOKEN}"}'></script>`;
+  assert.equal(cloudflareAnalyticsScriptTags(valid, TEST_ANALYTICS_TOKEN).length, 1);
+  assert.equal(cloudflareAnalyticsScriptTags(valid.replace(TEST_ANALYTICS_TOKEN, 'wrong'), TEST_ANALYTICS_TOKEN).length, 0);
+  assert.equal(cloudflareAnalyticsScriptTags(valid.replace('></script>', ' data-user-id="1"></script>'), TEST_ANALYTICS_TOKEN).length, 0);
+  assert.equal(cloudflareAnalyticsScriptTags(valid.replace(CLOUDFLARE_BEACON_URL, `${CLOUDFLARE_BEACON_URL}?v=1`), TEST_ANALYTICS_TOKEN).length, 0);
 });
 
 test('analytics request allowlist accepts only the fixed GET and constrained standard RUM POST', () => {
   assert.equal(isAllowedCloudflareAnalyticsRequest({
+    expectedToken: TEST_ANALYTICS_TOKEN,
     expectedOrigin,
     headers: {},
     method: 'GET',
@@ -61,19 +63,19 @@ test('analytics request allowlist accepts only the fixed GET and constrained sta
     resourceType: 'script',
     url: CLOUDFLARE_BEACON_URL
   }), true);
-  assert.equal(isAllowedCloudflareAnalyticsRequest(rumRequest()), true);
-  assert.equal(isAllowedCloudflareAnalyticsRequest(rumRequest({
+  assert.equal(isAllowedCloudflareAnalyticsRequest({ ...rumRequest(), expectedToken: TEST_ANALYTICS_TOKEN }), true);
+  assert.equal(isAllowedCloudflareAnalyticsRequest({ ...rumRequest({
     payload: { st: 1 },
     resourceType: 'ping'
-  })), true);
-  assert.equal(isAllowedCloudflareAnalyticsRequest(rumRequest({
+  }), expectedToken: TEST_ANALYTICS_TOKEN }), true);
+  assert.equal(isAllowedCloudflareAnalyticsRequest({ ...rumRequest({
     payload: {
       eventType: 3,
       lcp: { url: 'blob:https://herehigher.github.io/opaque-photo-id' },
       st: 1
     },
     resourceType: 'ping'
-  })), true);
+  }), expectedToken: TEST_ANALYTICS_TOKEN }), true);
 
   const rejected = [
     rumRequest({ resourceType: 'fetch' }),
@@ -97,5 +99,7 @@ test('analytics request allowlist accepts only the fixed GET and constrained sta
     rumRequest({ payload: { resume: 'personal-data' } }),
     rumRequest({ payload: { pageloadId: 'person@example.test' } })
   ];
-  for (const request of rejected) assert.equal(isAllowedCloudflareAnalyticsRequest(request), false);
+  for (const request of rejected) {
+    assert.equal(isAllowedCloudflareAnalyticsRequest({ ...request, expectedToken: TEST_ANALYTICS_TOKEN }), false);
+  }
 });

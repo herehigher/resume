@@ -40,8 +40,9 @@ Smoke が失敗した場合、deployment 自体は完了しているため「dep
 - [ ] 保存・再読込、入力例からの復元、項目削除、JSON書き出し・読込後も三言語のデータが混ざらない。
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
 - [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
-- [ ] Developer Tools の Network で、同一 origin の公開 static file に加え、`https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST だけが発生する。その他の外部 runtime asset / request、同一 origin の POST / fetch / XHR、未知の path、WebSocket はない。
-- [ ] Cloudflare RUM request の URL と payload を確認し、履歴書入力、氏名・連絡先、写真、import / export JSON、localStorage の下書き、custom event、利用者単位 ID が含まれない。Page URL の query は `lang=ja`、`lang=zh-CN`、`lang=en` 以外を含まない。
+- [ ] Clone / fork または source build では、4 HTML が `data-analytics-mode="disabled" data-analytics-provider="none"` を示し、Developer Tools の Network に同一 origin の公開 static file 以外の analytics / external runtime request、同一 origin POST、未知 path、WebSocket がない。
+- [ ] 公式 Pages release では、4 HTML の status tuple が tagged manifest と一致する。`disabled/none` なら beacon がなく、`enabled/cloudflare-web-analytics` なら `https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST が各 page で確認できる。未対応 tuple は configuration error として不合格にする。
+- [ ] Enabled の Cloudflare RUM request の URL と payload を確認し、履歴書入力、氏名・連絡先、写真、import / export JSON、localStorage の下書き、custom event、利用者単位 ID が含まれない。Page URL の query は `lang=ja`、`lang=zh-CN`、`lang=en` 以外を含まない。
 - [ ] Repository を public にした後、未ログインまたは private window から右下の GitHub source link と三言語の privacy notice link を開ける。
 
 ## Public entry・SEO・Agent contract

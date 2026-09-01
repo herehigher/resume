@@ -25,9 +25,9 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityTitle')).toBeFocused();
   await expect(dialog).toHaveAttribute('aria-labelledby', 'privacySecurityTitle');
   await expect(dialog).toHaveAttribute('aria-describedby', 'privacySecuritySummary');
-  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('Analytics は無効');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('履歴書の内容、写真、JSON、端末上の下書き');
-  await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('標準 RUM endpoint');
+  await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('同一 origin の静的 asset request だけ');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS.ja);
   await expect(page.locator('#privacyRepositoryLink')).toHaveAttribute('href', REPOSITORY_URL);
   for (const link of [page.locator('#privacyRepositoryLink'), page.locator('#privacyNoticeLink')]) {
@@ -43,7 +43,7 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityBadgeLabel')).toHaveText('本地处理');
   await badge.click();
   await expect(page.locator('#privacySecurityTitle')).toHaveText('隐私与安全');
-  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('未启用 Analytics');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('简历内容、照片、JSON 和设备上的草稿');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS['zh-CN']);
   await page.keyboard.press('Escape');
@@ -54,9 +54,19 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityBadgeLabel')).toHaveText('Processed locally');
   await badge.click();
   await expect(page.locator('#privacySecurityTitle')).toHaveText('Privacy & Security');
-  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('Analytics is disabled');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('resume content, photo, JSON, and on-device draft');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS.en);
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.analyticsMode = 'unknown';
+    document.documentElement.dataset.analyticsProvider = 'unknown';
+  });
+  await page.keyboard.press('Escape');
+  await page.locator('#localeSelect').selectOption('ja');
+  await badge.click();
+  await expect(page.locator('#privacySecurityUserBody')).toContainText('Analytics 設定を確認できません');
+  await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('configuration error');
 });
 
 test('editing, local save, and JSON export remain available after going offline', async ({ context, page }) => {

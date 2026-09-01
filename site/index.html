@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-analytics-mode="disabled" data-analytics-provider="none">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -295,7 +295,7 @@
 
       <div class="editor-footer">
         <button class="danger-text-button" id="clearButton" type="button">保存した下書きを削除</button>
-        <p>履歴書データはこのブラウザ内で処理・保存され、Cloudflare の集計アクセス解析へ送信されません。</p>
+        <p><span data-analytics-disclosure="status">この source build では Analytics は無効で、解析用の外部 request は発生しません。</span></p>
       </div>
     </section>
 
@@ -411,6 +411,5 @@
   </template>
 
   <script type="module" src="./assets/js/main.js"></script>
-  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"0b02ba35d9bc4d4d8dd63b42d6d51241"}'></script>
 </body>
 </html>

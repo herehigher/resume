@@ -13,9 +13,7 @@ const TEXT_TARGETS = Object.freeze({
   privacySecurityTitle: 'title',
   privacySecuritySummary: 'summary',
   privacySecurityUserHeading: 'userHeading',
-  privacySecurityUserBody: 'userBody',
   privacySecurityTechnicalHeading: 'technicalHeading',
-  privacySecurityTechnicalBody: 'technicalBody',
   privacySecurityStorageHeading: 'storageHeading',
   privacySecurityStorageBody: 'storageBody',
   privacyRepositoryLink: 'repositoryLink',
@@ -25,6 +23,14 @@ const TEXT_TARGETS = Object.freeze({
 
 function privacyNoticeUrl(locale) {
   return `${REPOSITORY_URL}/blob/main/PRIVACY.md#${PRIVACY_ANCHORS[locale]}`;
+}
+
+export function analyticsStatusFrom(element) {
+  const mode = element?.dataset?.analyticsMode;
+  const provider = element?.dataset?.analyticsProvider;
+  if (mode === 'disabled' && provider === 'none') return 'disabled';
+  if (mode === 'enabled' && provider === 'cloudflare-web-analytics') return 'enabled';
+  return 'configurationError';
 }
 
 export function initPrivacySecurity(initialLocale) {
@@ -40,9 +46,12 @@ export function initPrivacySecurity(initialLocale) {
 
   function applyLocale(locale) {
     const copy = getMessages(locale).privacySecurity;
+    const analyticsStatus = analyticsStatusFrom(document.documentElement);
     for (const [id, key] of Object.entries(TEXT_TARGETS)) {
       document.getElementById(id).textContent = copy[key];
     }
+    document.getElementById('privacySecurityUserBody').textContent = copy[`${analyticsStatus}UserBody`];
+    document.getElementById('privacySecurityTechnicalBody').textContent = copy[`${analyticsStatus}TechnicalBody`];
     button.setAttribute('aria-label', copy.badgeAria.replace('{version}', APP_VERSION));
     repositoryLink.setAttribute('aria-label', copy.sourceLinkAria);
     repositoryLink.title = copy.sourceLink;

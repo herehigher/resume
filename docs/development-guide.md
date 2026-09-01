@@ -7,7 +7,8 @@
 - Production は browser 標準の HTML、CSS、ES Modules で動作し、build や runtime framework を必要としません。
 - 正式な配布先は GitHub Pages です。Local development でも `file://` ではなく static server を使用します。
 - 公開用 application file は `site/` に集約し、履歴書の入力 data は browser 内で扱います。
-- Runtime の外部通信は、同一 origin の static asset、利用者が選択した profile link、標準 Cloudflare Web Analytics の固定 beacon script / RUM endpoint に限定します。Analytics は集計 page view と performance のみに使い、custom event や履歴書 data を送信しません。
+- `site/` source の runtime 通信は同一 origin の static asset と利用者が選択した profile link に限定し、Analytics は無効です。`herehigher/resume` の検証済み stable tag だけは、`.github/pages-release-manifest.json` が有効な場合に deployment-only adapter が staging artifact へ固定 Cloudflare beacon を追加します。Clone / fork は注入せず、未対応 configuration は失敗させます。
+- Analytics provider、固定 injection template、endpoint、privacy / network policy を変える場合は、独立した Pull Request、version、immutable stable tag が必要です。Manifest structure または provider fingerprint の意味を変える場合は `schemaVersion` を増やします。既存 tag の manual redeploy は、その tag 自身に含まれる adapter と schema の契約を使用して互換性を保ちます。Enabled tag が固定した旧 token を利用できない場合は再構築を hard failure とし、同じ tag を新しい token へ移行しません。
 - `site/index.html` は editor と `x-default` の入口です。`/ja/`、`/zh-cn/`、`/en/` は JavaScript が無効でも読める locale-specific public entry で、既存の `/?lang=ja`、`/?lang=zh-CN`、`/?lang=en` editor へ案内します。
 - Root と三言語 public entry は canonical / reciprocal hreflang で関係を宣言し、`site/sitemap.xml` は index 対象の canonical URL だけを列挙します。
 - 保存形式は `resume-studio-web-v1` です。日本語・简体中文・English の document section は独立し、profile・連絡先・写真は三言語で共有します。
@@ -76,9 +77,9 @@ Chrome で editor の `http://localhost:8000/`、public entry の `http://localh
 
 | Command | 確認内容 |
 | --- | --- |
-| `npm test` | Node unit / document test、`tests/public-entry.test.js` による canonical / hreflang / sitemap と代表的な JSON Schema / import case、`scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、全公開 HTML の external runtime asset / Cloudflare beacon 構成の static check |
+| `npm test` | Node unit / document test、public entry / Schema、source の Analytics 無効契約、manifest tuple、artifact staging の digest・fork・token failure path、`scripts/check-site.mjs` による JavaScript syntax、network API、legacy storage key、外部 runtime asset の static check |
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
-| `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、privacy / network guard、Cloudflare request allowlist、PDF page size・pagination・抽出 text の Playwright acceptance。Cloudflare は test 内で固定 response に置換し、live service に依存しない |
+| `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、source の外部通信拒否、disabled / enabled / configuration error の privacy status、合成 token で作る enabled artifact の固定 Cloudflare request、PDF page size・pagination・抽出 text の Playwright acceptance。Live provider には依存しない |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run generate:docs` | 三言語 screenshot、PDF sample、provenance manifest の再生成 |
 

@@ -22,5 +22,5 @@ English: This file records notable changes. Release dates are added only when th
 
 ### Security / Privacy
 
-- Cookie や利用者単位 ID を使わない標準 Cloudflare Web Analytics を、集計 page view / performance 計測の限定的な例外として追加。履歴書入力、写真、JSON、local draft は送信しません。
-- Added standard, cookie-free Cloudflare Web Analytics as the sole exception for aggregate page-view and performance metrics. Resume input, photos, JSON, and local drafts are not sent.
+- `site/` source、clone、fork は Analytics 無効とし、`herehigher/resume` の検証済み stable tag artifact だけへ tagged manifest に従う標準 Cloudflare Web Analytics を deployment 時に決定的に追加。Raw provider token は tracked tree に保存せず、履歴書入力、写真、JSON、local draft は送信しません。
+- Source sites and forks disable analytics. Only the official repository's validated stable-tag artifact receives the deterministic, tagged Cloudflare Web Analytics adapter; no raw provider token or resume data is committed or sent.

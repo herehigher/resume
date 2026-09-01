@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { cloudflareAnalyticsScriptTags, isCloudflareAnalyticsScriptTag } from './cloudflare-analytics.mjs';
 
 const root = resolve('site');
 const failures = [];
@@ -21,8 +20,7 @@ export function findExternalRuntimeAssets(html) {
       const relation = (relationMatch?.[2] || relationMatch?.[3] || '').trim().toLowerCase();
       return !['alternate', 'canonical'].includes(relation);
     });
-  return [...externalElements, ...externalLinks]
-    .filter(([tag]) => !isCloudflareAnalyticsScriptTag(tag));
+  return [...externalElements, ...externalLinks];
 }
 
 const files = walk(root);
@@ -57,8 +55,11 @@ files.filter((file) => extname(file) === '.html').forEach((file) => {
   if (findExternalRuntimeAssets(pageHtml).length) {
     failures.push(`${file}: external runtime assets are not allowed`);
   }
-  if (cloudflareAnalyticsScriptTags(pageHtml).length !== 1) {
-    failures.push(`${file}: exactly one standard Cloudflare Web Analytics beacon is required`);
+  if (!pageHtml.includes('data-analytics-mode="disabled" data-analytics-provider="none"')) {
+    failures.push(`${file}: source analytics status must be disabled/none`);
+  }
+  if (/data-cf-beacon|cloudflareinsights\.com/i.test(pageHtml)) {
+    failures.push(`${file}: source pages must not contain analytics runtime code`);
   }
 });
 

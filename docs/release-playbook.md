@@ -20,6 +20,8 @@ Release candidate（RC）は application version、`site/`、public sample、rel
 
 Screenshot に誤りが見つかった場合は tag 前に RC を修正して再生成します。Tag 後は tag を動かさず、修正を新しい version として release します。
 
+Official deployment で Analytics が enabled であることを示す screenshot は、deploy 後の Issue evidence として保存します。Source default が disabled であることを示す tag 内の生成 screenshot を置き換えたり、immutable tag へ書き戻したりしません。
+
 ## Preflight inputs と local gate
 
 最初に次を Issue または手元の release note に用意します。
@@ -31,6 +33,7 @@ Screenshot に誤りが見つかった場合は tag 前に RC を修正して再
 - Pull Request number: `<PR_NUMBER>`（v0.1.0 release PR は `28`）
 - 対象 Pull Request: `<PR_URL>`
 - Owner approval: 承認者と日時
+- Pages Analytics manifest: `.github/pages-release-manifest.json` の mode / provider / fingerprint / source / artifact digest
 
 Repository、account、作業 tree を確認します。Tag や deployment を変更しない read-only preflight です。
 
@@ -84,10 +87,50 @@ git diff --check origin/main...HEAD \
 
 `git diff --check` は現在の unstaged working tree、`git diff --check origin/main...HEAD` は fetch 済み `origin/main` から HEAD までの committed Pull Request range を検査します。前者が clean でも後者の代わりにはなりません。両方の結果を記録します。
 
+### Pages Analytics manifest の PR 前開発検証
+
+`site/` source、clone、fork は `disabled/none` で Analytics runtime を含みません。`.github/pages-release-manifest.json` は release tag に固定され、`(disabled, none, null)` または `(enabled, cloudflare-web-analytics, SHA-256 fingerprint)` のどちらかだけを許可します。Manifest は provider URL、script、command、環境変数名、自由記述 config を保持せず、source tree と最終 artifact tree の digest を固定します。
+
+Enabled release では owner の明示承認後、PR 前にも `herehigher/resume` の実際の repository variable を読み、token を表示・記録せずに fingerprint と artifact digest を独立復元します。Shell xtrace が有効な端末、認証未確認、variable を読む権限がない状態では実行しません。この working tree 上の確認は manifest を review 可能にするための開発検証であり、merge 後の pinned `<RELEASE_SHA>` に対する最終 gate の代わりにはなりません。
+
+```bash
+case "$-" in *x*) echo 'Disable shell xtrace before reading the provider token.' >&2; exit 1 ;; esac
+gh auth status || { echo 'GitHub authentication is unavailable; stop the release.' >&2; exit 1; }
+verification_output="$(mktemp)" \
+  || { echo 'Unable to create a private verification output.' >&2; exit 1; }
+trap 'rm -f "$verification_output"' EXIT
+analytics_token="$(gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher/resume)" \
+  || { echo 'Unable to read the approved repository variable; stop the release.' >&2; exit 1; }
+test -n "$analytics_token" \
+  || { echo 'The approved repository variable is empty; stop the release.' >&2; exit 1; }
+CLOUDFLARE_WEB_ANALYTICS_TOKEN="$analytics_token" GITHUB_OUTPUT="$verification_output" \
+  node scripts/prepare-pages-artifact.mjs derive-cloudflare --source site \
+  || { unset analytics_token; echo 'Artifact derivation failed; stop the release.' >&2; exit 1; }
+unset analytics_token
+node -e '
+  const fs = require("node:fs");
+  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const output = Object.fromEntries(fs.readFileSync(process.argv[2], "utf8").trim().split("\n").map((line) => line.split("=", 2)));
+  const expected = {
+    provider_fingerprint: manifest.providerTokenSha256,
+    source_digest: manifest.sourceTreeSha256,
+    final_digest: manifest.artifactTreeSha256
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (output[key] !== value) throw new Error(`${key} mismatch`);
+  }
+  if (!/^[0-9a-f]{64}$/.test(output.adapter_digest || "")) throw new Error("adapter digest missing");
+  process.stdout.write(`Verified source=${output.source_digest}, adapter=${output.adapter_digest}, artifact=${output.final_digest}\n`);
+' .github/pages-release-manifest.json "$verification_output" \
+  || { echo 'Tagged manifest does not reproduce; stop the release.' >&2; exit 1; }
+```
+
+Output に raw token は含めず、4 digest / fingerprint だけを evidence に記録します。Owner が variable access を承認していない、variable が読めない、または mismatch の場合は tag を作成しません。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直します。Enabled のまま先に tag を作ることは禁止です。
+
 ## Pull Request、Quality、merge
 
 1. Pull Request は日本語を主とし、必要なら短い English summary を付ける。目的、変更範囲、focused test、`npm run test:acceptance`、working tree の `git diff --check`、committed range の `git diff --check origin/main...HEAD`、目視結果、未確認事項、screenshot / PDF の source SHA を記録する。
-2. 同じ Pull Request で `CHANGELOG.md` の対象内容を `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ固化し、`package.json`、`APP_VERSION`、CHANGELOG version の一致と release notes / date を review する。
+2. 同じ Pull Request で `CHANGELOG.md` の対象内容を `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ固化し、`package.json`、`APP_VERSION`、CHANGELOG version、Pages manifest の mode / provider / fingerprint / source / artifact digest の一致と release notes / date を review する。
 3. Review 指摘を解消し、Pull Request の `Quality / quality` が成功していることを確認する。失敗または未確認の gate がある間は merge しない。
 4. Ruleset に従って `main` へ merge する。通常の `main` push では Pages deployment が起動しないことを確認する。
 5. Merge 後、review 済み Pull Request の `mergeCommit.oid` を GitHub から取得し、release 対象の full commit SHA として pin する。`origin/main` の当時の tip や PR head SHA から推測しない。
@@ -146,6 +189,116 @@ printf 'Pinned main Quality: %s\n' "$quality_url"
 ```
 
 この Quality URL と pinned `<RELEASE_SHA>` の組を evidence に記録します。
+
+### Pinned release SHA の最終 artifact gate
+
+Main `Quality / quality` の成功確認後、tag preflight より前に、review 済み `<RELEASE_SHA>` そのものを clean detached worktree へ展開し、tagged manifest と artifact を最終復元します。PR 前の working tree 検証、現在の `main` tip、別 commit の checkout を代用してはいけません。Manifest の unknown field、unsupported `schemaVersion`、不正 tuple、source digest mismatch、provider fingerprint mismatch、final artifact digest mismatch、cleanup failure はすべて tag 作成前の hard failure です。
+
+Enabled の場合だけ owner が承認した実 repository variable を読みます。Token は environment だけへ渡し、command argument、stdout、evidence に出しません。Disabled の場合は provider variable を読まず、validated source digest が source-identical final digest と一致することを確認します。
+
+```bash
+### FINAL_RELEASE_ARTIFACT_GATE_START
+case "$-" in *x*) echo 'Disable shell xtrace before the final artifact gate.' >&2; exit 1 ;; esac
+release_sha="${RELEASE_SHA:-<RELEASE_SHA>}"
+case "$release_sha" in *'<'*|*'>'*|'') echo 'Replace the release SHA placeholder first.' >&2; exit 1 ;; esac
+case "$release_sha" in *[!0-9a-f]*) echo 'Release SHA must be lowercase hexadecimal.' >&2; exit 1 ;; esac
+case "${#release_sha}" in 40|64) ;; *) echo 'Release SHA must be a full commit id.' >&2; exit 1 ;; esac
+
+final_gate_root=''
+final_gate_tree=''
+final_gate_output=''
+cleanup_final_gate() {
+  local cleanup_status=0
+  unset analytics_token
+  if [[ -n "$final_gate_output" && -e "$final_gate_output" ]]; then
+    rm -f -- "$final_gate_output" || cleanup_status=1
+  fi
+  if [[ -n "$final_gate_tree" && -d "$final_gate_tree" ]]; then
+    git worktree remove --force "$final_gate_tree" || cleanup_status=1
+  fi
+  if [[ -n "$final_gate_root" && -d "$final_gate_root" ]]; then
+    rmdir -- "$final_gate_root" || cleanup_status=1
+  fi
+  return "$cleanup_status"
+}
+trap 'cleanup_final_gate' EXIT
+trap 'exit 130' HUP INT TERM
+
+umask 077
+final_gate_root="$(mktemp -d)" \
+  || { echo 'Unable to create the final verification directory.' >&2; exit 1; }
+final_gate_tree="${final_gate_root}/release"
+final_gate_output="${final_gate_root}/outputs"
+: > "$final_gate_output" \
+  || { echo 'Unable to create the final verification output.' >&2; exit 1; }
+git worktree add --detach "$final_gate_tree" "$release_sha" \
+  || { echo 'Unable to create the detached release worktree.' >&2; exit 1; }
+test "$(git -C "$final_gate_tree" rev-parse HEAD)" = "$release_sha" \
+  || { echo 'Detached worktree is not the pinned release SHA.' >&2; exit 1; }
+if git -C "$final_gate_tree" symbolic-ref --quiet HEAD >/dev/null; then
+  echo 'Final verification worktree is not detached.' >&2
+  exit 1
+else
+  detached_status=$?
+  test "$detached_status" -eq 1 \
+    || { echo 'Unable to verify detached HEAD.' >&2; exit 1; }
+fi
+test -z "$(git -C "$final_gate_tree" status --porcelain=v1 --untracked-files=all)" \
+  || { echo 'Final verification worktree is not clean.' >&2; exit 1; }
+
+GITHUB_OUTPUT="$final_gate_output" node "$final_gate_tree/scripts/prepare-pages-artifact.mjs" validate \
+  --source "$final_gate_tree/site" \
+  --manifest "$final_gate_tree/.github/pages-release-manifest.json" \
+  || { echo 'Pinned manifest or source validation failed; stop the release.' >&2; exit 1; }
+manifest_mode="$(node -p \
+  'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).analyticsMode' \
+  "$final_gate_tree/.github/pages-release-manifest.json")" \
+  || { echo 'Unable to read the validated analytics mode.' >&2; exit 1; }
+
+if [[ "$manifest_mode" == 'enabled' ]]; then
+  : > "$final_gate_output" \
+    || { echo 'Unable to reset the private verification output.' >&2; exit 1; }
+  gh auth status \
+    || { echo 'GitHub authentication is unavailable; stop the release.' >&2; exit 1; }
+  analytics_token="$(gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher/resume)" \
+    || { echo 'Unable to read the approved repository variable; stop the release.' >&2; exit 1; }
+  test -n "$analytics_token" \
+    || { echo 'The approved repository variable is empty; stop the release.' >&2; exit 1; }
+  CLOUDFLARE_WEB_ANALYTICS_TOKEN="$analytics_token" GITHUB_OUTPUT="$final_gate_output" \
+    node "$final_gate_tree/scripts/prepare-pages-artifact.mjs" derive-cloudflare \
+    --source "$final_gate_tree/site" \
+    || { unset analytics_token; echo 'Pinned artifact derivation failed; stop the release.' >&2; exit 1; }
+  unset analytics_token
+elif [[ "$manifest_mode" != 'disabled' ]]; then
+  echo 'Validated manifest returned an unsupported analytics mode.' >&2
+  exit 1
+fi
+
+node -e '
+  const fs = require("node:fs");
+  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const lines = fs.readFileSync(process.argv[2], "utf8").trim().split("\n").filter(Boolean);
+  const output = Object.fromEntries(lines.map((line) => line.split("=", 2)));
+  const expectedProvider = manifest.providerTokenSha256 ?? "none";
+  const expectedFinal = manifest.analyticsMode === "disabled"
+    ? output.source_digest
+    : output.final_digest;
+  if (output.source_digest !== manifest.sourceTreeSha256) throw new Error("source digest mismatch");
+  if (output.provider_fingerprint !== expectedProvider) throw new Error("provider fingerprint mismatch");
+  if (expectedFinal !== manifest.artifactTreeSha256) throw new Error("final artifact digest mismatch");
+  if (!/^[0-9a-f]{64}$/.test(output.adapter_digest || "")) throw new Error("adapter digest missing");
+  process.stdout.write(`Verified pinned source=${output.source_digest}, adapter=${output.adapter_digest}, artifact=${expectedFinal}\n`);
+' "$final_gate_tree/.github/pages-release-manifest.json" "$final_gate_output" \
+  || { echo 'Pinned manifest does not reproduce exactly; stop the release.' >&2; exit 1; }
+
+cleanup_final_gate \
+  || { trap - EXIT HUP INT TERM; echo 'Final verification cleanup failed; stop the release.' >&2; exit 1; }
+trap - EXIT HUP INT TERM
+printf 'Final release artifact gate passed: %s\n' "$release_sha"
+### FINAL_RELEASE_ARTIFACT_GATE_END
+```
+
+成功 marker、pinned SHA、source / provider / adapter / final digest を evidence に記録します。この gate を通過しない限り tag preflight へ進みません。
 
 ## 初回 Pages と HTTPS 設定
 
@@ -249,6 +402,9 @@ Issue または Pull Request に次を記録します。Placeholder を実値ま
 - Committed PR range `git diff --check origin/main...HEAD`: `<RESULT>`
 - Version consistency (`package.json` / `APP_VERSION` / `CHANGELOG.md`): `<RESULT>`
 - CHANGELOG release notes / date: `<RELEASE_VERSION>` / `<RELEASE_DATE>` / `<RESULT>`
+- Pages Analytics mode / provider / fingerprint: `<MODE>` / `<PROVIDER>` / `<SHA256_OR_NONE>`
+- Pages source / adapter / final artifact digest: `<SOURCE_SHA256>` / `<ADAPTER_SHA256>` / `<ARTIFACT_SHA256>`
+- Final pinned artifact gate: `<RELEASE_SHA>` / `<RESULT>`
 - Visual acceptance: `<RESULT, OS, CHROME_VERSION, CHECKED_AT>`
 - Screenshot / PDF source SHA: `<SHA_OR_NOT_APPLICABLE>`
 - Pages Source / custom domain / HTTPS: `<SETTINGS_RESULT>`
@@ -261,7 +417,7 @@ Issue または Pull Request に次を記録します。Placeholder を実値ま
 
 ## Existing tag の manual redeploy / rollback
 
-Manual redeploy は既存の immutable stable tag だけを対象にします。CDN の一時状態を再確認する場合は同じ tag、content defect から rollback する場合は直前に受入済みの tag を選びます。新しい未検証 ref、branch、SHA は入力しません。
+Manual redeploy は既存の immutable stable tag だけを対象にします。CDN の一時状態を再確認する場合は同じ tag、content defect から rollback する場合は直前に受入済みの tag を選びます。新しい未検証 ref、branch、SHA や Analytics override は入力しません。同じ tag は自身の tagged manifest を再利用し、mode、provider、fingerprint、artifact digest を変更できません。
 
 実行前に owner approval、default branch、対象 tag の存在、package version、過去の受入記録を確認します。
 
@@ -292,7 +448,7 @@ gh workflow run deploy-pages.yml --ref main --field "release_tag=${existing_tag}
   || { echo 'Manual redeploy dispatch failed; inspect Actions before retrying.' >&2; exit 1; }
 ```
 
-Manual run も exact tag、version、main ancestry、Quality を再検証します。完了後は Actions、environment URL、online smoke、manual browser の証拠を新しい記録として残します。Rollback は tag を変更する操作ではなく、既存 tag の検証済み `site/` を再 deployment する操作です。
+Manual run も exact tag、version、main ancestry、Quality、tagged manifest、最終 artifact digest を再検証します。Enabled tag は fingerprint と一致する provider token を保持している場合だけ決定的に再構築できます。旧 token が利用不能または variable が変更されていれば redeploy は失敗し、同じ tag を別 token で再構築しません。修正には新しい version/tag を使用します。完了後は Actions、environment URL、online smoke、manual browser の証拠を新しい記録として残します。Rollback は tag を変更する操作ではなく、既存 tag の検証済み `site/` を再 deployment する操作です。
 
 ## 失敗時の判断
 
