@@ -29,7 +29,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   const completionLabel = document.getElementById('completionLabel');
   const confirmDialog = document.getElementById('confirmDialog');
   const clearButton = document.getElementById('clearButton');
+  const clearDraftRow = document.getElementById('clearDraftRow');
   const clearDraftEmptyStatus = document.getElementById('clearDraftEmptyStatus');
+  const reloadDraftButton = document.getElementById('reloadDraftButton');
   const saveDraftButton = document.getElementById('saveDraftButton');
   let zoom = 1;
   let saveTimer;
@@ -57,7 +59,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   function updateClearDraftControl() {
     const hasClearableDraft = !sampleMode && (shouldPersistDraft || hasCurrentInput(store.getState()));
     clearButton.hidden = !hasClearableDraft;
+    clearDraftRow.hidden = !hasClearableDraft;
     clearDraftEmptyStatus.hidden = sampleMode || hasClearableDraft;
+    reloadDraftButton.disabled = sampleMode || !store.hasStoredState();
   }
 
   function setDraftStatus(message, tone = '') {
@@ -102,6 +106,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     saveTimer = window.setTimeout(() => {
       try {
         store.save();
+        updateClearDraftControl();
         setDraftStatus('この端末に保存済み', 'success');
       } catch {
         setDraftStatus('保存容量を超えたため、下書きを保存できませんでした', 'error');
@@ -126,6 +131,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       return;
     }
     shouldPersistDraft = true;
+    updateClearDraftControl();
     showDraftMessage('保存した内容を読み込みました', {
       fallback: 'この端末に保存済み',
       fallbackTone: 'success'

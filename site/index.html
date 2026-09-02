@@ -87,12 +87,22 @@
         <span class="completion-label" id="completionLabel">0% 完了</span>
       </div>
       <div class="completion-track" aria-hidden="true"><span id="completionBar"></span></div>
-      <div class="draft-controls" aria-label="下書きの保存">
-        <button class="secondary-button" id="saveDraftButton" type="button">下書きを保存</button>
-        <button class="secondary-button" id="reloadDraftButton" type="button">保存内容を再読込</button>
-        <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
-        <span class="draft-message" id="saveStatus" aria-live="polite">入力内容は自動保存されます</span>
-      </div>
+      <section class="draft-controls" aria-labelledby="draftControlsTitle">
+        <div class="draft-controls-heading">
+          <strong id="draftControlsTitle">この端末の下書き</strong>
+          <span class="draft-message" id="saveStatus" aria-live="polite">入力内容は自動保存されます</span>
+        </div>
+        <div class="draft-control-actions">
+          <button class="secondary-button" id="saveDraftButton" type="button">下書きを保存</button>
+          <button class="secondary-button" id="reloadDraftButton" type="button">保存内容を再読込</button>
+          <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
+        </div>
+        <p class="draft-empty-status" id="clearDraftEmptyStatus" aria-live="polite">この端末に保存された下書きはありません</p>
+        <div class="draft-clear-row" id="clearDraftRow">
+          <span class="draft-clear-notice" id="clearDraftNotice">画面上の入力内容も削除されます</span>
+          <button class="draft-clear-button" id="clearButton" type="button">この端末の下書きを削除…</button>
+        </div>
+      </section>
       <div class="sample-mode-panel" id="sampleModePanel" aria-live="polite" hidden>
         <div class="sample-mode-copy"><strong>入力例を一時表示しています</strong><span>保存済みの下書きは変更されません。</span></div>
         <button class="secondary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
@@ -299,10 +309,6 @@
       </form>
 
       <div class="editor-footer">
-        <div class="editor-footer-actions draft-danger-zone">
-          <button class="secondary-danger-button" id="clearButton" type="button">入力内容とこの端末の下書きを削除…</button>
-          <p class="draft-empty-status" id="clearDraftEmptyStatus" aria-live="polite">この端末に保存された下書きはありません</p>
-        </div>
         <div class="editor-legal">
           <p><span data-analytics-disclosure="status">この source build では Analytics は無効で、解析用の外部 request は発生しません。</span></p>
           <p class="editor-copyright">© 2026 herehigher · <a href="https://github.com/herehigher/resume/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></p>
@@ -382,7 +388,7 @@
       <h2>下書きデータを削除しますか？</h2>
       <p>この操作は取り消せません。このブラウザに保存されている履歴書・職務経歴書の下書きと、画面上の入力内容がすべて削除されます。</p>
       <div class="dialog-actions">
-        <button class="secondary-button" value="cancel">キャンセル</button>
+        <button class="secondary-button" id="cancelClearButton" value="cancel" autofocus>キャンセル</button>
         <button class="danger-button" id="confirmClearButton" value="confirm">消去する</button>
       </div>
     </form>
