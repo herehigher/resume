@@ -36,6 +36,8 @@ npx --yes http-server site --port 8000
 
 Chrome で `http://localhost:8000/` を開きます。
 
+下書きの AES-GCM 暗号化には secure context が必要です。`https://`、`http://localhost`、または `http://127.0.0.1` の URL を使用し、server が表示する `http://0.0.0.0` や LAN IP の URL は開かないでください。
+
 ## README だけで使い始める
 
 1. 右上の言語 selector で日本語、简体中文、English を選びます。URL の `?lang=ja`、`?lang=zh-CN`、`?lang=en` から直接開くこともできます。

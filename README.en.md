@@ -36,6 +36,8 @@ npx --yes http-server site --port 8000
 
 Open `http://localhost:8000/` in Chrome.
 
+AES-GCM draft encryption requires a secure context. Use `https://`, `http://localhost`, or `http://127.0.0.1`; do not open a `http://0.0.0.0` or LAN-IP URL shown by the server.
+
 ## Start with this README only
 
 1. Select 日本語, 简体中文, or English from the language selector in the upper-right corner. You can also open `?lang=ja`, `?lang=zh-CN`, or `?lang=en` directly.

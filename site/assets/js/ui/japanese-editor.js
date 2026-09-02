@@ -2,6 +2,7 @@ import { createJapaneseSampleState, cloneData } from '../state/defaults.js';
 import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
+import { messageForDraftStorageError } from './draft-storage-error.js';
 
 const PROFILE_FIELD_NAMES = new Set([
   'fullName',
@@ -93,8 +94,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
         fallback: 'この端末に保存済み',
         fallbackTone: 'success'
       });
-    } catch {
-      setDraftStatus('暗号化した下書きを保存できませんでした', 'error');
+    } catch (error) {
+      setDraftStatus(messageForDraftStorageError(error, 'ja', '暗号化した下書きを保存できませんでした'), 'error');
     }
   }
 
@@ -109,8 +110,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
         await store.save();
         updateClearDraftControl();
         setDraftStatus('この端末に保存済み', 'success');
-      } catch {
-        setDraftStatus('暗号化した下書きを保存できませんでした', 'error');
+      } catch (error) {
+        setDraftStatus(messageForDraftStorageError(error, 'ja', '暗号化した下書きを保存できませんでした'), 'error');
       }
     }, 300);
   }
@@ -132,8 +133,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       });
         return;
       }
-    } catch {
-      setDraftStatus('暗号化した下書きを読み込めませんでした', 'error');
+    } catch (error) {
+      setDraftStatus(messageForDraftStorageError(error, 'ja', '暗号化した下書きを読み込めませんでした'), 'error');
       return;
     }
     shouldPersistDraft = true;
@@ -158,8 +159,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     let currentDraft;
     try {
       currentDraft = await protectDraftBeforeSample(store, shouldPersistDraft);
-    } catch {
-      setDraftStatus('現在の下書きを保護できないため、入力例を表示できません', 'error');
+    } catch (error) {
+      setDraftStatus(messageForDraftStorageError(error, 'ja', '現在の下書きを保護できないため、入力例を表示できません'), 'error');
       return;
     }
     draftBeforeSample = currentDraft;

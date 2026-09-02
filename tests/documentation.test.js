@@ -158,6 +158,8 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
     /python3 -m http\.server 8000 --directory site/,
     /npx --yes http-server site --port 8000/,
     /http:\/\/localhost:8000\//,
+    /http:\/\/127\.0\.0\.1/,
+    /http:\/\/0\.0\.0\.0/,
     /file:\/\//,
     /\?lang=ja/,
     /\?lang=zh-CN/,

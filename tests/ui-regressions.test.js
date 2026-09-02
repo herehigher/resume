@@ -10,6 +10,8 @@ import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
 import { APP_VERSION, REPOSITORY_URL, STATE_VERSION } from '../site/assets/js/config.js';
+import { DraftStorageError, getDraftStorageCapabilityError } from '../site/assets/js/state/storage.js';
+import { messageForDraftStorageError } from '../site/assets/js/ui/draft-storage-error.js';
 
 const packageJson = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -30,7 +32,19 @@ test('every locale has distinct import, export, and locale-save error messages',
     assert.ok(messages.printDocument);
     assert.ok(messages.backupMenuLabel);
     assert.ok(messages.backupMenuShortLabel);
+    assert.match(messages.draftStorageCompatibilityError, /https:\/\/|http:\/\/localhost/);
     assert.notEqual(messages.exportError, messages.importError);
+  }
+});
+
+test('draft storage compatibility failures use one actionable message per locale', () => {
+  const unavailable = getDraftStorageCapabilityError({ crypto: {}, isSecureContext: false });
+  assert.ok(unavailable instanceof DraftStorageError);
+  assert.equal(unavailable.code, 'crypto-unavailable');
+  assert.equal(getDraftStorageCapabilityError({ crypto: { subtle: {} }, isSecureContext: true }), null);
+  for (const [locale, messages] of [['ja', ja], ['zh-CN', zhCN], ['en', en]]) {
+    assert.equal(messageForDraftStorageError(unavailable, locale, 'fallback'), messages.draftStorageCompatibilityError);
+    assert.equal(messageForDraftStorageError(new DraftStorageError('decrypt-failed'), locale, 'fallback'), 'fallback');
   }
 });
 
