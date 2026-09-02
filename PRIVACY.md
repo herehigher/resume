@@ -14,6 +14,8 @@ Version 1.1 - Effective 2026-09-01
 
 Resume Studio は、現在の browser origin の `localStorage` に `resume-studio-web-v1` という key で下書きを保存します。下書き本文は Web Crypto の AES-GCM で暗号化し、保存値は format version、algorithm、nonce、ciphertext を含む内部用 envelope です。復号用 AES key は取り出せない `CryptoKey` として同じ origin の IndexedDB に分けて保存し、localStorage には保存しません。一つの v1 state に profile、埋め込み写真、日本語・简体中文・English の文書、言語と用紙設定が含まれます。既存の plaintext v1 下書きは、暗号化保存が成功した場合だけ同じ key で暗号化形式へ移行します。旧形式 `resume-studio-data-v1` は読み込み、移行、削除しません。入力時の自動保存に加え、利用者は手動保存、JSON 書き出し・読込、browser の印刷機能による PDF 保存を実行できます。公開 JSON の format は v1 のままで、暗号 envelope は export されません。
 
+暗号化保存には secure context が必要です。`https://`、`http://localhost`、または `http://127.0.0.1` 以外の non-secure HTTP origin では草稿の保存・再読込を拒否し、既存の保存データを変更しません。
+
 ### Network と外部送信
 
 Repository の `site/`、clone、fork では Analytics は無効で、HTML、CSS、JavaScript、画像などの同一 origin static asset request 以外の解析通信は発生しません。`herehigher/resume` の検証済み stable tag だけは、tag に固定された manifest が有効な場合に deployment-only adapter が Pages artifact へ Cloudflare Web Analytics を追加します。現在の状態は HTML の `data-analytics-mode` / `data-analytics-provider`、画面の status、Network panel で確認できます。未対応の組は configuration error として表示され、無効状態へ黙って降格しません。
@@ -36,6 +38,8 @@ JSON と PDF には氏名、連絡先、経歴、写真などの個人情報が�
 
 Resume Studio 使用 key `resume-studio-web-v1`，把草稿保存在当前 browser origin 的 `localStorage` 中。草稿正文通过 Web Crypto AES-GCM 加密；保存值是仅供内部使用的 envelope，包含 format version、algorithm、nonce 和 ciphertext。用于解密的 AES key 是不可导出的 `CryptoKey`，单独存放在同一 origin 的 IndexedDB，不存入 localStorage。一个 v1 state 包含 profile、嵌入照片、日本語、简体中文和 English 文档，以及语言与纸张设置。已有的 plaintext v1 草稿只有在加密保存成功后才会迁移为加密格式；旧格式 `resume-studio-data-v1` 不会被读取、迁移或删除。除输入时自动保存外，用户还可以手动保存、导出/导入 JSON，并通过 browser 打印功能保存 PDF。公开 JSON format 仍为 v1，导出中不会包含该 envelope。
 
+加密保存需要安全上下文。在 `https://`、`http://localhost` 或 `http://127.0.0.1` 以外的非安全 HTTP origin 中，应用会拒绝保存和重新载入草稿，并且不会修改已有的保存数据。
+
 ### 网络与外部提交
 
 Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics；除加载 HTML、CSS、JavaScript、图片等同一 origin 静态 asset 外，不会产生统计通信。只有 `herehigher/resume` 的已验证 stable tag，才可在 tagged manifest 启用时由 deployment-only adapter 向 Pages artifact 加入 Cloudflare Web Analytics。可通过 HTML 的 `data-analytics-mode` / `data-analytics-provider`、页面 status 和 Network panel 核查当前状态。未知组合会显示 configuration error，不会静默降级为禁用状态。
@@ -57,6 +61,8 @@ JSON 和 PDF 可能包含姓名、联系方式、经历及照片等个人信息�
 ### Data stored
 
 Resume Studio stores the draft in `localStorage` for the current browser origin under the key `resume-studio-web-v1`. Draft content is encrypted with Web Crypto AES-GCM; the stored internal envelope contains a format version, algorithm, nonce, and ciphertext. The decryption AES key is a non-extractable `CryptoKey`, kept separately in IndexedDB for the same origin and never in localStorage. One v1 state contains the profile, embedded photo, Japanese, Simplified Chinese, and English documents, plus locale and paper settings. An existing plaintext v1 draft is migrated to encrypted storage only after encrypted persistence succeeds. The legacy `resume-studio-data-v1` key is never read, migrated, or removed. In addition to autosave while editing, the user can save manually, export/import JSON, and save a PDF through the browser's print function. The public JSON format remains v1; the internal envelope is never exported.
+
+Encrypted persistence requires a secure context. On non-secure HTTP origins other than `http://localhost` or `http://127.0.0.1`, the app refuses to save or reload drafts and does not change existing saved data.
 
 ### Network and external submission
 

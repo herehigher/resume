@@ -38,6 +38,7 @@ export default {
     configurationErrorTechnicalBody: 'data-analytics-mode と data-analytics-provider の組が未対応です。これは configuration error であり、Analytics が無効とは扱いません。',
     storageHeading: '端末上のデータについて',
     storageBody: '下書き本文は localStorage に AES-GCM で暗号化して保存し、復号用の取り出せない鍵はこの origin の IndexedDB に分けて保存します。JSON 書き出しは暗号化されません。鍵や browser data を失うと下書きは復号できません。JSON backup を保管してください。same-origin script/XSS、browser profile の侵害には保護を提供しません。',
+    storageUnavailableBody: 'このページでは安全な下書き保存を利用できません。この機能には secure context と Web Crypto が必要です。https://、http://localhost、または http://127.0.0.1 で対応 browser から開き直してください。既存の保存データは変更しません。JSON 書き出しは暗号化されません。',
     repositoryLink: 'GitHub でソースコードを見る',
     privacyNoticeLink: 'プライバシー声明の全文',
     close: '閉じる'

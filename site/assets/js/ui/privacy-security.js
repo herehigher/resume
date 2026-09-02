@@ -15,7 +15,6 @@ const TEXT_TARGETS = Object.freeze({
   privacySecurityUserHeading: 'userHeading',
   privacySecurityTechnicalHeading: 'technicalHeading',
   privacySecurityStorageHeading: 'storageHeading',
-  privacySecurityStorageBody: 'storageBody',
   privacyRepositoryLink: 'repositoryLink',
   privacyNoticeLink: 'privacyNoticeLink',
   privacySecurityCloseButton: 'close'
@@ -33,7 +32,7 @@ export function analyticsStatusFrom(element) {
   return 'configurationError';
 }
 
-export function initPrivacySecurity(initialLocale) {
+export function initPrivacySecurity(initialLocale, { draftStorageAvailable = true } = {}) {
   const button = document.getElementById('privacySecurityButton');
   const dialog = document.getElementById('privacySecurityDialog');
   const repositoryLink = document.getElementById('repositoryLink');
@@ -50,6 +49,9 @@ export function initPrivacySecurity(initialLocale) {
     for (const [id, key] of Object.entries(TEXT_TARGETS)) {
       document.getElementById(id).textContent = copy[key];
     }
+    document.getElementById('privacySecurityStorageBody').textContent = copy[
+      draftStorageAvailable ? 'storageBody' : 'storageUnavailableBody'
+    ];
     document.getElementById('privacySecurityUserBody').textContent = copy[`${analyticsStatus}UserBody`];
     document.getElementById('privacySecurityTechnicalBody').textContent = copy[`${analyticsStatus}TechnicalBody`];
     document.querySelectorAll('[data-analytics-disclosure="status"], [data-editor-analytics-disclosure="status"]').forEach((element) => {

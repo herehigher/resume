@@ -67,6 +67,7 @@ export default {
     configurationErrorTechnicalBody: 'data-analytics-mode 与 data-analytics-provider 的组合不受支持。这属于 configuration error，不能按 Analytics 已禁用处理。',
     storageHeading: '设备上的数据',
     storageBody: '草稿正文使用 AES-GCM 加密后保存在 localStorage；不可导出的解密密钥单独保存在此 origin 的 IndexedDB。导出的 JSON 不加密。若密钥或 browser data 丢失，草稿将无法解密，请保管 JSON backup。它不能防护同源 script/XSS 或 browser profile 被入侵。',
+    storageUnavailableBody: '此页面无法使用安全草稿存储；该功能需要安全上下文和 Web Crypto。请通过支持的 browser 使用 https://、http://localhost 或 http://127.0.0.1 重新打开。已有的保存数据不会被修改。导出的 JSON 不加密。',
     repositoryLink: '在 GitHub 查看源代码',
     privacyNoticeLink: '阅读完整隐私声明',
     close: '关闭'

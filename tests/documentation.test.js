@@ -165,6 +165,7 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
     /\?lang=zh-CN/,
     /\?lang=en/,
     /localStorage/,
+    /AES-GCM/,
     /resume-studio-web-v1/,
     /resume-studio-data-v1/,
     /JSON/,
@@ -177,6 +178,11 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
     /中文简历/,
     /PRIVACY\.md#privacy-/,
     /LICENSE/
+  ];
+  const obsoletePlaintextClaims = [
+    /localStorage と export file は暗号化されません/,
+    /localStorage 和 export file 不会被加密/,
+    /Neither localStorage nor exported files are encrypted/
   ];
   const localeFacts = {
     'README.md': [/## Web版/, /入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
@@ -195,6 +201,9 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
     const markdown = readFileSync(path.join(root, relativePath), 'utf8');
     assert.doesNotMatch(markdown, /\bDemo\b/, `${relativePath} must describe the production Web App, not a demo`);
     assert.doesNotMatch(markdown, /Issue #9/, `${relativePath} must not describe the published Web App as pending`);
+    for (const pattern of obsoletePlaintextClaims) {
+      assert.doesNotMatch(markdown, pattern, `${relativePath} contains obsolete plaintext-storage copy`);
+    }
     for (const pattern of [...commonFacts, ...localeFacts[relativePath]]) {
       assert.match(markdown, pattern, `${relativePath} is missing ${pattern}`);
     }
@@ -535,6 +544,8 @@ test('privacy has stable tri-lingual anchors and one effective version', () => {
     'resume-studio-data-v1',
     'localStorage',
     'AES-GCM',
+    'secure context',
+    'http://localhost',
     'IndexedDB',
     'non-extractable',
     'private browsing',

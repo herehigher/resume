@@ -53,7 +53,9 @@ const embeddedPhotoUrl = createEmbeddedPhotoUrl();
 const japaneseEditor = initJapaneseEditor(store, { embeddedPhotoUrl });
 const chineseEditor = initChineseEditor(store, { embeddedPhotoUrl });
 const englishEditor = initEnglishEditor(store);
-const privacySecurity = initPrivacySecurity(locale);
+const privacySecurity = initPrivacySecurity(locale, {
+  draftStorageAvailable: storageError?.code !== 'crypto-unavailable'
+});
 if (storageError) {
   const message = document.getElementById('globalMessage');
   message.textContent = messageForDraftStorageError(storageError, locale, {
