@@ -99,7 +99,29 @@ test('Japanese profile and credential links only activate HTTP URLs', () => {
   assert.match(html, /href="https:\/\/github\.com\/example"/);
   assert.match(html, /href="https:\/\/example\.com\/credentials\/123"/);
   assert.doesNotMatch(html, /href="javascript:/);
-  assert.match(html, /<span class="profile-url-link">javascript:alert\(1\)<\/span>/);
+  assert.match(html, /<span class="profile-url-link">LinkedIn: javascript:alert\(1\)<\/span>/);
+});
+
+test('Japanese resume uses a local portfolio highlight and symmetric history headings', () => {
+  const state = createJapaneseSampleState(createDefaultState('ja'));
+  const html = renderJapaneseDocument(state);
+
+  assert.match(html, /class="portfolio-highlight"/);
+  assert.match(html, /class="portfolio-highlight-link" href="https:\/\/example\.com"/);
+  assert.doesNotMatch(html, /favicon|portfolio-highlight-mark|<img/);
+  assert.match(html, /class="paper-table-date">年月<\/div><div class="paper-table-detail">学歴<\/div>/);
+  assert.match(html, /class="paper-table-date">年月<\/div><div class="paper-table-detail">職歴<\/div>/);
+  assert.doesNotMatch(html, /<div class="paper-table-header"><div>年月<\/div><div>学歴・職歴<\/div>/);
+});
+
+test('Japanese resume grid shares one track and keeps long contact values inside their cells', () => {
+  const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
+
+  assert.match(japaneseCss, /--ja-key-column:\s*88px/);
+  assert.match(japaneseCss, /grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\) var\(--ja-key-column\) minmax\(0, 1fr\)/);
+  assert.match(japaneseCss, /\.resume-contact \.paper-label:nth-child\(3\)\s*\{[^}]*border-left:\s*1px solid var\(--ja-line-strong\)/s);
+  assert.match(japaneseCss, /\.resume-contact \.paper-value\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s);
+  assert.match(japaneseCss, /\.paper-table-row\s*\{[^}]*grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\)/s);
 });
 
 test('Japanese sample data is isolated from the current draft', () => {

@@ -50,14 +50,22 @@ function credentialLink(value) {
 function renderResumeProfiles(fields) {
   const profiles = [
     ['GitHub', fields.github],
-    ['LinkedIn', fields.linkedin],
-    ['Portfolio', fields.portfolio]
+    ['LinkedIn', fields.linkedin]
   ].filter(([, value]) => hasContent(value));
-  if (!profiles.length) return '';
-  const rows = profiles
-    .map(([label, value]) => `<div class="resume-online-row"><span class="paper-label">${label}</span>${safeLink(label, value, 'profile-url-link')}</div>`)
-    .join('');
-  return `<section class="resume-online-profiles"><div class="resume-online-title">オンラインプロフィール</div>${rows}</section>`;
+  const portfolio = hasContent(fields.portfolio)
+    ? `<div class="portfolio-highlight">
+        <span class="portfolio-highlight-label">PORTFOLIO</span>
+        <span class="portfolio-highlight-content"><strong>ポートフォリオ</strong>${safeLink('Portfolio', fields.portfolio, 'portfolio-highlight-link')}</span>
+      </div>`
+    : '';
+  const secondaryLinks = profiles
+    .map(([label, value]) => safeLink(label, value, 'profile-url-link', true))
+    .filter(Boolean);
+  if (!portfolio && !secondaryLinks.length) return '';
+  const profilesRow = secondaryLinks.length
+    ? `<div class="resume-social-links"><span>ONLINE</span><div>${secondaryLinks.join('')}</div></div>`
+    : '';
+  return `<section class="resume-online-profiles" aria-label="オンラインプロフィール">${portfolio}${profilesRow}</section>`;
 }
 
 function renderCareerProfiles(fields) {
@@ -72,7 +80,7 @@ function renderCareerProfiles(fields) {
 function renderHistoryRows(items, category) {
   const enteredItems = items.filter((item) => itemHasContent(item, ['date', 'detail']));
   if (!enteredItems.length) return '';
-  const rows = [`<div class="paper-table-row category-row"><div class="paper-table-date"></div><div class="paper-table-detail">${category}</div></div>`];
+  const rows = [`<div class="paper-table-row category-row"><div class="paper-table-date">年月</div><div class="paper-table-detail">${category}</div></div>`];
   enteredItems.forEach((item) => {
     rows.push(`<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}</div></div>`);
   });
@@ -104,8 +112,10 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
   const photo = photoUrl ? `<img src="${escapeHTML(photoUrl)}" alt="">` : '証明写真';
   return `
     <article class="document-page resume-document">
-      <h2 class="resume-document-title">履 歴 書</h2>
-      <div class="resume-current-date">${displayText(japaneseDate(fields.createdDate), '作成日')} 現在</div>
+      <header class="resume-document-header">
+        <h2 class="resume-document-title">履 歴 書</h2>
+        <div class="resume-current-date">${displayText(japaneseDate(fields.createdDate), '作成日')} 現在</div>
+      </header>
       <section class="resume-profile">
         <div class="profile-text">
           <div class="profile-kana"><span class="paper-label">ふりがな</span><span class="paper-value">${displayText(fields.nameKana)}</span></div>
@@ -121,14 +131,15 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
       </section>
       ${renderResumeProfiles(fields)}
       <section class="paper-section">
-        <div class="paper-table-header"><div>年月</div><div>学歴・職歴</div></div>
+        <h3 class="resume-section-title">学歴・職歴</h3>
         ${renderHistoryRows(document.education, '学歴')}
         ${renderHistoryRows(document.employment, '職歴')}
       </section>
     </article>
     <article class="document-page resume-document">
       <section class="paper-section paper-section-first">
-        <div class="paper-table-header"><div>年月</div><div>免許・資格</div></div>
+        <h3 class="resume-section-title">免許・資格</h3>
+        <div class="paper-table-header"><div>年月</div><div>内容</div></div>
         ${renderQualificationRows(document.qualification)}
       </section>
       <section class="paper-text-section"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
