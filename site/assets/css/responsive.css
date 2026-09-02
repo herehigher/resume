@@ -10,7 +10,7 @@
   body { overflow: hidden; }
   .app-header { height: 62px; padding: 0 14px; }
   .brand small, .desktop-only { display: none; }
-  .brand-mark { height: 32px; width: 32px; }
+  .brand-mark { border-radius: 9px; height: 34px; width: 34px; }
   .document-switcher { display: none; }
   .data-menu-label { display: none; }
   .data-menu-short-label { display: inline; }

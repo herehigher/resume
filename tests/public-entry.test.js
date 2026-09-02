@@ -3,15 +3,25 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { findExternalRuntimeAssets } from '../scripts/check-site.mjs';
+import en from '../site/assets/js/i18n/en.js';
+import ja from '../site/assets/js/i18n/ja.js';
+import zhCN from '../site/assets/js/i18n/zh-CN.js';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const base = 'https://herehigher.github.io/resume/';
 const routes = Object.freeze([
-  { file: 'site/index.html', lang: 'ja', canonical: base, h1: '履歴書を作成', icon: './assets/favicon/resume-studio.png' },
-  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成', icon: '../assets/favicon/resume-studio.png' },
-  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历', icon: '../assets/favicon/resume-studio.png' },
-  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume', icon: '../assets/favicon/resume-studio.png' }
+  { file: 'site/index.html', lang: 'ja', canonical: base, h1: '履歴書を作成', assetPath: './assets/favicon/' },
+  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成', assetPath: '../assets/favicon/' },
+  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历', assetPath: '../assets/favicon/' },
+  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume', assetPath: '../assets/favicon/' }
+]);
+const faviconAssets = Object.freeze([
+  { rel: 'icon', file: 'resume-studio-16.png', sizes: '16x16', width: 16 },
+  { rel: 'icon', file: 'resume-studio-32.png', sizes: '32x32', width: 32 },
+  { rel: 'icon', file: 'resume-studio-192.png', sizes: '192x192', width: 192 },
+  { rel: 'icon', file: 'resume-studio.png', sizes: '512x512', width: 512 },
+  { rel: 'apple-touch-icon', file: 'resume-studio-180.png', sizes: '180x180', width: 180 }
 ]);
 const alternateLinks = Object.freeze({
   ja: `${base}ja/`,
@@ -28,6 +38,18 @@ function source(file) {
 function linkTarget(html, rel, language = '') {
   const match = html.match(new RegExp(`<link\\s+[^>]*rel="${rel}"[^>]*${language ? `hreflang="${language}"[^>]*` : ''}href="([^"]+)"`, 'i'));
   return match?.[1] || '';
+}
+
+function linkAttributes(html) {
+  return [...html.matchAll(/<link\s+([^>]+)>/gi)].map((match) => Object.fromEntries(
+    [...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((attribute) => [attribute[1], attribute[2]])
+  ));
+}
+
+function pngDimensions(file) {
+  const png = readFileSync(file);
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
 }
 
 function resolvePointer(root, reference) {
@@ -57,8 +79,15 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /<meta\s+name="description"\s+content="[^"]+"/i);
     assert.match(html, /<title>[^<]+<\/title>/i);
     assert.match(html, new RegExp(`<h1[^>]*>${route.h1}</h1>`));
-    assert.equal(linkTarget(html, 'icon'), route.icon);
-    assert.equal(existsSync(new URL(route.icon, new URL(`../${route.file}`, import.meta.url))), true);
+    const links = linkAttributes(html);
+    for (const asset of faviconAssets) {
+      const href = `${route.assetPath}${asset.file}`;
+      const link = links.find((candidate) => candidate.rel === asset.rel && candidate.href === href);
+      assert.deepEqual(link, { rel: asset.rel, type: 'image/png', sizes: asset.sizes, href }, `${route.file} must expose ${asset.file}`);
+      const file = new URL(href, new URL(`../${route.file}`, import.meta.url));
+      assert.equal(existsSync(file), true);
+      assert.deepEqual(pngDimensions(file), { width: asset.width, height: asset.width });
+    }
     assert.equal(linkTarget(html, 'canonical'), route.canonical);
     for (const [locale, url] of Object.entries(alternateLinks)) {
       assert.equal(linkTarget(html, 'alternate', locale), url, `${route.file} must link to ${locale}`);
@@ -83,6 +112,19 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
   }
+});
+
+test('editor brand uses the shared favicon crop as a decorative image and retains localized accessible names', () => {
+  const html = source('site/index.html');
+  assert.match(html, /<a class="brand" href="#" aria-label="Resume Studio ホーム">/);
+  assert.match(html, /<img class="brand-mark" src="\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="38" height="38">/);
+  assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
+  assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
+  assert.deepEqual(
+    [ja.brandHome, zhCN.brandHome, en.brandHome],
+    ['Resume Studio ホーム', 'Resume Studio 首页', 'Resume Studio home']
+  );
+  assert.match(source('site/assets/js/ui/locale-controller.js'), /\.brand'\)\.setAttribute\('aria-label', copy\.brandHome\)/);
 });
 
 test('static guard permits only canonical and alternate external link metadata', () => {
