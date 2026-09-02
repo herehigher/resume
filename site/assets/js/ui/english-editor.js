@@ -17,7 +17,7 @@ export function createEnglishItem(type) {
 }
 
 export function renderEnglishWorkspace() {
-  return `<main class="workspace english-workspace" data-english-editor data-mobile-mode="editor" hidden>
+  return `<main class="workspace english-workspace" lang="en" data-english-editor data-mobile-mode="editor" hidden>
     <div class="en-mobile-view-switch" aria-label="Mobile view">
       <button class="is-active" aria-pressed="true" data-en-mobile-view="editor" type="button">Edit</button>
       <button aria-pressed="false" data-en-mobile-view="preview" type="button">Preview</button>
