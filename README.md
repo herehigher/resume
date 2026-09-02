@@ -6,7 +6,7 @@ Resume Studio は、ブラウザ内で日本語・简体中文・English の履�
 
 ## Web版
 
-Web版は Issue #9 で公開予定です。公開先の動作確認が完了するまでは、下記のローカル起動方法を利用してください。
+Web版: [https://herehigher.github.io/resume/](https://herehigher.github.io/resume/)
 
 ## 対応する文書と用紙
 
