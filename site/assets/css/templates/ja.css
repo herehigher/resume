@@ -10,47 +10,75 @@
   width: 760px;
 }
 
-.resume-document-title { font-size: 26px; font-weight: 500; letter-spacing: .36em; margin: 0 0 10px; text-align: center; }
-.resume-current-date { font-size: 10px; margin-bottom: 8px; text-align: right; }
-.resume-profile { border: 1px solid #374151; display: grid; grid-template-columns: 1fr 108px; }
-.profile-text > div { align-items: center; border-bottom: 1px solid #6b7280; display: grid; min-height: 32px; }
-.profile-text > div:last-child { border-bottom: 0; }
-.profile-kana { grid-template-columns: 86px 1fr; }
-.profile-name { grid-template-columns: 86px 1fr; min-height: 67px !important; }
-.profile-birth { grid-template-columns: 86px 1fr auto; }
-.paper-label { font-size: 9px; padding: 0 10px; }
-.paper-value { font-size: 10px; padding: 0 10px; white-space: pre-wrap; }
-.profile-name .paper-value { font-size: 22px; letter-spacing: .1em; }
-.profile-photo { align-items: center; border-left: 1px solid #374151; color: #9ca3af; display: flex; font-family: sans-serif; font-size: 9px; justify-content: center; overflow: hidden; }
-.profile-photo img { height: 100%; object-fit: cover; width: 100%; }
-.resume-contact { border: 1px solid #374151; border-top: 0; }
-.resume-contact > div { align-items: stretch; border-bottom: 1px solid #6b7280; display: grid; grid-template-columns: 86px 1fr 86px 1fr; min-height: 34px; }
-.resume-contact > div:last-child { border-bottom: 0; }
-.resume-contact .paper-label { align-items: center; border-right: 1px solid #6b7280; display: flex; }
-.resume-contact .paper-value { align-items: center; display: flex; }
-.resume-contact .full-contact { grid-column: span 3; }
-.resume-online-profiles { border: 1px solid #374151; border-top: 0; }
-.resume-online-title { background: #f7f7f7; border-bottom: 1px solid #6b7280; font-size: 9px; padding: 6px 10px; }
-.resume-online-row { border-bottom: 1px solid #9ca3af; display: grid; grid-template-columns: 86px 1fr; min-height: 27px; }
-.resume-online-row:last-child { border-bottom: 0; }
-.resume-online-row .paper-label { align-items: center; border-right: 1px solid #9ca3af; display: flex; }
-.profile-url-link { align-items: center; color: #2457a2; display: flex; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 7.5px; line-height: 1.4; overflow-wrap: anywhere; padding: 5px 10px; text-decoration: underline; word-break: break-all; }
+.resume-document,
+.career-document {
+  --ja-accent: #173f6f;
+  --ja-accent-blue: #2f6da5;
+  --ja-fill-label: #f7f9fc;
+  --ja-fill-section: #edf4fa;
+  --ja-key-column: 88px;
+  --ja-line-default: #b7c3cf;
+  --ja-line-soft: #d8e0e8;
+  --ja-line-strong: #7c8ea2;
+  --ja-link: #2457a2;
+  --ja-muted: #56677b;
+  --ja-text: #182235;
+}
 
-.paper-section { border: 1px solid #374151; border-top: 0; }
+.resume-document { color: var(--ja-text); font-family: "Yu Gothic", "Hiragino Sans", sans-serif; }
+.resume-document-header { align-items: end; border-bottom: 2px solid var(--ja-accent); display: grid; gap: 28px; grid-template-columns: 1fr auto; padding-bottom: 13px; }
+.resume-document-title { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 28px; font-weight: 500; letter-spacing: .28em; margin: 0; }
+.resume-current-date { color: var(--ja-muted); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.resume-profile { border-bottom: 1px solid var(--ja-line-strong); display: grid; grid-template-columns: minmax(0, 1fr) 118px; margin-top: 18px; }
+.profile-text > div { align-items: center; border-top: 1px solid var(--ja-line-default); display: grid; min-height: 38px; }
+.profile-kana { grid-template-columns: var(--ja-key-column) minmax(0, 1fr); }
+.profile-name { grid-template-columns: var(--ja-key-column) minmax(0, 1fr); min-height: 68px !important; }
+.profile-birth { grid-template-columns: var(--ja-key-column) minmax(0, 1fr) auto; }
+.paper-label { color: var(--ja-muted); font-size: 9.5px; padding: 0 12px; }
+.paper-value { font-size: 10.5px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; padding: 8px 14px; white-space: pre-wrap; }
+.profile-text .paper-label { align-items: center; align-self: stretch; background: var(--ja-fill-label); border-right: 1px solid var(--ja-line-default); display: flex; }
+.profile-name .paper-value { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 22px; letter-spacing: .1em; }
+.profile-photo { align-items: center; background: var(--ja-fill-label); border: 1px solid var(--ja-line-strong); color: var(--ja-muted); display: flex; font-family: sans-serif; font-size: 9px; justify-content: center; margin: 0 0 12px 14px; overflow: hidden; }
+.profile-photo img { height: 100%; object-fit: cover; width: 100%; }
+.resume-contact { border-bottom: 1px solid var(--ja-line-strong); }
+.resume-contact > div { align-items: stretch; border-top: 1px solid var(--ja-line-default); display: grid; grid-template-columns: var(--ja-key-column) minmax(0, 1fr) var(--ja-key-column) minmax(0, 1fr); min-height: 40px; }
+.resume-contact .paper-label { align-items: center; background: var(--ja-fill-label); border-right: 1px solid var(--ja-line-default); display: flex; }
+.resume-contact .paper-label:nth-child(3) { border-left: 1px solid var(--ja-line-strong); }
+.resume-contact .paper-value { align-items: center; display: flex; min-width: 0; overflow-wrap: anywhere; }
+.resume-contact .full-contact { grid-column: span 3; }
+.resume-online-profiles { border-bottom: 1px solid var(--ja-line-strong); }
+.portfolio-highlight { align-items: center; background: var(--ja-fill-label); border-left: 4px solid var(--ja-accent-blue); border-top: 1px solid var(--ja-line-strong); display: grid; grid-template-columns: calc(var(--ja-key-column) - 4px) minmax(0, 1fr); min-height: 58px; }
+.portfolio-highlight-label { align-items: center; align-self: stretch; border-right: 1px solid var(--ja-line-default); color: var(--ja-accent); display: flex; font-size: 8.5px; font-weight: 700; letter-spacing: .08em; padding: 0 10px; }
+.portfolio-highlight-content { display: grid; gap: 2px; min-width: 0; padding: 8px 14px; }
+.portfolio-highlight-content strong { color: var(--ja-text); font-size: 10px; font-weight: 700; }
+.portfolio-highlight-link { color: var(--ja-link); font-size: 9px; line-height: 1.45; min-width: 0; overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.resume-social-links { align-items: baseline; border-top: 1px solid var(--ja-line-soft); color: var(--ja-muted); display: grid; grid-template-columns: var(--ja-key-column) minmax(0, 1fr); min-height: 31px; }
+.resume-social-links > span { font-size: 8px; letter-spacing: .08em; padding: 6px 12px; }
+.resume-social-links > div { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0; padding: 6px 14px; }
+.profile-url-link { color: var(--ja-link); font-size: 8px; line-height: 1.45; overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+
+.resume-section-title { align-items: center; border-bottom: 1px solid var(--ja-line-strong); color: var(--ja-text); display: flex; font-size: 13px; gap: 10px; margin: 16px 0 0; padding-bottom: 7px; }
+.resume-section-title::before { background: var(--ja-accent-blue); content: ""; height: 18px; width: 4px; }
+.paper-section { border-bottom: 1px solid var(--ja-line-strong); }
 .paper-table-header,
-.paper-table-row { display: grid; grid-template-columns: 72px 1fr; }
-.paper-table-header { background: #f7f7f7; border-bottom: 1px solid #374151; font-size: 10px; text-align: center; }
-.paper-table-header > div { padding: 6px; }
-.paper-table-header > div:first-child { border-right: 1px solid #374151; }
-.paper-table-row { border-bottom: 1px solid #9ca3af; min-height: 31px; }
-.paper-table-row:last-child { border-bottom: 0; }
-.paper-table-date { align-items: center; border-right: 1px solid #9ca3af; display: flex; font-size: 9px; justify-content: center; padding: 5px; }
-.paper-table-detail { align-items: center; display: flex; flex-wrap: wrap; font-size: 10px; padding: 6px 12px; white-space: pre-wrap; }
-.qualification-proof { color: #2457a2; display: block; flex-basis: 100%; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 6.5px; line-height: 1.45; margin-top: 3px; overflow-wrap: anywhere; text-decoration: underline; word-break: break-all; }
-.paper-table-row.category-row .paper-table-detail { justify-content: center; letter-spacing: .3em; }
-.paper-text-section { border: 1px solid #374151; border-top: 0; min-height: 130px; }
-.paper-text-title { background: #f7f7f7; border-bottom: 1px solid #374151; font-size: 10px; padding: 6px 10px; }
-.paper-text-content { font-size: 10px; line-height: 1.9; padding: 12px 14px; white-space: pre-wrap; }
+.paper-table-row { display: grid; grid-template-columns: var(--ja-key-column) minmax(0, 1fr); }
+.paper-table-header { background: var(--ja-fill-label); border-bottom: 1px solid var(--ja-line-default); font-size: 9.5px; text-align: center; }
+.paper-table-header > div { padding: 7px; }
+.paper-table-header > div:first-child { border-right: 1px solid var(--ja-line-default); color: var(--ja-muted); }
+.paper-table-row { min-height: 34px; }
+.paper-table-row + .paper-table-row { border-top: 1px solid var(--ja-line-soft); }
+.paper-table-row + .category-row { border-top-color: var(--ja-line-strong); }
+.category-row + .paper-table-row { border-top-color: var(--ja-line-default); }
+.paper-table-date { align-items: center; border-right: 1px solid var(--ja-line-default); color: var(--ja-muted); display: flex; font-size: 9px; font-variant-numeric: tabular-nums; justify-content: center; padding: 6px; white-space: nowrap; }
+.paper-table-detail { align-items: center; display: flex; flex-wrap: wrap; font-size: 10.5px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; padding: 7px 14px; white-space: pre-wrap; }
+.qualification-proof { color: var(--ja-link); display: block; flex-basis: 100%; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 7.5px; line-height: 1.45; margin-top: 3px; overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.paper-table-row.category-row { background: var(--ja-fill-section); }
+.paper-table-row.category-row .paper-table-date { font-weight: 400; }
+.paper-table-row.category-row .paper-table-detail { color: var(--ja-accent); font-weight: 700; justify-content: center; letter-spacing: .16em; }
+.paper-text-section { border-bottom: 1px solid var(--ja-line-strong); margin-top: 22px; min-height: 130px; }
+.paper-text-title { align-items: center; border-bottom: 1px solid var(--ja-line-default); color: var(--ja-text); display: flex; font-size: 12px; font-weight: 700; gap: 9px; padding: 0 0 7px; }
+.paper-text-title::before { background: var(--ja-accent-blue); content: ""; height: 17px; width: 4px; }
+.paper-text-content { font-size: 10.5px; line-height: 1.9; padding: 12px 5px; white-space: pre-wrap; }
 
 .career-document { font-family: "Yu Gothic", "Hiragino Sans", sans-serif; }
 .career-doc-header { border-bottom: 3px solid #1f3f70; padding-bottom: 14px; }
@@ -74,8 +102,8 @@
 .empty-preview { color: #8a95a4; font-family: sans-serif; font-size: 10px; font-style: italic; }
 
 
-.paper-section-first { border-top: 1px solid #374151; }
-.requests-section { min-height: 145px; }
+.paper-section-first .resume-section-title { margin-top: 0; }
+.requests-section { border-bottom: 0; min-height: 145px; }
 
 @page japanese-a4 {
   margin: 14mm 15mm;
@@ -90,12 +118,15 @@
   }
   #japaneseWorkspace .empty-preview { display: none; }
   #japaneseWorkspace .paper-table-header,
+  #japaneseWorkspace .resume-document-header,
+  #japaneseWorkspace .resume-section-title,
   #japaneseWorkspace .paper-text-title,
   #japaneseWorkspace .career-section-title,
   #japaneseWorkspace .career-company-heading { break-after: avoid-page; }
   #japaneseWorkspace .resume-profile,
   #japaneseWorkspace .resume-contact > div,
-  #japaneseWorkspace .resume-online-row,
+  #japaneseWorkspace .portfolio-highlight,
+  #japaneseWorkspace .resume-social-links,
   #japaneseWorkspace .paper-table-row,
   #japaneseWorkspace .career-company { break-inside: avoid-page; }
   #japaneseWorkspace .paper-text-section { break-inside: auto; }
