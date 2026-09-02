@@ -108,23 +108,28 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/\?lang=/);
     assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
+    assert.match(html, /<img class="entry-mark" src="\.\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="48" height="48">/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
   }
 });
 
-test('editor brand uses the shared favicon crop as a decorative image and retains localized accessible names', () => {
+test('editor brand opens the active locale entry and public entries use the shared decorative mark', () => {
   const html = source('site/index.html');
-  assert.match(html, /<a class="brand" href="#" aria-label="Resume Studio ホーム">/);
+  assert.match(html, /<a class="brand" href="\.\/ja\/" aria-label="Resume Studio の紹介ページを開く">/);
   assert.match(html, /<img class="brand-mark" src="\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="38" height="38">/);
   assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
   assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
+  assert.match(source('site/assets/css/public-entry.css'), /\.entry-mark\s*\{[\s\S]*?height: 48px;[\s\S]*?object-fit: cover;[\s\S]*?width: 48px;/);
   assert.deepEqual(
-    [ja.brandHome, zhCN.brandHome, en.brandHome],
-    ['Resume Studio ホーム', 'Resume Studio 首页', 'Resume Studio home']
+    [ja.brandEntry, zhCN.brandEntry, en.brandEntry],
+    ['Resume Studio の紹介ページを開く', '打开 Resume Studio 简介页', 'Open the Resume Studio introduction']
   );
-  assert.match(source('site/assets/js/ui/locale-controller.js'), /\.brand'\)\.setAttribute\('aria-label', copy\.brandHome\)/);
+  const controller = source('site/assets/js/ui/locale-controller.js');
+  assert.match(controller, /const publicEntryPaths = Object\.freeze\(\{[\s\S]*?ja: '\.\/ja\/',[\s\S]*?'zh-CN': '\.\/zh-cn\/',[\s\S]*?en: '\.\/en\/'/);
+  assert.match(controller, /brand\.href = publicEntryPaths\[locale\];/);
+  assert.match(controller, /brand\.setAttribute\('aria-label', copy\.brandEntry\)/);
 });
 
 test('static guard permits only canonical and alternate external link metadata', () => {

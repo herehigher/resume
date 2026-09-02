@@ -1,6 +1,12 @@
 import { SUPPORTED_LOCALES } from '../config.js';
 import { getMessages } from '../i18n/index.js';
 
+const publicEntryPaths = Object.freeze({
+  ja: './ja/',
+  'zh-CN': './zh-cn/',
+  en: './en/'
+});
+
 function showMessage(message, isError = false) {
   const element = document.getElementById('globalMessage');
   element.textContent = message;
@@ -51,6 +57,7 @@ export function initLocaleController(store, {
   const exportButton = document.getElementById('exportDataButton');
   const importButton = document.getElementById('importDataButton');
   const importInput = document.getElementById('importDataInput');
+  const brand = document.querySelector('.brand');
   let renderedLocale = '';
 
   function applyLocale(force = false) {
@@ -62,7 +69,8 @@ export function initLocaleController(store, {
 
     document.documentElement.lang = copy.htmlLang;
     document.title = copy.pageTitle;
-    document.querySelector('.brand').setAttribute('aria-label', copy.brandHome);
+    brand.href = publicEntryPaths[locale];
+    brand.setAttribute('aria-label', copy.brandEntry);
     document.getElementById('brandSubtitle').textContent = copy.brandSubtitle;
     document.getElementById('localeLabel').textContent = copy.localeLabel;
     dataMenuSummary.setAttribute('aria-label', copy.backupMenuLabel);

@@ -53,6 +53,18 @@ test('@mobile 320px header keeps the larger favicon separate from its controls',
   await expectNoPageOverflow(page);
 });
 
+test('brand link follows the active editor locale', async ({ page }) => {
+  for (const [locale, entryPath, accessibleName] of [
+    ['ja', './ja/', 'Resume Studio の紹介ページを開く'],
+    ['zh-CN', './zh-cn/', '打开 Resume Studio 简介页'],
+    ['en', './en/', 'Open the Resume Studio introduction']
+  ]) {
+    await openLocale(page, locale);
+    await expect(page.locator('.brand')).toHaveAttribute('href', entryPath);
+    await expect(page.locator('.brand')).toHaveAttribute('aria-label', accessibleName);
+  }
+});
+
 test('localized public pages remain useful when JavaScript is disabled', async ({ baseURL, browser }) => {
   const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
   const page = await context.newPage();
@@ -64,7 +76,26 @@ test('localized public pages remain useful when JavaScript is disabled', async (
     await page.goto(path);
     await expect(page.locator('html')).toHaveAttribute('lang', language);
     await expect(page.locator('h1')).toHaveText(heading);
+    await expect(page.locator('.entry-mark')).toHaveAttribute('alt', '');
+    await expect(page.locator('.entry-mark')).toHaveAttribute('width', '48');
+    await expect(page.locator('.entry-mark')).toHaveAttribute('height', '48');
     await expect(page.locator('.entry-button')).toBeVisible();
   }
   await context.close();
+});
+
+test('@mobile 320px localized public entries keep the mark, heading, and primary button separate', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  for (const path of ['/ja/', '/zh-cn/', '/en/']) {
+    await page.goto(path);
+    const layout = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+      return { button: rect('.entry-button'), heading: rect('h1'), mark: rect('.entry-mark') };
+    });
+    expect(layout.mark.width).toBe(48);
+    expect(layout.mark.height).toBe(48);
+    expect(layout.mark.bottom).toBeLessThanOrEqual(layout.heading.top);
+    expect(layout.heading.bottom).toBeLessThanOrEqual(layout.button.top);
+    await expectNoPageOverflow(page);
+  }
 });

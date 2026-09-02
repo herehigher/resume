@@ -28,6 +28,7 @@ body {
 .entry-grid { display: grid; gap: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .entry-card { min-width: 0; }
 .entry-kicker { color: #3569a8; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.entry-mark { display: block; height: 48px; margin: 0 0 12px; object-fit: cover; width: 48px; }
 .entry-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .entry-button { display: inline-block; padding: 10px 16px; border-radius: 8px; background: #1f5f9f; color: #fff; font-weight: 700; text-decoration: none; }
 .entry-button:focus-visible, a:focus-visible { outline: 3px solid #e69b2d; outline-offset: 3px; }
