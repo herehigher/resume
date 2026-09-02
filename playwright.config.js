@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = 'http://127.0.0.1:4173';
+const baseURL = 'http://127.0.0.1:4183';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -34,10 +34,18 @@ export default defineConfig({
       }
     }
   ],
-  webServer: {
-    command: 'node tests/e2e/server.mjs',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 10_000
-  }
+  webServer: [
+    {
+      command: 'PORT=4183 node tests/e2e/server.mjs',
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 10_000
+    },
+    {
+      command: 'HOST=0.0.0.0 PORT=4184 node tests/e2e/server.mjs',
+      url: 'http://0.0.0.0:4184',
+      reuseExistingServer: !process.env.CI,
+      timeout: 10_000
+    }
+  ]
 });

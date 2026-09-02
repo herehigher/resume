@@ -36,6 +36,8 @@ npx --yes http-server site --port 8000
 
 使用 Chrome 打开 `http://localhost:8000/`。
 
+草稿的 AES-GCM 加密需要 secure context。请使用 `https://`、`http://localhost` 或 `http://127.0.0.1`；不要打开 server 显示的 `http://0.0.0.0` 或 LAN IP URL。
+
 ## 只通过 README 开始使用
 
 1. 在右上角的语言 selector 中选择日本語、简体中文或 English，也可以直接打开 `?lang=ja`、`?lang=zh-CN`、`?lang=en`。

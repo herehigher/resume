@@ -20,6 +20,18 @@ export class DraftStorageError extends Error {
   }
 }
 
+export function getDraftStorageCapabilityError({
+  crypto = globalThis.crypto,
+  isSecureContext = globalThis.isSecureContext
+} = {}) {
+  if (!isSecureContext || !crypto?.subtle) return new DraftStorageError('crypto-unavailable');
+  return null;
+}
+
+export function isDraftStorageCompatibilityError(error) {
+  return error instanceof DraftStorageError && error.code === 'crypto-unavailable';
+}
+
 function toBase64(bytes) {
   let value = '';
   bytes.forEach((byte) => { value += String.fromCharCode(byte); });

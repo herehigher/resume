@@ -4,6 +4,7 @@ import { cloneData } from '../state/defaults.js';
 import { getChineseFields, renderChineseDocument } from '../templates/zh-CN.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
+import { messageForDraftStorageError } from './draft-storage-error.js';
 
 const PROFILE_FIELDS = new Set([
   'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'
@@ -237,8 +238,8 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       try {
         await store.save();
         saveStatus.textContent = zhCN.savedStatus;
-      } catch {
-        saveStatus.textContent = zhCN.saveError;
+      } catch (error) {
+        saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', zhCN.saveError);
       }
     }, 300);
   }
@@ -352,8 +353,8 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     window.clearTimeout(saveTimer);
     try {
       draftBeforeSample = await protectChineseDraftBeforeSample(store, shouldPersistDraft);
-    } catch {
-      saveStatus.textContent = '无法保护当前草稿，示例未打开。';
+    } catch (error) {
+      saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', '无法保护当前草稿，示例未打开。');
       return;
     }
     draftBeforeSampleWasStored = shouldPersistDraft;
@@ -379,8 +380,8 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       await store.save();
       shouldPersistDraft = true;
       saveStatus.textContent = zhCN.savedStatus;
-    } catch {
-      saveStatus.textContent = zhCN.saveError;
+    } catch (error) {
+      saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', zhCN.saveError);
     }
   }
 
@@ -492,8 +493,8 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     if (action.dataset.zhAction === 'reload') {
       try {
         if (await store.reload()) shouldPersistDraft = true;
-      } catch {
-        saveStatus.textContent = '无法读取已加密的草稿。';
+      } catch (error) {
+        saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', '无法读取已加密的草稿。');
       }
     }
     if (action.dataset.zhAction === 'sample') enterSampleMode();

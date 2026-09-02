@@ -73,6 +73,8 @@ Git LFS client が未導入の場合は先にインストールします。`git 
 
 Chrome で editor の `http://localhost:8000/`、public entry の `http://localhost:8000/ja/`、`http://localhost:8000/zh-cn/`、`http://localhost:8000/en/` を開けます。Production code に build step はありません。
 
+草稿の AES-GCM 暗号化には secure context が必要です。local development では `https://`、`http://localhost`、または `http://127.0.0.1` を使い、server が表示する `http://0.0.0.0` や LAN IP の HTTP URL は選びません。これら non-secure origin では Web Crypto が利用できず、下書きの保存・再読込は実行できません。
+
 ## 変更に応じた検証
 
 変更範囲に近い focused test を先に実行し、広い gate は統合後に実行します。Pull Request 前の full gate は `npm run test:acceptance` です。実行できない項目がある場合は、理由と影響範囲を Pull Request に記録します。

@@ -3,6 +3,7 @@ import { cloneData } from '../state/defaults.js';
 import { renderEnglishDocument } from '../templates/en.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
+import { messageForDraftStorageError } from './draft-storage-error.js';
 
 const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
 const RESUME_FIELDS = new Set(['headline', 'location', 'summary', 'skills']);
@@ -237,8 +238,8 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       try {
         await store.save();
         setStatus('Saved on this device.');
-      } catch {
-        setStatus('Your changes could not be saved on this device.', true);
+      } catch (error) {
+        setStatus(messageForDraftStorageError(error, 'en', 'Your changes could not be saved on this device.'), true);
       }
     }, 300);
   }
@@ -342,8 +343,8 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     const currentDraft = cloneData(store.getState());
     try {
       if (shouldPersistDraft) await store.save();
-    } catch {
-      setStatus('The example cannot be shown because your current draft could not be protected.', true);
+    } catch (error) {
+      setStatus(messageForDraftStorageError(error, 'en', 'The example cannot be shown because your current draft could not be protected.'), true);
       return;
     }
     draftBeforeSample = currentDraft;
@@ -376,8 +377,8 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       await store.save();
       shouldPersistDraft = true;
       setStatus('The example was saved as your draft.');
-    } catch {
-      setStatus('The example could not be saved as your draft.', true);
+    } catch (error) {
+      setStatus(messageForDraftStorageError(error, 'en', 'The example could not be saved as your draft.'), true);
     }
   }
 
@@ -468,8 +469,8 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
         await store.save();
         shouldPersistDraft = true;
         setStatus('Draft saved.');
-      } catch {
-        setStatus('Your draft could not be saved.', true);
+      } catch (error) {
+        setStatus(messageForDraftStorageError(error, 'en', 'Your draft could not be saved.'), true);
       }
     } else if (event.target.closest('[data-en-reload]')) {
       window.clearTimeout(saveTimer);
@@ -480,8 +481,8 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
         } else {
           setStatus('There is no saved draft to reload.');
         }
-      } catch {
-        setStatus('The encrypted draft could not be read.', true);
+      } catch (error) {
+        setStatus(messageForDraftStorageError(error, 'en', 'The encrypted draft could not be read.'), true);
       }
     } else if (event.target.closest('[data-en-load-sample]')) {
       enterSampleMode();

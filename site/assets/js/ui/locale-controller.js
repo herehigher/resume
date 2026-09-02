@@ -1,5 +1,6 @@
 import { SUPPORTED_LOCALES } from '../config.js';
 import { getMessages } from '../i18n/index.js';
+import { messageForDraftStorageError } from './draft-storage-error.js';
 
 const publicEntryPaths = Object.freeze({
   ja: './ja/',
@@ -100,10 +101,10 @@ export function initLocaleController(store, {
     const previousLocale = store.getState().settings.locale;
     try {
       await persistLocaleChange(store, nextLocale, beforeLocalePersist);
-    } catch {
+    } catch (error) {
       select.value = store.getState().settings.locale;
       applyLocale(true);
-      showMessage(getMessages(previousLocale).localeSaveError, true);
+      showMessage(messageForDraftStorageError(error, previousLocale, getMessages(previousLocale).localeSaveError), true);
       return;
     }
     const url = new URL(window.location.href);
@@ -136,8 +137,8 @@ export function initLocaleController(store, {
       window.history.replaceState(null, '', url);
       applyLocale(true);
       showMessage(getMessages(locale).importSuccess);
-    } catch {
-      showMessage(currentCopy.importError, true);
+    } catch (error) {
+      showMessage(messageForDraftStorageError(error, store.getState().settings.locale, currentCopy.importError), true);
     } finally {
       importInput.value = '';
     }
