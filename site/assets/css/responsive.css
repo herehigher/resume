@@ -42,8 +42,9 @@
   .photo-thumbnail { height: 103px; width: 78px; }
   .two-columns, .three-columns, .postal-grid { grid-template-columns: 1fr; }
   .repeating-row { grid-template-columns: 104px 1fr 28px; }
-  .editor-footer { align-items: start; flex-direction: column; gap: 14px; }
-  .editor-footer p { text-align: left; }
+  .editor-footer { gap: 20px; }
+  .editor-footer-actions { align-items: flex-start; }
+  .editor-legal { padding-bottom: 62px; }
   .sample-mode-panel { grid-template-columns: 1fr; }
   .trust-capsule {
     bottom: calc(9px + env(safe-area-inset-bottom));

@@ -28,6 +28,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   const completionBar = document.getElementById('completionBar');
   const completionLabel = document.getElementById('completionLabel');
   const confirmDialog = document.getElementById('confirmDialog');
+  const clearButton = document.getElementById('clearButton');
+  const clearDraftEmptyStatus = document.getElementById('clearDraftEmptyStatus');
+  const saveDraftButton = document.getElementById('saveDraftButton');
   let zoom = 1;
   let saveTimer;
   let draftMessageTimer;
@@ -38,6 +41,23 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
 
   function japaneseDocument() {
     return store.getState().documents.ja;
+  }
+
+  function hasCurrentInput(state) {
+    if (state.profile.photo || Object.values(state.profile.fields).some(Boolean)) return true;
+    const japaneseFields = state.documents.ja.fields;
+    if (Object.entries(japaneseFields).some(([name, value]) => name !== 'createdDate' && Boolean(value))) return true;
+    const japaneseItems = ['education', 'employment', 'qualification', 'careers'];
+    if (japaneseItems.some((name) => state.documents.ja[name].some((item) => Object.values(item).some(Boolean)))) return true;
+    return ['zh-CN', 'en'].some((locale) => Object.values(state.documents[locale].resume).some((value) => (
+      Array.isArray(value) ? value.some((item) => Object.values(item).some(Boolean)) : Boolean(value)
+    )));
+  }
+
+  function updateClearDraftControl() {
+    const hasClearableDraft = !sampleMode && (shouldPersistDraft || hasCurrentInput(store.getState()));
+    clearButton.hidden = !hasClearableDraft;
+    clearDraftEmptyStatus.hidden = sampleMode || hasClearableDraft;
   }
 
   function setDraftStatus(message, tone = '') {
@@ -63,6 +83,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     try {
       store.save();
       shouldPersistDraft = true;
+      updateClearDraftControl();
       showDraftMessage(message, {
         fallback: 'この端末に保存済み',
         fallbackTone: 'success'
@@ -76,6 +97,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     window.clearTimeout(saveTimer);
     if (sampleMode) return;
     shouldPersistDraft = true;
+    updateClearDraftControl();
     setDraftStatus('保存中…');
     saveTimer = window.setTimeout(() => {
       try {
@@ -89,6 +111,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
 
   function mutate(mutator) {
     store.update(mutator, { persist: false });
+    updateClearDraftControl();
     scheduleSave();
   }
 
@@ -112,7 +135,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   function setSampleModeUI(active) {
     document.querySelector('.draft-controls').hidden = active;
     document.getElementById('sampleModePanel').hidden = !active;
-    document.getElementById('clearButton').hidden = active;
+    updateClearDraftControl();
     const sampleButton = document.getElementById('loadSampleButton');
     sampleButton.disabled = active;
     sampleButton.textContent = active ? '入力例を表示中' : '入力例を表示';
@@ -311,6 +334,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     renderDocumentControls();
     setMobileView(document.getElementById('japaneseWorkspace').dataset.mobileMode || 'editor');
     renderPreview();
+    updateClearDraftControl();
   }
 
   function switchDocument(documentType) {
@@ -463,9 +487,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   document.getElementById('loadSampleButton').addEventListener('click', enterSampleMode);
   document.getElementById('restoreDraftButton').addEventListener('click', () => restoreDraftFromSample());
   document.getElementById('adoptSampleButton').addEventListener('click', adoptSampleAsDraft);
-  document.getElementById('saveDraftButton').addEventListener('click', () => saveNow());
+  saveDraftButton.addEventListener('click', () => saveNow());
   document.getElementById('reloadDraftButton').addEventListener('click', reloadDraft);
-  document.getElementById('clearButton').addEventListener('click', () => confirmDialog.showModal());
+  clearButton.addEventListener('click', () => confirmDialog.showModal());
   document.getElementById('confirmClearButton').addEventListener('click', () => {
     window.clearTimeout(saveTimer);
     try {
@@ -477,6 +501,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       showDraftMessage('下書きデータを削除しました', {
         fallback: '下書きは保存されていません'
       });
+      updateClearDraftControl();
+      window.setTimeout(() => saveDraftButton.focus());
     } catch {
       setDraftStatus('下書きデータを削除できませんでした', 'error');
     }

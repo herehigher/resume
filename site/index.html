@@ -299,8 +299,14 @@
       </form>
 
       <div class="editor-footer">
-        <button class="danger-text-button" id="clearButton" type="button">保存した下書きを削除</button>
-        <p><span data-analytics-disclosure="status">この source build では Analytics は無効で、解析用の外部 request は発生しません。</span></p>
+        <div class="editor-footer-actions draft-danger-zone">
+          <button class="secondary-danger-button" id="clearButton" type="button">入力内容とこの端末の下書きを削除…</button>
+          <p class="draft-empty-status" id="clearDraftEmptyStatus" aria-live="polite">この端末に保存された下書きはありません</p>
+        </div>
+        <div class="editor-legal">
+          <p><span data-analytics-disclosure="status">この source build では Analytics は無効で、解析用の外部 request は発生しません。</span></p>
+          <p class="editor-copyright">© 2026 herehigher · <a href="https://github.com/herehigher/resume/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></p>
+        </div>
       </div>
     </section>
 
