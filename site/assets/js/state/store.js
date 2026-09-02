@@ -1,16 +1,10 @@
 import { createDefaultState, cloneData } from './defaults.js';
-import {
-  hasStoredState,
-  loadStoredState,
-  parseImportedState,
-  persistState,
-  removeStoredState,
-  serializeState
-} from './storage.js';
+import { createDraftStorage, parseImportedState, serializeState } from './storage.js';
 import { assertValidState } from './schema.js';
 
-export function createStore({ storage, initialState }) {
+export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
   let state = cloneData(assertValidState(initialState));
+  let stored = hasStoredState;
   const listeners = new Set();
 
   function notify(type) {
@@ -21,10 +15,17 @@ export function createStore({ storage, initialState }) {
 
   function replace(nextState, { persist = false, type = 'replace' } = {}) {
     const next = cloneData(assertValidState(nextState));
-    if (persist) persistState(storage, next);
-    state = next;
-    notify(type);
-    return state;
+    if (!persist) {
+      state = next;
+      notify(type);
+      return state;
+    }
+    return persistence.save(next).then(() => {
+      state = next;
+      stored = true;
+      notify(type);
+      return state;
+    });
   }
 
   return {
@@ -38,33 +39,39 @@ export function createStore({ storage, initialState }) {
     },
     replace,
     save() {
-      persistState(storage, state);
-      notify('save');
+      const snapshot = cloneData(state);
+      return persistence.save(snapshot).then(() => {
+        stored = true;
+        notify('save');
+      });
     },
-    reload() {
-      const stored = loadStoredState(storage);
-      if (!stored) return false;
-      replace(stored, { type: 'reload' });
+    async reload() {
+      const next = await persistence.load();
+      if (!next) return false;
+      state = cloneData(next);
+      stored = true;
+      notify('reload');
       return true;
     },
     reset(locale = state.settings.locale) {
       replace(createDefaultState(locale), { type: 'reset' });
     },
-    clearPersisted() {
-      removeStoredState(storage);
+    async clearPersisted() {
+      await persistence.remove();
+      stored = false;
       notify('clear');
     },
     hasStoredState() {
-      return hasStoredState(storage);
+      return stored;
     },
     exportJson() {
       return serializeState(state);
     },
     importJson(text) {
       const imported = parseImportedState(text);
-      replace(imported, { persist: true, type: 'import' });
-      return state;
+      return replace(imported, { persist: true, type: 'import' });
     },
+    flush() { return persistence.flush(); },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

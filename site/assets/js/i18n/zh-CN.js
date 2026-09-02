@@ -65,7 +65,7 @@ export default {
     enabledTechnicalBody: '在 F12 的 Network 中，除同一 origin 的静态 asset 外，还会看到固定的 Cloudflare beacon script 和标准 RUM endpoint；不会产生其他外部通信。',
     configurationErrorTechnicalBody: 'data-analytics-mode 与 data-analytics-provider 的组合不受支持。这属于 configuration error，不能按 Analytics 已禁用处理。',
     storageHeading: '设备上的数据',
-    storageBody: 'localStorage 中的草稿和导出文件均未加密。使用共享设备以及保管或共享文件时请注意安全。',
+    storageBody: '草稿正文使用 AES-GCM 加密后保存在 localStorage；不可导出的解密密钥单独保存在此 origin 的 IndexedDB。导出的 JSON 不加密。若密钥或 browser data 丢失，草稿将无法解密，请保管 JSON backup。它不能防护同源 script/XSS 或 browser profile 被入侵。',
     repositoryLink: '在 GitHub 查看源代码',
     privacyNoticeLink: '阅读完整隐私声明',
     close: '关闭'

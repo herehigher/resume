@@ -5,7 +5,6 @@ import { STORAGE_KEY } from '../site/assets/js/config.js';
 import { resolveLocale } from '../site/assets/js/i18n/index.js';
 import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { validateState } from '../site/assets/js/state/schema.js';
-import { loadStoredState } from '../site/assets/js/state/storage.js';
 import { createStore } from '../site/assets/js/state/store.js';
 import { protectDraftBeforeSample } from '../site/assets/js/ui/japanese-editor.js';
 import { persistLocaleChange } from '../site/assets/js/ui/locale-controller.js';
@@ -23,6 +22,24 @@ function createMemoryStorage(initial = {}) {
       values.delete(key);
     }
   };
+}
+
+function createTestPersistence(storage) {
+  return {
+    async save(state) { storage.setItem(STORAGE_KEY, JSON.stringify(state)); },
+    async load() { const raw = storage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; },
+    async remove() { storage.removeItem(STORAGE_KEY); },
+    flush() { return Promise.resolve(); }
+  };
+}
+
+function readPersisted(storage) {
+  const raw = storage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function createTestStore(storage, initialState) {
+  return createStore({ storage, initialState, persistence: createTestPersistence(storage) });
 }
 
 test('default state contains independent locale documents', () => {
@@ -53,29 +70,29 @@ test('new storage ignores the legacy key', () => {
   const storage = createMemoryStorage({
     'resume-studio-data-v1': JSON.stringify({ fields: { fullName: 'Legacy' } })
   });
-  assert.equal(loadStoredState(storage), null);
+  assert.equal(readPersisted(storage), null);
 });
 
-test('locale documents persist without overwriting each other', () => {
+test('locale documents persist without overwriting each other', async () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  const store = createTestStore(storage, createDefaultState('ja'));
 
   store.update((state) => {
     state.documents.ja.fields.motivation = '日本語';
     state.documents['zh-CN'].resume.summary = '中文';
     state.documents.en.resume.summary = 'English';
   });
-  store.save();
+  await store.save();
 
-  const restored = loadStoredState(storage);
+  const restored = readPersisted(storage);
   assert.equal(restored.documents.ja.fields.motivation, '日本語');
   assert.equal(restored.documents['zh-CN'].resume.summary, '中文');
   assert.equal(restored.documents.en.resume.summary, 'English');
 });
 
-test('export and import round trip preserves all locale data', () => {
+test('export and import round trip preserves all locale data', async () => {
   const storage = createMemoryStorage();
-  const source = createStore({ storage, initialState: createDefaultState('en') });
+  const source = createTestStore(storage, createDefaultState('en'));
   source.update((state) => {
     state.profile.fields.fullName = 'Sample Person';
     state.documents.ja.fields.selfPromotion = '自己PR';
@@ -85,20 +102,20 @@ test('export and import round trip preserves all locale data', () => {
   });
 
   const targetStorage = createMemoryStorage();
-  const target = createStore({ storage: targetStorage, initialState: createDefaultState() });
-  target.importJson(source.exportJson());
+  const target = createTestStore(targetStorage, createDefaultState());
+  await target.importJson(source.exportJson());
 
   assert.deepEqual(target.getState(), source.getState());
   assert.equal(JSON.parse(targetStorage.getItem(STORAGE_KEY)).profile.fields.fullName, 'Sample Person');
 });
 
-test('invalid import does not change current or persisted data', () => {
+test('invalid import does not change current or persisted data', async () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  const store = createTestStore(storage, createDefaultState('ja'));
   store.update((state) => {
     state.profile.fields.fullName = '守るデータ';
   });
-  store.save();
+  await store.save();
   const beforeState = JSON.stringify(store.getState());
   const beforeStored = storage.getItem(STORAGE_KEY);
 
@@ -107,74 +124,74 @@ test('invalid import does not change current or persisted data', () => {
   assert.equal(storage.getItem(STORAGE_KEY), beforeStored);
 });
 
-test('entering sample mode synchronously persists pending draft changes', () => {
+test('entering sample mode persists pending draft changes', async () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState() });
+  const store = createTestStore(storage, createDefaultState());
   store.update((state) => {
     state.profile.fields.fullName = '保存直前の氏名';
   });
 
-  const snapshot = protectDraftBeforeSample(store, true);
+  const snapshot = await protectDraftBeforeSample(store, true);
 
   assert.equal(snapshot.profile.fields.fullName, '保存直前の氏名');
-  assert.equal(loadStoredState(storage).profile.fields.fullName, '保存直前の氏名');
+  assert.equal(readPersisted(storage).profile.fields.fullName, '保存直前の氏名');
 });
 
-test('sample draft protection propagates storage failures without changing state', () => {
+test('sample draft protection propagates storage failures without changing state', async () => {
   const storage = createMemoryStorage();
   storage.setItem = () => {
     throw new Error('quota exceeded');
   };
-  const store = createStore({ storage, initialState: createDefaultState() });
+  const store = createTestStore(storage, createDefaultState());
   store.update((state) => {
     state.profile.fields.fullName = '画面に残す氏名';
   });
 
-  assert.throws(() => protectDraftBeforeSample(store, true), /quota exceeded/);
+  await assert.rejects(() => protectDraftBeforeSample(store, true), /quota exceeded/);
   assert.equal(store.getState().profile.fields.fullName, '画面に残す氏名');
-  assert.equal(loadStoredState(storage), null);
+  assert.equal(readPersisted(storage), null);
 });
 
-test('changing locale from sample mode persists the protected draft, not sample data', () => {
+test('changing locale from sample mode persists the protected draft, not sample data', async () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  const store = createTestStore(storage, createDefaultState('ja'));
   store.update((state) => {
     state.profile.fields.fullName = '保存する氏名';
   });
-  store.save();
-  const protectedDraft = protectDraftBeforeSample(store, true);
+  await store.save();
+  const protectedDraft = await protectDraftBeforeSample(store, true);
   store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
 
-  persistLocaleChange(store, 'zh-CN', () => {
+  await persistLocaleChange(store, 'zh-CN', () => {
     store.replace(protectedDraft, { type: 'restore' });
   });
 
   assert.equal(store.getState().profile.fields.fullName, '保存する氏名');
   assert.equal(store.getState().settings.locale, 'zh-CN');
-  assert.equal(loadStoredState(storage).profile.fields.fullName, '保存する氏名');
-  assert.equal(loadStoredState(storage).settings.locale, 'zh-CN');
+  assert.equal(readPersisted(storage).profile.fields.fullName, '保存する氏名');
+  assert.equal(readPersisted(storage).settings.locale, 'zh-CN');
 });
 
-test('failed locale persistence leaves state and stored data unchanged', () => {
+test('failed locale persistence leaves state and stored data unchanged', async () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState('ja') });
+  const store = createTestStore(storage, createDefaultState('ja'));
   store.update((state) => {
     state.profile.fields.fullName = '保持する氏名';
   });
-  store.save();
+  await store.save();
   const storedBefore = storage.getItem(STORAGE_KEY);
   storage.setItem = () => {
     throw new Error('quota exceeded');
   };
 
-  assert.throws(() => persistLocaleChange(store, 'en'), /quota exceeded/);
+  await assert.rejects(() => persistLocaleChange(store, 'en'), /quota exceeded/);
   assert.equal(store.getState().settings.locale, 'ja');
   assert.equal(storage.getItem(STORAGE_KEY), storedBefore);
 });
 
 test('import rejects remote and unsupported photo sources', () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState() });
+  const store = createTestStore(storage, createDefaultState());
   const unsafe = createDefaultState();
   unsafe.profile.photo = 'https://example.com/tracker.png';
 

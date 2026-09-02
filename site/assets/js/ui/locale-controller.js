@@ -86,12 +86,12 @@ export function initLocaleController(store, {
     onLocaleApplied(locale);
   }
 
-  select.addEventListener('change', () => {
+  select.addEventListener('change', async () => {
     if (!SUPPORTED_LOCALES.includes(select.value)) return;
     const nextLocale = select.value;
     const previousLocale = store.getState().settings.locale;
     try {
-      persistLocaleChange(store, nextLocale, beforeLocalePersist);
+      await persistLocaleChange(store, nextLocale, beforeLocalePersist);
     } catch {
       select.value = store.getState().settings.locale;
       applyLocale(true);
@@ -121,7 +121,7 @@ export function initLocaleController(store, {
     if (!file) return;
     const currentCopy = getMessages(store.getState().settings.locale);
     try {
-      store.importJson(await file.text());
+      await store.importJson(await file.text());
       const locale = store.getState().settings.locale;
       const url = new URL(window.location.href);
       url.searchParams.set('lang', locale);

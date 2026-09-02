@@ -56,7 +56,7 @@ export default {
     enabledTechnicalBody: 'In the F12 Network panel, you can see same-origin static assets plus the fixed Cloudflare beacon script and standard RUM endpoint. No other external runtime requests are made.',
     configurationErrorTechnicalBody: 'The data-analytics-mode and data-analytics-provider tuple is unsupported. This is a configuration error, not a disabled analytics state.',
     storageHeading: 'Data on your device',
-    storageBody: 'Drafts in localStorage and exported files are not encrypted. Take care when using a shared device and when storing or sharing exported files.',
+    storageBody: 'Draft content is AES-GCM encrypted in localStorage. A non-extractable decryption key is stored separately in IndexedDB for this origin. Exported JSON is not encrypted. Losing the key or browser data makes the draft unrecoverable, so keep a JSON backup. This does not protect against same-origin scripts/XSS or browser-profile compromise.',
     repositoryLink: 'View source code on GitHub',
     privacyNoticeLink: 'Read the full privacy notice',
     close: 'Close'

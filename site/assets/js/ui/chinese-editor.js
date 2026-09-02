@@ -35,9 +35,9 @@ export function calculateChineseCompletion(state) {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-export function protectChineseDraftBeforeSample(store, shouldPersistDraft) {
+export async function protectChineseDraftBeforeSample(store, shouldPersistDraft) {
   const snapshot = cloneData(store.getState());
-  if (shouldPersistDraft) store.save();
+  if (shouldPersistDraft) await store.save();
   return snapshot;
 }
 
@@ -236,9 +236,9 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     if (sampleMode) return;
     shouldPersistDraft = true;
     saveStatus.textContent = zhCN.savingStatus;
-    saveTimer = window.setTimeout(() => {
+    saveTimer = window.setTimeout(async () => {
       try {
-        store.save();
+        await store.save();
         saveStatus.textContent = zhCN.savedStatus;
       } catch {
         saveStatus.textContent = zhCN.saveError;
@@ -342,10 +342,10 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     rootElement.querySelector('[data-zh-sample-panel]').hidden = !active;
   }
 
-  function enterSampleMode() {
+  async function enterSampleMode() {
     window.clearTimeout(saveTimer);
     try {
-      draftBeforeSample = protectChineseDraftBeforeSample(store, shouldPersistDraft);
+      draftBeforeSample = await protectChineseDraftBeforeSample(store, shouldPersistDraft);
     } catch {
       saveStatus.textContent = '无法保护当前草稿，示例未打开。';
       return;
@@ -367,10 +367,10 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     return true;
   }
 
-  function saveNow() {
+  async function saveNow() {
     window.clearTimeout(saveTimer);
     try {
-      store.save();
+      await store.save();
       shouldPersistDraft = true;
       saveStatus.textContent = zhCN.savedStatus;
     } catch {
@@ -440,7 +440,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     }
   }
 
-  function onClick(event) {
+  async function onClick(event) {
     const add = event.target.closest('[data-zh-add]');
     const remove = event.target.closest('[data-zh-remove]');
     const action = event.target.closest('[data-zh-action]');
@@ -461,7 +461,13 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     }
     if (!action) return;
     if (action.dataset.zhAction === 'save') saveNow();
-    if (action.dataset.zhAction === 'reload' && store.reload()) shouldPersistDraft = true;
+    if (action.dataset.zhAction === 'reload') {
+      try {
+        if (await store.reload()) shouldPersistDraft = true;
+      } catch {
+        saveStatus.textContent = '无法读取已加密的草稿。';
+      }
+    }
     if (action.dataset.zhAction === 'sample') enterSampleMode();
     if (action.dataset.zhAction === 'restore') restoreDraftFromSample();
     if (action.dataset.zhAction === 'adopt') {
@@ -496,11 +502,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   function onPageHide() {
     window.clearTimeout(saveTimer);
     if (sampleMode || !shouldPersistDraft) return;
-    try {
-      store.save();
-    } catch {
-      // 保存失败时保留已有数据。
-    }
+    void store.save().catch(() => {});
   }
 
   rootElement.addEventListener('input', onInput);
