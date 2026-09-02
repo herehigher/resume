@@ -1,4 +1,5 @@
 import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js';
+import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
 
 function hasText(value) {
   return Boolean(String(value || '').trim());
@@ -77,12 +78,12 @@ function renderContact(fields) {
 }
 
 function renderProfiles(fields) {
-  const links = [
-    renderLink(fields.github, 'GitHub'),
-    renderLink(fields.linkedin, 'LinkedIn'),
-    renderLink(fields.portfolio, '个人主页')
-  ].filter(Boolean);
-  return links.length ? `<div class="zh-profile-links">${links.join('')}</div>` : '';
+  const links = getProfileLinks(fields).map((link) => {
+    const content = `${profileLinkIcon(link.icon)}<span>${escapeHTML(link.name)} · ${escapeHTML(link.displayUrl)}</span>`;
+    if (!isClickableUrl(link.url)) return `<span class="zh-link">${content}</span>`;
+    return `<a class="zh-link" href="${escapeHTML(link.url)}" target="_blank" rel="noopener noreferrer">${content}</a>`;
+  });
+  return links.length ? `<div class="zh-profile-links"><strong>Links</strong>${links.join('')}</div>` : '';
 }
 
 function renderOptionalDetails(fields) {

@@ -48,7 +48,7 @@
     "string": { "type": "string" },
     "profileFields": {
       "type": "object",
-      "required": ["fullName", "birthDate", "gender", "postalCode", "address", "phone", "email", "github", "linkedin", "portfolio"],
+      "required": ["fullName", "birthDate", "gender", "postalCode", "address", "phone", "email", "links"],
       "properties": {
         "fullName": { "$ref": "#/$defs/string" },
         "birthDate": { "$ref": "#/$defs/string" },
@@ -57,9 +57,7 @@
         "address": { "$ref": "#/$defs/string" },
         "phone": { "$ref": "#/$defs/string" },
         "email": { "$ref": "#/$defs/string" },
-        "github": { "$ref": "#/$defs/string" },
-        "linkedin": { "$ref": "#/$defs/string" },
-        "portfolio": { "$ref": "#/$defs/string" }
+        "links": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/string" } }
       }
     },
     "japaneseDocument": {

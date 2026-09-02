@@ -20,9 +20,7 @@ export function createDefaultProfile() {
       address: '',
       phone: '',
       email: '',
-      github: '',
-      linkedin: '',
-      portfolio: ''
+      links: []
     }
   };
 }
@@ -119,9 +117,7 @@ export function createJapaneseSampleState(sourceState) {
       address: '東京都千代田区千代田1-1',
       phone: '090-1234-5678',
       email: 'taro.yamada@example.jp',
-      github: 'https://github.com/taro-yamada',
-      linkedin: 'https://www.linkedin.com/in/taro-yamada',
-      portfolio: 'https://example.com'
+      links: ['https://github.com/taro-yamada', 'https://www.linkedin.com/in/taro-yamada', 'https://example.com']
     }
   };
   state.documents.ja = {

@@ -1,6 +1,6 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
-import { expect, openLocale, test } from './fixtures.js';
+import { expect, openLocale, revealField, test } from './fixtures.js';
 
 const A4 = { width: 595.28, height: 841.89 };
 const LETTER = { width: 612, height: 792 };
@@ -103,3 +103,24 @@ test('PDF long: English の超長文は複数 Letter ページになり末尾ま
   expect(text).toContain('LONG PDF END MARKER');
   expectPageSize(pages, LETTER);
 });
+
+for (const [locale, addSelector, previewSelector, pageSize] of [
+  ['ja', '#addProfileLinkButton', '#documentPreview', A4],
+  ['zh-CN', '[data-zh-add-profile-link]', '[data-zh-preview]', A4],
+  ['en', '[data-en-add-profile-link]', '[data-en-preview]', LETTER]
+]) {
+  test(`PDF ${locale}: Links はサイト名と protocol を除いた長い URL を印刷する @pdf`, async ({ page }) => {
+    const longUrl = `https://example.test/${'long-profile-path-'.repeat(12)}details`;
+    await openLocale(page, locale);
+    const add = page.locator(addSelector);
+    await revealField(add);
+    await add.click();
+    await page.locator('[data-profile-link-index="0"]').fill(longUrl);
+    await expect(page.locator(previewSelector)).toContainText('Website');
+    const pages = await inspectPdf(await printPdf(page));
+    const text = pages.map((item) => item.text).join(' ').replace(/\s/g, '');
+    expect(text).toContain('example.test/long-profile-path-');
+    expect(text).not.toContain('https://');
+    expectPageSize(pages, pageSize);
+  });
+}

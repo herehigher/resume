@@ -68,6 +68,10 @@ export function validateState(value) {
     errors.push('profile.photo must be an embedded JPEG, PNG, or WebP image');
   }
 
+  if (!Array.isArray(value.profile?.fields?.links) || value.profile.fields.links.length > 3) {
+    errors.push('profile.fields.links must contain at most 3 entries');
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

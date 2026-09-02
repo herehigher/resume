@@ -31,7 +31,7 @@ function fillProfile(state, locale) {
     fullName: locale === 'ja' ? '印刷 試験' : locale === 'zh-CN' ? '打印测试' : 'Print Test',
     phone: '000-0000-0000',
     email: 'pdf-fixture@example.com',
-    github: 'https://example.com/pdf-fixture'
+    links: ['https://example.com/pdf-fixture']
   };
 }
 

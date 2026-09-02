@@ -54,6 +54,9 @@
 }
 
 .en-contact-label { font-weight: 700; }
+.en-profile-link { align-items: baseline; display: inline-flex; gap: 3px; }
+.en-url { align-items: baseline; display: inline-flex; gap: 4px; max-width: 100%; }
+.en-url .profile-link-icon { fill: currentColor; flex: 0 0 auto; height: 11px; width: 11px; }
 
 .english-document a {
   color: #174f91;

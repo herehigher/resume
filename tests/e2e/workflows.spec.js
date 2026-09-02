@@ -43,10 +43,11 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   const name = page.locator('[name="fullName"]');
   const motivation = page.locator('[name="motivation"]');
-  const github = page.locator('[name="github"]');
-  const portfolio = page.locator('[name="portfolio"]');
+  const addLink = page.locator('#addProfileLinkButton');
   await revealField(motivation);
-  await revealField(github);
+  await revealField(addLink);
+  await addLink.click();
+  const github = page.locator('[data-profile-link-index="0"]');
 
   const maliciousName = '<img data-e2e-malicious src=x onerror=alert(1)> 山田';
   await name.fill(maliciousName);
@@ -56,7 +57,8 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
   await expect.poll(() => page.locator('#clearButton').evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await motivation.fill('顧客課題を整理し、改善を最後まで推進します。');
   await github.fill('https://github.com/resume-studio-test');
-  await portfolio.fill('javascript:alert(1)');
+  await addLink.click();
+  await page.locator('[data-profile-link-index="1"]').fill('javascript:alert(1)');
   await page.locator('[data-add="education"]').click();
   const education = page.locator('#educationList .repeating-row').last();
   await education.locator('[data-key="date"]').fill('2020-04');
@@ -151,6 +153,22 @@ test('@mobile 日本語の下書き操作は375pxと401pxで縦に並び、44px�
     expect(Number.parseFloat(actionLayout.columns[0])).toBeCloseTo(actionLayout.width, 0);
     await expectNoPageOverflow(page);
   }
+});
+
+test('@mobile Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const add = page.locator('#addProfileLinkButton');
+  await revealField(add);
+  for (const url of ['https://github.com/mobile-example', 'https://www.linkedin.com/in/mobile-example', 'https://example.test/mobile']) {
+    await add.click();
+    await page.locator('[data-profile-link-index]').last().fill(url);
+  }
+  await expect(add).toBeDisabled();
+  await expect(page.locator('#documentPreview')).toContainText('GitHub');
+  await page.locator('[data-remove-profile-link="1"]').click();
+  await expect(page.locator('[data-profile-link-index]')).toHaveCount(2);
+  await expect(add).toBeEnabled();
+  await expectNoPageOverflow(page);
 });
 
 test('三言語エディターは Analytics 表示の下に著作権と MIT License を常設する', async ({ page }) => {
@@ -412,13 +430,16 @@ test('三言語で入力例を草稿操作にまとめ、言語とPDFをヘッ�
 
 test('三言語のプロフィールURLはHTTP(S)だけがリンクになる', async ({ page }) => {
   const cases = [
-    ['ja', '[name="github"]', '#documentPreview'],
-    ['zh-CN', '[data-profile="github"]', '[data-zh-preview]'],
-    ['en', '[data-profile-field="github"]', '[data-en-preview]']
+    ['ja', '#addProfileLinkButton', '[data-profile-link-index="0"]', '#documentPreview'],
+    ['zh-CN', '[data-zh-add-profile-link]', '[data-profile-link-index="0"]', '[data-zh-preview]'],
+    ['en', '[data-en-add-profile-link]', '[data-profile-link-index="0"]', '[data-en-preview]']
   ];
 
-  for (const [locale, fieldSelector, previewSelector] of cases) {
+  for (const [locale, addSelector, fieldSelector, previewSelector] of cases) {
     await openLocale(page, locale);
+    const add = page.locator(addSelector);
+    await revealField(add);
+    await add.click();
     const field = page.locator(fieldSelector);
     const preview = page.locator(previewSelector);
     await revealField(field);

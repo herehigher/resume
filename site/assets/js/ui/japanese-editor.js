@@ -1,5 +1,7 @@
 import { createJapaneseSampleState, cloneData } from '../state/defaults.js';
 import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
+import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
+import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 
 const PROFILE_FIELD_NAMES = new Set([
   'fullName',
@@ -8,10 +10,7 @@ const PROFILE_FIELD_NAMES = new Set([
   'postalCode',
   'address',
   'phone',
-  'email',
-  'github',
-  'linkedin',
-  'portfolio'
+  'email'
 ]);
 
 export async function protectDraftBeforeSample(store, shouldPersistDraft) {
@@ -46,7 +45,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   }
 
   function hasCurrentInput(state) {
-    if (state.profile.photo || Object.values(state.profile.fields).some(Boolean)) return true;
+    if (state.profile.photo || Object.values(state.profile.fields).some((value) => (
+      Array.isArray(value) ? value.some(Boolean) : Boolean(value)
+    ))) return true;
     const japaneseFields = state.documents.ja.fields;
     if (Object.entries(japaneseFields).some(([name, value]) => name !== 'createdDate' && Boolean(value))) return true;
     const japaneseItems = ['education', 'employment', 'qualification', 'careers'];
@@ -244,6 +245,17 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     renderCareerList();
   }
 
+  function renderProfileLinks() {
+    const links = store.getState().profile.fields.links;
+    renderProfileLinksEditor(document.getElementById('profileLinksEditor'), links, {
+      placeholder: 'https://example.com',
+      removeLabel: 'リンクを削除'
+    });
+    const addButton = document.getElementById('addProfileLinkButton');
+    addButton.disabled = !canAddProfileLink(links);
+    addButton.textContent = canAddProfileLink(links) ? '＋ リンクを追加' : 'リンクは最大3件です';
+  }
+
   function updatePhotoUI() {
     const photo = store.getState().profile.photo;
     const displayUrl = embeddedPhotoUrl.resolve(photo);
@@ -341,6 +353,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       if (field) field.value = value || '';
     });
     updatePhotoUI();
+    renderProfileLinks();
     renderLists();
     renderDocumentControls();
     setMobileView(document.getElementById('japaneseWorkspace').dataset.mobileMode || 'editor');
@@ -359,6 +372,14 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
 
   function onFormInput(event) {
     const target = event.target;
+    if (target.dataset.profileLinkIndex !== undefined) {
+      mutate((state) => {
+        state.profile.fields.links[Number(target.dataset.profileLinkIndex)] = target.value;
+      });
+      updateProfileLinkRecognition(target);
+      renderPreview();
+      return;
+    }
     if (!target.name) return;
     mutate((state) => {
       const targetFields = PROFILE_FIELD_NAMES.has(target.name)
@@ -463,10 +484,21 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     const documentTab = event.target.closest('[data-document]');
     const addButton = event.target.closest('[data-add]');
     const removeButton = event.target.closest('.remove-row-button, .remove-career-button');
+    const removeProfileLinkButton = event.target.closest('[data-remove-profile-link]');
     const mobileViewButton = event.target.closest('[data-mobile-view]');
     if (documentTab) switchDocument(documentTab.dataset.document);
     if (addButton) addItem(addButton.dataset.add);
     if (removeButton) removeItem(removeButton);
+    if (removeProfileLinkButton) {
+      mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
+      renderProfileLinks();
+      renderPreview();
+    }
+    if (event.target.closest('#addProfileLinkButton')) {
+      mutate((state) => addProfileLink(state.profile.fields));
+      renderProfileLinks();
+      renderPreview();
+    }
     if (mobileViewButton) {
       setMobileView(mobileViewButton.dataset.mobileView);
     }

@@ -14,9 +14,7 @@ export function createEnglishSampleState(sourceState) {
       address: '',
       phone: '+1 206 555 0142',
       email: 'alex.morgan@example.com',
-      github: 'https://github.com/alexmorgan',
-      linkedin: 'https://www.linkedin.com/in/alexmorgan',
-      portfolio: 'https://alexmorgan.example.com'
+      links: ['https://github.com/alexmorgan', 'https://www.linkedin.com/in/alexmorgan', 'https://alexmorgan.example.com']
     }
   };
   state.documents.en = {

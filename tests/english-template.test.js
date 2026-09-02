@@ -60,7 +60,7 @@ test('English template excludes sensitive profile fields and only links HTTP(S) 
   state.profile.fields.gender = 'PRIVATE-GENDER';
   state.profile.fields.postalCode = 'PRIVATE-POSTAL';
   state.profile.fields.address = 'PRIVATE-FULL-ADDRESS';
-  state.profile.fields.linkedin = 'javascript:alert(1)';
+  state.profile.fields.links[1] = 'javascript:alert(1)';
   state.documents.en.resume.projects[0].url = 'https://example.com/a-very-long-project-url-that-remains-clickable';
 
   const html = renderEnglishResume(state);

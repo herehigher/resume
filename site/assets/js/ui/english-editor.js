@@ -1,8 +1,10 @@
 import { createEnglishSampleState } from '../data/en-sample.js';
 import { cloneData } from '../state/defaults.js';
 import { renderEnglishDocument } from '../templates/en.js';
+import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
+import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 
-const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email', 'github', 'linkedin', 'portfolio']);
+const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
 const RESUME_FIELDS = new Set(['headline', 'location', 'summary', 'skills']);
 
 const ITEM_SHAPES = Object.freeze({
@@ -60,9 +62,9 @@ export function renderEnglishWorkspace() {
               <label class="input-field"><span>Email</span><input data-profile-field="email" type="email" autocomplete="email"></label>
             </div>
             <label class="input-field"><span>City, State / Country</span><input data-resume-field="location" autocomplete="address-level2" placeholder="Seattle, WA / United States"></label>
-            <label class="input-field"><span>LinkedIn URL</span><input data-profile-field="linkedin" type="url" autocomplete="url" inputmode="url" placeholder="https://www.linkedin.com/in/username"></label>
-            <label class="input-field"><span>GitHub URL</span><input data-profile-field="github" type="url" autocomplete="url" inputmode="url" placeholder="https://github.com/username"></label>
-            <label class="input-field"><span>Portfolio URL</span><input data-profile-field="portfolio" type="url" autocomplete="url" inputmode="url" placeholder="https://example.com"></label>
+            <div class="profile-links-editor" data-en-profile-links></div>
+            <button class="small-add-button" data-en-add-profile-link type="button">Add link</button>
+            <span class="field-help">Up to 3 links. The site name and icon are matched from the URL.</span>
           </div>
         </details>
 
@@ -262,6 +264,14 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     });
   }
 
+  function renderProfileLinks() {
+    const links = store.getState().profile.fields.links;
+    renderProfileLinksEditor(root.querySelector('[data-en-profile-links]'), links, { removeLabel: 'Remove link' });
+    const addButton = root.querySelector('[data-en-add-profile-link]');
+    addButton.disabled = !canAddProfileLink(links);
+    addButton.textContent = canAddProfileLink(links) ? 'Add link' : 'Maximum of 3 links';
+  }
+
   function updateCompletion() {
     const state = store.getState();
     const values = [
@@ -305,6 +315,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       field.value = resume()[field.dataset.resumeField] || '';
     });
     Object.keys(ITEM_SHAPES).forEach(renderList);
+    renderProfileLinks();
     pageSizeSelect.value = state.settings.pageSizeByLocale.en;
     setMobileView(root.dataset.mobileMode || 'editor');
     renderPreview();
@@ -374,6 +385,15 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     const profileField = event.target.dataset.profileField;
     const resumeField = event.target.dataset.resumeField;
     const itemField = event.target.dataset.enItemField;
+    const profileLinkIndex = event.target.dataset.profileLinkIndex;
+    if (profileLinkIndex !== undefined) {
+      mutate((state) => {
+        state.profile.fields.links[Number(profileLinkIndex)] = event.target.value;
+      });
+      updateProfileLinkRecognition(event.target);
+      renderPreview();
+      return;
+    }
     if (profileField && PROFILE_FIELDS.has(profileField)) {
       mutate((state) => {
         state.profile.fields[profileField] = event.target.value;
@@ -411,6 +431,20 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     }
     const addButton = event.target.closest('[data-en-add]');
     const removeButton = event.target.closest('[data-en-remove]');
+    const addProfileLinkButton = event.target.closest('[data-en-add-profile-link]');
+    const removeProfileLinkButton = event.target.closest('[data-remove-profile-link]');
+    if (addProfileLinkButton) {
+      mutate((state) => addProfileLink(state.profile.fields));
+      renderProfileLinks();
+      renderPreview();
+      return;
+    }
+    if (removeProfileLinkButton) {
+      mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
+      renderProfileLinks();
+      renderPreview();
+      return;
+    }
     if (addButton) {
       const type = addButton.dataset.enAdd;
       const item = createEnglishItem(type);
