@@ -71,7 +71,23 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   await page.locator('#saveDraftButton').click();
   await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+  await expect.poll(() => page.evaluate(async () => {
+    const request = indexedDB.open('resume-studio-web-v1-keys');
+    const database = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const key = await new Promise((resolve, reject) => {
+      const get = database.transaction('keys', 'readonly').objectStore('keys').get('draft-encryption-key');
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    database.close();
+    return key && { type: key.type, extractable: key.extractable, algorithm: key.algorithm.name, usages: [...key.usages].sort() };
+  })).toEqual({ type: 'secret', extractable: false, algorithm: 'AES-GCM', usages: ['decrypt', 'encrypt'] });
   await expect(page.locator('#reloadDraftButton')).toBeEnabled();
+  await page.reload();
+  await expect(name).toHaveValue(maliciousName);
   await name.fill('一時変更');
   await page.locator('#reloadDraftButton').click();
   await expect(name).toHaveValue(maliciousName);
@@ -97,6 +113,20 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
   await page.locator('#confirmClearButton').click();
   await expect(name).toHaveValue('');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
+  await expect.poll(() => page.evaluate(async () => {
+    const request = indexedDB.open('resume-studio-web-v1-keys');
+    const database = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const key = await new Promise((resolve, reject) => {
+      const get = database.transaction('keys', 'readonly').objectStore('keys').get('draft-encryption-key');
+      get.onsuccess = () => resolve(get.result);
+      get.onerror = () => reject(get.error);
+    });
+    database.close();
+    return key ?? null;
+  })).toBeNull();
   await expect(page.locator('#clearButton')).toBeHidden();
   await expect(page.locator('#clearDraftEmptyStatus')).toBeVisible();
   await expect(page.locator('#clearDraftEmptyStatus')).toHaveText('この端末に保存された下書きはありません');
@@ -211,9 +241,10 @@ test('embedded photos stay as data URLs in storage but render only through revoc
     await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0)).toBe(true);
   }
   await expect(page.locator('img[src^="data:image"]')).toHaveCount(0);
-  await expect.poll(() => page.evaluate((key) => (
-    JSON.parse(localStorage.getItem(key)).profile.photo
-  ), STORAGE_KEY)).toBe(PHOTO_DATA_URL);
+  await expect.poll(() => page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
+    return raw && !raw.includes('data:image') && JSON.parse(raw).format;
+  }, STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
 
   const initialBlobUrl = await japaneseImages.first().getAttribute('src');
   await page.locator('#photoInput').setInputFiles({
@@ -231,9 +262,7 @@ test('embedded photos stay as data URLs in storage but render only through revoc
       return false;
     }
   }, initialBlobUrl)).toBe(false);
-  await expect.poll(() => page.evaluate((key) => (
-    JSON.parse(localStorage.getItem(key)).profile.photo.startsWith('data:image/jpeg;base64,')
-  ), STORAGE_KEY)).toBe(true);
+  await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).format, STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
 
   await page.locator('#localeSelect').selectOption('zh-CN');
   const chineseImages = page.locator('[data-zh-photo-thumbnail] img, [data-zh-preview] .zh-profile-photo');
@@ -246,9 +275,7 @@ test('embedded photos stay as data URLs in storage but render only through revoc
 
   await page.locator('[data-zh-action="remove-photo"]').click();
   await expect(chineseImages).toHaveCount(0);
-  await expect.poll(() => page.evaluate((key) => (
-    JSON.parse(localStorage.getItem(key)).profile.photo
-  ), STORAGE_KEY)).toBe('');
+  await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).format, STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
   await expect.poll(() => page.evaluate(async (url) => {
     try {
       await fetch(url);
@@ -343,9 +370,9 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   await expect(page.locator('#globalMessage')).toContainText('読み込めませんでした');
   await expect(name).toHaveValue('読み込んだ氏名');
   await expect.poll(() => page.evaluate((key) => {
-    const stored = JSON.parse(localStorage.getItem(key));
-    return stored.profile.fields.fullName;
-  }, STORAGE_KEY)).toBe('読み込んだ氏名');
+    const raw = localStorage.getItem(key);
+    return raw && !raw.includes('読み込んだ氏名') && JSON.parse(raw).format;
+  }, STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
 });
 
 test('三言語で入力例を草稿操作にまとめ、言語とPDFをヘッダー右端に表示する', async ({ page }) => {

@@ -36,7 +36,7 @@ export default {
     enabledTechnicalBody: 'F12 の Network では、同一 origin の静的 asset に加え、Cloudflare の固定 beacon script と標準 RUM endpoint への request を確認できます。その他の外部通信は行いません。',
     configurationErrorTechnicalBody: 'data-analytics-mode と data-analytics-provider の組が未対応です。これは configuration error であり、Analytics が無効とは扱いません。',
     storageHeading: '端末上のデータについて',
-    storageBody: 'localStorage の下書きと書き出したファイルは暗号化されません。共有端末での利用やファイルの保管・共有には注意してください。',
+    storageBody: '下書き本文は localStorage に AES-GCM で暗号化して保存し、復号用の取り出せない鍵はこの origin の IndexedDB に分けて保存します。JSON 書き出しは暗号化されません。鍵や browser data を失うと下書きは復号できません。JSON backup を保管してください。same-origin script/XSS、browser profile の侵害には保護を提供しません。',
     repositoryLink: 'GitHub でソースコードを見る',
     privacyNoticeLink: 'プライバシー声明の全文',
     close: '閉じる'

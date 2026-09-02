@@ -231,9 +231,9 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     }
     shouldPersistDraft = true;
     setStatus('Saving…');
-    saveTimer = window.setTimeout(() => {
+    saveTimer = window.setTimeout(async () => {
       try {
-        store.save();
+        await store.save();
         setStatus('Saved on this device.');
       } catch {
         setStatus('Your changes could not be saved on this device.', true);
@@ -326,11 +326,11 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     root.querySelector('[data-en-sample-panel]').hidden = !active;
   }
 
-  function enterSampleMode() {
+  async function enterSampleMode() {
     window.clearTimeout(saveTimer);
     const currentDraft = cloneData(store.getState());
     try {
-      if (shouldPersistDraft) store.save();
+      if (shouldPersistDraft) await store.save();
     } catch {
       setStatus('The example cannot be shown because your current draft could not be protected.', true);
       return;
@@ -355,14 +355,14 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     return true;
   }
 
-  function adoptSample() {
+  async function adoptSample() {
     if (!sampleMode) return;
     sampleMode = false;
     draftBeforeSample = null;
     draftBeforeSampleWasStored = false;
     setSampleUI(false);
     try {
-      store.save();
+      await store.save();
       shouldPersistDraft = true;
       setStatus('The example was saved as your draft.');
     } catch {
@@ -403,7 +403,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     renderPreview();
   }
 
-  function onClick(event) {
+  async function onClick(event) {
     const mobileViewButton = event.target.closest('[data-en-mobile-view]');
     if (mobileViewButton) {
       setMobileView(mobileViewButton.dataset.enMobileView);
@@ -431,7 +431,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     if (event.target.closest('[data-en-save]')) {
       window.clearTimeout(saveTimer);
       try {
-        store.save();
+        await store.save();
         shouldPersistDraft = true;
         setStatus('Draft saved.');
       } catch {
@@ -439,11 +439,15 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       }
     } else if (event.target.closest('[data-en-reload]')) {
       window.clearTimeout(saveTimer);
-      if (store.reload()) {
-        shouldPersistDraft = true;
-        setStatus('Saved draft reloaded.');
-      } else {
-        setStatus('There is no saved draft to reload.');
+      try {
+        if (await store.reload()) {
+          shouldPersistDraft = true;
+          setStatus('Saved draft reloaded.');
+        } else {
+          setStatus('There is no saved draft to reload.');
+        }
+      } catch {
+        setStatus('The encrypted draft could not be read.', true);
       }
     } else if (event.target.closest('[data-en-load-sample]')) {
       enterSampleMode();
@@ -457,11 +461,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   function onPageHide() {
     window.clearTimeout(saveTimer);
     if (sampleMode || !shouldPersistDraft) return;
-    try {
-      store.save();
-    } catch {
-      // Keep the last stored draft when browser storage is full.
-    }
+    void store.save().catch(() => {});
   }
 
   const unsubscribe = store.subscribe((_state, event) => {

@@ -28,6 +28,7 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityUserBody')).toContainText('Analytics は無効');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('履歴書の内容、写真、JSON、端末上の下書き');
   await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('同一 origin の静的 asset request だけ');
+  await expect(page.locator('#privacySecurityStorageBody')).toContainText('AES-GCM');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS.ja);
   await expect(page.locator('#privacyRepositoryLink')).toHaveAttribute('href', REPOSITORY_URL);
   for (const link of [page.locator('#privacyRepositoryLink'), page.locator('#privacyNoticeLink')]) {
@@ -45,6 +46,7 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityTitle')).toHaveText('隐私与安全');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('未启用 Analytics');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('简历内容、照片、JSON 和设备上的草稿');
+  await expect(page.locator('#privacySecurityStorageBody')).toContainText('不可导出的解密密钥');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS['zh-CN']);
   await page.keyboard.press('Escape');
   await expect(dialog).not.toHaveAttribute('open', '');
@@ -56,6 +58,7 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect(page.locator('#privacySecurityTitle')).toHaveText('Privacy & Security');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('Analytics is disabled');
   await expect(page.locator('#privacySecurityUserBody')).toContainText('resume content, photo, JSON, and on-device draft');
+  await expect(page.locator('#privacySecurityStorageBody')).toContainText('non-extractable decryption key');
   await expect(page.locator('#privacyNoticeLink')).toHaveAttribute('href', PRIVACY_URLS.en);
 
   await page.evaluate(() => {
@@ -76,9 +79,10 @@ test('editing, local save, and JSON export remain available after going offline'
   const name = page.locator('[name="fullName"]');
   await name.fill('オフライン 編集');
   await page.locator('#saveDraftButton').click();
-  await expect.poll(() => page.evaluate(() => (
-    JSON.parse(localStorage.getItem('resume-studio-web-v1')).profile.fields.fullName
-  ))).toBe('オフライン 編集');
+  await expect.poll(() => page.evaluate(() => {
+    const raw = localStorage.getItem('resume-studio-web-v1');
+    return raw && !raw.includes('オフライン 編集') && JSON.parse(raw).format;
+  })).toBe('resume-studio-local-encrypted-v1');
 
   await page.locator('#dataMenuSummary').click();
   const downloadPromise = page.waitForEvent('download');

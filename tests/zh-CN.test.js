@@ -5,7 +5,6 @@ import { readFileSync } from 'node:fs';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
 import { createChineseSampleState } from '../site/assets/js/state/zh-CN.js';
 import { validateState } from '../site/assets/js/state/schema.js';
-import { loadStoredState } from '../site/assets/js/state/storage.js';
 import { createStore } from '../site/assets/js/state/store.js';
 import {
   calculateChineseCompletion,
@@ -33,6 +32,15 @@ function createMemoryStorage() {
     removeItem(key) {
       values.delete(key);
     }
+  };
+}
+
+function createTestPersistence(storage) {
+  return {
+    async save(state) { storage.setItem('resume-studio-web-v1', JSON.stringify(state)); },
+    async load() { const raw = storage.getItem('resume-studio-web-v1'); return raw ? JSON.parse(raw) : null; },
+    async remove() { storage.removeItem('resume-studio-web-v1'); },
+    flush() { return Promise.resolve(); }
   };
 }
 
@@ -120,18 +128,19 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
   assert.equal(calculateChineseCompletion(sample), 100);
 });
 
-test('opening the Chinese sample protects the existing persisted draft', () => {
+test('opening the Chinese sample protects the existing persisted draft', async () => {
   const storage = createMemoryStorage();
-  const store = createStore({ storage, initialState: createDefaultState('zh-CN') });
+  const store = createStore({ storage, initialState: createDefaultState('zh-CN'), persistence: createTestPersistence(storage) });
   store.update((state) => {
     state.profile.fields.fullName = '需要保留的姓名';
     state.documents['zh-CN'].resume.summary = '需要保留的概述';
   });
-  const snapshot = protectChineseDraftBeforeSample(store, true);
+  const snapshot = await protectChineseDraftBeforeSample(store, true);
   store.replace(createChineseSampleState(store.getState()), { type: 'zh-sample' });
 
-  assert.equal(loadStoredState(storage).profile.fields.fullName, '需要保留的姓名');
-  assert.equal(loadStoredState(storage).documents['zh-CN'].resume.summary, '需要保留的概述');
+  const persisted = JSON.parse(storage.getItem('resume-studio-web-v1'));
+  assert.equal(persisted.profile.fields.fullName, '需要保留的姓名');
+  assert.equal(persisted.documents['zh-CN'].resume.summary, '需要保留的概述');
   assert.equal(snapshot.profile.fields.fullName, '需要保留的姓名');
 });
 

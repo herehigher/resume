@@ -14,9 +14,9 @@ const PROFILE_FIELD_NAMES = new Set([
   'portfolio'
 ]);
 
-export function protectDraftBeforeSample(store, shouldPersistDraft) {
+export async function protectDraftBeforeSample(store, shouldPersistDraft) {
   const currentDraft = cloneData(store.getState());
-  if (shouldPersistDraft) store.save();
+  if (shouldPersistDraft) await store.save();
   return currentDraft;
 }
 
@@ -82,10 +82,10 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     }, 3000);
   }
 
-  function saveNow(message = '下書きを保存しました') {
+  async function saveNow(message = '下書きを保存しました') {
     window.clearTimeout(saveTimer);
     try {
-      store.save();
+      await store.save();
       shouldPersistDraft = true;
       updateClearDraftControl();
       showDraftMessage(message, {
@@ -93,7 +93,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
         fallbackTone: 'success'
       });
     } catch {
-      setDraftStatus('保存容量を超えたため、下書きを保存できませんでした', 'error');
+      setDraftStatus('暗号化した下書きを保存できませんでした', 'error');
     }
   }
 
@@ -103,13 +103,13 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     shouldPersistDraft = true;
     updateClearDraftControl();
     setDraftStatus('保存中…');
-    saveTimer = window.setTimeout(() => {
+    saveTimer = window.setTimeout(async () => {
       try {
-        store.save();
+        await store.save();
         updateClearDraftControl();
         setDraftStatus('この端末に保存済み', 'success');
       } catch {
-        setDraftStatus('保存容量を超えたため、下書きを保存できませんでした', 'error');
+        setDraftStatus('暗号化した下書きを保存できませんでした', 'error');
       }
     }, 300);
   }
@@ -120,14 +120,19 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     scheduleSave();
   }
 
-  function reloadDraft() {
+  async function reloadDraft() {
     window.clearTimeout(saveTimer);
-    if (!store.reload()) {
+    try {
+      if (!await store.reload()) {
       showDraftMessage('保存された下書きはありません', {
         fallback: shouldPersistDraft ? 'この端末に保存済み' : '入力内容は自動保存されます',
         fallbackTone: shouldPersistDraft ? 'success' : '',
         tone: ''
       });
+        return;
+      }
+    } catch {
+      setDraftStatus('暗号化した下書きを読み込めませんでした', 'error');
       return;
     }
     shouldPersistDraft = true;
@@ -147,11 +152,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     sampleButton.textContent = active ? '入力例を表示中' : '入力例を表示';
   }
 
-  function enterSampleMode() {
+  async function enterSampleMode() {
     window.clearTimeout(saveTimer);
     let currentDraft;
     try {
-      currentDraft = protectDraftBeforeSample(store, shouldPersistDraft);
+      currentDraft = await protectDraftBeforeSample(store, shouldPersistDraft);
     } catch {
       setDraftStatus('現在の下書きを保護できないため、入力例を表示できません', 'error');
       return;
@@ -180,13 +185,13 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     return true;
   }
 
-  function adoptSampleAsDraft() {
+  async function adoptSampleAsDraft() {
     if (!sampleMode) return;
     sampleMode = false;
     draftBeforeSample = null;
     draftBeforeSampleWasStored = false;
     setSampleModeUI(false);
-    saveNow('入力例を下書きとして保存しました');
+    await saveNow('入力例を下書きとして保存しました');
   }
 
   function renderSimpleList(type, containerId) {
@@ -496,11 +501,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   saveDraftButton.addEventListener('click', () => saveNow());
   document.getElementById('reloadDraftButton').addEventListener('click', reloadDraft);
   clearButton.addEventListener('click', () => confirmDialog.showModal());
-  document.getElementById('confirmClearButton').addEventListener('click', () => {
+  document.getElementById('confirmClearButton').addEventListener('click', async () => {
     window.clearTimeout(saveTimer);
     try {
+      await store.clearPersisted();
       store.reset(store.getState().settings.locale);
-      store.clearPersisted();
       shouldPersistDraft = false;
       sampleMode = false;
       setSampleModeUI(false);
@@ -526,11 +531,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   window.addEventListener('pagehide', () => {
     window.clearTimeout(saveTimer);
     if (sampleMode || !shouldPersistDraft) return;
-    try {
-      store.save();
-    } catch {
-      // 保存容量を超えた場合は既存データを維持する。
-    }
+    void store.save().catch(() => {});
   });
 
   store.subscribe((_state, event) => {
