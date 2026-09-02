@@ -114,9 +114,22 @@ for (const [locale, addSelector, previewSelector, pageSize] of [
     await openLocale(page, locale);
     const add = page.locator(addSelector);
     await revealField(add);
-    await add.click();
-    await page.locator('[data-profile-link-index="0"]').fill(longUrl);
+    const links = locale === 'en'
+      ? [
+        'https://github.com/example',
+        'https://www.linkedin.com/in/example',
+        longUrl
+      ]
+      : [longUrl];
+    for (const link of links) {
+      await add.click();
+      await page.locator('[data-profile-link-index]').last().fill(link);
+    }
     await expect(page.locator(previewSelector)).toContainText('Website');
+    if (locale === 'en') {
+      await expect(page.locator('.en-profile-links > .en-contact-label')).toHaveCount(1);
+      await expect(page.locator('.en-profile-link-list > li')).toHaveCount(3);
+    }
     const pages = await inspectPdf(await printPdf(page));
     const text = pages.map((item) => item.text).join(' ').replace(/\s/g, '');
     expect(text).toContain('example.test/long-profile-path-');
