@@ -20,10 +20,18 @@ Web版: [https://herehigher.github.io/resume/](https://herehigher.github.io/resu
 
 ## ローカルで起動する
 
-Node.js はテストに使用しますが、アプリの実行に build は不要です。ES Modules を利用するため `file://` ではなく静的 Web server から `site/` を配信します。
+Node.js はテストに使用しますが、アプリの実行に build は不要です。ES Modules を利用するため `file://` ではなく静的 Web server から `site/` を配信します。Python 3 または Node.js と npx のどちらか一方を選び、両方を同時に実行する必要はありません。
+
+Python 3:
 
 ```bash
 python3 -m http.server 8000 --directory site
+```
+
+Node.js と npx:
+
+```bash
+npx --yes http-server site --port 8000
 ```
 
 Chrome で `http://localhost:8000/` を開きます。

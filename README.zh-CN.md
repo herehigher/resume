@@ -20,10 +20,18 @@ Resume Studio 是一款个人使用的静态 Web 应用，可在浏览器中编�
 
 ## 在本地启动
 
-Node.js 仅用于测试，应用本身不需要 build。因为使用 ES Modules，请通过静态 Web server 提供 `site/`，不要用 `file://` 直接打开。
+Node.js 仅用于测试，应用本身不需要 build。因为使用 ES Modules，请通过静态 Web server 提供 `site/`，不要用 `file://` 直接打开。请选择 Python 3 或 Node.js 加 npx 中的一种方式，无需同时运行两者。
+
+Python 3：
 
 ```bash
 python3 -m http.server 8000 --directory site
+```
+
+Node.js 和 npx：
+
+```bash
+npx --yes http-server site --port 8000
 ```
 
 使用 Chrome 打开 `http://localhost:8000/`。
