@@ -1,4 +1,4 @@
-import { expect, openLocale, test } from './fixtures.js';
+import { expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
 
 test('document tabs expose synchronized selection state and keyboard navigation', async ({ page }) => {
   await openLocale(page, 'ja');
@@ -36,6 +36,21 @@ test('@mobile mobile view controls expose synchronized selection state', async (
   await page.locator('[data-en-mobile-view="preview"]').click();
   await expect(page.locator('[data-en-mobile-view="editor"]')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('[data-en-mobile-view="preview"]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('@mobile 320px header keeps the larger favicon separate from its controls', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await openLocale(page, 'ja');
+
+  const layout = await page.evaluate(() => {
+    const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+    return { actions: rect('.header-actions'), brand: rect('.brand'), image: rect('.brand-mark') };
+  });
+  expect(layout.image.width).toBe(34);
+  expect(layout.image.height).toBe(34);
+  expect(layout.brand.right).toBeLessThanOrEqual(layout.actions.left);
+  await expect(page.locator('#printButton')).toBeVisible();
+  await expectNoPageOverflow(page);
 });
 
 test('localized public pages remain useful when JavaScript is disabled', async ({ baseURL, browser }) => {
