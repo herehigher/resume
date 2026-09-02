@@ -58,6 +58,7 @@ export default {
     configurationErrorTechnicalBody: 'The data-analytics-mode and data-analytics-provider tuple is unsupported. This is a configuration error, not a disabled analytics state.',
     storageHeading: 'Data on your device',
     storageBody: 'Draft content is AES-GCM encrypted in localStorage. A non-extractable decryption key is stored separately in IndexedDB for this origin. Exported JSON is not encrypted. Losing the key or browser data makes the draft unrecoverable, so keep a JSON backup. This does not protect against same-origin scripts/XSS or browser-profile compromise.',
+    storageUnavailableBody: 'Secure draft storage is unavailable on this page because it requires a secure context and Web Crypto. Reopen it in a supported browser with https://, http://localhost, or http://127.0.0.1. Existing saved data is not changed. Exported JSON is not encrypted.',
     repositoryLink: 'View source code on GitHub',
     privacyNoticeLink: 'Read the full privacy notice',
     close: 'Close'

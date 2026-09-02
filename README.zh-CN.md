@@ -72,7 +72,7 @@ npx --yes http-server site --port 8000
 ## 数据和隐私
 
 - 保存 key 为 `resume-studio-web-v1`，会把 profile、照片和三种语言文档一起保存到当前 browser origin。
-- 照片和导出的 JSON 都可能含个人信息；localStorage 和 export file 不会被加密。
+- 草稿正文以 AES-GCM 加密后保存在 localStorage。导出的 JSON 和 PDF 不加密，并可能包含照片等个人信息，请安全保管。
 - 清除 browser data、结束 private browsing、存储容量不足或 browser storage eviction 都可能导致草稿丢失。重要草稿请导出 JSON backup。
 - 应用内删除只清除 v1 state，不会删除旧 `resume-studio-data-v1`、已下载的 JSON/PDF 或 browser download history。
 - Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics，不会向同一 origin 静态 asset 以外的地址发送统计请求。只有 `herehigher/resume` 的已验证 stable tag，才可在 tagged manifest 启用时由 deployment-only adapter 向 artifact 确定性加入标准 Cloudflare Web Analytics。它不使用 Cookie、localStorage、用户级 ID 或 custom event，也不会发送简历输入、照片、JSON 或设备草稿。可通过页面 status 与 Network panel 核查当前 mode。

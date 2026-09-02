@@ -72,7 +72,7 @@ All assets use fictional sample data. Their source and Chromium version are reco
 ## Data and privacy
 
 - The storage key is `resume-studio-web-v1`. The profile, photo, and all three language documents are stored together for the current browser origin.
-- Photos and exported JSON may contain personal information. Neither localStorage nor exported files are encrypted.
+- Draft content is AES-GCM encrypted in localStorage. Exported JSON and PDF files are not encrypted and may contain photos or other personal information, so store them securely.
 - Clearing browser data, ending a private-browsing session, exceeding the storage quota, or browser storage eviction can remove a draft. Export important drafts as JSON backups.
 - In-app deletion clears the v1 state. It does not delete the legacy `resume-studio-data-v1` key, downloaded JSON/PDF files, or browser download history.
 - The repository `site/`, clones, and forks disable analytics by default and make no analytics requests beyond same-origin static assets. Only a validated stable tag in `herehigher/resume` may have the deployment-only adapter deterministically add standard Cloudflare Web Analytics when its tagged manifest enables it. It uses no cookies, localStorage, user-level IDs, or custom events and sends no resume input, photo, JSON, or on-device draft. The page status and Network panel expose the active mode.

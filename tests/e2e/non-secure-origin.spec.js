@@ -14,6 +14,7 @@ const cases = [
   {
     locale: 'ja',
     message: 'このページでは下書きを安全に保存できません。https://、http://localhost、または http://127.0.0.1 で開き直してください。保存済みデータは変更していません。',
+    privacyBody: 'このページでは安全な下書き保存を利用できません。',
     save: '#saveDraftButton',
     reload: '#reloadDraftButton',
     sample: '#loadSampleButton',
@@ -23,6 +24,7 @@ const cases = [
   {
     locale: 'zh-CN',
     message: '此页面无法安全保存草稿。请使用 https://、http://localhost 或 http://127.0.0.1 重新打开。已保存的数据未被修改。',
+    privacyBody: '此页面无法使用安全草稿存储',
     save: '[data-zh-action="save"]',
     reload: '[data-zh-action="reload"]',
     sample: '[data-zh-action="sample"]',
@@ -32,6 +34,7 @@ const cases = [
   {
     locale: 'en',
     message: 'This page cannot save drafts securely. Reopen it with https://, http://localhost, or http://127.0.0.1. Saved data was not changed.',
+    privacyBody: 'Secure draft storage is unavailable on this page',
     save: '[data-en-save]',
     reload: '[data-en-reload]',
     sample: '[data-en-load-sample]',
@@ -72,6 +75,9 @@ test('non-secure HTTP origin keeps encrypted drafts untouched and gives actionab
     }))).toEqual({ secure: false, subtle: false });
     await expect(page.locator('#globalMessage')).toHaveText(scenario.message);
     await expect(page.locator(scenario.reload)).toBeEnabled();
+    await page.locator('#privacySecurityButton').click();
+    await expect(page.locator('#privacySecurityStorageBody')).toContainText(scenario.privacyBody);
+    await page.locator('#privacySecurityCloseButton').click();
 
     await page.evaluate(async ({ database, store, key }) => {
       const request = indexedDB.open(database, 1);
