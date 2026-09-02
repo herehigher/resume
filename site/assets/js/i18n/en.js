@@ -6,7 +6,7 @@ export default {
   localeLabel: 'Display language',
   backupMenuLabel: 'Backup & restore',
   backupMenuShortLabel: 'Backup',
-  brandHome: 'Resume Studio home',
+  brandEntry: 'Open the Resume Studio introduction',
   exportData: 'Export data',
   importData: 'Import data',
   printDocument: 'Save PDF',

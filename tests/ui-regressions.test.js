@@ -24,7 +24,7 @@ test('print styles never reveal a hidden locale workspace', () => {
 
 test('every locale has distinct import, export, and locale-save error messages', () => {
   for (const messages of [ja, zhCN, en]) {
-    assert.ok(messages.brandHome);
+    assert.ok(messages.brandEntry);
     assert.ok(messages.exportError);
     assert.ok(messages.localeSaveError);
     assert.ok(messages.printDocument);

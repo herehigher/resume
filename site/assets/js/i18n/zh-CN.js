@@ -6,7 +6,7 @@ export default {
   localeLabel: '显示语言',
   backupMenuLabel: '备份与恢复',
   backupMenuShortLabel: '备份',
-  brandHome: 'Resume Studio 首页',
+  brandEntry: '打开 Resume Studio 简介页',
   exportData: '导出数据',
   importData: '导入数据',
   printDocument: '导出 PDF',
