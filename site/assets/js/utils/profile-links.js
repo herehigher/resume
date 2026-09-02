@@ -10,6 +10,7 @@ const KNOWN_SITES = Object.freeze([
   { hostname: 'note.com', name: 'note', icon: 'note' },
   { hostname: 'zenn.dev', name: 'Zenn', icon: 'zenn' },
   { hostname: 'medium.com', name: 'Medium', icon: 'medium' },
+  { hostname: 'x.com', name: 'X', icon: 'x' },
   { hostname: 'youtube.com', name: 'YouTube', icon: 'youtube' }
 ]);
 
@@ -62,6 +63,7 @@ export function profileLinkIcon(icon) {
     note: '<path d="M4 4h16v16H4V4Zm3 3v10h10V7H7Zm2 2h6v2H9V9Zm0 4h6v2H9v-2Z"/>',
     zenn: '<path d="m4 5 7 7-7 7h4l7-7-7-7H4Zm8 0 7 7-7 7h4l7-7-7-7h-4Z"/>',
     medium: '<path d="M3 6.5c0-.8.3-1.2 1-1.2h5.4l4.1 9.2 3.6-9.2H22c.6 0 1 .4 1 1v11.2c0 .7-.4 1.2-1.1 1.2h-3.2V9.8l-3.6 8.9h-2.7L8.2 9.8v8.9H4.1c-.7 0-1.1-.5-1.1-1.2V6.5Z"/>',
+    x: '<path d="M4 3h4.2l4.4 5.9L17.6 3H20l-6.3 7.2L20.5 21h-4.2l-4.8-6.4L5.9 21H3.5l6.9-7.9L4 3Zm3.1 1.8 9.8 14.4h1.7L8.8 4.8H7.1Z"/>',
     youtube: '<path d="M21.6 7.2a2.8 2.8 0 0 0-2-2C17.8 4.7 12 4.7 12 4.7s-5.8 0-7.6.5a2.8 2.8 0 0 0-2 2A29 29 0 0 0 2 12a29 29 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.8.5 7.6.5 7.6.5s5.8 0 7.6-.5a2.8 2.8 0 0 0 2-2A29 29 0 0 0 22 12a29 29 0 0 0-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z"/>'
   };
   return `<svg class="profile-link-icon profile-link-icon--${escapeHTML(icon)}" aria-hidden="true" viewBox="0 0 24 24">${paths[icon] || paths.external}</svg>`;
