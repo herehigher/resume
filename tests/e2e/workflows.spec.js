@@ -21,6 +21,22 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
   await expect(page.locator('#draftControlsTitle')).toHaveText('この端末の下書き');
   await expect(page.locator('#japaneseWorkspace .draft-controls #saveStatus')).toBeVisible();
   await expect(page.locator('#reloadDraftButton')).toBeDisabled();
+  const disabledReloadStyle = await page.locator('#reloadDraftButton').evaluate((button) => {
+    const disabled = getComputedStyle(button);
+    const enabled = getComputedStyle(document.getElementById('saveDraftButton'));
+    return {
+      backgroundColor: disabled.backgroundColor,
+      color: disabled.color,
+      cursor: disabled.cursor,
+      opacity: disabled.opacity,
+      enabledBackgroundColor: enabled.backgroundColor,
+      enabledColor: enabled.color
+    };
+  });
+  expect(disabledReloadStyle.cursor).toBe('not-allowed');
+  expect(Number.parseFloat(disabledReloadStyle.opacity)).toBeLessThan(1);
+  expect(disabledReloadStyle.backgroundColor).not.toBe(disabledReloadStyle.enabledBackgroundColor);
+  expect(disabledReloadStyle.color).not.toBe(disabledReloadStyle.enabledColor);
   await expect(page.locator('#clearButton')).toBeHidden();
   await expect(page.locator('#clearDraftEmptyStatus')).toHaveText('この端末に保存された下書きはありません');
   await expect(page.locator('#clearDraftEmptyStatus')).toHaveAttribute('aria-live', 'polite');
