@@ -156,6 +156,9 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
   const commonFacts = [
     /https:\/\/herehigher\.github\.io\/resume\//,
     /python3 -m http\.server 8000 --directory site/,
+    /npx --yes http-server@14\.1\.1 site --port 8000/,
+    /http:\/\/localhost:8000\//,
+    /file:\/\//,
     /\?lang=ja/,
     /\?lang=zh-CN/,
     /\?lang=en/,

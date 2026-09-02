@@ -20,10 +20,18 @@ The locale-specific document sections are stored independently and do not overwr
 
 ## Run locally
 
-Node.js is used for tests, but the app requires no production build. Because it uses ES Modules, serve `site/` from a static web server instead of opening it with `file://`.
+Node.js is used for tests, but the app requires no production build. Because it uses ES Modules, serve `site/` from a static web server instead of opening it with `file://`. Choose either Python 3 or Node.js with npx; you do not need to run both.
+
+Python 3:
 
 ```bash
 python3 -m http.server 8000 --directory site
+```
+
+Node.js and npx:
+
+```bash
+npx --yes http-server@14.1.1 site --port 8000
 ```
 
 Open `http://localhost:8000/` in Chrome.
