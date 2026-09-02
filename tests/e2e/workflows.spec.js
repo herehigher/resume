@@ -291,6 +291,28 @@ test('English: complete editing flow saves, restores, protects samples, and remo
   await expect(workspace.locator('[data-en-preview]')).not.toContainText('E2E Labs');
 });
 
+test('English: native month inputs inherit the English locale for every dated entry type', async ({ page }) => {
+  await openLocale(page, 'en');
+  const workspace = page.locator('[data-english-editor]');
+  await expect(workspace).toHaveAttribute('lang', 'en');
+
+  for (const type of ['experience', 'projects', 'education', 'certifications']) {
+    const addButton = workspace.locator(`[data-en-add="${type}"]`);
+    const section = addButton.locator('xpath=ancestor::details[1]');
+    if (!(await section.evaluate((element) => element.open))) {
+      await section.locator('summary').click();
+    }
+    await expect(addButton).toBeVisible();
+  }
+
+  const monthInputs = workspace.locator('input[type="month"]');
+  await expect(monthInputs).toHaveCount(7);
+  for (const input of await monthInputs.all()) await expect(input).toBeVisible();
+  await expect.poll(() => monthInputs.evaluateAll((inputs) => inputs.map((input) => (
+    input.closest('[lang]')?.getAttribute('lang')
+  )))).toEqual(['en', 'en', 'en', 'en', 'en', 'en', 'en']);
+});
+
 test('JSON の書き出し・読込が往復し、不正データは既存下書きを壊さない', async ({ page }) => {
   await openLocale(page, 'ja');
   const name = page.locator('[name="fullName"]');
