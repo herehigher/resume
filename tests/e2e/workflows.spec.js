@@ -18,7 +18,28 @@ const PROFILE_URL_CASES = [
 test('日本語: 入力・保存復元・例示保護・削除・安全なプレビュー', async ({ page }) => {
   await openLocale(page, 'ja');
   await expect(page.locator('.header-actions #saveStatus')).toHaveCount(0);
+  await expect(page.locator('#draftControlsTitle')).toHaveText('この端末の下書き');
   await expect(page.locator('#japaneseWorkspace .draft-controls #saveStatus')).toBeVisible();
+  await expect(page.locator('#reloadDraftButton')).toBeDisabled();
+  const disabledReloadStyle = await page.locator('#reloadDraftButton').evaluate((button) => {
+    const disabled = getComputedStyle(button);
+    const enabled = getComputedStyle(document.getElementById('saveDraftButton'));
+    return {
+      backgroundColor: disabled.backgroundColor,
+      color: disabled.color,
+      cursor: disabled.cursor,
+      opacity: disabled.opacity,
+      enabledBackgroundColor: enabled.backgroundColor,
+      enabledColor: enabled.color
+    };
+  });
+  expect(disabledReloadStyle.cursor).toBe('not-allowed');
+  expect(Number.parseFloat(disabledReloadStyle.opacity)).toBeLessThan(1);
+  expect(disabledReloadStyle.backgroundColor).not.toBe(disabledReloadStyle.enabledBackgroundColor);
+  expect(disabledReloadStyle.color).not.toBe(disabledReloadStyle.enabledColor);
+  await expect(page.locator('#clearButton')).toBeHidden();
+  await expect(page.locator('#clearDraftEmptyStatus')).toHaveText('この端末に保存された下書きはありません');
+  await expect(page.locator('#clearDraftEmptyStatus')).toHaveAttribute('aria-live', 'polite');
 
   const name = page.locator('[name="fullName"]');
   const motivation = page.locator('[name="motivation"]');
@@ -29,6 +50,10 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   const maliciousName = '<img data-e2e-malicious src=x onerror=alert(1)> 山田';
   await name.fill(maliciousName);
+  await expect(page.locator('#clearButton')).toBeVisible();
+  await expect(page.locator('#clearButton')).toHaveText('この端末の下書きを削除…');
+  await expect(page.locator('#clearDraftNotice')).toHaveText('画面上の入力内容も削除されます');
+  await expect.poll(() => page.locator('#clearButton').evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await motivation.fill('顧客課題を整理し、改善を最後まで推進します。');
   await github.fill('https://github.com/resume-studio-test');
   await portfolio.fill('javascript:alert(1)');
@@ -46,6 +71,7 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   await page.locator('#saveDraftButton').click();
   await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+  await expect(page.locator('#reloadDraftButton')).toBeEnabled();
   await name.fill('一時変更');
   await page.locator('#reloadDraftButton').click();
   await expect(name).toHaveValue(maliciousName);
@@ -62,9 +88,80 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   await page.locator('#clearButton').click();
   await expect(page.locator('#confirmDialog')).toBeVisible();
+  await expect(page.locator('#cancelClearButton')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#confirmDialog')).not.toBeVisible();
+  await expect(page.locator('#clearButton')).toBeFocused();
+
+  await page.locator('#clearButton').click();
   await page.locator('#confirmClearButton').click();
   await expect(name).toHaveValue('');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
+  await expect(page.locator('#clearButton')).toBeHidden();
+  await expect(page.locator('#clearDraftEmptyStatus')).toBeVisible();
+  await expect(page.locator('#clearDraftEmptyStatus')).toHaveText('この端末に保存された下書きはありません');
+  await expect(page.locator('#reloadDraftButton')).toBeDisabled();
+  await expect(page.locator('#saveDraftButton')).toBeFocused();
+});
+
+test('@mobile 日本語の下書き操作は375pxと401pxで縦に並び、44px以上の押下領域を保つ', async ({ page }) => {
+  for (const width of [375, 401]) {
+    await page.setViewportSize({ width, height: 844 });
+    await openLocale(page, 'ja');
+    await page.locator('[name="fullName"]').fill(`モバイル ${width}`);
+    const buttons = page.locator('#japaneseWorkspace .draft-control-actions .secondary-button, #clearButton');
+    for (const button of await buttons.all()) {
+      await expect.poll(() => button.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+    }
+    const actionLayout = await page.locator('#japaneseWorkspace .draft-control-actions').evaluate((element) => ({
+      columns: getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/),
+      width: element.getBoundingClientRect().width
+    }));
+    expect(actionLayout.columns).toHaveLength(1);
+    expect(Number.parseFloat(actionLayout.columns[0])).toBeCloseTo(actionLayout.width, 0);
+    await expectNoPageOverflow(page);
+  }
+});
+
+test('三言語エディターは Analytics 表示の下に著作権と MIT License を常設する', async ({ page }) => {
+  for (const [locale, workspace] of [
+    ['ja', '#japaneseWorkspace'],
+    ['zh-CN', '#chineseWorkspace'],
+    ['en', '[data-english-editor]']
+  ]) {
+    await openLocale(page, locale);
+    const legal = page.locator(`${workspace} .editor-legal`);
+    const license = legal.locator('a');
+    await expect(page.locator(`${workspace} .editor-footer .editor-legal`)).toHaveCount(1);
+    await expect(page.locator(`${workspace} .editor-footer #clearButton`)).toHaveCount(0);
+    await expect(legal.locator('[data-analytics-disclosure="status"], [data-editor-analytics-disclosure="status"]')).toBeVisible();
+    await expect(license).toHaveText('MIT License');
+    await expect(license).toHaveAttribute('href', 'https://github.com/herehigher/resume/blob/main/LICENSE');
+    await expect(license).toHaveAttribute('target', '_blank');
+    await expect(license).toHaveAttribute('rel', 'noopener noreferrer');
+  }
+
+  await openLocale(page, 'ja');
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('#japaneseWorkspace .editor-legal')).toBeHidden();
+});
+
+test('@mobile 著作権表示は固定の trust capsule に隠れない', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const legal = page.locator('#japaneseWorkspace .editor-legal');
+  await legal.scrollIntoViewIfNeeded();
+  const layout = await page.evaluate(() => {
+    const legalBox = document.querySelector('#japaneseWorkspace .editor-copyright').getBoundingClientRect();
+    const capsuleBox = document.getElementById('trustCapsule').getBoundingClientRect();
+    return {
+      legalBottom: legalBox.bottom,
+      legalRight: legalBox.right,
+      capsuleLeft: capsuleBox.left,
+      capsuleTop: capsuleBox.top
+    };
+  });
+  expect(layout.legalBottom <= layout.capsuleTop || layout.legalRight <= layout.capsuleLeft).toBe(true);
+  await expectNoPageOverflow(page);
 });
 
 test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除条目', async ({ page }) => {

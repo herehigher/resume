@@ -52,6 +52,9 @@ export function initPrivacySecurity(initialLocale) {
     }
     document.getElementById('privacySecurityUserBody').textContent = copy[`${analyticsStatus}UserBody`];
     document.getElementById('privacySecurityTechnicalBody').textContent = copy[`${analyticsStatus}TechnicalBody`];
+    document.querySelectorAll('[data-analytics-disclosure="status"], [data-editor-analytics-disclosure="status"]').forEach((element) => {
+      element.textContent = copy[`${analyticsStatus}Disclosure`];
+    });
     button.setAttribute('aria-label', copy.badgeAria.replace('{version}', APP_VERSION));
     repositoryLink.setAttribute('aria-label', copy.sourceLinkAria);
     repositoryLink.title = copy.sourceLink;

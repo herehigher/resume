@@ -126,6 +126,12 @@ export function renderEnglishWorkspace() {
           </div>
         </details>
       </form>
+      <div class="editor-footer editor-footer--legal">
+        <div class="editor-legal">
+          <p><span data-editor-analytics-disclosure="status">Analytics is disabled in this source build. It makes no analytics requests.</span></p>
+          <p class="editor-copyright">© 2026 herehigher · <a href="https://github.com/herehigher/resume/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></p>
+        </div>
+      </div>
     </section>
 
     <section class="preview-panel" aria-label="English resume preview">

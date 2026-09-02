@@ -19,6 +19,7 @@ const alternateLinks = Object.freeze({
   en: `${base}en/`,
   'x-default': base
 });
+const licenseUrl = 'https://github.com/herehigher/resume/blob/main/LICENSE';
 
 function source(file) {
   return readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -79,6 +80,8 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /<a class="entry-button" href="\.\.\/\?lang=/);
     assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
+    assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
+    assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
   }
 });
 
