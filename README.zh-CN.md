@@ -6,7 +6,7 @@ Resume Studio 是一款个人使用的静态 Web 应用，可在浏览器中编�
 
 ## 在线版
 
-在线版将在 Issue #9 中发布。在公开地址完成验证前，请使用下面的本地启动方式。
+在线版：[https://herehigher.github.io/resume/](https://herehigher.github.io/resume/)
 
 ## 支持的文档和纸张
 

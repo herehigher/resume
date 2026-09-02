@@ -6,7 +6,7 @@ Resume Studio is a personal, static web app for editing Japanese, Simplified Chi
 
 ## Web App
 
-Publication of the hosted Web App is tracked in Issue #9. Use the local setup below until its URL has been verified.
+Web App: [https://herehigher.github.io/resume/](https://herehigher.github.io/resume/)
 
 ## Documents and paper sizes
 

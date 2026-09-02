@@ -150,11 +150,11 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
   assert.match(rootReadme, /日本語（このページ）/);
   assert.doesNotMatch(rootReadme, /#project-overview|README\.ja\.md/);
   assert.match(rootReadme, /README だけで使い始める/);
-  assert.match(rootReadme, /Issue #9/);
-  assert.doesNotMatch(rootReadme, /https:\/\/herehigher\.github\.io/);
+  assert.match(rootReadme, /https:\/\/herehigher\.github\.io\/resume\//);
+  assert.doesNotMatch(rootReadme, /Issue #9/);
 
   const commonFacts = [
-    /Issue #9/,
+    /https:\/\/herehigher\.github\.io\/resume\//,
     /python3 -m http\.server 8000 --directory site/,
     /\?lang=ja/,
     /\?lang=zh-CN/,
@@ -189,6 +189,7 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
   for (const relativePath of detailedReadmes) {
     const markdown = readFileSync(path.join(root, relativePath), 'utf8');
     assert.doesNotMatch(markdown, /\bDemo\b/, `${relativePath} must describe the production Web App, not a demo`);
+    assert.doesNotMatch(markdown, /Issue #9/, `${relativePath} must not describe the published Web App as pending`);
     for (const pattern of [...commonFacts, ...localeFacts[relativePath]]) {
       assert.match(markdown, pattern, `${relativePath} is missing ${pattern}`);
     }
