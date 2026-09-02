@@ -31,7 +31,7 @@ python3 -m http.server 8000 --directory site
 Node.js と npx:
 
 ```bash
-npx --yes http-server@14.1.1 site --port 8000
+npx --yes http-server site --port 8000
 ```
 
 Chrome で `http://localhost:8000/` を開きます。
