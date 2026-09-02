@@ -199,22 +199,12 @@
           <details class="form-section">
             <summary>
               <span class="section-number">03</span>
-              <span><strong>オンラインプロフィール</strong><small>GitHub・LinkedIn・ポートフォリオ</small></span>
+              <span><strong>Links</strong><small>最大3件。URLを入力するとサイト名とアイコンを自動で判別します。</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
             <div class="section-content">
-              <label class="input-field">
-                <span>GitHub URL</span>
-                <input name="github" type="url" autocomplete="url" inputmode="url" placeholder="https://github.com/username">
-              </label>
-              <label class="input-field">
-                <span>LinkedIn URL</span>
-                <input name="linkedin" type="url" autocomplete="url" inputmode="url" placeholder="https://www.linkedin.com/in/username">
-              </label>
-              <label class="input-field">
-                <span>ポートフォリオ URL</span>
-                <input name="portfolio" type="url" autocomplete="url" inputmode="url" placeholder="https://example.com">
-              </label>
+              <div class="profile-links-editor" id="profileLinksEditor"></div>
+              <button class="small-add-button" id="addProfileLinkButton" type="button">＋ リンクを追加</button>
             </div>
           </details>
         </div>

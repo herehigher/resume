@@ -84,14 +84,13 @@ test('Chinese template renders photos only from an explicit display URL', () => 
 test('Chinese template escapes text and only makes HTTP(S) profile links clickable', () => {
   const state = createDefaultState('zh-CN');
   state.profile.fields.fullName = '<img src=x onerror=alert(1)>';
-  state.profile.fields.github = 'javascript:alert(1)';
-  state.profile.fields.portfolio = 'https://example.com/me?x=1&y=2';
+  state.profile.fields.links = ['javascript:alert(1)', 'https://example.com/me?x=1&y=2'];
   state.documents['zh-CN'].resume.summary = '<script>alert(1)</script>';
   const html = renderChineseResume(state);
 
   assert.doesNotMatch(html, /<script>|<img src=x/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.match(html, /<span class="zh-link">GitHub<\/span>/);
+  assert.match(html, /Website · javascript:alert\(1\)/);
   assert.doesNotMatch(html, /href="javascript:/);
   assert.doesNotMatch(html, /href="mailto:/);
   assert.match(html, /href="https:\/\/example\.com\/me\?x=1&amp;y=2"/);
@@ -107,7 +106,7 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
   assert.equal(sample.profile.fields.fullName, '简立');
   assert.equal(sample.profile.fields.email, 'jian.li@example.com');
   assert.deepEqual(
-    [sample.profile.fields.github, sample.profile.fields.linkedin, sample.profile.fields.portfolio],
+    sample.profile.fields.links,
     [
       'https://example.com/jian-li/github',
       'https://example.com/jian-li/linkedin',

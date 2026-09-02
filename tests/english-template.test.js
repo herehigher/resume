@@ -60,7 +60,7 @@ test('English template excludes sensitive profile fields and only links HTTP(S) 
   state.profile.fields.gender = 'PRIVATE-GENDER';
   state.profile.fields.postalCode = 'PRIVATE-POSTAL';
   state.profile.fields.address = 'PRIVATE-FULL-ADDRESS';
-  state.profile.fields.linkedin = 'javascript:alert(1)';
+  state.profile.fields.links[1] = 'javascript:alert(1)';
   state.documents.en.resume.projects[0].url = 'https://example.com/a-very-long-project-url-that-remains-clickable';
 
   const html = renderEnglishResume(state);
@@ -68,6 +68,24 @@ test('English template excludes sensitive profile fields and only links HTTP(S) 
   assert.match(html, /Location:<\/span> Seattle, WA \/ United States/);
   assert.doesNotMatch(html, /href="javascript:/);
   assert.match(html, /href="https:\/\/example\.com\/a-very-long-project-url-that-remains-clickable"/);
+});
+
+test('English profile Links use one stable label with a separate wrapping list', () => {
+  const state = createDefaultState('en');
+  state.profile.fields.links = [
+    'https://github.com/example',
+    'https://www.linkedin.com/in/example',
+    `https://example.test/${'long-link-path-'.repeat(10)}details`
+  ];
+  const html = renderEnglishResume(state);
+  const css = readFileSync(new URL('../site/assets/css/templates/en.css', import.meta.url), 'utf8');
+
+  assert.equal((html.match(/>Links:<\/span>/g) || []).length, 1);
+  assert.match(html, /class="en-profile-links"/);
+  assert.equal((html.match(/<li><(?:a|span) class="en-url"/g) || []).length, 3);
+  assert.match(css, /\.en-profile-links\s*\{[^}]*grid-template-columns:\s*max-content minmax\(0, 1fr\)/s);
+  assert.match(css, /\.en-profile-links > \.en-contact-label\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.match(css, /\.en-url > span\s*\{[^}]*overflow-wrap:\s*anywhere/s);
 });
 
 test('English page-size setting selects an A4 or US Letter document class', () => {

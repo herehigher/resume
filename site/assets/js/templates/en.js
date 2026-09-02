@@ -1,4 +1,5 @@
 import { escapeHTML, isClickableUrl } from '../utils/html.js';
+import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
 
 const MONTH_NAMES = Object.freeze([
   'January',
@@ -93,13 +94,18 @@ function renderUrl(value, className = 'en-url') {
 }
 
 function renderContact(profile, location) {
+  const profileLinks = getProfileLinks(profile).map((link) => {
+    const content = `${profileLinkIcon(link.icon)}<span>${escapeHTML(link.name)} · ${escapeHTML(link.displayUrl)}</span>`;
+    const rendered = isClickableUrl(link.url)
+      ? `<a class="en-url" href="${escapeHTML(link.url)}" target="_blank" rel="noopener noreferrer">${content}</a>`
+      : `<span class="en-url">${content}</span>`;
+    return `<li>${rendered}</li>`;
+  });
   const contactItems = [
     location ? `<li><span class="en-contact-label">Location:</span> ${text(location)}</li>` : '',
     profile.phone ? `<li><span class="en-contact-label">Phone:</span> ${text(profile.phone)}</li>` : '',
     profile.email ? `<li><span class="en-contact-label">Email:</span> ${text(profile.email)}</li>` : '',
-    profile.linkedin ? `<li><span class="en-contact-label">LinkedIn:</span> ${renderUrl(profile.linkedin)}</li>` : '',
-    profile.github ? `<li><span class="en-contact-label">GitHub:</span> ${renderUrl(profile.github)}</li>` : '',
-    profile.portfolio ? `<li><span class="en-contact-label">Portfolio:</span> ${renderUrl(profile.portfolio)}</li>` : ''
+    profileLinks.length ? `<li class="en-profile-links"><span class="en-contact-label">Links:</span><ul class="en-profile-link-list">${profileLinks.join('')}</ul></li>` : ''
   ].filter(Boolean);
   return contactItems.length ? `<ul class="en-contact-list">${contactItems.join('')}</ul>` : '';
 }

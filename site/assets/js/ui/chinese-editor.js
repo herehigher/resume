@@ -2,10 +2,11 @@ import zhCN from '../i18n/zh-CN.js';
 import { createChineseSampleState } from '../state/zh-CN.js';
 import { cloneData } from '../state/defaults.js';
 import { getChineseFields, renderChineseDocument } from '../templates/zh-CN.js';
+import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
+import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 
 const PROFILE_FIELDS = new Set([
-  'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email',
-  'github', 'linkedin', 'portfolio'
+  'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'
 ]);
 
 const ITEM_FACTORIES = Object.freeze({
@@ -89,11 +90,7 @@ export function renderChineseEditorShell() {
               <label class="input-field"><span>出生日期 <em>${zhCN.optionalLabel}</em></span><input data-profile="birthDate" type="date"></label>
               <label class="input-field"><span>性别 <em>${zhCN.optionalLabel}</em></span><select data-profile="gender"><option value="">不填写</option><option>男</option><option>女</option><option>其他</option></select></label>
             </div>
-            <div class="field-grid">
-              <label class="input-field"><span>GitHub</span><input data-profile="github" type="url" inputmode="url" placeholder="https://github.com/username"></label>
-              <label class="input-field"><span>LinkedIn</span><input data-profile="linkedin" type="url" inputmode="url" placeholder="https://www.linkedin.com/in/username"></label>
-              <label class="input-field"><span>个人主页 / 作品集</span><input data-profile="portfolio" type="url" inputmode="url" placeholder="https://example.com"></label>
-            </div>
+            <div class="field-grid"><div class="list-heading"><strong>Links</strong><button class="small-add-button" data-zh-add-profile-link type="button">添加链接</button></div><span class="field-help">最多 3 条。输入 URL 后自动识别网站名称和图标。</span><div class="profile-links-editor" data-zh-profile-links></div></div>
           </div>
         </details>
         <details class="form-section" open>
@@ -269,6 +266,14 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     });
   }
 
+  function renderProfileLinks() {
+    const links = store.getState().profile.fields.links;
+    renderProfileLinksEditor(rootElement.querySelector('[data-zh-profile-links]'), links, { removeLabel: '删除链接' });
+    const addButton = rootElement.querySelector('[data-zh-add-profile-link]');
+    addButton.disabled = !canAddProfileLink(links);
+    addButton.textContent = canAddProfileLink(links) ? '添加链接' : '最多 3 条链接';
+  }
+
   function applyZoom() {
     preview.style.transform = `scale(${zoom})`;
     rootElement.querySelector('[data-zh-zoom-label]').textContent = `${Math.round(zoom * 100)}%`;
@@ -321,6 +326,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       field.value = state.documents['zh-CN'].resume[field.dataset.resume] || '';
     });
     updatePhoto();
+    renderProfileLinks();
     renderLists();
     setMobileView(rootElement.dataset.mobileMode || 'editor');
     renderPreview();
@@ -417,6 +423,14 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
 
   function onInput(event) {
     const field = event.target;
+    if (field.dataset.profileLinkIndex !== undefined) {
+      mutate((state) => {
+        state.profile.fields.links[Number(field.dataset.profileLinkIndex)] = field.value;
+      });
+      updateProfileLinkRecognition(field);
+      renderPreview();
+      return;
+    }
     if (field.dataset.profile) {
       mutate((state) => {
         state.profile.fields[field.dataset.profile] = field.value;
@@ -443,6 +457,8 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   async function onClick(event) {
     const add = event.target.closest('[data-zh-add]');
     const remove = event.target.closest('[data-zh-remove]');
+    const addProfileLinkButton = event.target.closest('[data-zh-add-profile-link]');
+    const removeProfileLinkButton = event.target.closest('[data-remove-profile-link]');
     const action = event.target.closest('[data-zh-action]');
     const mobileView = event.target.closest('[data-zh-mobile-view]');
     if (add) {
@@ -455,6 +471,18 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       mutate((state) => state.documents['zh-CN'].resume[entry.dataset.zhType].splice(Number(entry.dataset.zhIndex), 1));
       renderLists();
       renderPreview();
+    }
+    if (addProfileLinkButton) {
+      mutate((state) => addProfileLink(state.profile.fields));
+      renderProfileLinks();
+      renderPreview();
+      return;
+    }
+    if (removeProfileLinkButton) {
+      mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
+      renderProfileLinks();
+      renderPreview();
+      return;
     }
     if (mobileView) {
       setMobileView(mobileView.dataset.zhMobileView);

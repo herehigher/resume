@@ -54,6 +54,13 @@
 }
 
 .en-contact-label { font-weight: 700; }
+.en-profile-links { align-items: start; display: grid; flex: 1 0 100%; gap: 4px 8px; grid-template-columns: max-content minmax(0, 1fr); }
+.en-profile-links > .en-contact-label { white-space: nowrap; }
+.en-profile-link-list { display: grid; gap: 3px; list-style: none; margin: 0; min-width: 0; padding: 0; }
+.en-profile-link-list li { display: block; min-width: 0; }
+.en-url { align-items: baseline; display: grid; gap: 4px; grid-template-columns: auto minmax(0, 1fr); max-width: 100%; min-width: 0; }
+.en-url .profile-link-icon { fill: currentColor; flex: 0 0 auto; height: 11px; width: 11px; }
+.en-url > span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 
 .english-document a {
   color: #174f91;

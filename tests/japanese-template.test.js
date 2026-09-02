@@ -87,8 +87,7 @@ test('Japanese PDF output omits blank rows and empty career entries', () => {
 
 test('Japanese profile and credential links only activate HTTP URLs', () => {
   const state = createDefaultState('ja');
-  state.profile.fields.github = 'https://github.com/example';
-  state.profile.fields.linkedin = 'javascript:alert(1)';
+  state.profile.fields.links = ['https://github.com/example', 'javascript:alert(1)'];
   state.documents.ja.qualification = [{
     date: '2026-01',
     detail: '認定資格',
@@ -99,16 +98,18 @@ test('Japanese profile and credential links only activate HTTP URLs', () => {
   assert.match(html, /href="https:\/\/github\.com\/example"/);
   assert.match(html, /href="https:\/\/example\.com\/credentials\/123"/);
   assert.doesNotMatch(html, /href="javascript:/);
-  assert.match(html, /<span class="profile-url-link">LinkedIn: javascript:alert\(1\)<\/span>/);
+  assert.match(html, /Website · javascript:alert\(1\)/);
 });
 
-test('Japanese resume uses a local portfolio highlight and symmetric history headings', () => {
+test('Japanese resume prints local link icons, readable URLs, and symmetric history headings', () => {
   const state = createJapaneseSampleState(createDefaultState('ja'));
   const html = renderJapaneseDocument(state);
 
-  assert.match(html, /class="portfolio-highlight"/);
-  assert.match(html, /class="portfolio-highlight-link" href="https:\/\/example\.com"/);
-  assert.doesNotMatch(html, /favicon|portfolio-highlight-mark|<img/);
+  assert.match(html, /class="resume-links" aria-label="Links"/);
+  assert.match(html, /profile-link-icon--github/);
+  assert.match(html, /Website · example\.com/);
+  const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
+  assert.match(japaneseCss, /\.resume-links \{[^}]*margin-bottom:\s*16px/s);
   assert.match(html, /class="paper-table-date">年月<\/div><div class="paper-table-detail">学歴<\/div>/);
   assert.match(html, /class="paper-table-date">年月<\/div><div class="paper-table-detail">職歴<\/div>/);
   assert.doesNotMatch(html, /<div class="paper-table-header"><div>年月<\/div><div>学歴・職歴<\/div>/);

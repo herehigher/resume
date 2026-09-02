@@ -3,7 +3,7 @@
   "settings": { "locale": "en", "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" } },
   "profile": {
     "photo": "",
-    "fields": { "fullName": "Avery Example", "birthDate": "1994-05-20", "gender": "", "postalCode": "100-0000", "address": "Example District, Example City", "phone": "+81-00-0000-0000", "email": "avery@example.test", "github": "https://example.test/avery", "linkedin": "https://example.test/avery-linkedin", "portfolio": "https://example.test/avery-portfolio" }
+    "fields": { "fullName": "Avery Example", "birthDate": "1994-05-20", "gender": "", "postalCode": "100-0000", "address": "Example District, Example City", "phone": "+81-00-0000-0000", "email": "avery@example.test", "links": ["https://example.test/avery", "https://example.test/avery-linkedin", "https://example.test/avery-portfolio"] }
   },
   "documents": {
     "ja": {

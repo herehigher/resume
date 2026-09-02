@@ -1,5 +1,6 @@
 import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../utils/date.js';
 import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js';
+import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
 
 function hasContent(value) {
   return String(value ?? '').trim().length > 0;
@@ -28,15 +29,6 @@ export function getJapaneseFields(state) {
   };
 }
 
-function safeLink(label, value, className, includeLabel = false) {
-  if (!hasContent(value)) return '';
-  const url = String(value).trim();
-  const displayUrl = url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
-  const linkText = `${includeLabel ? `${escapeHTML(label)}: ` : ''}${escapeHTML(displayUrl)}`;
-  if (!isClickableUrl(url)) return `<span class="${className}">${linkText}</span>`;
-  return `<a class="${className}" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
-}
-
 function credentialLink(value) {
   if (!hasContent(value)) return '';
   const url = String(value).trim();
@@ -47,33 +39,21 @@ function credentialLink(value) {
   return `<a class="qualification-proof" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">確認URL: ${escapeHTML(label)}</a>`;
 }
 
+function renderProfileLink(link, className) {
+  const label = `${escapeHTML(link.name)} · ${escapeHTML(link.displayUrl)}`;
+  const content = `${profileLinkIcon(link.icon)}<span>${label}</span>`;
+  if (!isClickableUrl(link.url)) return `<span class="${className}">${content}</span>`;
+  return `<a class="${className}" href="${escapeHTML(link.url)}" target="_blank" rel="noopener noreferrer">${content}</a>`;
+}
+
 function renderResumeProfiles(fields) {
-  const profiles = [
-    ['GitHub', fields.github],
-    ['LinkedIn', fields.linkedin]
-  ].filter(([, value]) => hasContent(value));
-  const portfolio = hasContent(fields.portfolio)
-    ? `<div class="portfolio-highlight">
-        <span class="portfolio-highlight-label">PORTFOLIO</span>
-        <span class="portfolio-highlight-content"><strong>ポートフォリオ</strong>${safeLink('Portfolio', fields.portfolio, 'portfolio-highlight-link')}</span>
-      </div>`
-    : '';
-  const secondaryLinks = profiles
-    .map(([label, value]) => safeLink(label, value, 'profile-url-link', true))
-    .filter(Boolean);
-  if (!portfolio && !secondaryLinks.length) return '';
-  const profilesRow = secondaryLinks.length
-    ? `<div class="resume-social-links"><span>ONLINE</span><div>${secondaryLinks.join('')}</div></div>`
-    : '';
-  return `<section class="resume-online-profiles" aria-label="オンラインプロフィール">${portfolio}${profilesRow}</section>`;
+  const links = getProfileLinks(fields);
+  if (!links.length) return '';
+  return `<section class="resume-links" aria-label="Links"><span class="resume-links-label">Links</span><div class="resume-links-list">${links.map((link) => renderProfileLink(link, 'profile-url-link')).join('')}</div></section>`;
 }
 
 function renderCareerProfiles(fields) {
-  const links = [
-    ['GitHub', fields.github],
-    ['LinkedIn', fields.linkedin],
-    ['Portfolio', fields.portfolio]
-  ].map(([label, value]) => safeLink(label, value, 'career-profile-link', true)).filter(Boolean);
+  const links = getProfileLinks(fields).map((link) => renderProfileLink(link, 'career-profile-link'));
   return links.length ? `<div class="career-profile-links">${links.join('')}</div>` : '';
 }
 
