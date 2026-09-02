@@ -91,6 +91,22 @@ test('envelope allowlist and bounds reject attacker-controlled storage without r
   assert.equal(storage.getItem(STORAGE_KEY), oversized);
 });
 
+test('save rejects an oversized schema-valid state before it can create an unloadable envelope', async () => {
+  const storage = memoryStorage();
+  const keys = memoryKeyStore();
+  const writer = persistence(storage, keys);
+  const originalState = createDefaultState();
+  originalState.profile.fields.fullName = 'Keep existing draft';
+  await writer.save(originalState);
+  const original = storage.getItem(STORAGE_KEY);
+  const oversized = createDefaultState();
+  oversized.profile.photo = `data:image/jpeg;base64,${'A'.repeat(3 * 1024 * 1024)}`;
+
+  await assert.rejects(() => writer.save(oversized), (error) => error.code === 'draft-too-large');
+  assert.equal(storage.getItem(STORAGE_KEY), original);
+  assert.equal((await writer.load()).profile.fields.fullName, 'Keep existing draft');
+});
+
 test('an existing ciphertext cannot be overwritten when its key is missing or invalid', async () => {
   const storage = memoryStorage();
   const originalKeys = memoryKeyStore();
@@ -102,6 +118,25 @@ test('an existing ciphertext cannot be overwritten when its key is missing or in
 
   const invalidKeys = { async read() { return { type: 'secret', extractable: true, algorithm: { name: 'AES-GCM' }, usages: ['encrypt', 'decrypt'] }; }, async write() {}, async remove() {} };
   await assert.rejects(() => persistence(storage, invalidKeys).save(createDefaultState()), (error) => error.code === 'key-invalid');
+  assert.equal(storage.getItem(STORAGE_KEY), original);
+});
+
+test('a different valid non-extractable key cannot overwrite an existing ciphertext after startup decrypt failure', async () => {
+  const storage = memoryStorage();
+  const keys = memoryKeyStore();
+  const writer = persistence(storage, keys);
+  const originalState = createDefaultState();
+  originalState.profile.fields.fullName = 'Original encrypted draft';
+  await writer.save(originalState);
+  const original = storage.getItem(STORAGE_KEY);
+  const replacementKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  await keys.write(replacementKey);
+
+  const afterLoadFailure = persistence(storage, keys);
+  await assert.rejects(() => afterLoadFailure.load(), (error) => error.code === 'decrypt-failed');
+  const editedDefault = createDefaultState();
+  editedDefault.profile.fields.fullName = 'Do not overwrite original';
+  await assert.rejects(() => afterLoadFailure.save(editedDefault), (error) => error.code === 'decrypt-failed');
   assert.equal(storage.getItem(STORAGE_KEY), original);
 });
 

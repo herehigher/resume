@@ -9,7 +9,7 @@ const KEY_STORE = 'keys';
 const KEY_ID = 'draft-encryption-key';
 const NONCE_BYTES = 12;
 const MAX_ENVELOPE_CHARACTERS = 4 * 1024 * 1024;
-const MAX_CIPHERTEXT_BYTES = 3 * 1024 * 1024;
+const MAX_CIPHERTEXT_BYTES = (3 * 1024 * 1024) - 1024;
 
 export class DraftStorageError extends Error {
   constructor(code, cause) {
@@ -161,6 +161,9 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
   async function encrypt(state, allowKeyCreation) {
     assertValidState(state);
     const key = await encryptionKey({ create: allowKeyCreation });
+    const plaintext = new TextEncoder().encode(JSON.stringify(state));
+    // AES-GCM appends a 128-bit authentication tag, so reject before allocating an oversized envelope.
+    if (plaintext.byteLength + 16 > MAX_CIPHERTEXT_BYTES) throw new DraftStorageError('draft-too-large');
     let nonce;
     let encrypted;
     try {
@@ -169,7 +172,10 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     } catch (error) {
       throw new DraftStorageError('crypto-failed', error);
     }
-    return JSON.stringify({ format: ENCRYPTED_DRAFT_FORMAT, algorithm: ENCRYPTED_DRAFT_ALGORITHM, nonce: toBase64(nonce), ciphertext: toBase64(new Uint8Array(encrypted)) });
+    if (encrypted.byteLength > MAX_CIPHERTEXT_BYTES) throw new DraftStorageError('draft-too-large');
+    const envelope = JSON.stringify({ format: ENCRYPTED_DRAFT_FORMAT, algorithm: ENCRYPTED_DRAFT_ALGORITHM, nonce: toBase64(nonce), ciphertext: toBase64(new Uint8Array(encrypted)) });
+    if (envelope.length > MAX_ENVELOPE_CHARACTERS) throw new DraftStorageError('draft-too-large');
+    return envelope;
   }
   async function decrypt(envelope) {
     const { nonce, ciphertext } = validateEnvelope(envelope);
@@ -194,29 +200,38 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     let parsed;
     try { parsed = JSON.parse(raw); } catch (error) { throw new DraftStorageError('corrupt-envelope', error); }
     if (isPlaintextState(parsed)) {
-      await save(parsed, { plaintextMigration: true });
+      await save(parsed);
       return parsed;
     }
     return decrypt(parsed);
   }
-  function save(state, { plaintextMigration = false } = {}) {
+  function save(state) {
     const snapshot = cloneData(assertValidState(state));
     return enqueue(async () => {
       let existing;
       try { existing = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
-      let allowKeyCreation = !existing || plaintextMigration;
-      if (existing && !plaintextMigration) {
+      let allowKeyCreation = !existing;
+      if (existing) {
         if (existing.length > MAX_ENVELOPE_CHARACTERS) throw new DraftStorageError('corrupt-envelope');
         try {
           const parsed = JSON.parse(existing);
           if (isPlaintextState(parsed)) allowKeyCreation = true;
-          else validateEnvelope(parsed);
+          else {
+            validateEnvelope(parsed);
+            // Do not replace a ciphertext unless the current key proves it can decrypt it.
+            await decrypt(parsed);
+          }
         } catch (error) {
           throw error instanceof DraftStorageError ? error : new DraftStorageError('corrupt-envelope', error);
         }
       }
       const encrypted = await encrypt(snapshot, allowKeyCreation);
-      try { storage.setItem(STORAGE_KEY, encrypted); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+      try {
+        if (storage.getItem(STORAGE_KEY) !== existing) throw new DraftStorageError('storage-changed');
+        storage.setItem(STORAGE_KEY, encrypted);
+      } catch (error) {
+        throw error instanceof DraftStorageError ? error : new DraftStorageError('storage-unavailable', error);
+      }
     });
   }
   function remove() {
