@@ -13,12 +13,17 @@ const adapterPath = fileURLToPath(import.meta.url);
 const digestPattern = /^[0-9a-f]{64}$/;
 const cloudflareTokenPattern = /^[0-9a-f]{32}$/;
 const htmlPaths = Object.freeze([
+  'editor/index.html',
   'en/index.html',
   'index.html',
   'ja/index.html',
   'zh-cn/index.html'
 ]);
 const disclosureCopy = Object.freeze({
+  'editor/index.html': Object.freeze({
+    disabled: 'この source build では Analytics は無効で、解析用の外部 request は発生しません。',
+    enabled: 'この公式 release は、集計 page view と performance のため Cookie を使わない Cloudflare Web Analytics を利用します。'
+  }),
   'en/index.html': Object.freeze({
     disabled: 'Analytics is disabled in this source build. It makes no analytics requests.',
     enabled: 'This official release uses cookie-free Cloudflare Web Analytics for aggregate page views and performance.'
@@ -155,7 +160,7 @@ async function validateSourceSite(sourceDirectory) {
     .map(({ relativePath }) => relativePath)
     .filter((relativePath) => relativePath.endsWith('.html'));
   if (actualHtml.length !== htmlPaths.length || actualHtml.some((value, index) => value !== htmlPaths[index])) {
-    fail('Source site must contain exactly the four canonical HTML paths');
+    fail('Source site must contain exactly the public and editor HTML paths');
   }
   for (const relativePath of htmlPaths) {
     const html = await readFile(path.join(sourceDirectory, relativePath), 'utf8');

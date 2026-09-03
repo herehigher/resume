@@ -1,11 +1,11 @@
 import { SUPPORTED_LOCALES } from '../config.js';
 import { getMessages } from '../i18n/index.js';
-import { messageForDraftStorageError } from './draft-storage-error.js';
+import { saveLocalePreference } from '../state/locale-preference.js';
 
 const publicEntryPaths = Object.freeze({
-  ja: './ja/',
-  'zh-CN': './zh-cn/',
-  en: './en/'
+  ja: '../ja/',
+  'zh-CN': '../zh-cn/',
+  en: '../en/'
 });
 
 function showMessage(message, isError = false) {
@@ -30,15 +30,16 @@ function downloadState(store, locale) {
   URL.revokeObjectURL(url);
 }
 
-export function persistLocaleChange(store, locale, beforePersist = () => {}) {
-  beforePersist();
-  return store.update((state) => {
+export function persistLocaleChange(store, storage, locale) {
+  store.update((state) => {
     state.settings.locale = locale;
-  }, { persist: true, type: 'locale' });
+  }, { type: 'locale' });
+  saveLocalePreference(storage, locale);
 }
 
 export function initLocaleController(store, {
-  beforeLocalePersist = () => {},
+  locale: initialLocale,
+  preferenceStorage = window.localStorage,
   onLocaleApplied = () => {}
 } = {}) {
   const select = document.getElementById('localeSelect');
@@ -59,10 +60,10 @@ export function initLocaleController(store, {
   const importButton = document.getElementById('importDataButton');
   const importInput = document.getElementById('importDataInput');
   const brand = document.querySelector('.brand');
+  let locale = initialLocale || store.getState().settings.locale;
   let renderedLocale = '';
 
   function applyLocale(force = false) {
-    const locale = store.getState().settings.locale;
     if (!force && renderedLocale === locale) return;
     renderedLocale = locale;
     const copy = getMessages(locale);
@@ -98,23 +99,22 @@ export function initLocaleController(store, {
   select.addEventListener('change', async () => {
     if (!SUPPORTED_LOCALES.includes(select.value)) return;
     const nextLocale = select.value;
-    const previousLocale = store.getState().settings.locale;
-    try {
-      await persistLocaleChange(store, nextLocale, beforeLocalePersist);
-    } catch (error) {
-      select.value = store.getState().settings.locale;
-      applyLocale(true);
-      showMessage(messageForDraftStorageError(error, previousLocale, getMessages(previousLocale).localeSaveError), true);
-      return;
-    }
+    locale = nextLocale;
+    store.update((state) => {
+      state.settings.locale = nextLocale;
+    }, { type: 'locale' });
     const url = new URL(window.location.href);
     url.searchParams.set('lang', nextLocale);
     window.history.replaceState(null, '', url);
     applyLocale(true);
+    try {
+      saveLocalePreference(preferenceStorage, nextLocale);
+    } catch (_error) {
+      showMessage(getMessages(nextLocale).localeSaveError, true);
+    }
   });
 
   exportButton.addEventListener('click', () => {
-    const locale = store.getState().settings.locale;
     const copy = getMessages(locale);
     try {
       downloadState(store, locale);
@@ -128,24 +128,20 @@ export function initLocaleController(store, {
   importInput.addEventListener('change', async () => {
     const file = importInput.files?.[0];
     if (!file) return;
-    const currentCopy = getMessages(store.getState().settings.locale);
+    const currentCopy = getMessages(locale);
     try {
       await store.importJson(await file.text());
-      const locale = store.getState().settings.locale;
-      const url = new URL(window.location.href);
-      url.searchParams.set('lang', locale);
-      window.history.replaceState(null, '', url);
       applyLocale(true);
       showMessage(getMessages(locale).importSuccess);
-    } catch (error) {
-      showMessage(messageForDraftStorageError(error, store.getState().settings.locale, currentCopy.importError), true);
+    } catch (_error) {
+      showMessage(currentCopy.importError, true);
     } finally {
       importInput.value = '';
     }
   });
 
   store.subscribe((_state, event) => {
-    if (['import', 'locale', 'reset', 'reload'].includes(event.type)) applyLocale(true);
+    if (['locale', 'reset', 'reload'].includes(event.type)) applyLocale(true);
   });
 
   applyLocale(true);

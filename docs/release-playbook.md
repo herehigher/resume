@@ -140,7 +140,7 @@ node -e '
   || { echo 'Tagged manifest does not reproduce; stop the release.' >&2; exit 1; }
 ```
 
-Output に raw token は含めず、4 digest / fingerprint だけを evidence に記録します。Owner が variable access を承認していない、variable が読めない、または mismatch の場合は tag を作成しません。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直します。Enabled のまま先に tag を作ることは禁止です。
+Output に raw token は含めず、4 digest / fingerprint だけを evidence に記録します。Owner が variable access を承認していない、variable が読めない、または mismatch の場合は tag を作成しません。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直します。Enabled のまま先に tag を作ることは禁止です。artifact の document allowlist は公開首頁、三言語 landing page、`/editor/` の5 HTMLだけとし、editor は `noindex,follow` でも disclosure と beacon contract の対象です。
 
 ## Pull Request、Quality、merge
 

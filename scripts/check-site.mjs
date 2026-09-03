@@ -38,14 +38,14 @@ javascriptFiles.forEach((file) => {
   }
 });
 
-const indexPath = join(root, 'index.html');
+const indexPath = join(root, 'editor/index.html');
 const html = readFileSync(indexPath, 'utf8');
-if (/<style(?:\s|>)/i.test(html)) failures.push('site/index.html must not contain inline style blocks');
-if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html)) failures.push('site/index.html must not contain inline scripts');
-if (!html.includes('type="module" src="./assets/js/main.js"')) failures.push('site/index.html must load the main ES Module');
+if (/<style(?:\s|>)/i.test(html)) failures.push('site/editor/index.html must not contain inline style blocks');
+if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html)) failures.push('site/editor/index.html must not contain inline scripts');
+if (!html.includes('type="module" src="../assets/js/main.js"')) failures.push('site/editor/index.html must load the main ES Module');
 
-const referencedAssets = [...html.matchAll(/(?:href|src)="(\.\/assets\/[^"]+)"/g)]
-  .map((match) => resolve(root, match[1]));
+const referencedAssets = [...html.matchAll(/(?:href|src)="(\.\.\/assets\/[^"]+)"/g)]
+  .map((match) => resolve(root, 'editor', match[1]));
 referencedAssets.forEach((file) => {
   if (!files.includes(file)) failures.push(`Missing referenced asset: ${file}`);
 });

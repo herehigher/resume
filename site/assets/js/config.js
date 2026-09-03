@@ -1,4 +1,5 @@
 export const STORAGE_KEY = 'resume-studio-web-v1';
+export const LOCALE_PREFERENCE_KEY = 'resume-studio-locale-v1';
 export const STATE_VERSION = 1;
 export const APP_VERSION = '0.1.0';
 export const REPOSITORY_URL = 'https://github.com/herehigher/resume';

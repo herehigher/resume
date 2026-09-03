@@ -106,7 +106,7 @@ test('enabled artifact exposes fixed status and only the standard analytics requ
   }));
   await context.route(CLOUDFLARE_RUM_URL, (route) => route.fulfill({ status: 204 }));
 
-  await page.goto(enabledBaseURL);
+  await page.goto(`${enabledBaseURL}/editor/`);
   await expect(page.locator('html')).toHaveAttribute('data-analytics-mode', 'enabled');
   await expect(page.locator('html')).toHaveAttribute('data-analytics-provider', CLOUDFLARE_PROVIDER);
   await expect(page.locator('[data-analytics-disclosure="status"]')).toContainText('公式 release');

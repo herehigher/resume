@@ -61,7 +61,7 @@ test('privacy and security copy has the same complete key set in every locale', 
 });
 
 test('all locale editors and template styles are connected to the page', () => {
-  const html = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../site/editor/index.html', import.meta.url), 'utf8');
   const main = readFileSync(new URL('../site/assets/js/main.js', import.meta.url), 'utf8');
   const localeController = readFileSync(
     new URL('../site/assets/js/ui/locale-controller.js', import.meta.url),

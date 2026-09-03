@@ -14,7 +14,7 @@ export default {
   exportError: '无法导出数据。',
   importSuccess: '数据已导入。',
   importError: '无法导入该数据。',
-  localeSaveError: '无法保存显示语言。',
+  localeSaveError: '显示语言已切换，但下次打开时可能无法记住。',
   draftStorageCompatibilityError: '此页面无法安全保存草稿。请使用 https://、http://localhost 或 http://127.0.0.1 重新打开。已保存的数据未被修改。',
   pendingTitle: '中文简历编辑器',
   pendingBody: '填写经历与成果，右侧将实时生成适合 A4 打印的中文简历。',

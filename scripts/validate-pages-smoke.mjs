@@ -16,6 +16,7 @@ const PAGE_CONTRACTS = Object.freeze([
   Object.freeze({ file: 'zh-cn/index.html', lang: 'zh-CN', canonical: 'https://herehigher.github.io/resume/zh-cn/' }),
   Object.freeze({ file: 'en/index.html', lang: 'en', canonical: 'https://herehigher.github.io/resume/en/' })
 ]);
+const EDITOR_CONTRACT = Object.freeze({ file: 'editor/index.html', lang: 'ja', canonical: 'https://herehigher.github.io/resume/editor/' });
 const ALTERNATES = Object.freeze({
   ja: 'https://herehigher.github.io/resume/ja/',
   'zh-CN': 'https://herehigher.github.io/resume/zh-cn/',
@@ -120,6 +121,15 @@ export async function validateDeploymentArtifact({
     assertCanonicalLinks(html, contract);
     assertAnalytics(html, contract.file, { analyticsMode, analyticsProvider, providerFingerprint });
   }
+  const editor = await readFile(path.join(directory, EDITOR_CONTRACT.file), 'utf8');
+  const editorAttributes = openingHtml(editor, EDITOR_CONTRACT.file);
+  if (editorAttributes.get('lang') !== EDITOR_CONTRACT.lang) fail('editor language is invalid');
+  const editorCanonical = [...editor.matchAll(/<link\b[^>]*>/gi)].map((match) => attributes(match[0]))
+    .filter((item) => item.get('rel') === 'canonical');
+  if (editorCanonical.length !== 1 || editorCanonical[0].get('href') !== EDITOR_CONTRACT.canonical) fail('editor canonical URL is invalid');
+  if (!/<meta\s+name="robots"\s+content="noindex,follow">/i.test(editor)) fail('editor must be noindex,follow');
+  if (/hreflang=/i.test(editor)) fail('editor must not join the public hreflang cluster');
+  assertAnalytics(editor, EDITOR_CONTRACT.file, { analyticsMode, analyticsProvider, providerFingerprint });
   const config = await readFile(path.join(directory, 'assets/js/config.js'), 'utf8');
   const versionPattern = new RegExp(`^export const APP_VERSION = '${packageVersion.replaceAll('.', '\\.')}';$`, 'gm');
   if ((config.match(versionPattern) || []).length !== 1) fail('APP_VERSION does not match package version');

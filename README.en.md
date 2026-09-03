@@ -34,13 +34,13 @@ Node.js and npx:
 npx --yes http-server site --port 8000
 ```
 
-Open `http://localhost:8000/` in Chrome.
+Open `http://localhost:8000/` in Chrome to select a language, or open the editor at `http://localhost:8000/editor/`.
 
 AES-GCM draft encryption requires a secure context. Use `https://`, `http://localhost`, or `http://127.0.0.1`; do not open a `http://0.0.0.0` or LAN-IP URL shown by the server.
 
 ## Start with this README only
 
-1. Select 日本語, 简体中文, or English from the language selector in the upper-right corner. You can also open `?lang=ja`, `?lang=zh-CN`, or `?lang=en` directly.
+1. Select 日本語, 简体中文, or English on the public homepage. In the editor, use the language selector in the upper-right corner. You can also open `/editor/?lang=ja`, `/editor/?lang=zh-CN`, or `/editor/?lang=en` directly.
 2. Edit a field and the preview updates immediately. Select “View example” to inspect a completed document first. The example does not overwrite a saved draft.
 3. Input is saved automatically to `localStorage` in the current browser profile. Use “Save draft” for a manual save and “Reload saved draft” to restore the saved content.
 4. Select “Save PDF,” then choose “Save as PDF” in Chrome's print dialog. Review the paper and print limitations below.

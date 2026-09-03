@@ -68,9 +68,9 @@ test('@mobile 320px header keeps readable locale choices and separate controls i
 
 test('brand link follows the active editor locale', async ({ page }) => {
   for (const [locale, entryPath, accessibleName] of [
-    ['ja', './ja/', 'Resume Studio の紹介ページを開く'],
-    ['zh-CN', './zh-cn/', '打开 Resume Studio 简介页'],
-    ['en', './en/', 'Open the Resume Studio introduction']
+    ['ja', '../ja/', 'Resume Studio の紹介ページを開く'],
+    ['zh-CN', '../zh-cn/', '打开 Resume Studio 简介页'],
+    ['en', '../en/', 'Open the Resume Studio introduction']
   ]) {
     await openLocale(page, locale);
     await expect(page.locator('.brand')).toHaveAttribute('href', entryPath);
@@ -104,9 +104,27 @@ test('localized public pages remain useful when JavaScript is disabled', async (
   await context.close();
 });
 
+test('homepage and locale CTAs lead to the matching editor locale', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#localeSelect')).toHaveCount(0);
+  await expect(page.locator('a[href="./ja/"]')).toHaveCount(3);
+
+  for (const [landingPath, locale] of [
+    ['/ja/', 'ja'],
+    ['/zh-cn/', 'zh-CN'],
+    ['/en/', 'en']
+  ]) {
+    await page.goto(landingPath);
+    await expect(page.locator('.entry-button')).toHaveAttribute('href', `../editor/?lang=${locale}`);
+    await page.locator('.entry-button').click();
+    await expect(page.locator('#localeSelect')).toHaveValue(locale);
+    await expect(page.locator('.brand')).toHaveAttribute('href', `../${landingPath.slice(1)}`);
+  }
+});
+
 test('@mobile 320px localized public entries keep the centered brand, heading, and primary button separate', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
-  for (const path of ['/ja/', '/zh-cn/', '/en/']) {
+  for (const path of ['/', '/ja/', '/zh-cn/', '/en/']) {
     await page.goto(path);
     const layout = await page.evaluate(() => {
       const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();

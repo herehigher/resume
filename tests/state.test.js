@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { STORAGE_KEY } from '../site/assets/js/config.js';
+import { LOCALE_PREFERENCE_KEY, STORAGE_KEY } from '../site/assets/js/config.js';
 import { resolveLocale } from '../site/assets/js/i18n/index.js';
+import { loadLocalePreference, saveLocalePreference } from '../site/assets/js/state/locale-preference.js';
 import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { createStore } from '../site/assets/js/state/store.js';
@@ -63,7 +64,19 @@ test('locale resolution follows URL, saved setting, browser, default order', () 
   assert.equal(resolveLocale({ browserLanguages: ['en-GB'] }), 'en');
   assert.equal(resolveLocale({ browserLanguages: ['zh-Hans'] }), 'zh-CN');
   assert.equal(resolveLocale({ browserLanguages: ['zh'] }), 'zh-CN');
+  assert.equal(resolveLocale({ browserLanguages: ['zh-TW'] }), 'ja');
+  assert.equal(resolveLocale({ browserLanguages: ['zh-Hant'] }), 'ja');
   assert.equal(resolveLocale({ browserLanguages: ['fr-FR'] }), 'ja');
+});
+
+test('locale preference is versioned, unencrypted, and independent from the draft', () => {
+  const storage = createMemoryStorage();
+  assert.equal(loadLocalePreference(storage), null);
+  saveLocalePreference(storage, 'en');
+  assert.equal(loadLocalePreference(storage), 'en');
+  assert.deepEqual(JSON.parse(storage.getItem(LOCALE_PREFERENCE_KEY)), { version: 1, locale: 'en' });
+  storage.setItem(STORAGE_KEY, JSON.stringify(createDefaultState('ja')));
+  assert.equal(loadLocalePreference(storage), 'en');
 });
 
 test('new storage ignores the legacy key', () => {
@@ -152,27 +165,26 @@ test('sample draft protection propagates storage failures without changing state
   assert.equal(readPersisted(storage), null);
 });
 
-test('changing locale from sample mode persists the protected draft, not sample data', async () => {
+test('changing locale only saves the independent preference, not the current draft', async () => {
   const storage = createMemoryStorage();
   const store = createTestStore(storage, createDefaultState('ja'));
   store.update((state) => {
     state.profile.fields.fullName = '保存する氏名';
   });
   await store.save();
-  const protectedDraft = await protectDraftBeforeSample(store, true);
+  await protectDraftBeforeSample(store, true);
   store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
 
-  await persistLocaleChange(store, 'zh-CN', () => {
-    store.replace(protectedDraft, { type: 'restore' });
-  });
+  persistLocaleChange(store, storage, 'zh-CN');
 
-  assert.equal(store.getState().profile.fields.fullName, '保存する氏名');
+  assert.equal(store.getState().profile.fields.fullName, '山田 太郎');
   assert.equal(store.getState().settings.locale, 'zh-CN');
   assert.equal(readPersisted(storage).profile.fields.fullName, '保存する氏名');
-  assert.equal(readPersisted(storage).settings.locale, 'zh-CN');
+  assert.equal(readPersisted(storage).settings.locale, 'ja');
+  assert.equal(loadLocalePreference(storage), 'zh-CN');
 });
 
-test('failed locale persistence leaves state and stored data unchanged', async () => {
+test('failed locale preference persistence keeps the current session language and draft', async () => {
   const storage = createMemoryStorage();
   const store = createTestStore(storage, createDefaultState('ja'));
   store.update((state) => {
@@ -184,9 +196,19 @@ test('failed locale persistence leaves state and stored data unchanged', async (
     throw new Error('quota exceeded');
   };
 
-  await assert.rejects(() => persistLocaleChange(store, 'en'), /quota exceeded/);
-  assert.equal(store.getState().settings.locale, 'ja');
+  assert.throws(() => persistLocaleChange(store, storage, 'en'), /quota exceeded/);
+  assert.equal(store.getState().settings.locale, 'en');
   assert.equal(storage.getItem(STORAGE_KEY), storedBefore);
+});
+
+test('import retains the saved document locale without replacing the independent display preference', async () => {
+  const storage = createMemoryStorage();
+  saveLocalePreference(storage, 'en');
+  const store = createTestStore(storage, createDefaultState('en'));
+  const imported = createDefaultState('ja');
+  await store.importJson(JSON.stringify(imported));
+  assert.equal(store.getState().settings.locale, 'ja');
+  assert.equal(loadLocalePreference(storage), 'en');
 });
 
 test('import rejects remote and unsupported photo sources', () => {

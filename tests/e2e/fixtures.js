@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
 
 const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
+export const DRAFT_STORAGE_KEY = 'resume-studio-web-v1';
+export const LOCALE_PREFERENCE_KEY = 'resume-studio-locale-v1';
 
 function collectStaticPaths(directory = siteRoot) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -36,7 +38,7 @@ export async function installNetworkGuard(context, baseURL) {
     const resourceType = request.resourceType();
     const query = [...url.searchParams.entries()];
     const isDocument = resourceType === 'document'
-      && ['/', '/index.html', '/ja/', '/zh-cn/', '/en/'].includes(url.pathname)
+      && ['/', '/index.html', '/ja/', '/zh-cn/', '/en/', '/editor/', '/editor/index.html'].includes(url.pathname)
       && (query.length === 0 || (
         query.length === 1
         && query[0][0] === 'lang'
@@ -82,9 +84,22 @@ export const test = base.extend({
 export { expect } from '@playwright/test';
 
 export async function openLocale(page, locale) {
-  await page.goto(`/?lang=${encodeURIComponent(locale)}`);
+  await page.goto(`/editor/?lang=${encodeURIComponent(locale)}`);
   await expect(page.locator('html')).toHaveAttribute('lang', locale === 'en' ? 'en' : locale);
   await expect(page.locator('#localeSelect')).toHaveValue(locale);
+}
+
+export async function readLocalePreference(page) {
+  return page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw).locale : null;
+  }, LOCALE_PREFERENCE_KEY);
+}
+
+export async function writeLocalePreference(page, locale) {
+  await page.evaluate(({ key, value }) => {
+    localStorage.setItem(key, JSON.stringify({ version: 1, locale: value }));
+  }, { key: LOCALE_PREFERENCE_KEY, value: locale });
 }
 
 export async function revealField(locator) {

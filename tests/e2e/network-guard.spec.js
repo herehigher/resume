@@ -3,7 +3,7 @@ import { installNetworkGuard } from './fixtures.js';
 
 test('source build は analytics を含むすべての外部 runtime request を拒否する', async ({ baseURL, context, page }) => {
   const guard = await installNetworkGuard(context, baseURL);
-  await page.goto('/');
+  await page.goto('/editor/');
 
   expect(guard.unexpectedRequests).toEqual([]);
 
