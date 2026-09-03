@@ -250,15 +250,17 @@ jobs:
           fetch_and_check 'ja/' ja.html '<title>'
           fetch_and_check 'zh-cn/' zh-cn.html '<title>'
           fetch_and_check 'en/' en.html '<title>'
+          fetch_and_check 'editor/' editor.html '<title>'
           fetch_and_check 'sitemap.xml' sitemap.xml '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
           fetch_and_check 'schema/resume-studio-web-v1.schema.json' schema.json '"title": "Resume Studio web v1 export"'
           fetch_and_check 'schema/resume-studio-web-v1.example.json' example.json '"version": 1'
           fetch_and_check 'assets/js/config.js' config.js "APP_VERSION = '${PACKAGE_VERSION}'"
-          mkdir -p "$smoke_dir/ja" "$smoke_dir/zh-cn" "$smoke_dir/en" "$smoke_dir/assets/js"
+          mkdir -p "$smoke_dir/ja" "$smoke_dir/zh-cn" "$smoke_dir/en" "$smoke_dir/editor" "$smoke_dir/assets/js"
           mv "$smoke_dir/root.html" "$smoke_dir/index.html"
           mv "$smoke_dir/ja.html" "$smoke_dir/ja/index.html"
           mv "$smoke_dir/zh-cn.html" "$smoke_dir/zh-cn/index.html"
           mv "$smoke_dir/en.html" "$smoke_dir/en/index.html"
+          mv "$smoke_dir/editor.html" "$smoke_dir/editor/index.html"
           mv "$smoke_dir/config.js" "$smoke_dir/assets/js/config.js"
           node scripts/validate-pages-smoke.mjs \
             --directory "$smoke_dir" \

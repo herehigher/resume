@@ -132,17 +132,19 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
     "fetch_and_check 'ja/'",
     "fetch_and_check 'zh-cn/'",
     "fetch_and_check 'en/'",
+    "fetch_and_check 'editor/'",
     "fetch_and_check 'sitemap.xml'",
     "fetch_and_check 'schema/resume-studio-web-v1.schema.json'",
     "fetch_and_check 'schema/resume-studio-web-v1.example.json'",
     "fetch_and_check 'assets/js/config.js'"
   ]) assert.match(deploy, new RegExp(publicPath.replaceAll('.', '\\.')));
-  assert.match(deploy, /mkdir -p "\$smoke_dir\/ja" "\$smoke_dir\/zh-cn" "\$smoke_dir\/en" "\$smoke_dir\/assets\/js"/);
+  assert.match(deploy, /mkdir -p "\$smoke_dir\/ja" "\$smoke_dir\/zh-cn" "\$smoke_dir\/en" "\$smoke_dir\/editor" "\$smoke_dir\/assets\/js"/);
   for (const relocation of [
     'mv "$smoke_dir/root.html" "$smoke_dir/index.html"',
     'mv "$smoke_dir/ja.html" "$smoke_dir/ja/index.html"',
     'mv "$smoke_dir/zh-cn.html" "$smoke_dir/zh-cn/index.html"',
     'mv "$smoke_dir/en.html" "$smoke_dir/en/index.html"',
+    'mv "$smoke_dir/editor.html" "$smoke_dir/editor/index.html"',
     'mv "$smoke_dir/config.js" "$smoke_dir/assets/js/config.js"'
   ]) assert.ok(deploy.includes(relocation), `${relocation} is missing`);
   assert.match(deploy, /validate-pages-smoke\.mjs[\s\S]*?--directory "\$smoke_dir"[\s\S]*?--package-version "\$PACKAGE_VERSION"/);
