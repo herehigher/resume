@@ -151,6 +151,26 @@ test('821pxの編集欄で入力例操作が折り返され、横にはみ出さ
   await expectNoPageOverflow(page);
 });
 
+test('1280pxの入力例モードでは状態文言を1行で表示する', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  const controls = page.locator('#japaneseWorkspace .draft-controls');
+  const status = page.locator('#saveStatus');
+  await expect(controls).toHaveClass(/is-sample-mode/);
+  await expect.poll(() => controls.locator('.draft-primary-row').evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length
+  ))).toBe(1);
+  await expect.poll(() => status.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { height: box.height, width: box.width };
+  })).toEqual(expect.objectContaining({ height: expect.any(Number), width: expect.any(Number) }));
+  const statusBox = await status.boundingBox();
+  expect(statusBox.width).toBeGreaterThan(150);
+  expect(statusBox.height).toBeLessThan(30);
+  await expectNoPageOverflow(page);
+});
+
 test('@mobile Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
   await openLocale(page, 'ja');
   const add = page.locator('#addProfileLinkButton');

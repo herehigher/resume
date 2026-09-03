@@ -82,6 +82,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   }
 
   function setSampleModeUI(active) {
+    document.querySelector('.draft-controls').classList.toggle('is-sample-mode', active);
     document.getElementById('draftNormalActions').hidden = active;
     document.getElementById('sampleModeActions').hidden = !active;
     clearButton.hidden = active;

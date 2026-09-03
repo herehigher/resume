@@ -344,6 +344,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   }
 
   function setSampleUI(active) {
+    root.querySelector('.draft-controls').classList.toggle('is-sample-mode', active);
     root.querySelector('[data-en-normal-actions]').hidden = active;
     root.querySelector('[data-en-sample-actions]').hidden = !active;
     root.querySelector('[data-en-clear]').hidden = active;

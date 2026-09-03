@@ -359,6 +359,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   }
 
   function setSampleMode(active) {
+    rootElement.querySelector('[data-zh-draft-controls]').classList.toggle('is-sample-mode', active);
     rootElement.querySelector('[data-zh-normal-actions]').hidden = active;
     rootElement.querySelector('[data-zh-sample-actions]').hidden = !active;
     rootElement.querySelector('[data-zh-action="clear"]').hidden = active;
