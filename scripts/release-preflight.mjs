@@ -54,11 +54,12 @@ function assertVersionContract({ changelog, config, packageVersion }) {
   if (!heading.test(changelog)) fail('CHANGELOG release heading is missing or invalid');
 }
 
-async function archiveRelease(cwd, releaseSha, target) {
+export async function archiveRelease(cwd, releaseSha, target) {
   let archive;
   try {
     archive = execFileSync('git', ['archive', '--format=tar', '--end-of-options', releaseSha], {
       cwd,
+      maxBuffer: 16 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'pipe']
     });
   } catch {

@@ -1,12 +1,24 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { runReleasePreflight } from '../scripts/release-preflight.mjs';
+import { archiveRelease, runReleasePreflight } from '../scripts/release-preflight.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+
+test('release preflight archives the complete release repository', async (t) => {
+  const target = mkdtempSync(path.join(os.tmpdir(), 'resume-release-archive-test-'));
+  t.after(() => rmSync(target, { force: true, recursive: true }));
+
+  await archiveRelease(root, 'HEAD', target);
+
+  const packageJson = JSON.parse(readFileSync(path.join(target, 'package.json'), 'utf8'));
+  assert.equal(packageJson.name, 'resume-studio');
+  assert.equal(readFileSync(path.join(target, 'site/assets/favicon/resume-studio.png')).byteLength > 200_000, true);
+});
 
 function mockPreflight({
   commandFailure,
