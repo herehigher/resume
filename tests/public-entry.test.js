@@ -12,9 +12,9 @@ import { parseImportedState } from '../site/assets/js/state/storage.js';
 const base = 'https://herehigher.github.io/resume/';
 const routes = Object.freeze([
   { file: 'site/index.html', lang: 'ja', canonical: base, h1: '履歴書を作成', assetPath: './assets/favicon/' },
-  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成', assetPath: '../assets/favicon/' },
-  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历', assetPath: '../assets/favicon/' },
-  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume', assetPath: '../assets/favicon/' }
+  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: '../assets/favicon/' },
+  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/' },
+  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/' }
 ]);
 const faviconAssets = Object.freeze([
   { rel: 'icon', file: 'resume-studio-16.png', sizes: '16x16', width: 16 },
@@ -108,7 +108,11 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/\?lang=/);
     assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
-    assert.match(html, /<img class="entry-mark" src="\.\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="48" height="48">/);
+    assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="\\.\\.\\/assets\\/favicon\\/resume-studio-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
+    assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
+    assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
+    assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
+    assert.match(html, /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-legal">/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
@@ -121,7 +125,24 @@ test('editor brand opens the active locale entry and public entries use the shar
   assert.match(html, /<img class="brand-mark" src="\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="38" height="38">/);
   assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
   assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
-  assert.match(source('site/assets/css/public-entry.css'), /\.entry-mark\s*\{[\s\S]*?height: 48px;[\s\S]*?object-fit: cover;[\s\S]*?width: 48px;/);
+  const publicEntryCss = source('site/assets/css/public-entry.css');
+  assert.match(publicEntryCss, /\.entry-header\s*\{[^}]*padding: 30px;/);
+  assert.match(publicEntryCss, /\.entry-brand\s*\{[\s\S]*?align-items: center;[\s\S]*?display: flex;[\s\S]*?gap: 12px;/);
+  assert.match(publicEntryCss, /\.entry-brand-copy\s*\{[\s\S]*?flex-direction: column;[\s\S]*?justify-content: center;[\s\S]*?min-width: 0;/);
+  assert.match(publicEntryCss, /\.entry-brand-title\s*\{[\s\S]*?font-size: 15px;[\s\S]*?font-weight: 700;[\s\S]*?letter-spacing: -\.01em;[\s\S]*?line-height: 1\.25;/);
+  assert.match(publicEntryCss, /\.entry-brand-subtitle\s*\{[\s\S]*?color: #64748b;[\s\S]*?font-size: 13px;[\s\S]*?line-height: 1\.45;[\s\S]*?margin-top: 3px;/);
+  assert.match(publicEntryCss, /\.entry-mark\s*\{[\s\S]*?background: #fff;[\s\S]*?border: 1px solid rgba\(15, 23, 42, \.12\);[\s\S]*?border-radius: 10px;[\s\S]*?box-shadow: 0 2px 8px rgba\(15, 23, 42, \.08\);[\s\S]*?height: 50px;[\s\S]*?object-fit: cover;[\s\S]*?width: 50px;/);
+  assert.match(publicEntryCss, /\.entry-main\s*\{[^}]*margin: 32px auto 0;[^}]*max-width: 650px;/);
+  assert.match(publicEntryCss, /\.entry-main h1\s*\{[\s\S]*?font-size: clamp\(23px, 3\.1vw, 31px\);[\s\S]*?letter-spacing: -\.035em;[\s\S]*?line-height: 1\.3;[\s\S]*?margin: 0;[\s\S]*?overflow-wrap: anywhere;/);
+  assert.match(publicEntryCss, /\.entry-lede\s*\{[\s\S]*?color: #354250;[\s\S]*?font-size: 16px;[\s\S]*?line-height: 1\.7;[\s\S]*?margin: 14px 0 0;/);
+  assert.match(publicEntryCss, /\.entry-trust-list\s*\{[\s\S]*?gap: 9px;[\s\S]*?margin: 21px 0 0;/);
+  assert.match(publicEntryCss, /\.entry-trust-dot\s*\{[\s\S]*?background: #eef5fc;[\s\S]*?border: 1px solid #cadeef;[\s\S]*?height: 19px;[\s\S]*?line-height: 17px;[\s\S]*?width: 19px;/);
+  assert.match(publicEntryCss, /\.entry-actions\s*\{[\s\S]*?justify-content: center;[\s\S]*?margin: 28px 0 22px;/);
+  assert.match(publicEntryCss, /\.entry-button\s*\{[\s\S]*?display: inline-flex;[\s\S]*?font-size: 14px;[\s\S]*?gap: 8px;[\s\S]*?min-height: 44px;[\s\S]*?padding: 0 19px;/);
+  assert.match(publicEntryCss, /\.entry-button:hover\s*\{[^}]*background: #194f86;/);
+  assert.match(publicEntryCss, /\.entry-legal\s*\{[\s\S]*?font-size: 12px;[\s\S]*?margin: 0;[\s\S]*?text-align: center;/);
+  assert.match(publicEntryCss, /\.entry-links\s*\{[^}]*text-align: center;/);
+  assert.match(publicEntryCss, /@media \(max-width: 620px\)[\s\S]*?\.entry-main h1\s*\{[^}]*font-size: 23px;/);
   assert.deepEqual(
     [ja.brandEntry, zhCN.brandEntry, en.brandEntry],
     ['Resume Studio の紹介ページを開く', '打开 Resume Studio 简介页', 'Open the Resume Studio introduction']

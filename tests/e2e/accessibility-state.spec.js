@@ -90,25 +90,43 @@ test('localized public pages remain useful when JavaScript is disabled', async (
     await expect(page.locator('html')).toHaveAttribute('lang', language);
     await expect(page.locator('h1')).toHaveText(heading);
     await expect(page.locator('.entry-mark')).toHaveAttribute('alt', '');
-    await expect(page.locator('.entry-mark')).toHaveAttribute('width', '48');
-    await expect(page.locator('.entry-mark')).toHaveAttribute('height', '48');
+    await expect(page.locator('.entry-mark')).toHaveAttribute('width', '50');
+    await expect(page.locator('.entry-mark')).toHaveAttribute('height', '50');
+    await expect(page.locator('.entry-header')).toHaveCSS('padding', '30px');
+    await expect(page.locator('.entry-main')).toHaveCSS('max-width', '650px');
+    await expect(page.locator('.entry-main h1')).toHaveCSS('font-size', '31px');
+    await expect(page.locator('.entry-lede')).toHaveCSS('font-size', '16px');
+    await expect(page.locator('.entry-trust-row')).toHaveCount(2);
+    await expect(page.locator('.entry-trust-dot').first()).toHaveCSS('height', '19px');
+    await expect(page.locator('[data-analytics-disclosure="status"]')).toHaveCount(1);
     await expect(page.locator('.entry-button')).toBeVisible();
   }
   await context.close();
 });
 
-test('@mobile 320px localized public entries keep the mark, heading, and primary button separate', async ({ page }) => {
+test('@mobile 320px localized public entries keep the centered brand, heading, and primary button separate', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   for (const path of ['/ja/', '/zh-cn/', '/en/']) {
     await page.goto(path);
     const layout = await page.evaluate(() => {
       const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
-      return { button: rect('.entry-button'), heading: rect('h1'), mark: rect('.entry-mark') };
+      return {
+        brand: rect('.entry-brand'),
+        button: rect('.entry-button'),
+        brandCopy: rect('.entry-brand-copy'),
+        heading: rect('h1'),
+        mark: rect('.entry-mark')
+      };
     });
-    expect(layout.mark.width).toBe(48);
-    expect(layout.mark.height).toBe(48);
-    expect(layout.mark.bottom).toBeLessThanOrEqual(layout.heading.top);
+    expect(layout.mark.width).toBe(50);
+    expect(layout.mark.height).toBe(50);
+    expect(Math.abs((layout.mark.top + layout.mark.bottom) / 2 - (layout.brandCopy.top + layout.brandCopy.bottom) / 2)).toBeLessThanOrEqual(1);
+    expect(layout.brand.bottom).toBeLessThanOrEqual(layout.heading.top);
     expect(layout.heading.bottom).toBeLessThanOrEqual(layout.button.top);
+    await expect(page.locator('.entry-header')).toHaveCSS('padding', '20px');
+    await expect(page.locator('.entry-main h1')).toHaveCSS('font-size', '23px');
+    await expect(page.locator('.entry-lede')).toHaveCSS('font-size', '15px');
+    await expect(page.locator('.entry-button')).toHaveCSS('min-height', '46px');
     await expectNoPageOverflow(page);
   }
 });
