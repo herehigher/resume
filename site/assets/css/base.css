@@ -231,7 +231,8 @@ button { cursor: pointer; }
 }
 
 .trust-source-link,
-.trust-privacy-button {
+.trust-privacy-button,
+.trust-version {
   align-items: center;
   background: transparent;
   border: 0;
@@ -258,11 +259,12 @@ button { cursor: pointer; }
 .trust-source-link svg { fill: currentColor; height: 19px; width: 19px; }
 
 .trust-privacy-button {
+  border-right: 1px solid var(--line);
   gap: 7px;
   padding: 0 11px 0 10px;
   white-space: nowrap;
 }
 
-.trust-privacy-button svg { fill: currentColor; height: 18px; width: 18px; }
+.trust-privacy-button svg { fill: currentColor; height: 19px; width: 19px; }
 .trust-privacy-button span { font-size: 10px; font-weight: 750; }
-.trust-privacy-button .trust-version { color: var(--muted); font-size: 9px; font-weight: 650; }
+.trust-version { color: var(--muted); font-size: 9px; font-weight: 650; padding: 0 10px; white-space: nowrap; }

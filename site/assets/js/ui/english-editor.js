@@ -159,8 +159,8 @@ function itemFields(type) {
     return `<label class="input-field"><span>Company</span><input data-en-item-field="company"></label>
       <label class="input-field"><span>Role</span><input data-en-item-field="role"></label>
       <div class="english-editor-date-grid">
-        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month"></label>
-        <label class="input-field"><span>End date <small>Leave blank for Present</small></span><input data-en-item-field="endDate" type="month"></label>
+        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month" lang="en-US"></label>
+        <label class="input-field"><span>End date <small>Leave blank for Present</small></span><input data-en-item-field="endDate" type="month" lang="en-US"></label>
       </div>
       <label class="input-field"><span>Responsibilities and achievements</span><textarea data-en-item-field="details" rows="5" placeholder="Write one achievement per line. Start with an action and include measurable impact when possible."></textarea></label>`;
   }
@@ -168,8 +168,8 @@ function itemFields(type) {
     return `<label class="input-field"><span>Project name</span><input data-en-item-field="name"></label>
       <label class="input-field"><span>Your role</span><input data-en-item-field="role"></label>
       <div class="english-editor-date-grid">
-        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month"></label>
-        <label class="input-field"><span>End date <small>Leave blank for Present</small></span><input data-en-item-field="endDate" type="month"></label>
+        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month" lang="en-US"></label>
+        <label class="input-field"><span>End date <small>Leave blank for Present</small></span><input data-en-item-field="endDate" type="month" lang="en-US"></label>
       </div>
       <label class="input-field"><span>Project achievements</span><textarea data-en-item-field="details" rows="4" placeholder="Write one outcome or contribution per line."></textarea></label>
       <label class="input-field"><span>Project URL</span><input data-en-item-field="url" type="url" inputmode="url"></label>`;
@@ -178,13 +178,13 @@ function itemFields(type) {
     return `<label class="input-field"><span>School</span><input data-en-item-field="school"></label>
       <label class="input-field"><span>Degree or program</span><input data-en-item-field="degree"></label>
       <div class="english-editor-date-grid">
-        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month"></label>
-        <label class="input-field"><span>End date <small>Leave blank if current</small></span><input data-en-item-field="endDate" type="month"></label>
+        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month" lang="en-US"></label>
+        <label class="input-field"><span>End date <small>Leave blank if current</small></span><input data-en-item-field="endDate" type="month" lang="en-US"></label>
       </div>
       <label class="input-field"><span>Details</span><textarea data-en-item-field="details" rows="3"></textarea></label>`;
   }
   return `<label class="input-field"><span>Certification</span><input data-en-item-field="name"></label>
-    <label class="input-field"><span>Date earned</span><input data-en-item-field="date" type="month"></label>
+    <label class="input-field"><span>Date earned</span><input data-en-item-field="date" type="month" lang="en-US"></label>
     <label class="input-field"><span>Credential URL</span><input data-en-item-field="url" type="url" inputmode="url"></label>`;
 }
 

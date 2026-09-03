@@ -108,9 +108,9 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
   assert.deepEqual(
     sample.profile.fields.links,
     [
-      'https://example.com/jian-li/github',
-      'https://example.com/jian-li/linkedin',
-      'https://example.com/jian-li'
+      'https://github.com/fictional-resume-profile',
+      'https://www.linkedin.com/in/fictional-resume-profile',
+      'https://jianli-resume.example'
     ]
   );
   assert.ok(resume.headline);
@@ -146,6 +146,11 @@ test('opening the Chinese sample protects the existing persisted draft', async (
 test('Chinese sample renders current experience first and valid PDF links', () => {
   const html = renderChineseResume(createChineseSampleState(createDefaultState('zh-CN')));
 
+  assert.match(html, /profile-link-icon--github/);
+  assert.match(html, /GitHub · github\.com\/fictional-resume-profile/);
+  assert.match(html, /profile-link-icon--linkedin/);
+  assert.match(html, /LinkedIn · www\.linkedin\.com\/in\/fictional-resume-profile/);
+  assert.match(html, /Website · jianli-resume\.example/);
   assert.ok(html.indexOf('正儿数字科技有限公司') < html.indexOf('八经网络科技有限公司'));
   assert.match(html, /2022\.04 — 至今/);
   assert.match(html, /href="https:\/\/example\.com\/projects\/analytics"/);
@@ -165,6 +170,8 @@ test('Chinese editor exposes all state-backed sections and accessible controls',
   assert.match(shell, /aria-label="缩小预览"/);
   assert.match(shell, /data-profile="birthDate"/);
   assert.match(shell, /选填/);
+  assert.match(shell, /class="editor-legal"/);
+  assert.doesNotMatch(shell, /data-zh-action="print"/);
 });
 
 test('Chinese repeating-item factories match the persisted state model', () => {

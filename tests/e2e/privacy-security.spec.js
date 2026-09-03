@@ -16,9 +16,16 @@ test('privacy UI switches immediately across all locales and exposes safe source
 
   await expect(page.locator('#privacySecurityBadgeLabel')).toHaveText('ローカル処理');
   await expect(page.locator('#privacySecurityVersion')).toHaveText(`v${packageJson.version}`);
+  await expect(page.locator('#privacySecurityButton svg')).toHaveCSS('width', '19px');
+  await expect.poll(() => page.locator('#trustCapsule').evaluate((capsule) => (
+    [...capsule.children].map((element) => element.id)
+  ))).toEqual(['privacySecurityButton', 'repositoryLink', 'privacySecurityVersion']);
   await expect(page.locator('#repositoryLink')).toHaveAttribute('href', REPOSITORY_URL);
   await expect(page.locator('#repositoryLink')).toHaveAttribute('target', '_blank');
   await expect(page.locator('#repositoryLink')).toHaveAttribute('rel', 'noopener noreferrer');
+  await badge.focus();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#repositoryLink')).toBeFocused();
 
   await badge.click();
   await expect(dialog).toHaveAttribute('open', '');
