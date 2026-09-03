@@ -15,6 +15,7 @@ English: This file records notable changes. Release dates are added only when th
 - GitHub、LinkedIn、GitLab、Qiita などを自動判定する、最大3件の共通 profile link 入力。
 - Desktop、Apple touch icon、Android 向けの複数サイズ favicon。
 - Release SHA、Analytics manifest、artifact digest、Pages semantic smoke を一括検証する release preflight。
+- 1 MiB を超える repository snapshot も固定 SHA から安全に検証できる release archive gate。
 
 ### Changed / 変更
 
