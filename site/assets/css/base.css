@@ -242,7 +242,6 @@ button { cursor: pointer; }
 }
 
 .trust-source-link {
-  border-right: 1px solid var(--line);
   justify-content: center;
   width: 40px;
 }

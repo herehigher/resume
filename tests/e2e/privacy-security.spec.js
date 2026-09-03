@@ -20,6 +20,8 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect.poll(() => page.locator('#trustCapsule').evaluate((capsule) => (
     [...capsule.children].map((element) => element.id)
   ))).toEqual(['privacySecurityButton', 'repositoryLink', 'privacySecurityVersion']);
+  await expect(page.locator('#privacySecurityButton')).toHaveCSS('border-right-width', '1px');
+  await expect(page.locator('#repositoryLink')).toHaveCSS('border-right-width', '0px');
   await expect(page.locator('#repositoryLink')).toHaveAttribute('href', REPOSITORY_URL);
   await expect(page.locator('#repositoryLink')).toHaveAttribute('target', '_blank');
   await expect(page.locator('#repositoryLink')).toHaveAttribute('rel', 'noopener noreferrer');
@@ -110,11 +112,22 @@ test('source, badge, and open privacy dialog are excluded from print', async ({ 
   await expect(page.locator('#privacySecurityDialog')).toBeHidden();
 });
 
-test('@mobile privacy UI stays reachable without overflowing the page', async ({ page }) => {
-  await openLocale(page, 'en');
-  await expect(page.locator('#repositoryLink')).toBeVisible();
-  await expect(page.locator('#privacySecurityButton')).toBeVisible();
-  await expectNoPageOverflow(page);
+test('@mobile privacy UI hides its label and stays reachable without overflow', async ({ page }) => {
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const locale of ['ja', 'zh-CN', 'en']) {
+      await openLocale(page, locale);
+      await expect(page.locator('#privacySecurityBadgeLabel')).toBeHidden();
+      await expect(page.locator('#repositoryLink')).toBeVisible();
+      await expect(page.locator('#privacySecurityButton')).toBeVisible();
+      await expectNoPageOverflow(page);
+      await expect.poll(() => page.locator('#trustCapsule').evaluate((capsule) => (
+        capsule.getBoundingClientRect().right <= window.innerWidth
+      ))).toBe(true);
+      await expect(page.locator('#privacySecurityButton')).toHaveCSS('border-right-width', '1px');
+      await expect(page.locator('#repositoryLink')).toHaveCSS('border-right-width', '0px');
+    }
+  }
 
   await page.locator('#privacySecurityButton').click();
   await expect(page.locator('#privacySecurityDialog')).toHaveAttribute('open', '');
