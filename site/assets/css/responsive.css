@@ -45,7 +45,9 @@
   .editor-footer { gap: 20px; }
   .editor-footer-actions { align-items: flex-start; }
   .editor-legal { padding-bottom: 62px; }
-  .sample-mode-panel { grid-template-columns: 1fr; }
+  .draft-primary-row { align-items: flex-start; grid-template-columns: 1fr; }
+  .draft-normal-actions,
+  .draft-sample-actions { justify-content: flex-start; }
   .draft-controls .secondary-button { min-height: 44px; }
   .draft-clear-row { align-items: flex-start; flex-direction: column; gap: 2px; }
   .draft-clear-button { margin-left: -10px; }

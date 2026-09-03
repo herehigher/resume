@@ -82,11 +82,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   }
 
   function setSampleModeUI(active) {
-    document.querySelector('.draft-controls').hidden = active;
-    document.getElementById('sampleModePanel').hidden = !active;
-    const sampleButton = document.getElementById('loadSampleButton');
-    sampleButton.disabled = active;
-    sampleButton.textContent = active ? '入力例を表示中' : '入力例を表示';
+    document.getElementById('draftNormalActions').hidden = active;
+    document.getElementById('sampleModeActions').hidden = !active;
+    clearButton.hidden = active;
   }
 
   async function enterSampleMode() {
@@ -103,6 +101,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     sampleMode = true;
     store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
     setSampleModeUI(true);
+    setDraftStatus('入力例を一時表示しています');
   }
 
   function restoreDraftFromSample({ announce = true } = {}) {

@@ -59,18 +59,20 @@ export function renderChineseEditorShell() {
       <section class="draft-controls" data-zh-draft-controls aria-label="草稿状态与操作">
         <div class="draft-primary-row">
           <span class="draft-message is-success" data-zh-draft-message role="status" aria-live="polite">${zhCN.savedStatus}</span>
-          <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
+          <div class="draft-normal-actions" data-zh-normal-actions>
+            <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
+          </div>
+          <div class="draft-sample-actions" data-zh-sample-actions hidden>
+            <span class="sample-mode-copy"><strong>${zhCN.sampleNotice}</strong></span>
+            <button class="secondary-button" type="button" data-zh-action="restore">${zhCN.restoreDraft}</button>
+            <button class="primary-button" type="button" data-zh-action="adopt">${zhCN.adoptSample}</button>
+          </div>
         </div>
         <div class="draft-clear-row">
-          <button class="draft-clear-button" type="button" data-zh-action="clear">清除本设备上的草稿</button>
+          <button class="draft-clear-button" type="button" data-zh-action="clear">清除此设备上的草稿</button>
           <span class="draft-clear-notice">输入内容会加密后仅保存在此设备上。</span>
         </div>
       </section>
-      <div class="sample-mode-panel" data-zh-sample-panel aria-live="polite" hidden>
-        <div class="sample-mode-copy"><strong>${zhCN.sampleNotice}</strong></div>
-        <button class="secondary-button" type="button" data-zh-action="restore">${zhCN.restoreDraft}</button>
-        <button class="primary-button" type="button" data-zh-action="adopt">${zhCN.adoptSample}</button>
-      </div>
       <form class="zh-resume-form" autocomplete="on">
         <details class="form-section" open>
           <summary><span class="section-number">01</span><span><strong>基本信息</strong><small>姓名、联系方式与选填的个人信息</small></span><span aria-hidden="true">⌄</span></summary>
@@ -357,8 +359,9 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   }
 
   function setSampleMode(active) {
-    rootElement.querySelector('[data-zh-draft-controls]').hidden = active;
-    rootElement.querySelector('[data-zh-sample-panel]').hidden = !active;
+    rootElement.querySelector('[data-zh-normal-actions]').hidden = active;
+    rootElement.querySelector('[data-zh-sample-actions]').hidden = !active;
+    rootElement.querySelector('[data-zh-action="clear"]').hidden = active;
   }
 
   async function enterSampleMode() {
@@ -373,6 +376,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     sampleMode = true;
     store.replace(createChineseSampleState(store.getState()), { type: 'zh-sample' });
     setSampleMode(true);
+    setStatus('正在查看填写示例。');
   }
 
   function restoreDraftFromSample() {

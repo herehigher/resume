@@ -94,18 +94,20 @@
       <section class="draft-controls" aria-label="下書きの状態と操作">
         <div class="draft-primary-row">
           <span class="draft-message is-success" id="saveStatus" role="status" aria-live="polite">この端末に保存済み</span>
-          <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
+          <div class="draft-normal-actions" id="draftNormalActions">
+            <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
+          </div>
+          <div class="draft-sample-actions" id="sampleModeActions" hidden>
+            <span class="sample-mode-copy"><strong>入力例を一時表示しています</strong><small>保存済みの下書きは変更されません。</small></span>
+            <button class="secondary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
+            <button class="primary-button" id="adoptSampleButton" type="button">この例を下書きとして使用</button>
+          </div>
         </div>
         <div class="draft-clear-row">
           <button class="draft-clear-button" id="clearButton" type="button">この端末の下書きを消去</button>
           <span class="draft-clear-notice">入力内容は暗号化してこの端末だけに保存されます。</span>
         </div>
       </section>
-      <div class="sample-mode-panel" id="sampleModePanel" aria-live="polite" hidden>
-        <div class="sample-mode-copy"><strong>入力例を一時表示しています</strong><span>保存済みの下書きは変更されません。</span></div>
-        <button class="secondary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
-        <button class="primary-button" id="adoptSampleButton" type="button">この例を下書きとして使用</button>
-      </div>
 
       <form id="resumeForm" autocomplete="on">
         <div id="sharedFields">

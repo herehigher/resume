@@ -40,18 +40,20 @@ export function renderEnglishWorkspace() {
       <section class="draft-controls" aria-label="Draft status and actions">
         <div class="draft-primary-row">
           <span class="draft-message is-success" data-en-save-status role="status" aria-live="polite">Saved on this device.</span>
-          <button class="secondary-button" data-en-load-sample type="button">View example</button>
+          <div class="draft-normal-actions" data-en-normal-actions>
+            <button class="secondary-button" data-en-load-sample type="button">View example</button>
+          </div>
+          <div class="draft-sample-actions" data-en-sample-actions hidden>
+            <span class="sample-mode-copy"><strong>Viewing an example resume</strong><small>Your saved draft has not been changed.</small></span>
+            <button class="secondary-button" data-en-restore-sample type="button">Return to my draft</button>
+            <button class="primary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
+          </div>
         </div>
         <div class="draft-clear-row">
-          <button class="draft-clear-button" data-en-clear type="button">Clear this device's draft</button>
+          <button class="draft-clear-button" data-en-clear type="button">Clear draft from this device</button>
           <span class="draft-clear-notice">Your input is encrypted and saved only on this device.</span>
         </div>
       </section>
-      <div class="sample-mode-panel" data-en-sample-panel aria-live="polite" hidden>
-        <div class="sample-mode-copy"><strong>Viewing an example resume</strong><span>Your saved draft has not been changed.</span></div>
-        <button class="secondary-button" data-en-restore-sample type="button">Return to my draft</button>
-        <button class="primary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
-      </div>
 
       <form data-en-form autocomplete="on">
         <details class="form-section" open>
@@ -342,8 +344,9 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   }
 
   function setSampleUI(active) {
-    root.querySelector('.draft-controls').hidden = active;
-    root.querySelector('[data-en-sample-panel]').hidden = !active;
+    root.querySelector('[data-en-normal-actions]').hidden = active;
+    root.querySelector('[data-en-sample-actions]').hidden = !active;
+    root.querySelector('[data-en-clear]').hidden = active;
   }
 
   async function enterSampleMode() {
