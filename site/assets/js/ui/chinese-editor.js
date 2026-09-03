@@ -5,6 +5,7 @@ import { getChineseFields, renderChineseDocument } from '../templates/zh-CN.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
+import { confirmAction } from './confirmation-dialog.js';
 
 const PROFILE_FIELDS = new Set([
   'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'
@@ -55,12 +56,16 @@ export function renderChineseEditorShell() {
         <span class="completion-label" data-zh-completion-label>0% ${zhCN.completion}</span>
       </div>
       <div class="completion-track" aria-hidden="true"><span data-zh-completion-bar></span></div>
-      <div class="draft-controls" data-zh-draft-controls>
-        <button class="secondary-button" type="button" data-zh-action="save">${zhCN.saveDraft}</button>
-        <button class="secondary-button" type="button" data-zh-action="reload">${zhCN.reloadDraft}</button>
-        <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
-        <span class="draft-message" data-zh-draft-message aria-live="polite">${zhCN.saveStatus}</span>
-      </div>
+      <section class="draft-controls" data-zh-draft-controls aria-label="草稿状态与操作">
+        <div class="draft-primary-row">
+          <span class="draft-message is-success" data-zh-draft-message role="status" aria-live="polite">${zhCN.savedStatus}</span>
+          <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
+        </div>
+        <div class="draft-clear-row">
+          <button class="draft-clear-button" type="button" data-zh-action="clear">清除本设备上的草稿</button>
+          <span class="draft-clear-notice">输入内容会加密后仅保存在此设备上。</span>
+        </div>
+      </section>
       <div class="sample-mode-panel" data-zh-sample-panel aria-live="polite" hidden>
         <div class="sample-mode-copy"><strong>${zhCN.sampleNotice}</strong></div>
         <button class="secondary-button" type="button" data-zh-action="restore">${zhCN.restoreDraft}</button>
@@ -229,17 +234,24 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     return store.getState().documents['zh-CN'].resume;
   }
 
+  function setStatus(message, tone = '') {
+    saveStatus.textContent = message;
+    saveStatus.classList.toggle('is-success', tone === 'success');
+    saveStatus.classList.toggle('is-saving', tone === 'saving');
+    saveStatus.classList.toggle('is-error', tone === 'error');
+  }
+
   function scheduleSave() {
     window.clearTimeout(saveTimer);
     if (sampleMode) return;
     shouldPersistDraft = true;
-    saveStatus.textContent = zhCN.savingStatus;
+    setStatus(zhCN.savingStatus, 'saving');
     saveTimer = window.setTimeout(async () => {
       try {
         await store.save();
-        saveStatus.textContent = zhCN.savedStatus;
+        setStatus(zhCN.savedStatus, 'success');
       } catch (error) {
-        saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', zhCN.saveError);
+        setStatus(messageForDraftStorageError(error, 'zh-CN', zhCN.saveError), 'error');
       }
     }, 300);
   }
@@ -354,7 +366,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     try {
       draftBeforeSample = await protectChineseDraftBeforeSample(store, shouldPersistDraft);
     } catch (error) {
-      saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', '无法保护当前草稿，示例未打开。');
+      setStatus(messageForDraftStorageError(error, 'zh-CN', '无法保护当前草稿，示例未打开。'), 'error');
       return;
     }
     draftBeforeSampleWasStored = shouldPersistDraft;
@@ -370,18 +382,52 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     sampleMode = false;
     draftBeforeSample = null;
     setSampleMode(false);
-    saveStatus.textContent = shouldPersistDraft ? zhCN.savedStatus : zhCN.saveStatus;
+    setStatus(shouldPersistDraft ? zhCN.savedStatus : zhCN.saveStatus, shouldPersistDraft ? 'success' : '');
     return true;
   }
 
-  async function saveNow() {
-    window.clearTimeout(saveTimer);
+  async function adoptSample() {
+    if (!sampleMode) return;
+    const confirmed = await confirmAction({
+      title: '将此示例保存为草稿吗？',
+      body: '当前草稿将被示例覆盖，且无法撤销。',
+      cancel: '取消',
+      confirm: '保存示例'
+    });
+    if (!confirmed || !sampleMode) return;
     try {
       await store.save();
       shouldPersistDraft = true;
-      saveStatus.textContent = zhCN.savedStatus;
+      sampleMode = false;
+      draftBeforeSample = null;
+      draftBeforeSampleWasStored = false;
+      setSampleMode(false);
+      setStatus('示例已保存为草稿。', 'success');
     } catch (error) {
-      saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', zhCN.saveError);
+      setStatus(messageForDraftStorageError(error, 'zh-CN', '无法将示例保存为草稿。'), 'error');
+    }
+  }
+
+  async function clearDraft() {
+    const confirmed = await confirmAction({
+      title: '清除本设备上的草稿吗？',
+      body: '保存的草稿和当前输入内容都会被删除，且无法撤销。',
+      cancel: '取消',
+      confirm: '清除'
+    });
+    if (!confirmed) return;
+    window.clearTimeout(saveTimer);
+    try {
+      await store.clearPersisted();
+      store.reset(store.getState().settings.locale);
+      shouldPersistDraft = false;
+      sampleMode = false;
+      draftBeforeSample = null;
+      draftBeforeSampleWasStored = false;
+      setSampleMode(false);
+      setStatus('草稿已清除。');
+    } catch (error) {
+      setStatus(messageForDraftStorageError(error, 'zh-CN', '无法清除草稿。'), 'error');
     }
   }
 
@@ -489,22 +535,10 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       setMobileView(mobileView.dataset.zhMobileView);
     }
     if (!action) return;
-    if (action.dataset.zhAction === 'save') saveNow();
-    if (action.dataset.zhAction === 'reload') {
-      try {
-        if (await store.reload()) shouldPersistDraft = true;
-      } catch (error) {
-        saveStatus.textContent = messageForDraftStorageError(error, 'zh-CN', '无法读取已加密的草稿。');
-      }
-    }
     if (action.dataset.zhAction === 'sample') enterSampleMode();
     if (action.dataset.zhAction === 'restore') restoreDraftFromSample();
-    if (action.dataset.zhAction === 'adopt') {
-      sampleMode = false;
-      draftBeforeSample = null;
-      setSampleMode(false);
-      saveNow();
-    }
+    if (action.dataset.zhAction === 'adopt') adoptSample();
+    if (action.dataset.zhAction === 'clear') clearDraft();
     if (action.dataset.zhAction === 'print') window.print();
     if (action.dataset.zhAction === 'zoom-out') {
       zoom = Math.max(.4, zoom - .1);

@@ -46,10 +46,9 @@
   .editor-footer-actions { align-items: flex-start; }
   .editor-legal { padding-bottom: 62px; }
   .sample-mode-panel { grid-template-columns: 1fr; }
-  #japaneseWorkspace .draft-control-actions { display: grid; grid-template-columns: 1fr; }
-  #japaneseWorkspace .draft-control-actions .secondary-button { min-height: 44px; width: 100%; }
-  #japaneseWorkspace .draft-clear-row { align-items: flex-start; flex-direction: column; gap: 2px; }
-  #japaneseWorkspace .draft-clear-button { margin-left: -10px; }
+  .draft-controls .secondary-button { min-height: 44px; }
+  .draft-clear-row { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .draft-clear-button { margin-left: -10px; }
   .trust-capsule {
     bottom: calc(9px + env(safe-area-inset-bottom));
     right: calc(9px + env(safe-area-inset-right));

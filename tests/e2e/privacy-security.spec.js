@@ -78,7 +78,7 @@ test('editing, local save, and JSON export remain available after going offline'
 
   const name = page.locator('[name="fullName"]');
   await name.fill('オフライン 編集');
-  await page.locator('#saveDraftButton').click();
+  await expect.poll(() => page.evaluate(() => Boolean(localStorage.getItem('resume-studio-web-v1')))).toBe(true);
   await expect.poll(() => page.evaluate(() => {
     const raw = localStorage.getItem('resume-studio-web-v1');
     return raw && !raw.includes('オフライン 編集') && JSON.parse(raw).format;

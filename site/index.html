@@ -91,20 +91,14 @@
         <span class="completion-label" id="completionLabel">0% 完了</span>
       </div>
       <div class="completion-track" aria-hidden="true"><span id="completionBar"></span></div>
-      <section class="draft-controls" aria-labelledby="draftControlsTitle">
-        <div class="draft-controls-heading">
-          <strong id="draftControlsTitle">この端末の下書き</strong>
-          <span class="draft-message" id="saveStatus" aria-live="polite">入力内容は自動保存されます</span>
-        </div>
-        <div class="draft-control-actions">
-          <button class="secondary-button" id="saveDraftButton" type="button">下書きを保存</button>
-          <button class="secondary-button" id="reloadDraftButton" type="button">保存内容を再読込</button>
+      <section class="draft-controls" aria-label="下書きの状態と操作">
+        <div class="draft-primary-row">
+          <span class="draft-message is-success" id="saveStatus" role="status" aria-live="polite">この端末に保存済み</span>
           <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
         </div>
-        <p class="draft-empty-status" id="clearDraftEmptyStatus" aria-live="polite">この端末に保存された下書きはありません</p>
-        <div class="draft-clear-row" id="clearDraftRow">
-          <span class="draft-clear-notice" id="clearDraftNotice">画面上の入力内容も削除されます</span>
-          <button class="draft-clear-button" id="clearButton" type="button">この端末の下書きを削除…</button>
+        <div class="draft-clear-row">
+          <button class="draft-clear-button" id="clearButton" type="button">この端末の下書きを消去</button>
+          <span class="draft-clear-notice">入力内容は暗号化してこの端末だけに保存されます。</span>
         </div>
       </section>
       <div class="sample-mode-panel" id="sampleModePanel" aria-live="polite" hidden>
@@ -384,6 +378,18 @@
       <div class="dialog-actions">
         <button class="secondary-button" id="cancelClearButton" value="cancel" autofocus>キャンセル</button>
         <button class="danger-button" id="confirmClearButton" value="confirm">消去する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="sampleAdoptDialog" aria-labelledby="sampleAdoptDialogTitle" aria-describedby="sampleAdoptDialogBody">
+    <form method="dialog" class="dialog-content">
+      <div class="dialog-icon">!</div>
+      <h2 id="sampleAdoptDialogTitle">入力例を下書きとして使用しますか？</h2>
+      <p id="sampleAdoptDialogBody">現在の下書きは入力例で上書きされます。この操作は取り消せません。</p>
+      <div class="dialog-actions">
+        <button class="secondary-button" id="cancelSampleAdoptButton" value="cancel" autofocus>キャンセル</button>
+        <button class="danger-button" id="confirmSampleAdoptButton" value="confirm">使用する</button>
       </div>
     </form>
   </dialog>
