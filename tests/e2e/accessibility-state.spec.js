@@ -38,19 +38,32 @@ test('@mobile mobile view controls expose synchronized selection state', async (
   await expect(page.locator('[data-en-mobile-view="preview"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('@mobile 320px header keeps the larger favicon separate from its controls', async ({ page }) => {
+test('@mobile 320px header keeps readable locale choices and separate controls in every locale', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
-  await openLocale(page, 'ja');
 
-  const layout = await page.evaluate(() => {
-    const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
-    return { actions: rect('.header-actions'), brand: rect('.brand'), image: rect('.brand-mark') };
-  });
-  expect(layout.image.width).toBe(34);
-  expect(layout.image.height).toBe(34);
-  expect(layout.brand.right).toBeLessThanOrEqual(layout.actions.left);
-  await expect(page.locator('#printButton')).toBeVisible();
-  await expectNoPageOverflow(page);
+  for (const locale of ['ja', 'zh-CN', 'en']) {
+    await openLocale(page, locale);
+
+    const layout = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+      return {
+        actions: rect('.header-actions'),
+        brand: rect('.brand'),
+        image: rect('.brand-mark'),
+        locale: rect('#localeSelect'),
+        menu: rect('#dataMenuSummary'),
+        print: rect('#printButton')
+      };
+    });
+    expect(layout.image.width).toBe(34);
+    expect(layout.image.height).toBe(34);
+    expect(layout.brand.right).toBeLessThanOrEqual(layout.actions.left);
+    expect(layout.locale.right).toBeLessThanOrEqual(layout.menu.left);
+    expect(layout.menu.right).toBeLessThanOrEqual(layout.print.left);
+    await expect(page.locator('#localeSelect')).toHaveCSS('font-size', '11px');
+    await expect(page.locator('#printButton')).toBeVisible();
+    await expectNoPageOverflow(page);
+  }
 });
 
 test('brand link follows the active editor locale', async ({ page }) => {

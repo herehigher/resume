@@ -33,6 +33,7 @@
 
 @media (max-width: 520px) {
   .brand strong { font-size: 12px; }
+  .locale-picker select { font-size: 11px; }
   .data-menu summary { padding: 0; width: 38px; }
   .data-menu-short-label,
   .data-menu-chevron { display: none; }
