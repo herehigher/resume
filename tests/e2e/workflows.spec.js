@@ -15,31 +15,14 @@ const PROFILE_URL_CASES = [
   ['ftp://example.test/profile', false]
 ];
 
-test('日本語: 入力・保存復元・例示保護・削除・安全なプレビュー', async ({ page }) => {
+test('日本語: 自動保存・例示保護・削除・安全なプレビュー', async ({ page }) => {
   await openLocale(page, 'ja');
   await expect(page.locator('.header-actions #saveStatus')).toHaveCount(0);
-  await expect(page.locator('#draftControlsTitle')).toHaveText('この端末の下書き');
   await expect(page.locator('#japaneseWorkspace .draft-controls #saveStatus')).toBeVisible();
-  await expect(page.locator('#reloadDraftButton')).toBeDisabled();
-  const disabledReloadStyle = await page.locator('#reloadDraftButton').evaluate((button) => {
-    const disabled = getComputedStyle(button);
-    const enabled = getComputedStyle(document.getElementById('saveDraftButton'));
-    return {
-      backgroundColor: disabled.backgroundColor,
-      color: disabled.color,
-      cursor: disabled.cursor,
-      opacity: disabled.opacity,
-      enabledBackgroundColor: enabled.backgroundColor,
-      enabledColor: enabled.color
-    };
-  });
-  expect(disabledReloadStyle.cursor).toBe('not-allowed');
-  expect(Number.parseFloat(disabledReloadStyle.opacity)).toBeLessThan(1);
-  expect(disabledReloadStyle.backgroundColor).not.toBe(disabledReloadStyle.enabledBackgroundColor);
-  expect(disabledReloadStyle.color).not.toBe(disabledReloadStyle.enabledColor);
-  await expect(page.locator('#clearButton')).toBeHidden();
-  await expect(page.locator('#clearDraftEmptyStatus')).toHaveText('この端末に保存された下書きはありません');
-  await expect(page.locator('#clearDraftEmptyStatus')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#draftControlsTitle, #saveDraftButton, #reloadDraftButton')).toHaveCount(0);
+  await expect(page.locator('#clearButton')).toHaveText('この端末の下書きを消去');
+  await expect(page.locator('#japaneseWorkspace .draft-clear-notice')).toHaveText('入力内容は暗号化してこの端末だけに保存されます。');
+  await expect(page.locator('#saveStatus')).toHaveAttribute('role', 'status');
 
   const name = page.locator('[name="fullName"]');
   const motivation = page.locator('[name="motivation"]');
@@ -51,9 +34,6 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
 
   const maliciousName = '<img data-e2e-malicious src=x onerror=alert(1)> 山田';
   await name.fill(maliciousName);
-  await expect(page.locator('#clearButton')).toBeVisible();
-  await expect(page.locator('#clearButton')).toHaveText('この端末の下書きを削除…');
-  await expect(page.locator('#clearDraftNotice')).toHaveText('画面上の入力内容も削除されます');
   await expect.poll(() => page.locator('#clearButton').evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await motivation.fill('顧客課題を整理し、改善を最後まで推進します。');
   await github.fill('https://github.com/resume-studio-test');
@@ -71,7 +51,6 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
   await expect(preview.locator('a[href^="javascript:"]')).toHaveCount(0);
   await expect(preview).toContainText('E2E大学 入学');
 
-  await page.locator('#saveDraftButton').click();
   await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
   await expect.poll(() => page.evaluate(async () => {
     const request = indexedDB.open('resume-studio-web-v1-keys');
@@ -87,17 +66,19 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
     database.close();
     return key && { type: key.type, extractable: key.extractable, algorithm: key.algorithm.name, usages: [...key.usages].sort() };
   })).toEqual({ type: 'secret', extractable: false, algorithm: 'AES-GCM', usages: ['decrypt', 'encrypt'] });
-  await expect(page.locator('#reloadDraftButton')).toBeEnabled();
   await page.reload();
-  await expect(name).toHaveValue(maliciousName);
-  await name.fill('一時変更');
-  await page.locator('#reloadDraftButton').click();
   await expect(name).toHaveValue(maliciousName);
 
   await page.locator('#loadSampleButton').click();
   await expect(preview).toContainText('山田 太郎');
-  await expect(page.locator('#sampleModePanel')).toContainText('入力例を一時表示しています');
+  await expect(page.locator('#sampleModeActions')).toContainText('入力例を一時表示しています');
   await expect(page.locator('.header-actions')).not.toContainText('入力例は一時表示です');
+  await page.locator('#adoptSampleButton').click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(page.locator('#sampleModeActions')).toBeVisible();
   await page.locator('#restoreDraftButton').click();
   await expect(name).toHaveValue(maliciousName);
 
@@ -129,30 +110,65 @@ test('日本語: 入力・保存復元・例示保護・削除・安全なプレ
     database.close();
     return key ?? null;
   })).toBeNull();
-  await expect(page.locator('#clearButton')).toBeHidden();
-  await expect(page.locator('#clearDraftEmptyStatus')).toBeVisible();
-  await expect(page.locator('#clearDraftEmptyStatus')).toHaveText('この端末に保存された下書きはありません');
-  await expect(page.locator('#reloadDraftButton')).toBeDisabled();
-  await expect(page.locator('#saveDraftButton')).toBeFocused();
+  await expect(page.locator('#clearButton')).toBeVisible();
+  await expect(page.locator('#loadSampleButton')).toBeFocused();
 });
 
-test('@mobile 日本語の下書き操作は375pxと401pxで縦に並び、44px以上の押下領域を保つ', async ({ page }) => {
+test('@mobile 日本語の下書き操作は375pxと401pxで折り返し、44px以上の押下領域を保つ', async ({ page }) => {
   for (const width of [375, 401]) {
     await page.setViewportSize({ width, height: 844 });
     await openLocale(page, 'ja');
     await page.locator('[name="fullName"]').fill(`モバイル ${width}`);
-    const buttons = page.locator('#japaneseWorkspace .draft-control-actions .secondary-button, #clearButton');
+    const buttons = page.locator('#japaneseWorkspace .draft-primary-row .secondary-button:visible, #clearButton:visible');
     for (const button of await buttons.all()) {
       await expect.poll(() => button.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     }
-    const actionLayout = await page.locator('#japaneseWorkspace .draft-control-actions').evaluate((element) => ({
-      columns: getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/),
-      width: element.getBoundingClientRect().width
-    }));
-    expect(actionLayout.columns).toHaveLength(1);
-    expect(Number.parseFloat(actionLayout.columns[0])).toBeCloseTo(actionLayout.width, 0);
+    await expect(page.locator('#japaneseWorkspace .draft-clear-row')).toHaveCSS('flex-direction', 'column');
     await expectNoPageOverflow(page);
   }
+});
+
+test('@mobile 入力例モードの復元と採用は44px以上の押下領域を保つ', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  const actions = page.locator('#sampleModeActions .secondary-button, #sampleModeActions .primary-button');
+  for (const action of await actions.all()) {
+    await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  }
+  await expectNoPageOverflow(page);
+});
+
+test('821pxの編集欄で入力例操作が折り返され、横にはみ出さない', async ({ page }) => {
+  await page.setViewportSize({ width: 821, height: 900 });
+  await openLocale(page, 'en');
+  const workspace = page.locator('[data-english-editor]');
+  await workspace.locator('[data-en-load-sample]').click();
+  await expect.poll(() => workspace.locator('.draft-primary-row').evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length
+  ))).toBe(1);
+  await expect(workspace.locator('[data-en-sample-actions]')).toBeVisible();
+  await expectNoPageOverflow(page);
+});
+
+test('1280pxの入力例モードでは状態文言を1行で表示する', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  const controls = page.locator('#japaneseWorkspace .draft-controls');
+  const status = page.locator('#saveStatus');
+  await expect(controls).toHaveClass(/is-sample-mode/);
+  await expect.poll(() => controls.locator('.draft-primary-row').evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length
+  ))).toBe(1);
+  await expect.poll(() => status.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { height: box.height, width: box.width };
+  })).toEqual(expect.objectContaining({ height: expect.any(Number), width: expect.any(Number) }));
+  const statusBox = await status.boundingBox();
+  expect(statusBox.width).toBeGreaterThan(150);
+  expect(statusBox.height).toBeLessThan(30);
+  await expectNoPageOverflow(page);
 });
 
 test('@mobile Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
@@ -169,6 +185,73 @@ test('@mobile Links は最大3件まで追加・編集・削除でき、横に�
   await expect(page.locator('[data-profile-link-index]')).toHaveCount(2);
   await expect(add).toBeEnabled();
   await expectNoPageOverflow(page);
+});
+
+test('入力例の採用は確認後だけ元の下書きを上書きする', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const name = page.locator('[name="fullName"]');
+  await name.fill('採用前の下書き');
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+
+  await page.locator('#loadSampleButton').click();
+  await page.locator('#adoptSampleButton').click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(name).toHaveValue('山田 太郎');
+  await expect(page.locator('#saveStatus')).toContainText('入力例を下書きとして保存しました');
+
+  await page.locator('#loadSampleButton').click();
+  await page.locator('#adoptSampleButton').click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sampleModeActions')).toBeVisible();
+  await page.locator('#restoreDraftButton').click();
+  await expect(name).toHaveValue('山田 太郎');
+});
+
+test('三言語の入力例モードはstickyな下書きコンポーネント内で確認してから採用する', async ({ page }) => {
+  const cases = [
+    {
+      locale: 'ja', workspace: '#japaneseWorkspace', field: '[name="fullName"]', original: '日本語の元下書き', sample: '山田 太郎',
+      normal: '#draftNormalActions', sampleActions: '#sampleModeActions', sampleButton: '#loadSampleButton', restore: '#restoreDraftButton', adopt: '#adoptSampleButton', clear: '#clearButton'
+    },
+    {
+      locale: 'zh-CN', workspace: '#chineseWorkspace', field: '[data-profile="fullName"]', original: '中文原草稿', sample: '简立',
+      normal: '[data-zh-normal-actions]', sampleActions: '[data-zh-sample-actions]', sampleButton: '[data-zh-action="sample"]', restore: '[data-zh-action="restore"]', adopt: '[data-zh-action="adopt"]', clear: '[data-zh-action="clear"]'
+    },
+    {
+      locale: 'en', workspace: '[data-english-editor]', field: '[data-profile-field="fullName"]', original: 'Original English draft', sample: 'Alex Morgan',
+      normal: '[data-en-normal-actions]', sampleActions: '[data-en-sample-actions]', sampleButton: '[data-en-load-sample]', restore: '[data-en-restore-sample]', adopt: '[data-en-adopt-sample]', clear: '[data-en-clear]'
+    }
+  ];
+
+  for (const scenario of cases) {
+    await openLocale(page, scenario.locale);
+    const workspace = page.locator(scenario.workspace);
+    const field = workspace.locator(scenario.field);
+    await field.fill(scenario.original);
+    await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+
+    await workspace.locator(scenario.sampleButton).click();
+    await expect(workspace.locator('.draft-controls')).toBeVisible();
+    await expect(workspace.locator('.draft-controls')).toHaveCSS('position', 'sticky');
+    await expect(workspace.locator('.draft-clear-notice')).toBeVisible();
+    await expect(workspace.locator(scenario.sampleActions)).toBeVisible();
+    await expect(workspace.locator(scenario.normal)).toBeHidden();
+    await expect(workspace.locator(scenario.clear)).toBeHidden();
+
+    await workspace.locator(scenario.adopt).click();
+    await page.locator('#cancelSampleAdoptButton').click();
+    await expect(workspace.locator(scenario.sampleActions)).toBeVisible();
+    await workspace.locator(scenario.restore).click();
+    await expect(field).toHaveValue(scenario.original);
+
+    await workspace.locator(scenario.sampleButton).click();
+    await workspace.locator(scenario.adopt).click();
+    await page.locator('#confirmSampleAdoptButton').click();
+    await expect(workspace.locator(scenario.normal)).toBeVisible();
+    await expect(field).toHaveValue(scenario.sample);
+  }
 });
 
 test('三言語エディターは Analytics 表示の下に著作権と MIT License を常設する', async ({ page }) => {
@@ -230,13 +313,10 @@ test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除
   await experience.locator('[data-zh-key="details"]').fill('将交付周期缩短30%');
   await expect(workspace.locator('[data-zh-preview]')).toContainText('将交付周期缩短30%');
 
-  await workspace.locator('[data-zh-action="save"]').click();
-  await name.fill('临时姓名');
-  await workspace.locator('[data-zh-action="reload"]').click();
-  await expect(name).toHaveValue('简立 E2E');
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
 
   await workspace.locator('[data-zh-action="sample"]').click();
-  await expect(workspace.locator('[data-zh-sample-panel]')).toBeVisible();
+  await expect(workspace.locator('[data-zh-sample-actions]')).toBeVisible();
   await workspace.locator('[data-zh-action="restore"]').click();
   await expect(name).toHaveValue('简立 E2E');
 
@@ -304,7 +384,7 @@ test('embedded photos stay as data URLs in storage but render only through revoc
   }, replacementBlobUrl)).toBe(false);
 });
 
-test('English: complete editing flow saves, restores, protects samples, and removes entries', async ({ page }) => {
+test('English: complete editing flow auto-saves, restores, protects samples, and removes entries', async ({ page }) => {
   await openLocale(page, 'en');
   const workspace = page.locator('[data-english-editor]');
   const name = workspace.locator('[data-profile-field="fullName"]');
@@ -322,13 +402,13 @@ test('English: complete editing flow saves, restores, protects samples, and remo
   await experience.locator('[data-en-item-field="details"]').fill('Improved activation by 25%.');
   await expect(workspace.locator('[data-en-preview]')).toContainText('Improved activation by 25%.');
 
-  await workspace.locator('[data-en-save]').click();
-  await name.fill('Temporary Name');
-  await workspace.locator('[data-en-reload]').click();
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+  await page.reload();
   await expect(name).toHaveValue('Alex E2E');
+  await expect(workspace.locator('[data-resume-field="headline"]')).toHaveValue('Product Engineering Lead');
 
   await workspace.locator('[data-en-load-sample]').click();
-  await expect(workspace.locator('[data-en-sample-panel]')).toBeVisible();
+  await expect(workspace.locator('[data-en-sample-actions]')).toBeVisible();
   await workspace.locator('[data-en-restore-sample]').click();
   await expect(name).toHaveValue('Alex E2E');
 
@@ -362,7 +442,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   await openLocale(page, 'ja');
   const name = page.locator('[name="fullName"]');
   await name.fill('書き出し前の氏名');
-  await page.locator('#saveDraftButton').click();
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
   await page.locator('#dataMenuSummary').click();
 
   const downloadPromise = page.waitForEvent('download');
@@ -393,14 +473,14 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   }, STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
 });
 
-test('三言語で入力例を草稿操作にまとめ、言語とPDFをヘッダー右端に表示する', async ({ page }) => {
+test('三言語で統一した下書きステータスを表示し、入力例を草稿操作にまとめる', async ({ page }) => {
   const cases = [
-    ['ja', '#japaneseWorkspace', '#loadSampleButton', '入力例を表示', 'バックアップと復元'],
-    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '查看填写示例', '备份与恢复'],
-    ['en', '[data-english-editor]', '[data-en-load-sample]', 'View example', 'Backup & restore']
+    ['ja', '#japaneseWorkspace', '#loadSampleButton', '入力例を表示', 'バックアップと復元', 'この端末の下書きを消去', '入力内容は暗号化してこの端末だけに保存されます。'],
+    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '查看填写示例', '备份与恢复', '清除此设备上的草稿', '输入内容会加密后仅保存在此设备上。'],
+    ['en', '[data-english-editor]', '[data-en-load-sample]', 'View example', 'Backup & restore', 'Clear draft from this device', 'Your input is encrypted and saved only on this device.']
   ];
 
-  for (const [locale, workspaceSelector, sampleSelector, sampleLabel, backupLabel] of cases) {
+  for (const [locale, workspaceSelector, sampleSelector, sampleLabel, backupLabel, clearLabel, encryptionNotice] of cases) {
     await openLocale(page, locale);
     const workspace = page.locator(workspaceSelector);
     const sampleButton = workspace.locator(sampleSelector);
@@ -408,6 +488,10 @@ test('三言語で入力例を草稿操作にまとめ、言語とPDFをヘッ�
     await expect(sampleButton).toBeVisible();
     await expect(sampleButton).toHaveText(sampleLabel);
     await expect(sampleButton.locator('xpath=ancestor::*[contains(@class, "draft-controls")]')).toHaveCount(1);
+    await expect(workspace.locator('.draft-primary-row .draft-message')).toHaveAttribute('role', 'status');
+    await expect(workspace.locator('.draft-clear-button')).toHaveText(clearLabel);
+    await expect(workspace.locator('.draft-clear-notice')).toHaveText(encryptionNotice);
+    await expect(workspace.locator('.draft-controls')).toHaveCSS('position', 'sticky');
     await expect(page.locator('.header-actions').locator(sampleSelector)).toHaveCount(0);
     await expect(backupMenu).toHaveAttribute('aria-label', backupLabel);
     await expect(backupMenu.locator('#dataMenuLabel')).toHaveText(backupLabel);
@@ -466,10 +550,7 @@ test('@mobile 日本語: 編集・保存復元・書き出し・プレビュー�
   const name = page.locator('[name="fullName"]');
   await expect(name).toBeVisible();
   await name.fill('モバイル 山田');
-  await page.locator('#saveDraftButton').click();
-  await name.fill('一時変更');
-  await page.locator('#reloadDraftButton').click();
-  await expect(name).toHaveValue('モバイル 山田');
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
   await expectNoPageOverflow(page);
 
   await page.locator('#dataMenuSummary').click();
@@ -491,10 +572,7 @@ test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async (
   const name = workspace.locator('[data-profile="fullName"]');
   await expect(name).toBeVisible();
   await name.fill('移动端 简立');
-  await workspace.locator('[data-zh-action="save"]').click();
-  await name.fill('临时姓名');
-  await workspace.locator('[data-zh-action="reload"]').click();
-  await expect(name).toHaveValue('移动端 简立');
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
   await expectNoPageOverflow(page);
 
   await page.locator('#dataMenuSummary').click();
@@ -516,10 +594,7 @@ test('@mobile English: editing, save/restore, and preview remain operable', asyn
   const name = workspace.locator('[data-profile-field="fullName"]');
   await expect(name).toBeVisible();
   await name.fill('Mobile Alex');
-  await workspace.locator('[data-en-save]').click();
-  await name.fill('Temporary Name');
-  await workspace.locator('[data-en-reload]').click();
-  await expect(name).toHaveValue('Mobile Alex');
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
   await expectNoPageOverflow(page);
 
   await page.locator('#dataMenuSummary').click();

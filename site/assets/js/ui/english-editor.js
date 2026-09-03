@@ -4,6 +4,7 @@ import { renderEnglishDocument } from '../templates/en.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
+import { confirmAction } from './confirmation-dialog.js';
 
 const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
 const RESUME_FIELDS = new Set(['headline', 'location', 'summary', 'skills']);
@@ -36,17 +37,23 @@ export function renderEnglishWorkspace() {
       </div>
       <div class="completion-track" aria-hidden="true"><span data-en-completion-bar></span></div>
 
-      <div class="draft-controls" aria-label="Draft controls">
-        <button class="secondary-button" data-en-save type="button">Save draft</button>
-        <button class="secondary-button" data-en-reload type="button">Reload saved draft</button>
-        <button class="secondary-button" data-en-load-sample type="button">View example</button>
-        <span class="draft-message" data-en-save-status aria-live="polite">Changes are saved on this device.</span>
-      </div>
-      <div class="sample-mode-panel" data-en-sample-panel aria-live="polite" hidden>
-        <div class="sample-mode-copy"><strong>Viewing an example resume</strong><span>Your saved draft has not been changed.</span></div>
-        <button class="secondary-button" data-en-restore-sample type="button">Return to my draft</button>
-        <button class="primary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
-      </div>
+      <section class="draft-controls" aria-label="Draft status and actions">
+        <div class="draft-primary-row">
+          <span class="draft-message is-success" data-en-save-status role="status" aria-live="polite">Saved on this device.</span>
+          <div class="draft-normal-actions" data-en-normal-actions>
+            <button class="secondary-button" data-en-load-sample type="button">View example</button>
+          </div>
+          <div class="draft-sample-actions" data-en-sample-actions hidden>
+            <span class="sample-mode-copy"><strong>Viewing an example resume</strong><small>Your saved draft has not been changed.</small></span>
+            <button class="secondary-button" data-en-restore-sample type="button">Return to my draft</button>
+            <button class="primary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
+          </div>
+        </div>
+        <div class="draft-clear-row">
+          <button class="draft-clear-button" data-en-clear type="button">Clear draft from this device</button>
+          <span class="draft-clear-notice">Your input is encrypted and saved only on this device.</span>
+        </div>
+      </section>
 
       <form data-en-form autocomplete="on">
         <details class="form-section" open>
@@ -221,9 +228,12 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     return store.getState().documents.en.resume;
   }
 
-  function setStatus(message, isError = false) {
+  function setStatus(message, tone = '') {
     saveStatus.textContent = message;
-    saveStatus.classList.toggle('is-error', isError);
+    const normalizedTone = tone === true ? 'error' : tone;
+    saveStatus.classList.toggle('is-success', normalizedTone === 'success');
+    saveStatus.classList.toggle('is-saving', normalizedTone === 'saving');
+    saveStatus.classList.toggle('is-error', normalizedTone === 'error');
   }
 
   function scheduleSave() {
@@ -233,11 +243,11 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       return;
     }
     shouldPersistDraft = true;
-    setStatus('Saving…');
+    setStatus('Saving…', 'saving');
     saveTimer = window.setTimeout(async () => {
       try {
         await store.save();
-        setStatus('Saved on this device.');
+        setStatus('Saved on this device.', 'success');
       } catch (error) {
         setStatus(messageForDraftStorageError(error, 'en', 'Your changes could not be saved on this device.'), true);
       }
@@ -334,8 +344,10 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   }
 
   function setSampleUI(active) {
-    root.querySelector('.draft-controls').hidden = active;
-    root.querySelector('[data-en-sample-panel]').hidden = !active;
+    root.querySelector('.draft-controls').classList.toggle('is-sample-mode', active);
+    root.querySelector('[data-en-normal-actions]').hidden = active;
+    root.querySelector('[data-en-sample-actions]').hidden = !active;
+    root.querySelector('[data-en-clear]').hidden = active;
   }
 
   async function enterSampleMode() {
@@ -363,22 +375,52 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     draftBeforeSample = null;
     draftBeforeSampleWasStored = false;
     setSampleUI(false);
-    if (announce) setStatus(shouldPersistDraft ? 'Returned to your saved draft.' : 'Returned to your draft.');
+    if (announce) setStatus(shouldPersistDraft ? 'Returned to your saved draft.' : 'Returned to your draft.', shouldPersistDraft ? 'success' : '');
     return true;
   }
 
   async function adoptSample() {
     if (!sampleMode) return;
-    sampleMode = false;
-    draftBeforeSample = null;
-    draftBeforeSampleWasStored = false;
-    setSampleUI(false);
+    const confirmed = await confirmAction({
+      title: 'Use this example as your draft?',
+      body: 'The example will replace your current draft. This cannot be undone.',
+      cancel: 'Cancel',
+      confirm: 'Use example'
+    });
+    if (!confirmed || !sampleMode) return;
     try {
       await store.save();
       shouldPersistDraft = true;
-      setStatus('The example was saved as your draft.');
+      sampleMode = false;
+      draftBeforeSample = null;
+      draftBeforeSampleWasStored = false;
+      setSampleUI(false);
+      setStatus('The example was saved as your draft.', 'success');
     } catch (error) {
       setStatus(messageForDraftStorageError(error, 'en', 'The example could not be saved as your draft.'), true);
+    }
+  }
+
+  async function clearDraft() {
+    const confirmed = await confirmAction({
+      title: 'Clear this device’s draft?',
+      body: 'Your saved draft and the current input will be deleted. This cannot be undone.',
+      cancel: 'Cancel',
+      confirm: 'Clear draft'
+    });
+    if (!confirmed) return;
+    window.clearTimeout(saveTimer);
+    try {
+      await store.clearPersisted();
+      store.reset(store.getState().settings.locale);
+      shouldPersistDraft = false;
+      sampleMode = false;
+      draftBeforeSample = null;
+      draftBeforeSampleWasStored = false;
+      setSampleUI(false);
+      setStatus('Draft cleared.');
+    } catch (error) {
+      setStatus(messageForDraftStorageError(error, 'en', 'The draft could not be cleared.'), true);
     }
   }
 
@@ -463,33 +505,14 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       renderPreview();
       return;
     }
-    if (event.target.closest('[data-en-save]')) {
-      window.clearTimeout(saveTimer);
-      try {
-        await store.save();
-        shouldPersistDraft = true;
-        setStatus('Draft saved.');
-      } catch (error) {
-        setStatus(messageForDraftStorageError(error, 'en', 'Your draft could not be saved.'), true);
-      }
-    } else if (event.target.closest('[data-en-reload]')) {
-      window.clearTimeout(saveTimer);
-      try {
-        if (await store.reload()) {
-          shouldPersistDraft = true;
-          setStatus('Saved draft reloaded.');
-        } else {
-          setStatus('There is no saved draft to reload.');
-        }
-      } catch (error) {
-        setStatus(messageForDraftStorageError(error, 'en', 'The encrypted draft could not be read.'), true);
-      }
-    } else if (event.target.closest('[data-en-load-sample]')) {
+    if (event.target.closest('[data-en-load-sample]')) {
       enterSampleMode();
     } else if (event.target.closest('[data-en-restore-sample]')) {
       restoreDraftFromSample();
     } else if (event.target.closest('[data-en-adopt-sample]')) {
       adoptSample();
+    } else if (event.target.closest('[data-en-clear]')) {
+      clearDraft();
     }
   }
 
