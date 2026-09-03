@@ -92,7 +92,9 @@ async function fileHash(file) {
 function createServerForSite() {
   return createServer(async (request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
-    const relativePath = pathname === '/' ? 'index.html' : pathname.slice(1);
+    const relativePath = pathname === '/'
+      ? 'index.html'
+      : `${pathname.slice(1)}${pathname.endsWith('/') ? 'index.html' : ''}`;
     const target = path.resolve(siteRoot, relativePath);
     if (target !== siteRoot && !target.startsWith(`${siteRoot}${path.sep}`)) {
       response.writeHead(403).end('Forbidden');

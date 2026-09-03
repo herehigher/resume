@@ -19,6 +19,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const source = path.join(root, 'site');
 const token = 'a'.repeat(32);
 const fingerprint = createHash('sha256').update(token).digest('hex');
+const packageVersion = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 
 function temporaryDirectory(t) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'resume-pages-smoke-'));
@@ -31,7 +32,7 @@ async function validate(directory, overrides = {}) {
     directory,
     analyticsMode: 'disabled',
     analyticsProvider: 'none',
-    packageVersion: '0.1.0',
+    packageVersion,
     providerFingerprint: 'none',
     ...overrides
   });
@@ -111,7 +112,7 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
     ['tuple', 'ja/index.html', (html) => html.replace('data-analytics-provider="none"', 'data-analytics-provider="other"'), /analytics tuple/],
     ['duplicate tuple', 'ja/index.html', (html) => html.replace('<html ', '<html data-analytics-mode="disabled" '), /must appear exactly once/],
     ['canonical', 'zh-cn/index.html', (html) => html.replace('https://herehigher.github.io/resume/zh-cn/', 'https://example.invalid/'), /canonical URL/],
-    ['version', 'assets/js/config.js', (config) => config.replace("APP_VERSION = '0.1.0'", "APP_VERSION = '9.9.9'"), /APP_VERSION/],
+    ['version', 'assets/js/config.js', (config) => config.replace(`APP_VERSION = '${packageVersion}'`, "APP_VERSION = '9.9.9'"), /APP_VERSION/],
     ['beacon', 'index.html', (html) => `${html}<script data-cf-beacon="{}"></script>`, /analytics runtime/]
   ];
   for (const [name, file, mutate, expected] of cases) {
