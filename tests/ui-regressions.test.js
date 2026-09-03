@@ -1,10 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
@@ -114,19 +110,18 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
   assert.equal((deploy.match(/vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/g) || []).length, 1);
   assert.match(deploy, /Prepare analytics-disabled artifact[\s\S]*?analytics_mode == 'disabled'.*analytics_provider == 'none'/);
   assert.match(deploy, /git diff --exit-code -- site[\s\S]*?status --porcelain=v1 --untracked-files=all -- site/);
-  assert.match(deploy, /Verify final artifact digest[\s\S]*?prepare-pages-artifact\.mjs verify[\s\S]*?uses: actions\/upload-pages-artifact@v3\s*\n\s*with:\s*\n\s*path: \$\{\{ runner\.temp \}\}\/resume-pages-site/);
+  assert.match(deploy, /Verify final artifact digest[\s\S]*?prepare-pages-artifact\.mjs verify[\s\S]*?uses: actions\/upload-pages-artifact@v5\s*\n\s*with:\s*\n\s*path: \$\{\{ runner\.temp \}\}\/resume-pages-site/);
   assert.match(deploy, /deploy:\s*\n\s*needs: \[validate, artifact\]/);
   assert.match(deploy, /name: github-pages\s*\n\s*url: \$\{\{ steps\.deployment\.outputs\.page_url \}\}/);
   assert.match(deploy, /id-token: write\s*\n\s*pages: write/);
-  assert.match(deploy, /uses: actions\/configure-pages@v5/);
-  assert.match(deploy, /uses: actions\/deploy-pages@v4/);
+  assert.match(deploy, /uses: actions\/configure-pages@v6/);
+  assert.match(deploy, /uses: actions\/deploy-pages@v5/);
   assert.match(deploy, /smoke:\s*\n\s*needs: \[validate, artifact, deploy\][\s\S]*?permissions: \{\}/);
   assert.match(deploy, /REPOSITORY: \$\{\{ github\.repository \}\}/);
   assert.match(deploy, /base_url.*!= https:\/\/\*[\s\S]*?page_authority.*== \*'@'\*[\s\S]*?unsafe deployment URL/);
   assert.match(deploy, /if \[\[ "\$REPOSITORY" == 'herehigher\/resume' \]\]; then\s*\n\s*test "\$base_url" = "\$EXPECTED_PAGE_URL"/);
-  assert.match(deploy, /check_analytics\(\)[\s\S]*?data-analytics-mode="disabled"[\s\S]*?data-analytics-mode="enabled"/);
-  assert.match(deploy, /beacon_count="\$\(count_occurrences[\s\S]*?attribute_count="\$\(count_occurrences[\s\S]*?test "\$beacon_count" -eq 1[\s\S]*?test "\$attribute_count" -eq 1/);
-  assert.match(deploy, /sha256sum[\s\S]*?PROVIDER_FINGERPRINT/);
+  assert.match(deploy, /node scripts\/validate-pages-smoke\.mjs[\s\S]*?--analytics-mode "\$ANALYTICS_MODE"[\s\S]*?--provider-fingerprint "\$PROVIDER_FINGERPRINT"/);
+  assert.doesNotMatch(deploy, /check_analytics\(/);
   assert.match(deploy, /local attempts=4[\s\S]*?for \(\(attempt = 1; attempt <= attempts; attempt \+= 1\)\); do/);
   assert.match(deploy, /if response_metadata="\$\(curl[\s\S]*?if grep --fixed-strings --quiet[\s\S]*?return 0/);
   assert.match(deploy, /if \(\(attempt < attempts\)\); then\s*\n\s*sleep 3/);
@@ -142,43 +137,13 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
     "fetch_and_check 'schema/resume-studio-web-v1.example.json'",
     "fetch_and_check 'assets/js/config.js'"
   ]) assert.match(deploy, new RegExp(publicPath.replaceAll('.', '\\.')));
-  for (const [path, locale] of [['ja/', 'ja'], ['zh-cn/', 'zh-CN'], ['en/', 'en']]) {
-    assert.match(
-      deploy,
-      new RegExp(`fetch_and_check '${path}' .*lang=\\\\"${locale}\\\\".*ANALYTICS_MODE.*ANALYTICS_PROVIDER`)
-    );
-  }
-});
-
-test('Pages analytics smoke rejects duplicate beacons even when they share one line', (t) => {
-  const deploy = readFileSync(new URL('../.github/workflows/deploy-pages.yml', import.meta.url), 'utf8');
-  const block = deploy.match(
-    / {10}# ANALYTICS_SMOKE_FUNCTION_START\n([\s\S]*?)\n {10}# ANALYTICS_SMOKE_FUNCTION_END/
-  );
-  assert.ok(block, 'analytics smoke function block is missing');
-  const functions = block[1].split('\n').map((line) => line.replace(/^ {10}/, '')).join('\n');
-  const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-pages-smoke-'));
-  t.after(() => rmSync(temporary, { force: true, recursive: true }));
-  const token = 'c'.repeat(32);
-  const fingerprint = createHash('sha256').update(token).digest('hex');
-  const tag = `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;:&quot;${token}&quot;}"></script>`;
-  const run = (html) => {
-    writeFileSync(path.join(temporary, 'page.html'), html);
-    return spawnSync('bash', ['-c', `set -euo pipefail
-smoke_dir="$1"
-ANALYTICS_MODE=enabled
-PROVIDER_FINGERPRINT="$2"
-${functions}
-check_analytics page.html
-printf 'SMOKE_SUCCESS\\n'
-`, 'analytics-smoke', temporary, fingerprint], { encoding: 'utf8' });
-  };
-
-  const valid = run(`<html data-analytics-mode="enabled" data-analytics-provider="cloudflare-web-analytics"><body>${tag}</body></html>`);
-  assert.equal(valid.status, 0, valid.stderr);
-  assert.match(valid.stdout, /SMOKE_SUCCESS/);
-
-  const duplicate = run(`<html data-analytics-mode="enabled" data-analytics-provider="cloudflare-web-analytics"><body>${tag}${tag}</body></html>`);
-  assert.notEqual(duplicate.status, 0);
-  assert.doesNotMatch(duplicate.stdout, /SMOKE_SUCCESS/);
+  assert.match(deploy, /mkdir -p "\$smoke_dir\/ja" "\$smoke_dir\/zh-cn" "\$smoke_dir\/en" "\$smoke_dir\/assets\/js"/);
+  for (const relocation of [
+    'mv "$smoke_dir/root.html" "$smoke_dir/index.html"',
+    'mv "$smoke_dir/ja.html" "$smoke_dir/ja/index.html"',
+    'mv "$smoke_dir/zh-cn.html" "$smoke_dir/zh-cn/index.html"',
+    'mv "$smoke_dir/en.html" "$smoke_dir/en/index.html"',
+    'mv "$smoke_dir/config.js" "$smoke_dir/assets/js/config.js"'
+  ]) assert.ok(deploy.includes(relocation), `${relocation} is missing`);
+  assert.match(deploy, /validate-pages-smoke\.mjs[\s\S]*?--directory "\$smoke_dir"[\s\S]*?--package-version "\$PACKAGE_VERSION"/);
 });

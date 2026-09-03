@@ -223,7 +223,7 @@ test('release screenshots and PDF samples are assigned to Git LFS', () => {
   assert.match(attributes, /^output\/pdf\/\*\.pdf filter=lfs diff=lfs merge=lfs -text$/m);
 
   const workflow = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
-  assert.match(workflow, /uses: actions\/checkout@v4[\s\S]*?lfs: true/);
+  assert.match(workflow, /uses: actions\/checkout@v7[\s\S]*?lfs: true/);
 });
 
 test('development docs cover localized public entry and machine-readable contracts', () => {
@@ -412,37 +412,11 @@ test('release playbook is canonical and covers publication, evidence, and recove
     playbook.indexOf('git ls-remote --tags origin') < playbook.indexOf('test -z "$remote_tag_result"'),
     'remote tag absence must be checked only after a successful query'
   );
-  const finalGate = playbook.match(
-    /```bash\n### FINAL_RELEASE_ARTIFACT_GATE_START\n([\s\S]*?)\n### FINAL_RELEASE_ARTIFACT_GATE_END\n```/
-  );
-  assert.ok(finalGate, 'final release artifact gate is missing');
-  const finalGateStart = playbook.indexOf('### FINAL_RELEASE_ARTIFACT_GATE_START');
-  assert.ok(
-    playbook.indexOf('この Quality URL と pinned `<RELEASE_SHA>` の組を evidence に記録します。') < finalGateStart,
-    'the final artifact gate must follow pinned main Quality verification'
-  );
-  assert.ok(
-    finalGateStart < playbook.indexOf('### RELEASE_TAG_PREFLIGHT_START'),
-    'the final artifact gate must precede tag preflight'
-  );
-  for (const contract of [
-    /git worktree add --detach "\$final_gate_tree" "\$release_sha"/,
-    /rev-parse HEAD.*"\$release_sha"/s,
-    /symbolic-ref --quiet HEAD/,
-    /status --porcelain=v1 --untracked-files=all/,
-    /prepare-pages-artifact\.mjs" validate/,
-    /gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher\/resume/,
-    /derive-cloudflare/,
-    /source digest mismatch/,
-    /provider fingerprint mismatch/,
-    /final artifact digest mismatch/,
-    /cleanup_final_gate.*Final verification cleanup failed/s
-  ]) assert.match(finalGate[1], contract);
-  assert.ok(
-    finalGate[1].indexOf('prepare-pages-artifact.mjs" validate')
-      < finalGate[1].indexOf('gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN'),
-    'manifest validation must fail before provider variable access'
-  );
+  assert.match(playbook, /npm run release:preflight --[\s\S]*?--release-tag '<RELEASE_TAG>'[\s\S]*?--release-sha '<RELEASE_SHA>'/);
+  assert.match(playbook, /remote tag query、main ancestry、.*prepared artifact の semantic smoke を fail-closed/s);
+  assert.match(playbook, /remote main の明示 refspec 更新/);
+  assert.match(playbook, /Git archive を一時領域へ展開して artifact を復元/);
+  assert.doesNotMatch(playbook, /FINAL_RELEASE_ARTIFACT_GATE_START|git worktree add --detach "\$final_gate_tree"/);
   assert.doesNotMatch(playbook, /git rev-parse --verify 'origin\/main\^\{commit\}'/);
   assert.doesNotMatch(playbook, /一度だけ `npm run generate:docs`/);
   assert.doesNotMatch(playbook, /gh[pousr]_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|Authorization:\s*Bearer/i);

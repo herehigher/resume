@@ -89,6 +89,7 @@ Chrome で editor の `http://localhost:8000/`、public entry の `http://localh
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run release:assets` | 新 version の最終 RC で三言語 screenshot、PDF sample、provenance manifest を再生成 |
 | `npm run test:release-assets` | Release asset が最終 RC の `site/` と一致し、既存の文書・画像・PDF 検査を通ることを確認 |
+| `npm run release:preflight -- --release-tag <TAG> --release-sha <SHA>` | Tag 作成前に immutable release SHA の version、tag absence、main ancestry、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証 |
 
 ### 変更種別ごとの route
 

@@ -47,6 +47,17 @@ git log -1 --oneline origin/main || { echo 'Unable to read origin/main; stop the
 
 期待する remote が `https://github.com/herehigher/resume.git`、active account が release 権限を持つ owner、作業 tree が意図した状態であることを確認します。認証出力を Issue に貼らず、token や credential は記録しません。
 
+Pinned `<RELEASE_SHA>` と `<RELEASE_TAG>` が決まったら、tag 作成直前に次の単一 command を実行します。これは tag、repository variable、Pages deployment を変更せず、remote tag query、main ancestry、`package.json` / `APP_VERSION` / `CHANGELOG.md`、tagged manifest、source / adapter / final artifact digest、prepared artifact の semantic smoke を fail-closed で検証します。enabled artifact では承認済み repository variable を stdout に出さずに読み、取得・network・digest のいずれかを確認できなければ失敗します。
+
+```bash
+case "$-" in *x*) echo 'Disable shell xtrace before release preflight.' >&2; exit 1 ;; esac
+npm run release:preflight -- \
+  --release-tag '<RELEASE_TAG>' \
+  --release-sha '<RELEASE_SHA>'
+```
+
+成功時の version、release SHA、source / adapter / final artifact digest、provider fingerprint だけを evidence に記録します。手動の確認は owner approval、RC の目視確認、Quality run、release date、tag 作成前の最終照合に限定します。
+
 RC branch で dependency と version / release notes の整合を確認します。`package.json`、`site/assets/js/config.js` の `APP_VERSION`、`CHANGELOG.md` の対象 version は同じ `<RELEASE_VERSION>` でなければなりません。
 
 ```bash
@@ -196,113 +207,11 @@ printf 'Pinned main Quality: %s\n' "$quality_url"
 
 ### Pinned release SHA の最終 artifact gate
 
-Main `Quality / quality` の成功確認後、tag preflight より前に、review 済み `<RELEASE_SHA>` そのものを clean detached worktree へ展開し、tagged manifest と artifact を最終復元します。PR 前の working tree 検証、現在の `main` tip、別 commit の checkout を代用してはいけません。Manifest の unknown field、unsupported `schemaVersion`、不正 tuple、source digest mismatch、provider fingerprint mismatch、final artifact digest mismatch、cleanup failure はすべて tag 作成前の hard failure です。
+Main `Quality / quality` の成功確認後、tag preflight より前に、review 済み `<RELEASE_SHA>` そのものへ前節の `npm run release:preflight` を実行します。command は Git archive を一時領域へ展開して artifact を復元するため、PR 前の working tree、現在の `main` tip、別 commit を代用しません。remote main の明示 refspec 更新、manifest、provider variable、source / adapter / final artifact digest、semantic smoke の不一致はすべて tag 作成前の hard failure です。
 
-Enabled の場合だけ owner が承認した実 repository variable を読みます。Token は environment だけへ渡し、command argument、stdout、evidence に出しません。Disabled の場合は provider variable を読まず、validated source digest が source-identical final digest と一致することを確認します。
+Enabled の場合だけ owner が承認した実 repository variable を読みます。Token は command argument、stdout、evidence に出しません。Disabled の場合は provider variable を読まず、validated source digest が source-identical final digest と一致することを確認します。
 
-```bash
-### FINAL_RELEASE_ARTIFACT_GATE_START
-case "$-" in *x*) echo 'Disable shell xtrace before the final artifact gate.' >&2; exit 1 ;; esac
-release_sha="${RELEASE_SHA:-<RELEASE_SHA>}"
-case "$release_sha" in *'<'*|*'>'*|'') echo 'Replace the release SHA placeholder first.' >&2; exit 1 ;; esac
-case "$release_sha" in *[!0-9a-f]*) echo 'Release SHA must be lowercase hexadecimal.' >&2; exit 1 ;; esac
-case "${#release_sha}" in 40|64) ;; *) echo 'Release SHA must be a full commit id.' >&2; exit 1 ;; esac
-
-final_gate_root=''
-final_gate_tree=''
-final_gate_output=''
-cleanup_final_gate() {
-  local cleanup_status=0
-  unset analytics_token
-  if [[ -n "$final_gate_output" && -e "$final_gate_output" ]]; then
-    rm -f -- "$final_gate_output" || cleanup_status=1
-  fi
-  if [[ -n "$final_gate_tree" && -d "$final_gate_tree" ]]; then
-    git worktree remove --force "$final_gate_tree" || cleanup_status=1
-  fi
-  if [[ -n "$final_gate_root" && -d "$final_gate_root" ]]; then
-    rmdir -- "$final_gate_root" || cleanup_status=1
-  fi
-  return "$cleanup_status"
-}
-trap 'cleanup_final_gate' EXIT
-trap 'exit 130' HUP INT TERM
-
-umask 077
-final_gate_root="$(mktemp -d)" \
-  || { echo 'Unable to create the final verification directory.' >&2; exit 1; }
-final_gate_tree="${final_gate_root}/release"
-final_gate_output="${final_gate_root}/outputs"
-: > "$final_gate_output" \
-  || { echo 'Unable to create the final verification output.' >&2; exit 1; }
-git worktree add --detach "$final_gate_tree" "$release_sha" \
-  || { echo 'Unable to create the detached release worktree.' >&2; exit 1; }
-test "$(git -C "$final_gate_tree" rev-parse HEAD)" = "$release_sha" \
-  || { echo 'Detached worktree is not the pinned release SHA.' >&2; exit 1; }
-if git -C "$final_gate_tree" symbolic-ref --quiet HEAD >/dev/null; then
-  echo 'Final verification worktree is not detached.' >&2
-  exit 1
-else
-  detached_status=$?
-  test "$detached_status" -eq 1 \
-    || { echo 'Unable to verify detached HEAD.' >&2; exit 1; }
-fi
-test -z "$(git -C "$final_gate_tree" status --porcelain=v1 --untracked-files=all)" \
-  || { echo 'Final verification worktree is not clean.' >&2; exit 1; }
-
-GITHUB_OUTPUT="$final_gate_output" node "$final_gate_tree/scripts/prepare-pages-artifact.mjs" validate \
-  --source "$final_gate_tree/site" \
-  --manifest "$final_gate_tree/.github/pages-release-manifest.json" \
-  || { echo 'Pinned manifest or source validation failed; stop the release.' >&2; exit 1; }
-manifest_mode="$(node -p \
-  'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).analyticsMode' \
-  "$final_gate_tree/.github/pages-release-manifest.json")" \
-  || { echo 'Unable to read the validated analytics mode.' >&2; exit 1; }
-
-if [[ "$manifest_mode" == 'enabled' ]]; then
-  : > "$final_gate_output" \
-    || { echo 'Unable to reset the private verification output.' >&2; exit 1; }
-  gh auth status \
-    || { echo 'GitHub authentication is unavailable; stop the release.' >&2; exit 1; }
-  analytics_token="$(gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher/resume)" \
-    || { echo 'Unable to read the approved repository variable; stop the release.' >&2; exit 1; }
-  test -n "$analytics_token" \
-    || { echo 'The approved repository variable is empty; stop the release.' >&2; exit 1; }
-  CLOUDFLARE_WEB_ANALYTICS_TOKEN="$analytics_token" GITHUB_OUTPUT="$final_gate_output" \
-    node "$final_gate_tree/scripts/prepare-pages-artifact.mjs" derive-cloudflare \
-    --source "$final_gate_tree/site" \
-    || { unset analytics_token; echo 'Pinned artifact derivation failed; stop the release.' >&2; exit 1; }
-  unset analytics_token
-elif [[ "$manifest_mode" != 'disabled' ]]; then
-  echo 'Validated manifest returned an unsupported analytics mode.' >&2
-  exit 1
-fi
-
-node -e '
-  const fs = require("node:fs");
-  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  const lines = fs.readFileSync(process.argv[2], "utf8").trim().split("\n").filter(Boolean);
-  const output = Object.fromEntries(lines.map((line) => line.split("=", 2)));
-  const expectedProvider = manifest.providerTokenSha256 ?? "none";
-  const expectedFinal = manifest.analyticsMode === "disabled"
-    ? output.source_digest
-    : output.final_digest;
-  if (output.source_digest !== manifest.sourceTreeSha256) throw new Error("source digest mismatch");
-  if (output.provider_fingerprint !== expectedProvider) throw new Error("provider fingerprint mismatch");
-  if (expectedFinal !== manifest.artifactTreeSha256) throw new Error("final artifact digest mismatch");
-  if (!/^[0-9a-f]{64}$/.test(output.adapter_digest || "")) throw new Error("adapter digest missing");
-  process.stdout.write(`Verified pinned source=${output.source_digest}, adapter=${output.adapter_digest}, artifact=${expectedFinal}\n`);
-' "$final_gate_tree/.github/pages-release-manifest.json" "$final_gate_output" \
-  || { echo 'Pinned manifest does not reproduce exactly; stop the release.' >&2; exit 1; }
-
-cleanup_final_gate \
-  || { trap - EXIT HUP INT TERM; echo 'Final verification cleanup failed; stop the release.' >&2; exit 1; }
-trap - EXIT HUP INT TERM
-printf 'Final release artifact gate passed: %s\n' "$release_sha"
-### FINAL_RELEASE_ARTIFACT_GATE_END
-```
-
-成功 marker、pinned SHA、source / provider / adapter / final digest を evidence に記録します。この gate を通過しない限り tag preflight へ進みません。
+前節の単一 preflight command を再実行し、手動では owner approval、RC の目視確認、pinned main Quality URL、release date、tag 作成直前の最終照合を確認します。成功 marker、pinned SHA、source / provider / adapter / final digest を evidence に記録します。この gate を通過しない限り tag を作成しません。
 
 ## 初回 Pages と HTTPS 設定
 
@@ -395,6 +304,7 @@ Issue または Pull Request に次を記録します。Placeholder を実値ま
 
 - Version / tag: `<RELEASE_VERSION>` / `<RELEASE_TAG>`
 - Release commit (full SHA): `<RELEASE_SHA>`
+- Immutable tag / validated release SHA: `<RELEASE_TAG>` / `<RELEASE_SHA>`
 - Owner approval: `<APPROVER>` / `<APPROVED_AT>`
 - Pull Request: `<PR_URL>`
 - Release Issue: `<ISSUE_URL>`
@@ -412,7 +322,9 @@ Issue または Pull Request に次を記録します。Placeholder を実値ま
 - Visual acceptance: `<RESULT, OS, CHROME_VERSION, CHECKED_AT>`
 - Screenshot / PDF source SHA: `<SHA_OR_NOT_APPLICABLE>`
 - Pages Source / custom domain / HTTPS: `<SETTINGS_RESULT>`
-- Deploy workflow: `<WORKFLOW_RUN_URL>`
+- Deploy workflow attempt / accepted run: `<ATTEMPT_RUN_URL>` / `<ACCEPTED_RUN_URL>`
+- Workflow source SHA / validated release SHA: `<WORKFLOW_SOURCE_SHA>` / `<RELEASE_SHA>`
+- Recovery PR / rerun chain: `<PR_OR_RUN_CHAIN_OR_NONE>`
 - Environment URL: `https://herehigher.github.io/resume/`
 - Online smoke / manual browser: `<RESULT>`
 - Known differences / follow-up Issue: `<DETAILS_OR_NONE>`

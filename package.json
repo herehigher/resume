@@ -8,6 +8,7 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "release:assets": "node scripts/generate-doc-assets.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "test": "node --test tests/*.test.js && npm run check",
     "test:release-assets": "node scripts/check-release-assets.mjs && node --test tests/documentation.test.js",
     "test:e2e": "playwright test",
