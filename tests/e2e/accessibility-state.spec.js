@@ -40,17 +40,31 @@ test('@mobile mobile view controls expose synchronized selection state', async (
 
 test('@mobile 320px header keeps the larger favicon separate from its controls', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
-  await openLocale(page, 'ja');
+  for (const locale of ['ja', 'zh-CN', 'en']) {
+    await openLocale(page, locale);
 
-  const layout = await page.evaluate(() => {
-    const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
-    return { actions: rect('.header-actions'), brand: rect('.brand'), image: rect('.brand-mark') };
-  });
-  expect(layout.image.width).toBe(34);
-  expect(layout.image.height).toBe(34);
-  expect(layout.brand.right).toBeLessThanOrEqual(layout.actions.left);
-  await expect(page.locator('#printButton')).toBeVisible();
-  await expectNoPageOverflow(page);
+    const layout = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+      const styles = (selector) => getComputedStyle(document.querySelector(selector));
+      return {
+        actions: rect('.header-actions'),
+        brand: rect('.brand'),
+        image: rect('.brand-mark'),
+        localeFontSize: styles('#localeSelect').fontSize,
+        localeHeight: rect('#localeSelect').height,
+        dataMenuFontSize: styles('#dataMenuSummary').fontSize,
+        dataMenuHeight: rect('#dataMenuSummary').height
+      };
+    });
+    expect(layout.image.width).toBe(34);
+    expect(layout.image.height).toBe(34);
+    expect(layout.localeFontSize).toBe('11px');
+    expect(layout.localeFontSize).toBe(layout.dataMenuFontSize);
+    expect(layout.localeHeight).toBe(layout.dataMenuHeight);
+    expect(layout.brand.right).toBeLessThanOrEqual(layout.actions.left);
+    await expect(page.locator('#printButton')).toBeVisible();
+    await expectNoPageOverflow(page);
+  }
 });
 
 test('brand link follows the active editor locale', async ({ page }) => {
