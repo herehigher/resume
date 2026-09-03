@@ -115,7 +115,6 @@ export function renderChineseEditorShell() {
         ${renderListSection('07', '证书与资质', 'certifications', '名称、取得时间与可选验证链接')}
       </form>
       <div class="editor-footer">
-        <div class="editor-footer-actions"><button class="primary-button" type="button" data-zh-action="print">${zhCN.exportPdf}</button></div>
         <div class="editor-legal">
           <p><span data-editor-analytics-disclosure="status">${zhCN.privacyNotice}</span></p>
           <p class="editor-copyright">© 2026 herehigher · <a href="https://github.com/herehigher/resume/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></p>

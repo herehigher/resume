@@ -416,26 +416,42 @@ test('English: complete editing flow auto-saves, restores, protects samples, and
   await expect(workspace.locator('[data-en-preview]')).not.toContainText('E2E Labs');
 });
 
-test('English: native month inputs inherit the English locale for every dated entry type', async ({ page }) => {
-  await openLocale(page, 'en');
+test('English: native month inputs keep their own English language metadata and YYYY-MM values in a Chinese browser locale', async ({ baseURL, browser }) => {
+  const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  await page.goto(`${baseURL}/?lang=en`);
   const workspace = page.locator('[data-english-editor]');
-  await expect(workspace).toHaveAttribute('lang', 'en');
+  for (const type of ['experience', 'projects', 'education', 'certifications']) {
+    const section = workspace.locator(`[data-en-add="${type}"]`).locator('xpath=ancestor::details[1]');
+    if (!(await section.evaluate((element) => element.open))) await section.locator('summary').click();
+  }
+  const initialMonthInputs = workspace.locator('input[type="month"]');
+  await expect(initialMonthInputs).toHaveCount(7);
+  for (const input of await initialMonthInputs.all()) {
+    await expect(input).toBeVisible();
+    await expect(input).toHaveAttribute('lang', 'en-US');
+    await input.fill('2025-06');
+    await expect(input).toHaveValue('2025-06');
+  }
+  expect(await initialMonthInputs.first().evaluate((input) => typeof input.showPicker)).toBe('function');
 
   for (const type of ['experience', 'projects', 'education', 'certifications']) {
     const addButton = workspace.locator(`[data-en-add="${type}"]`);
-    const section = addButton.locator('xpath=ancestor::details[1]');
-    if (!(await section.evaluate((element) => element.open))) {
-      await section.locator('summary').click();
-    }
     await expect(addButton).toBeVisible();
+    await addButton.click();
+    const added = workspace.locator(`[data-en-item="${type}"]`).last();
+    const monthInputs = added.locator('input[type="month"]');
+    await expect(monthInputs).toHaveCount(type === 'certifications' ? 1 : 2);
+    for (const input of await monthInputs.all()) {
+      await expect(input).toHaveAttribute('lang', 'en-US');
+      await input.fill('2025-06');
+      await expect(input).toHaveValue('2025-06');
+    }
   }
 
-  const monthInputs = workspace.locator('input[type="month"]');
-  await expect(monthInputs).toHaveCount(7);
-  for (const input of await monthInputs.all()) await expect(input).toBeVisible();
-  await expect.poll(() => monthInputs.evaluateAll((inputs) => inputs.map((input) => (
-    input.closest('[lang]')?.getAttribute('lang')
-  )))).toEqual(['en', 'en', 'en', 'en', 'en', 'en', 'en']);
+  await expect(initialMonthInputs).toHaveCount(14);
+  await expect.poll(() => initialMonthInputs.evaluateAll((inputs) => inputs.map((input) => input.value))).toEqual(Array(14).fill('2025-06'));
+  await context.close();
 });
 
 test('JSON の書き出し・読込が往復し、不正データは既存下書きを壊さない', async ({ page }) => {
