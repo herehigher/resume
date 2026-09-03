@@ -28,7 +28,7 @@ jobs:
       release_tag: ${{ steps.release.outputs.release_tag }}
     steps:
       - name: Checkout release metadata
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -66,13 +66,13 @@ jobs:
       source_digest: ${{ steps.manifest.outputs.source_digest }}
     steps:
       - name: Checkout validated release commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -127,7 +127,7 @@ jobs:
           --manifest .github/pages-release-manifest.json
 
       - name: Upload static site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ runner.temp }}/resume-pages-site
 
@@ -144,11 +144,11 @@ jobs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   smoke:
     needs: [validate, artifact, deploy]
@@ -164,6 +164,17 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
     steps:
+      - name: Checkout validated smoke contract
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.release_sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       - name: Verify deployed public paths
         shell: bash
         run: |
@@ -235,55 +246,23 @@ jobs:
             return 1
           }
 
-          # ANALYTICS_SMOKE_FUNCTION_START
-          count_occurrences() {
-            local needle="$1"
-            local file="$2"
-            { grep --only-matching --fixed-strings -- "$needle" "$file" || true; } \
-              | wc -l \
-              | tr -d '[:space:]'
-          }
-
-          check_analytics() {
-            local output="$1"
-            local file="${smoke_dir}/${output}"
-            if [[ "$ANALYTICS_MODE" == 'disabled' ]]; then
-              grep --fixed-strings --quiet 'data-analytics-mode="disabled" data-analytics-provider="none"' "$file"
-              if grep --extended-regexp --quiet 'data-cf-beacon|cloudflareinsights\.com' "$file"; then
-                echo "Analytics runtime unexpectedly present in ${output}." >&2
-                return 1
-              fi
-              return 0
-            fi
-
-            grep --fixed-strings --quiet 'data-analytics-mode="enabled" data-analytics-provider="cloudflare-web-analytics"' "$file"
-            local beacon_count attribute_count token_attribute_count token
-            beacon_count="$(count_occurrences 'https://static.cloudflareinsights.com/beacon.min.js' "$file")"
-            attribute_count="$(count_occurrences 'data-cf-beacon' "$file")"
-            token_attribute_count="$(
-              { grep --only-matching --extended-regexp \
-                'data-cf-beacon="\{&quot;token&quot;:&quot;[0-9a-f]{32}&quot;\}"' "$file" || true; } \
-                | wc -l \
-                | tr -d '[:space:]'
-            )"
-            test "$beacon_count" -eq 1
-            test "$attribute_count" -eq 1
-            test "$token_attribute_count" -eq 1
-            token="$(sed -n 's/.*data-cf-beacon="{&quot;token&quot;:&quot;\([0-9a-f]\{32\}\)&quot;}".*/\1/p' "$file")"
-            test "${#token}" -eq 32
-            test "$(printf '%s' "$token" | sha256sum | cut -d ' ' -f 1)" = "$PROVIDER_FINGERPRINT"
-          }
-          # ANALYTICS_SMOKE_FUNCTION_END
-
           fetch_and_check '' root.html '<title>Resume Studio'
-          fetch_and_check 'ja/' ja.html "<html lang=\"ja\" data-analytics-mode=\"${ANALYTICS_MODE}\" data-analytics-provider=\"${ANALYTICS_PROVIDER}\">"
-          fetch_and_check 'zh-cn/' zh-cn.html "<html lang=\"zh-CN\" data-analytics-mode=\"${ANALYTICS_MODE}\" data-analytics-provider=\"${ANALYTICS_PROVIDER}\">"
-          fetch_and_check 'en/' en.html "<html lang=\"en\" data-analytics-mode=\"${ANALYTICS_MODE}\" data-analytics-provider=\"${ANALYTICS_PROVIDER}\">"
+          fetch_and_check 'ja/' ja.html '<title>'
+          fetch_and_check 'zh-cn/' zh-cn.html '<title>'
+          fetch_and_check 'en/' en.html '<title>'
           fetch_and_check 'sitemap.xml' sitemap.xml '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
           fetch_and_check 'schema/resume-studio-web-v1.schema.json' schema.json '"title": "Resume Studio web v1 export"'
           fetch_and_check 'schema/resume-studio-web-v1.example.json' example.json '"version": 1'
           fetch_and_check 'assets/js/config.js' config.js "APP_VERSION = '${PACKAGE_VERSION}'"
-          check_analytics root.html
-          check_analytics ja.html
-          check_analytics zh-cn.html
-          check_analytics en.html
+          mkdir -p "$smoke_dir/ja" "$smoke_dir/zh-cn" "$smoke_dir/en" "$smoke_dir/assets/js"
+          mv "$smoke_dir/root.html" "$smoke_dir/index.html"
+          mv "$smoke_dir/ja.html" "$smoke_dir/ja/index.html"
+          mv "$smoke_dir/zh-cn.html" "$smoke_dir/zh-cn/index.html"
+          mv "$smoke_dir/en.html" "$smoke_dir/en/index.html"
+          mv "$smoke_dir/config.js" "$smoke_dir/assets/js/config.js"
+          node scripts/validate-pages-smoke.mjs \
+            --directory "$smoke_dir" \
+            --analytics-mode "$ANALYTICS_MODE" \
+            --analytics-provider "$ANALYTICS_PROVIDER" \
+            --package-version "$PACKAGE_VERSION" \
+            --provider-fingerprint "$PROVIDER_FINGERPRINT"
