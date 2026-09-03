@@ -128,6 +128,29 @@ test('@mobile 日本語の下書き操作は375pxと401pxで折り返し、44px�
   }
 });
 
+test('@mobile 入力例モードの復元と採用は44px以上の押下領域を保つ', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  const actions = page.locator('#sampleModeActions .secondary-button, #sampleModeActions .primary-button');
+  for (const action of await actions.all()) {
+    await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  }
+  await expectNoPageOverflow(page);
+});
+
+test('821pxの編集欄で入力例操作が折り返され、横にはみ出さない', async ({ page }) => {
+  await page.setViewportSize({ width: 821, height: 900 });
+  await openLocale(page, 'en');
+  const workspace = page.locator('[data-english-editor]');
+  await workspace.locator('[data-en-load-sample]').click();
+  await expect.poll(() => workspace.locator('.draft-primary-row').evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length
+  ))).toBe(1);
+  await expect(workspace.locator('[data-en-sample-actions]')).toBeVisible();
+  await expectNoPageOverflow(page);
+});
+
 test('@mobile Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
   await openLocale(page, 'ja');
   const add = page.locator('#addProfileLinkButton');
@@ -341,7 +364,7 @@ test('embedded photos stay as data URLs in storage but render only through revoc
   }, replacementBlobUrl)).toBe(false);
 });
 
-test('English: complete editing flow saves, restores, protects samples, and removes entries', async ({ page }) => {
+test('English: complete editing flow auto-saves, restores, protects samples, and removes entries', async ({ page }) => {
   await openLocale(page, 'en');
   const workspace = page.locator('[data-english-editor]');
   const name = workspace.locator('[data-profile-field="fullName"]');
@@ -359,10 +382,10 @@ test('English: complete editing flow saves, restores, protects samples, and remo
   await experience.locator('[data-en-item-field="details"]').fill('Improved activation by 25%.');
   await expect(workspace.locator('[data-en-preview]')).toContainText('Improved activation by 25%.');
 
-  await workspace.locator('[data-en-save]').click();
-  await name.fill('Temporary Name');
-  await workspace.locator('[data-en-reload]').click();
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+  await page.reload();
   await expect(name).toHaveValue('Alex E2E');
+  await expect(workspace.locator('[data-resume-field="headline"]')).toHaveValue('Product Engineering Lead');
 
   await workspace.locator('[data-en-load-sample]').click();
   await expect(workspace.locator('[data-en-sample-actions]')).toBeVisible();
