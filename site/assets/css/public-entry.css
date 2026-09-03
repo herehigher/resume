@@ -27,17 +27,32 @@ body {
 .entry-header { margin-bottom: 20px; }
 .entry-grid { display: grid; gap: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .entry-card { min-width: 0; }
-.entry-kicker { color: #3569a8; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.entry-mark { display: block; height: 48px; margin: 0 0 12px; object-fit: cover; width: 48px; }
-.entry-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.entry-brand { align-items: center; display: inline-flex; gap: 12px; }
+.entry-brand-copy { display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+.entry-brand-title { color: #18202b; font-size: 15px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
+.entry-brand-subtitle { color: #64748b; font-size: 13px; line-height: 1.2; }
+.entry-mark {
+  border: 1px solid rgba(15, 23, 42, .12);
+  border-radius: 10px;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .08);
+  display: block;
+  height: 50px;
+  object-fit: cover;
+  width: 50px;
+}
+.entry-header h1 { font-size: clamp(23px, 3.4vw, 31px); letter-spacing: -.03em; line-height: 1.2; margin: 32px 0 16px; }
+.entry-header > p:not(.entry-legal) { margin: 12px 0 0; }
+.entry-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 24px; }
 .entry-button { display: inline-block; padding: 10px 16px; border-radius: 8px; background: #1f5f9f; color: #fff; font-weight: 700; text-decoration: none; }
 .entry-button:focus-visible, a:focus-visible { outline: 3px solid #e69b2d; outline-offset: 3px; }
-.entry-legal { color: #687386; font-size: .78rem; margin: 8px 0 0; text-align: center; }
+.entry-legal { color: #687386; font-size: .78rem; margin: 24px 0 0; text-align: center; }
 .entry-legal a { color: #526d91; font-weight: 700; }
-.entry-links { margin-top: 24px; }
+.entry-links { margin: 24px 0 0; text-align: center; }
 
 @media (max-width: 620px) {
   .entry-shell { width: min(100% - 28px, 920px); padding-top: 20px; }
   .entry-header, .entry-card { padding: 20px; }
   .entry-grid { grid-template-columns: 1fr; }
+  .entry-header h1 { margin-top: 32px; }
 }

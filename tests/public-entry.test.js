@@ -108,7 +108,8 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/\?lang=/);
     assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
-    assert.match(html, /<img class="entry-mark" src="\.\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="48" height="48">/);
+    assert.match(html, /<div class="entry-brand">[\s\S]*?<img class="entry-mark" src="\.\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="50" height="50">[\s\S]*?<div class="entry-brand-copy">/);
+    assert.match(html, /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-legal">/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
@@ -121,7 +122,14 @@ test('editor brand opens the active locale entry and public entries use the shar
   assert.match(html, /<img class="brand-mark" src="\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="38" height="38">/);
   assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
   assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
-  assert.match(source('site/assets/css/public-entry.css'), /\.entry-mark\s*\{[\s\S]*?height: 48px;[\s\S]*?object-fit: cover;[\s\S]*?width: 48px;/);
+  const publicEntryCss = source('site/assets/css/public-entry.css');
+  assert.match(publicEntryCss, /\.entry-brand\s*\{[\s\S]*?align-items: center;[\s\S]*?display: inline-flex;/);
+  assert.match(publicEntryCss, /\.entry-brand-copy\s*\{[\s\S]*?flex-direction: column;[\s\S]*?gap: 3px;[\s\S]*?justify-content: center;/);
+  assert.match(publicEntryCss, /\.entry-brand-subtitle\s*\{[^}]*color: #64748b;[^}]*font-size: 13px;/);
+  assert.match(publicEntryCss, /\.entry-mark\s*\{[\s\S]*?border: 1px solid rgba\(15, 23, 42, \.12\);[\s\S]*?border-radius: 10px;[\s\S]*?box-shadow: 0 2px 8px rgba\(15, 23, 42, \.08\);[\s\S]*?height: 50px;[\s\S]*?object-fit: cover;[\s\S]*?width: 50px;/);
+  assert.match(publicEntryCss, /\.entry-header h1\s*\{[\s\S]*?font-size: clamp\(23px, 3\.4vw, 31px\);[\s\S]*?margin: 32px 0 16px;/);
+  assert.match(publicEntryCss, /\.entry-actions\s*\{[\s\S]*?justify-content: center;/);
+  assert.match(publicEntryCss, /\.entry-links\s*\{[^}]*text-align: center;/);
   assert.deepEqual(
     [ja.brandEntry, zhCN.brandEntry, en.brandEntry],
     ['Resume Studio の紹介ページを開く', '打开 Resume Studio 简介页', 'Open the Resume Studio introduction']
