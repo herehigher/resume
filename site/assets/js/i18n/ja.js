@@ -14,7 +14,7 @@ export default {
   exportError: 'データを書き出せませんでした。',
   importSuccess: 'データを読み込みました。',
   importError: 'データを読み込めませんでした。',
-  localeSaveError: '表示言語を保存できませんでした。',
+  localeSaveError: '表示言語は切り替えましたが、次回は記憶されない可能性があります。',
   draftStorageCompatibilityError: 'このページでは下書きを安全に保存できません。https://、http://localhost、または http://127.0.0.1 で開き直してください。保存済みデータは変更していません。',
   pendingTitle: 'この言語のテンプレートは準備中です',
   pendingBody: '言語別データ領域は利用できます。編集画面とPDFテンプレートは次の実装段階で追加します。',

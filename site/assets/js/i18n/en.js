@@ -14,7 +14,7 @@ export default {
   exportError: 'Your data could not be exported.',
   importSuccess: 'Your data was imported.',
   importError: 'This data could not be imported.',
-  localeSaveError: 'The display language could not be saved.',
+  localeSaveError: 'The display language changed, but it may not be remembered next time.',
   draftStorageCompatibilityError: 'This page cannot save drafts securely. Reopen it with https://, http://localhost, or http://127.0.0.1. Saved data was not changed.',
   pendingTitle: 'Create an English resume',
   pendingBody: 'Build a single-column, ATS-friendly resume for A4 or US Letter paper.',

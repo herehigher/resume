@@ -34,13 +34,13 @@ Node.js と npx:
 npx --yes http-server site --port 8000
 ```
 
-Chrome で `http://localhost:8000/` を開きます。
+Chrome で `http://localhost:8000/` を開いて言語を選ぶか、editor の `http://localhost:8000/editor/` を開きます。
 
 下書きの AES-GCM 暗号化には secure context が必要です。`https://`、`http://localhost`、または `http://127.0.0.1` の URL を使用し、server が表示する `http://0.0.0.0` や LAN IP の URL は開かないでください。
 
 ## README だけで使い始める
 
-1. 右上の言語 selector で日本語、简体中文、English を選びます。URL の `?lang=ja`、`?lang=zh-CN`、`?lang=en` から直接開くこともできます。
+1. 公開首頁で日本語、简体中文、English を選びます。editor 内では右上の言語 selector を使え、`/editor/?lang=ja`、`/editor/?lang=zh-CN`、`/editor/?lang=en` から直接開くこともできます。
 2. 入力欄を編集すると preview がすぐ更新されます。まず確認したい場合は「入力例を表示」を選びます。入力例は保存済み下書きを上書きしません。
 3. 入力内容は現在の browser profile の `localStorage` に自動保存されます。「下書きを保存」で手動保存し、「保存内容を再読込」で保存済み内容へ戻せます。
 4. 「PDF出力」を選び、Chrome の印刷画面で「PDF に保存」を選びます。用紙と印刷設定は下記の制限事項を確認してください。

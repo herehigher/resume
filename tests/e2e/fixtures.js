@@ -36,7 +36,7 @@ export async function installNetworkGuard(context, baseURL) {
     const resourceType = request.resourceType();
     const query = [...url.searchParams.entries()];
     const isDocument = resourceType === 'document'
-      && ['/', '/index.html', '/ja/', '/zh-cn/', '/en/'].includes(url.pathname)
+      && ['/', '/index.html', '/ja/', '/zh-cn/', '/en/', '/editor/', '/editor/index.html'].includes(url.pathname)
       && (query.length === 0 || (
         query.length === 1
         && query[0][0] === 'lang'
@@ -82,7 +82,7 @@ export const test = base.extend({
 export { expect } from '@playwright/test';
 
 export async function openLocale(page, locale) {
-  await page.goto(`/?lang=${encodeURIComponent(locale)}`);
+  await page.goto(`/editor/?lang=${encodeURIComponent(locale)}`);
   await expect(page.locator('html')).toHaveAttribute('lang', locale === 'en' ? 'en' : locale);
   await expect(page.locator('#localeSelect')).toHaveValue(locale);
 }

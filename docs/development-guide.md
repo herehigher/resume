@@ -9,8 +9,9 @@
 - 公開用 application file は `site/` に集約し、履歴書の入力 data は browser 内で扱います。
 - `site/` source の runtime 通信は同一 origin の static asset と利用者が選択した profile link に限定し、Analytics は無効です。`herehigher/resume` の検証済み stable tag だけは、`.github/pages-release-manifest.json` が有効な場合に deployment-only adapter が staging artifact へ固定 Cloudflare beacon を追加します。Clone / fork は注入せず、未対応 configuration は失敗させます。
 - Analytics provider、固定 injection template、endpoint、privacy / network policy を変える場合は、独立した Pull Request、version、immutable stable tag が必要です。Manifest structure または provider fingerprint の意味を変える場合は `schemaVersion` を増やします。既存 tag の manual redeploy は、その tag 自身に含まれる adapter と schema の契約を使用して互換性を保ちます。Enabled tag が固定した旧 token を利用できない場合は再構築を hard failure とし、同じ tag を新しい token へ移行しません。
-- `site/index.html` は editor と `x-default` の入口です。`/ja/`、`/zh-cn/`、`/en/` は JavaScript が無効でも読める locale-specific public entry で、既存の `/?lang=ja`、`/?lang=zh-CN`、`/?lang=en` editor へ案内します。
-- Root と三言語 public entry は canonical / reciprocal hreflang で関係を宣言し、`site/sitemap.xml` は index 対象の canonical URL だけを列挙します。
+- `site/index.html` は redirect を行わない `x-default` の公開首頁です。`/ja/`、`/zh-cn/`、`/en/` は JavaScript が無効でも読める locale-specific public entry で、それぞれ `/editor/?lang=ja`、`/editor/?lang=zh-CN`、`/editor/?lang=en` へ案内します。editor は `/editor/` にあり、`noindex,follow` として公開 hreflang cluster・sitemap から除外します。
+- Root と三言語 public entry は canonical / reciprocal hreflang で関係を宣言し、`site/sitemap.xml` は index 対象の4 canonical URL だけを列挙します。
+- 表示 locale は非機密の versioned localStorage key `resume-studio-locale-v1` に draft と分離して保存します。決定順は URL query、保存 preference、`navigator.languages`、`ja` です。import 内の `settings.locale` は document data として保持しますが、表示 preference は変更しません。`zh-TW` と `zh-Hant` は简体中文へ自動 mapping しません。
 - 保存形式は `resume-studio-web-v1` です。日本語・简体中文・English の document section は独立し、profile・連絡先・写真は三言語で共有します。
 - 公開 export contract は `site/schema/resume-studio-web-v1.schema.json`、架空の import example は同 directory の JSON file です。Application の runtime validator と public JSON Schema の契約を一致させます。
 
@@ -21,7 +22,8 @@
 ```text
 resume/
 ├── site/                       # GitHub Pages へ配信する static application
-│   ├── index.html              # Editor shell と x-default entry
+│   ├── index.html              # x-default public homepage
+│   ├── editor/index.html       # noindex editor shell
 │   ├── ja/index.html           # 日本語 public entry
 │   ├── zh-cn/index.html        # 简体中文 public entry
 │   ├── en/index.html           # English public entry
@@ -71,7 +73,7 @@ python3 -m http.server 8000 --directory site
 
 Git LFS client が未導入の場合は先にインストールします。`git lfs pull` により release screenshot と PDF sample の実体を取得します。
 
-Chrome で editor の `http://localhost:8000/`、public entry の `http://localhost:8000/ja/`、`http://localhost:8000/zh-cn/`、`http://localhost:8000/en/` を開けます。Production code に build step はありません。
+Chrome で editor の `http://localhost:8000/editor/`、public entry の `http://localhost:8000/`、`http://localhost:8000/ja/`、`http://localhost:8000/zh-cn/`、`http://localhost:8000/en/` を開けます。Production code に build step はありません。
 
 草稿の AES-GCM 暗号化には secure context が必要です。local development では `https://`、`http://localhost`、または `http://127.0.0.1` を使い、server が表示する `http://0.0.0.0` や LAN IP の HTTP URL は選びません。これら non-secure origin では Web Crypto が利用できず、下書きの保存・再読込は実行できません。
 

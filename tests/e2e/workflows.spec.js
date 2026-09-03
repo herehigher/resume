@@ -419,7 +419,7 @@ test('English: complete editing flow auto-saves, restores, protects samples, and
 test('English: native month inputs keep their own English language metadata and YYYY-MM values in a Chinese browser locale', async ({ baseURL, browser }) => {
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
-  await page.goto(`${baseURL}/?lang=en`);
+  await page.goto(`${baseURL}/editor/?lang=en`);
   const workspace = page.locator('[data-english-editor]');
   for (const type of ['experience', 'projects', 'education', 'certifications']) {
     const section = workspace.locator(`[data-en-add="${type}"]`).locator('xpath=ancestor::details[1]');

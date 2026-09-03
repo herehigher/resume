@@ -171,7 +171,7 @@ async function generateVariant(browser, baseURL, siteHash, variant) {
     }, { timestamp: fixedTimestamp });
 
     const page = await context.newPage();
-    await page.goto(`${baseURL}/?lang=${encodeURIComponent(variant.locale)}`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseURL}/editor/?lang=${encodeURIComponent(variant.locale)}`, { waitUntil: 'networkidle' });
     await page.locator('#localeSelect').waitFor({ state: 'visible' });
     if (await page.locator('#localeSelect').inputValue() !== variant.locale) {
       throw new Error(`Locale did not resolve to ${variant.locale}`);

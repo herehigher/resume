@@ -62,7 +62,7 @@ test('non-secure HTTP origin keeps encrypted drafts untouched and gives actionab
   });
 
   for (const scenario of cases) {
-    await page.goto(`http://0.0.0.0:4184/?lang=${encodeURIComponent(scenario.locale)}`);
+    await page.goto(`http://0.0.0.0:4184/editor/?lang=${encodeURIComponent(scenario.locale)}`);
     await expect.poll(() => page.evaluate(() => ({
       secure: isSecureContext,
       subtle: Boolean(globalThis.crypto?.subtle)

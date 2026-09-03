@@ -2,6 +2,7 @@ import { STORAGE_KEY } from './config.js';
 import { resolveLocale } from './i18n/index.js';
 import { createDefaultState, cloneData } from './state/defaults.js';
 import { createDraftStorage, getDraftStorageCapabilityError } from './state/storage.js';
+import { loadLocalePreference } from './state/locale-preference.js';
 import { createStore } from './state/store.js';
 import { messageForDraftStorageError } from './ui/draft-storage-error.js';
 import { renderEnglishWorkspace, initEnglishEditor } from './ui/english-editor.js';
@@ -34,7 +35,7 @@ if (storageError?.code === 'crypto-unavailable') {
 }
 const locale = resolveLocale({
   search: window.location.search,
-  storedLocale: storedState?.settings.locale,
+  storedLocale: loadLocalePreference(window.localStorage),
   browserLanguages: navigator.languages || [navigator.language]
 });
 const initialState = storedState ? cloneData(storedState) : createDefaultState(locale);
@@ -66,11 +67,8 @@ if (storageError) {
   message.classList.add('is-error');
 }
 initLocaleController(store, {
-  beforeLocalePersist() {
-    japaneseEditor.restoreDraftBeforePersistence();
-    chineseEditor.restoreDraftBeforePersistence();
-    englishEditor.restoreDraftBeforePersistence();
-  },
+  locale,
+  preferenceStorage: window.localStorage,
   onLocaleApplied(locale) {
     privacySecurity.applyLocale(locale);
     if (locale === 'ja') japaneseEditor.refresh();

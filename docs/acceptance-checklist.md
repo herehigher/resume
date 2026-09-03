@@ -40,8 +40,8 @@ Smoke が失敗した場合、deployment 自体は完了しているため「dep
 - [ ] 保存・再読込、入力例からの復元、項目削除、JSON書き出し・読込後も三言語のデータが混ざらない。
 - [ ] HTMLらしい入力が文字として表示され、画像・スクリプト・イベントハンドラとして実行されない。
 - [ ] `http://` と `https://` だけがリンクになり、`javascript:`、`data:`、相対URL、`mailto:`、`ftp:` はクリックできない。
-- [ ] Clone / fork または source build では、4 HTML が `data-analytics-mode="disabled" data-analytics-provider="none"` を示し、Developer Tools の Network に同一 origin の公開 static file 以外の analytics / external runtime request、同一 origin POST、未知 path、WebSocket がない。
-- [ ] 公式 Pages release では、4 HTML の status tuple が tagged manifest と一致する。`disabled/none` なら beacon がなく、`enabled/cloudflare-web-analytics` なら `https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST が各 page で確認できる。未対応 tuple は configuration error として不合格にする。
+- [ ] Clone / fork または source build では、公開4ページと editor の5 HTML が `data-analytics-mode="disabled" data-analytics-provider="none"` を示し、Developer Tools の Network に同一 origin の公開 static file 以外の analytics / external runtime request、同一 origin POST、未知 path、WebSocket がない。
+- [ ] 公式 Pages release では、公開4ページと editor の5 HTML の status tuple が tagged manifest と一致する。`disabled/none` なら beacon がなく、`enabled/cloudflare-web-analytics` なら `https://static.cloudflareinsights.com/beacon.min.js` への GET と `https://cloudflareinsights.com/cdn-cgi/rum` への標準 POST が各 page で確認できる。未対応 tuple は configuration error として不合格にする。
 - [ ] Enabled の Cloudflare RUM request の URL と payload を確認し、履歴書入力、氏名・連絡先、写真、import / export JSON、localStorage の下書き、custom event、利用者単位 ID が含まれない。Page URL の query は `lang=ja`、`lang=zh-CN`、`lang=en` 以外を含まない。
 - [ ] Repository を public にした後、未ログインまたは private window から右下の GitHub source link と三言語の privacy notice link を開ける。
 
@@ -49,14 +49,15 @@ Smoke が失敗した場合、deployment 自体は完了しているため「dep
 
 対象: GitHub Pages へ deploy した release candidate の実 URL。Project site の場合は `/resume/` subpath を含めて確認する。
 
-- [ ] Root editor を直接開き、JavaScript を無効にしても `lang`、title、description、H1 と基本的な editor content を読める。
+- [ ] Root を直接開き、JavaScript を無効にしても `lang`、title、description、H1、主要説明、三言語への導線を読める。browser language による強制 redirect がない。
 - [ ] 三言語 public entry は JavaScript を無効にしても対応する `lang`、title、description、H1、主要説明、editor CTA、JSON Schema link を読める。
-- [ ] Root と三言語 public entry の canonical が実 deployment URL と一致し、`ja`、`zh-CN`、`en`、`x-default` の hreflang が全 page で reciprocal になっている。
+- [ ] Root と三言語 public entry の canonical が実 deployment URL と一致し、`ja`、`zh-CN`、`en`、`x-default` の hreflang が全 page で reciprocal になっている。`/editor/` は `noindex,follow` で、public hreflang cluster に含まれない。
 - [ ] `sitemap.xml` が HTTP 200 と XML content type で取得でき、root と三言語の canonical URL だけを含む。
 - [ ] `schema/resume-studio-web-v1.schema.json` と架空 example JSON が HTTP 200 で取得でき、example を editor へ import できる。
 - [ ] Public JSON Schema が現在の runtime import contract と一致し、無効 version / locale / missing field / remote photo URL を拒否する。
 - [ ] 三言語 public entry が、application は data を upload しないこと、export file は写真や個人情報を含み得ること、利用者の明示承認なしに Agent が upload / transmit / share してはいけないことを区別して説明する。
-- [ ] Public entry から editor へ移動したとき、`?lang=ja`、`?lang=zh-CN`、`?lang=en` が正しく適用される。
+- [ ] Public entry から `/editor/` へ移動したとき、`?lang=ja`、`?lang=zh-CN`、`?lang=en` が正しく適用される。editor の brand から active locale の紹介ページへ戻れる。
+- [ ] 表示 locale は URL query、保存 preference、browser language、`ja` の順で決まり、draft の削除後も preference が維持される。preference の保存に失敗しても現在の表示は切り替わり、次回記憶されない可能性が通知される。
 - [ ] Canonical / hreflang 以外の外部 runtime asset がなく、履歴書 data の network 送信も発生しない。
 
 ## PDF 目視確認
