@@ -12,7 +12,11 @@ export function createChineseSampleState(sourceState) {
       address: '上海市',
       phone: '138 0000 0000',
       email: 'jian.li@example.com',
-      links: ['https://example.com/jian-li/github', 'https://example.com/jian-li/linkedin', 'https://example.com/jian-li']
+      links: [
+        'https://github.com/resume-studio-fictional-example',
+        'https://www.linkedin.com/in/resume-studio-fictional-example',
+        'https://resume-studio-fictional.example.test'
+      ]
     }
   };
   state.documents['zh-CN'] = {

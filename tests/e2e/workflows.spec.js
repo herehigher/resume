@@ -277,6 +277,12 @@ test('三言語エディターは Analytics 表示の下に著作権と MIT Lice
   await expect(page.locator('#japaneseWorkspace .editor-legal')).toBeHidden();
 });
 
+test('@mobile 简体中文では末尾のPDF導線を出さず、headerのPDF導線を維持する', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  await expect(page.locator('#chineseWorkspace .editor-footer [data-zh-action="print"]')).toHaveCount(0);
+  await expect(page.locator('#printButton')).toBeVisible();
+});
+
 test('@mobile 著作権表示は固定の trust capsule に隠れない', async ({ page }) => {
   await openLocale(page, 'ja');
   const legal = page.locator('#japaneseWorkspace .editor-legal');
@@ -416,26 +422,53 @@ test('English: complete editing flow auto-saves, restores, protects samples, and
   await expect(workspace.locator('[data-en-preview]')).not.toContainText('E2E Labs');
 });
 
-test('English: native month inputs inherit the English locale for every dated entry type', async ({ page }) => {
-  await openLocale(page, 'en');
-  const workspace = page.locator('[data-english-editor]');
-  await expect(workspace).toHaveAttribute('lang', 'en');
+test('English: Chinese browser locale uses locale-independent YYYY-MM fields for initial and added entries', async ({ baseURL, browser }) => {
+  const context = await browser.newContext({ baseURL, locale: 'zh-CN' });
+  const page = await context.newPage();
+  try {
+    await openLocale(page, 'en');
+    await expect.poll(() => page.evaluate(() => navigator.language)).toBe('zh-CN');
+    const workspace = page.locator('[data-english-editor]');
+    const initialMonthInputs = workspace.locator('[data-en-month-input]');
+    await expect(initialMonthInputs).toHaveCount(7);
+    await expect(workspace.locator('input[type="month"]')).toHaveCount(0);
+    await expect.poll(() => initialMonthInputs.evaluateAll((inputs) => inputs.map((input) => ({
+      type: input.getAttribute('type'),
+      inputMode: input.getAttribute('inputmode'),
+      placeholder: input.getAttribute('placeholder')
+    })))).toEqual(Array.from({ length: 7 }, () => ({
+      type: 'text',
+      inputMode: 'numeric',
+      placeholder: 'YYYY-MM'
+    })));
 
-  for (const type of ['experience', 'projects', 'education', 'certifications']) {
-    const addButton = workspace.locator(`[data-en-add="${type}"]`);
-    const section = addButton.locator('xpath=ancestor::details[1]');
-    if (!(await section.evaluate((element) => element.open))) {
-      await section.locator('summary').click();
+    const initialStartDate = initialMonthInputs.first();
+    await initialStartDate.pressSequentially('2024-09');
+    await expect(initialStartDate).toHaveValue('2024-09');
+    await expect(workspace.locator('[data-en-preview]')).toContainText('September 2024');
+
+    for (const [type, monthFieldCount] of [
+      ['experience', 2], ['projects', 2], ['education', 2], ['certifications', 1]
+    ]) {
+      const addButton = workspace.locator(`[data-en-add="${type}"]`);
+      const section = addButton.locator('xpath=ancestor::details[1]');
+      if (!(await section.evaluate((element) => element.open))) await section.locator('summary').click();
+      await addButton.click();
+      const fields = workspace.locator(`[data-en-item="${type}"]`).last().locator('[data-en-month-input]');
+      await expect(fields).toHaveCount(monthFieldCount);
+      for (const field of await fields.all()) {
+        await field.pressSequentially('2025-03');
+        await expect(field).toHaveValue('2025-03');
+      }
     }
-    await expect(addButton).toBeVisible();
-  }
 
-  const monthInputs = workspace.locator('input[type="month"]');
-  await expect(monthInputs).toHaveCount(7);
-  for (const input of await monthInputs.all()) await expect(input).toBeVisible();
-  await expect.poll(() => monthInputs.evaluateAll((inputs) => inputs.map((input) => (
-    input.closest('[lang]')?.getAttribute('lang')
-  )))).toEqual(['en', 'en', 'en', 'en', 'en', 'en', 'en']);
+    await initialStartDate.fill('2025-13');
+    await expect(initialStartDate).toHaveAttribute('aria-invalid', 'true');
+    await initialStartDate.press('Tab');
+    await expect(initialStartDate).toHaveValue('2024-09');
+  } finally {
+    await context.close();
+  }
 });
 
 test('JSON の書き出し・読込が往復し、不正データは既存下書きを壊さない', async ({ page }) => {

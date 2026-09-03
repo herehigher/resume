@@ -108,9 +108,9 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
   assert.deepEqual(
     sample.profile.fields.links,
     [
-      'https://example.com/jian-li/github',
-      'https://example.com/jian-li/linkedin',
-      'https://example.com/jian-li'
+      'https://github.com/resume-studio-fictional-example',
+      'https://www.linkedin.com/in/resume-studio-fictional-example',
+      'https://resume-studio-fictional.example.test'
     ]
   );
   assert.ok(resume.headline);
@@ -124,6 +124,10 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
   assert.equal(resume.education[0].school, '国子监理工大学');
   assert.ok(resume.skills);
   assert.ok(resume.certifications.length >= 2);
+  const html = renderChineseResume(sample);
+  assert.match(html, /profile-link-icon--github/);
+  assert.match(html, /profile-link-icon--linkedin/);
+  assert.match(html, /profile-link-icon--external/);
   assert.equal(calculateChineseCompletion(sample), 100);
 });
 
@@ -165,6 +169,7 @@ test('Chinese editor exposes all state-backed sections and accessible controls',
   assert.match(shell, /aria-label="缩小预览"/);
   assert.match(shell, /data-profile="birthDate"/);
   assert.match(shell, /选填/);
+  assert.doesNotMatch(shell, /data-zh-action="print"/);
 });
 
 test('Chinese repeating-item factories match the persisted state model', () => {

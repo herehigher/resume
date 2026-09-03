@@ -8,6 +8,7 @@ import { confirmAction } from './confirmation-dialog.js';
 
 const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
 const RESUME_FIELDS = new Set(['headline', 'location', 'summary', 'skills']);
+const MONTH_VALUE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const ITEM_SHAPES = Object.freeze({
   experience: { startDate: '', endDate: '', company: '', role: '', details: '' },
@@ -159,8 +160,8 @@ function itemFields(type) {
     return `<label class="input-field"><span>Company</span><input data-en-item-field="company"></label>
       <label class="input-field"><span>Role</span><input data-en-item-field="role"></label>
       <div class="english-editor-date-grid">
-        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month"></label>
-        <label class="input-field"><span>End date <small>Leave blank for Present</small></span><input data-en-item-field="endDate" type="month"></label>
+        <label class="input-field"><span>Start date</span>${englishMonthInput('startDate')}</label>
+        <label class="input-field"><span>End date <small>Leave blank for Present</small></span>${englishMonthInput('endDate')}</label>
       </div>
       <label class="input-field"><span>Responsibilities and achievements</span><textarea data-en-item-field="details" rows="5" placeholder="Write one achievement per line. Start with an action and include measurable impact when possible."></textarea></label>`;
   }
@@ -168,8 +169,8 @@ function itemFields(type) {
     return `<label class="input-field"><span>Project name</span><input data-en-item-field="name"></label>
       <label class="input-field"><span>Your role</span><input data-en-item-field="role"></label>
       <div class="english-editor-date-grid">
-        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month"></label>
-        <label class="input-field"><span>End date <small>Leave blank for Present</small></span><input data-en-item-field="endDate" type="month"></label>
+        <label class="input-field"><span>Start date</span>${englishMonthInput('startDate')}</label>
+        <label class="input-field"><span>End date <small>Leave blank for Present</small></span>${englishMonthInput('endDate')}</label>
       </div>
       <label class="input-field"><span>Project achievements</span><textarea data-en-item-field="details" rows="4" placeholder="Write one outcome or contribution per line."></textarea></label>
       <label class="input-field"><span>Project URL</span><input data-en-item-field="url" type="url" inputmode="url"></label>`;
@@ -178,14 +179,18 @@ function itemFields(type) {
     return `<label class="input-field"><span>School</span><input data-en-item-field="school"></label>
       <label class="input-field"><span>Degree or program</span><input data-en-item-field="degree"></label>
       <div class="english-editor-date-grid">
-        <label class="input-field"><span>Start date</span><input data-en-item-field="startDate" type="month"></label>
-        <label class="input-field"><span>End date <small>Leave blank if current</small></span><input data-en-item-field="endDate" type="month"></label>
+        <label class="input-field"><span>Start date</span>${englishMonthInput('startDate')}</label>
+        <label class="input-field"><span>End date <small>Leave blank if current</small></span>${englishMonthInput('endDate')}</label>
       </div>
       <label class="input-field"><span>Details</span><textarea data-en-item-field="details" rows="3"></textarea></label>`;
   }
   return `<label class="input-field"><span>Certification</span><input data-en-item-field="name"></label>
-    <label class="input-field"><span>Date earned</span><input data-en-item-field="date" type="month"></label>
+    <label class="input-field"><span>Date earned</span>${englishMonthInput('date')}</label>
     <label class="input-field"><span>Credential URL</span><input data-en-item-field="url" type="url" inputmode="url"></label>`;
+}
+
+function englishMonthInput(field) {
+  return `<input data-en-item-field="${field}" data-en-month-input type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}-(0[1-9]|1[0-2])" placeholder="YYYY-MM">`;
 }
 
 function renderEditorItem(type, item, index) {
@@ -449,8 +454,14 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       const item = event.target.closest('[data-en-item]');
       const type = item?.dataset.enItem;
       if (!ITEM_SHAPES[type] || !(itemField in ITEM_SHAPES[type])) return;
+      const value = event.target.value;
+      if (event.target.dataset.enMonthInput !== undefined && value && !MONTH_VALUE_PATTERN.test(value)) {
+        event.target.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      event.target.removeAttribute('aria-invalid');
       mutate((state) => {
-        state.documents.en.resume[type][Number(item.dataset.index)][itemField] = event.target.value;
+        state.documents.en.resume[type][Number(item.dataset.index)][itemField] = value;
       });
     } else {
       return;
@@ -464,6 +475,18 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       state.settings.pageSizeByLocale.en = pageSizeSelect.value === 'A4' ? 'A4' : 'LETTER';
     });
     renderPreview();
+  }
+
+  function onBlur(event) {
+    const field = event.target;
+    if (field.dataset.enMonthInput === undefined || !field.value || MONTH_VALUE_PATTERN.test(field.value)) return;
+    const item = field.closest('[data-en-item]');
+    const type = item?.dataset.enItem;
+    const key = field.dataset.enItemField;
+    field.value = ITEM_SHAPES[type] && key in ITEM_SHAPES[type]
+      ? resume()[type][Number(item.dataset.index)][key]
+      : '';
+    field.removeAttribute('aria-invalid');
   }
 
   async function onClick(event) {
@@ -533,6 +556,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     if (['import', 'reload', 'reset', 'en-sample', 'en-restore'].includes(event.type)) hydrate();
   });
   form.addEventListener('input', onInput);
+  form.addEventListener('blur', onBlur, true);
   root.addEventListener('change', onChange);
   root.addEventListener('click', onClick);
   window.addEventListener('resize', fitPreview);
@@ -549,6 +573,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       window.clearTimeout(saveTimer);
       unsubscribe();
       form.removeEventListener('input', onInput);
+      form.removeEventListener('blur', onBlur, true);
       root.removeEventListener('change', onChange);
       root.removeEventListener('click', onClick);
       window.removeEventListener('resize', fitPreview);

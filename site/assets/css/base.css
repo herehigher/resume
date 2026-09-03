@@ -241,7 +241,7 @@ button { cursor: pointer; }
 }
 
 .trust-source-link {
-  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   justify-content: center;
   width: 40px;
 }
@@ -263,6 +263,6 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 
-.trust-privacy-button svg { fill: currentColor; height: 18px; width: 18px; }
+.trust-privacy-button svg { fill: currentColor; height: 19px; width: 19px; }
 .trust-privacy-button span { font-size: 10px; font-weight: 750; }
-.trust-privacy-button .trust-version { color: var(--muted); font-size: 9px; font-weight: 650; }
+.trust-version { align-items: center; color: var(--muted); display: inline-flex; font-size: 9px; font-weight: 650; padding: 0 11px 0 0; white-space: nowrap; }

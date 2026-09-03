@@ -9,6 +9,19 @@ const PRIVACY_URLS = {
   en: `${REPOSITORY_URL}/blob/main/PRIVACY.md#privacy-en`
 };
 
+test('trust capsule orders privacy, GitHub, and version as separate controls', async ({ page }) => {
+  await openLocale(page, 'en');
+  const capsule = page.locator('#trustCapsule');
+  await expect.poll(() => capsule.evaluate((element) => Array.from(element.children).map((child) => child.id))).toEqual([
+    'privacySecurityButton',
+    'repositoryLink',
+    'privacySecurityVersion'
+  ]);
+  await expect(page.locator('#privacySecurityButton #privacySecurityVersion')).toHaveCount(0);
+  await expect(page.locator('#privacySecurityButton svg')).toHaveCSS('height', '19px');
+  await expect(page.locator('#privacySecurityButton svg')).toHaveCSS('width', '19px');
+});
+
 test('privacy UI switches immediately across all locales and exposes safe source links', async ({ page }) => {
   await openLocale(page, 'ja');
   const badge = page.locator('#privacySecurityButton');
