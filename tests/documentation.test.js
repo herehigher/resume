@@ -271,21 +271,34 @@ test('development docs cover localized public entry and machine-readable contrac
   }
 });
 
-test('v0.1.0 changelog freezes the dated release without losing release notes', () => {
+test('changelog freezes dated releases without losing release notes', () => {
   const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   const unreleased = '## [Unreleased]';
-  const release = '## [0.1.0] - 2026-09-01';
+  const latestRelease = '## [0.2.0] - 2026-09-03';
+  const initialRelease = '## [0.1.0] - 2026-09-01';
   const unreleasedIndex = changelog.indexOf(unreleased);
-  const releaseIndex = changelog.indexOf(release);
+  const latestReleaseIndex = changelog.indexOf(latestRelease);
+  const initialReleaseIndex = changelog.indexOf(initialRelease);
 
   assert.ok(unreleasedIndex >= 0);
-  assert.ok(releaseIndex > unreleasedIndex, 'Unreleased must remain before the latest release');
-  assert.equal(changelog.slice(unreleasedIndex + unreleased.length, releaseIndex).trim(), '');
+  assert.ok(latestReleaseIndex > unreleasedIndex, 'Unreleased must remain before the latest release');
+  assert.ok(initialReleaseIndex > latestReleaseIndex, 'Releases must remain in descending order');
+  assert.equal(changelog.slice(unreleasedIndex + unreleased.length, latestReleaseIndex).trim(), '');
+  assert.equal((changelog.match(/^## \[0\.2\.0\] - 2026-09-03$/gm) || []).length, 1);
   assert.equal((changelog.match(/^## \[0\.1\.0\] - 2026-09-01$/gm) || []).length, 1);
 
-  const releaseNotes = changelog.slice(releaseIndex + release.length);
-  assert.match(releaseNotes, /### Added \/ 追加/);
-  assert.match(releaseNotes, /### Security \/ Privacy/);
+  const latestReleaseNotes = changelog.slice(latestReleaseIndex + latestRelease.length, initialReleaseIndex);
+  for (const fact of [
+    'AES-GCM',
+    '`/editor/`',
+    '最大3件の共通 profile link',
+    '日本語履歴書 PDF',
+    'release preflight'
+  ]) assert.match(latestReleaseNotes, new RegExp(literalPattern(fact)));
+
+  const initialReleaseNotes = changelog.slice(initialReleaseIndex + initialRelease.length);
+  assert.match(initialReleaseNotes, /### Added \/ 追加/);
+  assert.match(initialReleaseNotes, /### Security \/ Privacy/);
   for (const fact of [
     '日本語の履歴書・職務経歴書',
     '简体中文 resume editor',
@@ -301,7 +314,7 @@ test('v0.1.0 changelog freezes the dated release without losing release notes', 
     '`site/` source、clone、fork は Analytics 無効',
     'deployment 時に決定的に追加',
     'no raw provider token'
-  ]) assert.match(releaseNotes, new RegExp(literalPattern(fact)));
+  ]) assert.match(initialReleaseNotes, new RegExp(literalPattern(fact)));
 });
 
 test('release playbook is canonical and covers publication, evidence, and recovery decisions', () => {
@@ -577,9 +590,11 @@ test('PDF samples have physical paper sizes and extractable first/last markers',
   };
   for (const output of manifest.outputs) {
     const pages = await inspectPdf(path.join(root, output.pdf.path));
+    const firstPageText = pages[0].text.replace(/\s+/g, '');
+    const lastPageText = pages.at(-1).text.replace(/\s+/g, '');
     assert.ok(pages.length >= 1, `${output.locale} PDF must have a page`);
-    assert.match(pages[0].text, new RegExp(output.firstText));
-    assert.match(pages.at(-1).text, new RegExp(output.lastText));
+    assert.ok(firstPageText.includes(output.firstText.replace(/\s+/g, '')), `${output.locale} PDF must contain its first marker`);
+    assert.ok(lastPageText.includes(output.lastText.replace(/\s+/g, '')), `${output.locale} PDF must contain its last marker`);
     for (const page of pages) {
       assert.ok(Math.abs(page.width - sizes[output.paper].width) < 1);
       assert.ok(Math.abs(page.height - sizes[output.paper].height) < 1);

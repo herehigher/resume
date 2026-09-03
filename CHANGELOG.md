@@ -6,6 +6,33 @@ English: This file records notable changes. Release dates are added only when th
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-03
+
+### Added / 追加
+
+- `localStorage` の下書き本文を Web Crypto AES-GCM で暗号化し、取り出せない鍵を同一 origin の IndexedDB に分離して保存する仕組み。
+- 日本語・简体中文・English の紹介ページと、`/editor/` に分離した編集画面。表示 locale の独立した端末内 preference。
+- GitHub、LinkedIn、GitLab、Qiita などを自動判定する、最大3件の共通 profile link 入力。
+- Desktop、Apple touch icon、Android 向けの複数サイズ favicon。
+- Release SHA、Analytics manifest、artifact digest、Pages semantic smoke を一括検証する release preflight。
+
+### Changed / 変更
+
+- 日本語履歴書 PDF を、連絡先、経歴、資格と長文の可読性を高めた現代的な layout に刷新。
+- 公開首頁、三言語の紹介ページ、editor の導線と brand 表示を整理し、検索対象ページと編集画面の役割を明確化。
+- Mobile の言語選択、三言語の端末内下書き status、削除確認 UI、copyright 表示を改善。
+- Pages deployment と smoke test を reusable Quality gate、固定 release SHA、再現可能な artifact 検証へ更新。
+
+### Fixed / 修正
+
+- English の month input locale、多言語 UI の表示不整合、Cloudflare Analytics status marker を修正。
+- Non-secure HTTP origin で暗号化草稿を利用できない場合に、既存の保存内容を変更せず理由を案内するよう修正。
+
+### Security / Privacy
+
+- 下書きの暗号化保存には secure context を要求し、暗号化・鍵・storage の検証失敗時に plaintext fallback や既存 ciphertext の上書きを行わない。
+- JSON export と PDF は暗号化されないこと、端末内暗号化の保護範囲、復号鍵喪失時の risk を三言語の privacy notice に明記。
+
 ## [0.1.0] - 2026-09-01
 
 ### Added / 追加
