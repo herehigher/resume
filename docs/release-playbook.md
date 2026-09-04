@@ -37,6 +37,17 @@ Screenshot に誤りが見つかった場合は tag 前に RC を修正して再
 
 Official deployment で Analytics が enabled であることを示す screenshot は、deploy 後の Issue evidence として保存します。Source default が disabled であることを示す tag 内の生成 screenshot を置き換えたり、immutable tag へ書き戻したりしません。
 
+### Runner-only manifest digest preparation
+
+Enabled Analytics release で `site/` が変わった場合は、version と release notes を固定した RC を review して `main` へ merge した後、default branch から `Prepare release manifest` workflow を手動実行します。この read-only workflow は owner-approved repository variable を GitHub runner 内だけで使用し、raw provider value を log、summary、artifact、release host へ出さず、review 済み provider fingerprint と一致することを確認して source / adapter / final artifact digest だけを summary に書きます。
+
+```bash
+gh workflow run prepare-release-manifest.yml --ref main \
+  || { echo 'Release manifest preparation dispatch failed; stop the release.' >&2; exit 1; }
+```
+
+成功 run の default-branch full SHA、version、provider fingerprint、三つの digest、run URL を記録し、その exact tuple を follow-up Pull Request の `.github/pages-release-manifest.json` へ反映します。Workflow failure、空の summary、SHA / version / fingerprint の不一致では推測せず停止します。この preparation run は final pre-tag artifact gate ではなく、tag publish helper の Approval B に使用できません。Disabled manifest は provider value を必要としないため、この workflow を使用しません。
+
 ## Preflight inputs と local gate
 
 最初に次を Issue または手元の release note に用意します。

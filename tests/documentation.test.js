@@ -270,27 +270,40 @@ test('development docs cover localized public entry and machine-readable contrac
 test('changelog freezes dated releases without losing release notes', () => {
   const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   const unreleased = '## [Unreleased]';
-  const latestRelease = '## [0.2.0] - 2026-09-03';
+  const latestRelease = '## [0.2.1] - 2026-09-04';
+  const previousRelease = '## [0.2.0] - 2026-09-03';
   const initialRelease = '## [0.1.0] - 2026-09-01';
   const unreleasedIndex = changelog.indexOf(unreleased);
   const latestReleaseIndex = changelog.indexOf(latestRelease);
+  const previousReleaseIndex = changelog.indexOf(previousRelease);
   const initialReleaseIndex = changelog.indexOf(initialRelease);
 
   assert.ok(unreleasedIndex >= 0);
   assert.ok(latestReleaseIndex > unreleasedIndex, 'Unreleased must remain before the latest release');
-  assert.ok(initialReleaseIndex > latestReleaseIndex, 'Releases must remain in descending order');
+  assert.ok(previousReleaseIndex > latestReleaseIndex, 'Releases must remain in descending order');
+  assert.ok(initialReleaseIndex > previousReleaseIndex, 'Releases must remain in descending order');
   assert.equal(changelog.slice(unreleasedIndex + unreleased.length, latestReleaseIndex).trim(), '');
+  assert.equal((changelog.match(/^## \[0\.2\.1\] - 2026-09-04$/gm) || []).length, 1);
   assert.equal((changelog.match(/^## \[0\.2\.0\] - 2026-09-03$/gm) || []).length, 1);
   assert.equal((changelog.match(/^## \[0\.1\.0\] - 2026-09-01$/gm) || []).length, 1);
 
-  const latestReleaseNotes = changelog.slice(latestReleaseIndex + latestRelease.length, initialReleaseIndex);
+  const latestReleaseNotes = changelog.slice(latestReleaseIndex + latestRelease.length, previousReleaseIndex);
+  for (const fact of [
+    '壊れた暗号化下書き',
+    'X 連絡先',
+    'マーモット',
+    '末尾空白 page',
+    'owner-approved trusted release host'
+  ]) assert.match(latestReleaseNotes, new RegExp(literalPattern(fact)));
+
+  const previousReleaseNotes = changelog.slice(previousReleaseIndex + previousRelease.length, initialReleaseIndex);
   for (const fact of [
     'AES-GCM',
     '`/editor/`',
     '最大3件の共通 profile link',
     '日本語履歴書 PDF',
     'release preflight'
-  ]) assert.match(latestReleaseNotes, new RegExp(literalPattern(fact)));
+  ]) assert.match(previousReleaseNotes, new RegExp(literalPattern(fact)));
 
   const initialReleaseNotes = changelog.slice(initialReleaseIndex + initialRelease.length);
   assert.match(initialReleaseNotes, /### Added \/ 追加/);

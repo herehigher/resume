@@ -91,6 +91,7 @@ Chrome で editor の `http://localhost:8000/editor/`、public entry の `http:/
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run release:assets -- --source-sha <SHA>` | 指定 commit の Git archive から一時候補として三言語 screenshot、PDF sample、provenance manifest を生成・検査し、source SHA・site hash・対象7ファイルと SHA-256 を表示する |
 | `npm run test:release-assets` | Release asset が最終 RC の `site/` と一致し、既存の文書・画像・PDF 検査を通ることを確認 |
+| GitHub `Prepare release manifest` | Enabled Analytics の versioned `site/` から、provider raw value を runner 内だけで使用して manifest 用の非機密 source / adapter / artifact digest を導出 |
 | GitHub `Pre-tag artifact gate` | Tag 作成前に immutable release SHA の version、main ancestry、#77 の online path contract、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証。raw provider value は GitHub runner 外へ出さない |
 
 ### 変更種別ごとの route

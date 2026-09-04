@@ -1,0 +1,55 @@
+name: Prepare release manifest
+run-name: "Prepare release manifest: ${{ github.sha }}"
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  prepare-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout default branch dispatch commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Derive enabled artifact digests in runner temporary storage
+        id: manifest
+        env:
+          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
+          RELEASE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: node scripts/prepare-release-manifest.mjs
+
+      - name: Write non-secret preparation summary
+        env:
+          ADAPTER_DIGEST: ${{ steps.manifest.outputs.adapter_digest }}
+          ARTIFACT_DIGEST: ${{ steps.manifest.outputs.final_digest }}
+          PACKAGE_VERSION: ${{ steps.manifest.outputs.package_version }}
+          PROVIDER_FINGERPRINT: ${{ steps.manifest.outputs.provider_fingerprint }}
+          RELEASE_SHA: ${{ steps.manifest.outputs.release_sha }}
+          SOURCE_DIGEST: ${{ steps.manifest.outputs.source_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo '## Prepare release manifest'
+            echo
+            echo "- Version: \`${PACKAGE_VERSION}\`"
+            echo "- Default-branch SHA: \`${RELEASE_SHA}\`"
+            echo "- Provider fingerprint: \`${PROVIDER_FINGERPRINT}\`"
+            echo "- Source digest: \`${SOURCE_DIGEST}\`"
+            echo "- Adapter digest: \`${ADAPTER_DIGEST}\`"
+            echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
+            echo "- Run: ${run_url}"
+          } >> "$GITHUB_STEP_SUMMARY"
