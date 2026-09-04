@@ -1,0 +1,114 @@
+name: Pre-tag artifact gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Stable tag to create after this gate, for example v0.2.0
+        required: true
+        type: string
+      release_sha:
+        description: Full merged commit SHA to validate
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  pretag-artifact:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout default branch dispatch commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Validate read-only pre-tag inputs
+        id: release
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_SHA_INPUT: ${{ github.event.inputs.release_sha }}
+          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag }}
+        run: node scripts/validate-pretag-release.mjs
+
+      - name: Checkout validated merged commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.release_sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Validate release Pages manifest without provider value
+        id: manifest
+        run: >-
+          node scripts/prepare-pages-artifact.mjs validate
+          --source site
+          --manifest .github/pages-release-manifest.json
+
+      - name: Prepare enabled artifact in runner temporary storage
+        if: ${{ steps.manifest.outputs.analytics_mode == 'enabled' && steps.manifest.outputs.analytics_provider == 'cloudflare-web-analytics' }}
+        env:
+          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
+        run: >-
+          node scripts/prepare-pages-artifact.mjs prepare
+          --source site
+          --output "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --manifest .github/pages-release-manifest.json
+          --repository "${GITHUB_REPOSITORY}"
+
+      - name: Prepare disabled artifact in runner temporary storage
+        if: ${{ steps.manifest.outputs.analytics_mode == 'disabled' && steps.manifest.outputs.analytics_provider == 'none' }}
+        run: >-
+          node scripts/prepare-pages-artifact.mjs prepare
+          --source site
+          --output "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --manifest .github/pages-release-manifest.json
+          --repository "${GITHUB_REPOSITORY}"
+
+      - name: Verify final artifact digest
+        id: artifact
+        run: >-
+          node scripts/prepare-pages-artifact.mjs verify
+          --directory "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --manifest .github/pages-release-manifest.json
+
+      - name: Verify prepared artifact semantics
+        run: >-
+          node scripts/validate-pages-smoke.mjs
+          --directory "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --analytics-mode "${{ steps.manifest.outputs.analytics_mode }}"
+          --analytics-provider "${{ steps.manifest.outputs.analytics_provider }}"
+          --package-version "${{ steps.release.outputs.package_version }}"
+          --provider-fingerprint "${{ steps.manifest.outputs.provider_fingerprint }}"
+
+      - name: Write non-secret gate summary
+        env:
+          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.final_digest }}
+          PROVIDER_FINGERPRINT: ${{ steps.manifest.outputs.provider_fingerprint }}
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo '## Pre-tag artifact gate'
+            echo
+            echo "- Tag: \`${RELEASE_TAG}\`"
+            echo "- Merged SHA: \`${RELEASE_SHA}\`"
+            echo "- Provider fingerprint: \`${PROVIDER_FINGERPRINT}\`"
+            echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
+            echo "- Run: ${run_url}"
+          } >> "$GITHUB_STEP_SUMMARY"
