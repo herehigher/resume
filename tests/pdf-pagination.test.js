@@ -52,6 +52,10 @@ test('print styles use physical page sizes without a clipping container', () => 
   }
   assert.match(japaneseCss, /\.paper-text-section\s*\{\s*break-inside:\s*auto;/);
   assert.match(japaneseCss, /#japaneseWorkspace \.paper-text-section\s*\{[^}]*min-height:\s*0;/s);
+  assert.match(chineseCss, /@media print[\s\S]*?\.zh-certifications ul\s*\{\s*display:\s*block;/);
+  assert.match(chineseCss, /@media print[\s\S]*?\.zh-certifications li \+ li\s*\{\s*margin-top:\s*7px;/);
+  assert.match(englishCss, /@media print[\s\S]*?\.en-certification-list li\s*\{\s*display:\s*block;/);
+  assert.match(englishCss, /@media print[\s\S]*?\.en-certification-date\s*\{\s*margin-left:\s*10px;/);
 });
 
 test('browser PDF fixture exposes every supported print parameter', () => {
