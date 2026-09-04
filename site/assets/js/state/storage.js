@@ -10,6 +10,12 @@ const KEY_ID = 'draft-encryption-key';
 const NONCE_BYTES = 12;
 const MAX_ENVELOPE_CHARACTERS = 4 * 1024 * 1024;
 const MAX_CIPHERTEXT_BYTES = (3 * 1024 * 1024) - 1024;
+const PERMANENTLY_UNREADABLE_DRAFT_ERROR_CODES = new Set([
+  'corrupt-envelope',
+  'decrypt-failed',
+  'key-invalid',
+  'key-missing'
+]);
 
 export class DraftStorageError extends Error {
   constructor(code, cause) {
@@ -30,6 +36,10 @@ export function getDraftStorageCapabilityError({
 
 export function isDraftStorageCompatibilityError(error) {
   return error instanceof DraftStorageError && error.code === 'crypto-unavailable';
+}
+
+function isPermanentlyUnreadableDraftError(error) {
+  return error instanceof DraftStorageError && PERMANENTLY_UNREADABLE_DRAFT_ERROR_CODES.has(error.code);
 }
 
 function toBase64(bytes) {
@@ -268,6 +278,16 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
 
 export async function loadStoredState(storage, options) {
   return createDraftStorage(storage, options).load();
+}
+
+export async function loadAndRecoverUnreadableDraft(persistence) {
+  try {
+    return { state: await persistence.load(), recovered: false };
+  } catch (error) {
+    if (!isPermanentlyUnreadableDraftError(error)) throw error;
+    await persistence.remove();
+    return { state: null, recovered: true };
+  }
 }
 
 export function serializeState(state) {

@@ -1,7 +1,7 @@
 import { STORAGE_KEY } from './config.js';
 import { resolveLocale } from './i18n/index.js';
 import { createDefaultState, cloneData } from './state/defaults.js';
-import { createDraftStorage, getDraftStorageCapabilityError } from './state/storage.js';
+import { createDraftStorage, getDraftStorageCapabilityError, loadAndRecoverUnreadableDraft } from './state/storage.js';
 import { loadLocalePreference } from './state/locale-preference.js';
 import { createStore } from './state/store.js';
 import { messageForDraftStorageError } from './ui/draft-storage-error.js';
@@ -18,9 +18,12 @@ let storageError = getDraftStorageCapabilityError({
   crypto: window.crypto,
   isSecureContext: window.isSecureContext
 });
+let recoveredDraft = false;
 if (!storageError) {
   try {
-    storedState = await persistence.load();
+    const result = await loadAndRecoverUnreadableDraft(persistence);
+    storedState = result.state;
+    recoveredDraft = result.recovered;
   } catch (error) {
     storageError = error;
   }
@@ -65,6 +68,13 @@ if (storageError) {
     en: 'The saved draft could not be read securely. The original saved data was not changed.'
   }[locale]);
   message.classList.add('is-error');
+} else if (recoveredDraft) {
+  const message = document.getElementById('globalMessage');
+  message.textContent = {
+    ja: '保存済みの下書きに問題があったため、新しい既定の下書きに自動復旧しました。',
+    'zh-CN': '已因保存的草稿出现问题而自动恢复为新的默认草稿。',
+    en: 'Because the saved draft had a problem, it was automatically recovered to a new default draft.'
+  }[locale];
 }
 initLocaleController(store, {
   locale,
