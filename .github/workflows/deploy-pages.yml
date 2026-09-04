@@ -207,63 +207,9 @@ jobs:
             exit 1
           fi
 
-          smoke_dir="${RUNNER_TEMP}/resume-pages-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          mkdir -p "$smoke_dir"
-
-          fetch_and_check() {
-            local path="$1"
-            local output="$2"
-            local marker="$3"
-            local attempts=4
-            local attempt response_metadata
-            local last_result='request did not complete'
-
-            for ((attempt = 1; attempt <= attempts; attempt += 1)); do
-              if response_metadata="$(curl --fail --silent --show-error \
-                --proto '=https' \
-                --connect-timeout 10 \
-                --max-time 30 \
-                --output "${smoke_dir}/${output}" \
-                --write-out 'HTTP %{http_code}; type=%{content_type}; url=%{url_effective}' \
-                "${base_url}${path}?release=${RELEASE_SHA}&attempt=${attempt}")"; then
-                if grep --fixed-strings --quiet "$marker" "${smoke_dir}/${output}"; then
-                  return 0
-                fi
-                last_result="${response_metadata}; expected marker not found"
-              else
-                last_result='HTTPS request failed'
-              fi
-
-              if ((attempt < attempts)); then
-                sleep 3
-              fi
-            done
-
-            echo "Pages smoke failed for '${path:-/}' after ${attempts} attempts: ${last_result}." >&2
-            if [[ -f "${smoke_dir}/${output}" ]]; then
-              echo "Last public response: bytes=$(wc -c < "${smoke_dir}/${output}"), sha256=$(sha256sum "${smoke_dir}/${output}" | cut -d ' ' -f 1)." >&2
-            fi
-            return 1
-          }
-
-          fetch_and_check '' root.html '<title>Resume Studio'
-          fetch_and_check 'ja/' ja.html '<title>'
-          fetch_and_check 'zh-cn/' zh-cn.html '<title>'
-          fetch_and_check 'en/' en.html '<title>'
-          fetch_and_check 'editor/' editor.html '<title>'
-          fetch_and_check 'sitemap.xml' sitemap.xml '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-          fetch_and_check 'schema/resume-studio-web-v1.schema.json' schema.json '"title": "Resume Studio web v1 export"'
-          fetch_and_check 'schema/resume-studio-web-v1.example.json' example.json '"version": 1'
-          fetch_and_check 'assets/js/config.js' config.js "APP_VERSION = '${PACKAGE_VERSION}'"
-          mkdir -p "$smoke_dir/ja" "$smoke_dir/zh-cn" "$smoke_dir/en" "$smoke_dir/editor" "$smoke_dir/assets/js"
-          mv "$smoke_dir/root.html" "$smoke_dir/index.html"
-          mv "$smoke_dir/ja.html" "$smoke_dir/ja/index.html"
-          mv "$smoke_dir/zh-cn.html" "$smoke_dir/zh-cn/index.html"
-          mv "$smoke_dir/en.html" "$smoke_dir/en/index.html"
-          mv "$smoke_dir/editor.html" "$smoke_dir/editor/index.html"
-          mv "$smoke_dir/config.js" "$smoke_dir/assets/js/config.js"
           node scripts/validate-pages-smoke.mjs \
-            --directory "$smoke_dir" \
+            --base-url "$base_url" \
+            --release-sha "$RELEASE_SHA" \
             --analytics-mode "$ANALYTICS_MODE" \
             --analytics-provider "$ANALYTICS_PROVIDER" \
             --package-version "$PACKAGE_VERSION" \

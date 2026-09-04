@@ -2,10 +2,11 @@ import {
   CLOUDFLARE_BEACON_URL,
   CLOUDFLARE_RUM_URL
 } from './prepare-pages-artifact.mjs';
+import { documentUrlPaths } from './deployment-path-contract.mjs';
 
 const DOCUMENT_PATHS = new Set([
-  '/', '/index.html', '/ja/', '/zh-cn/', '/en/', '/editor/', '/editor/index.html',
-  '/resume/', '/resume/index.html', '/resume/ja/', '/resume/zh-cn/', '/resume/en/', '/resume/editor/', '/resume/editor/index.html'
+  ...documentUrlPaths(),
+  ...documentUrlPaths('/resume/')
 ]);
 const LOCALES = new Set(['ja', 'zh-CN', 'en']);
 const RUM_KEYS = new Set([

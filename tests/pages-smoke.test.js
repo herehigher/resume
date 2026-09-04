@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
 import {
   CLOUDFLARE_PROVIDER,
   OFFICIAL_REPOSITORY,
@@ -13,7 +14,7 @@ import {
   deriveCloudflareArtifact,
   prepareArtifact
 } from '../scripts/prepare-pages-artifact.mjs';
-import { validateDeploymentArtifact } from '../scripts/validate-pages-smoke.mjs';
+import { validateDeploymentArtifact, validatePublishedDeployment } from '../scripts/validate-pages-smoke.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = path.join(root, 'site');
@@ -112,6 +113,9 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
     ['tuple', 'ja/index.html', (html) => html.replace('data-analytics-provider="none"', 'data-analytics-provider="other"'), /analytics tuple/],
     ['duplicate tuple', 'ja/index.html', (html) => html.replace('<html ', '<html data-analytics-mode="disabled" '), /must appear exactly once/],
     ['canonical', 'zh-cn/index.html', (html) => html.replace('https://herehigher.github.io/resume/zh-cn/', 'https://example.invalid/'), /canonical URL/],
+    ['editor', 'editor/index.html', (html) => html.replace('noindex,follow', 'index,follow'), /editor\/ \[artifact=editor\/index\.html; status=local; content-type=text\/html\]: must be noindex,follow/],
+    ['schema identity', 'schema/resume-studio-web-v1.schema.json', (schema) => schema.replace('https://herehigher.github.io/resume/schema/', 'https://example.invalid/'), /identity or title is invalid/],
+    ['import version', 'schema/resume-studio-web-v1.example.json', (example) => example.replace('"version": 1', '"version": 2'), /version is invalid/],
     ['version', 'assets/js/config.js', (config) => config.replace(`APP_VERSION = '${packageVersion}'`, "APP_VERSION = '9.9.9'"), /APP_VERSION/],
     ['beacon', 'index.html', (html) => `${html}<script data-cf-beacon="{}"></script>`, /analytics runtime/]
   ];
@@ -152,4 +156,78 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
       providerFingerprint: fingerprint
     }), expected);
   }
+});
+
+test('published smoke fetches every authoritative path and reports editor response metadata', async () => {
+  const requests = [];
+  const contentTypeFor = (kind) => {
+    if (kind === 'html') return 'text/html; charset=utf-8';
+    if (kind === 'xml') return 'application/xml; charset=utf-8';
+    if (kind === 'javascript') return 'text/javascript; charset=utf-8';
+    return 'application/json; charset=utf-8';
+  };
+  const fetchImpl = async (url) => {
+    const request = new URL(url);
+    const urlPath = request.pathname.replace('/resume/', '');
+    requests.push(urlPath);
+    const contract = DEPLOYMENT_PATH_CONTRACTS.find((candidate) => candidate.urlPath === urlPath);
+    if (!contract) return new Response('not found', { status: 404 });
+    return new Response(readFileSync(path.join(source, contract.artifactPath), 'utf8'), {
+      headers: { 'content-type': contentTypeFor(contract.kind) },
+      status: 200
+    });
+  };
+  await validatePublishedDeployment({
+    analyticsMode: 'disabled',
+    analyticsProvider: 'none',
+    baseUrl: 'https://example.test/resume/',
+    fetchImpl,
+    packageVersion,
+    providerFingerprint: 'none',
+    releaseSha: 'a'.repeat(40)
+  });
+  assert.deepEqual(requests, DEPLOYMENT_PATH_CONTRACTS.map((contract) => contract.urlPath));
+
+  const missingEditor = async (url) => {
+    const request = new URL(url);
+    if (request.pathname.endsWith('/editor/')) {
+      return new Response('not found', {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        status: 404
+      });
+    }
+    return fetchImpl(url);
+  };
+  await assert.rejects(validatePublishedDeployment({
+    analyticsMode: 'disabled',
+    analyticsProvider: 'none',
+    attempts: 1,
+    baseUrl: 'https://example.test/resume/',
+    fetchImpl: missingEditor,
+    packageVersion,
+    providerFingerprint: 'none'
+  }), /editor\/ \[artifact=editor\/index\.html; status=404; content-type=text\/html; charset=utf-8\]/);
+});
+
+test('published smoke bounds every request with an injectable timeout signal', async () => {
+  const timeoutCalls = [];
+  const timeoutSignal = (milliseconds) => {
+    timeoutCalls.push(milliseconds);
+    return AbortSignal.abort(new Error('simulated timeout'));
+  };
+  await assert.rejects(validatePublishedDeployment({
+    analyticsMode: 'disabled',
+    analyticsProvider: 'none',
+    attempts: 1,
+    baseUrl: 'https://example.test/resume/',
+    fetchImpl: async (_url, { signal }) => {
+      assert.equal(signal.aborted, true);
+      throw signal.reason;
+    },
+    packageVersion,
+    providerFingerprint: 'none',
+    requestTimeoutMs: 25,
+    timeoutSignal
+  }), /\/ \[artifact=index\.html; status=timeout; content-type=unknown\]/);
+  assert.deepEqual(timeoutCalls, [25]);
 });

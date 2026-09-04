@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
@@ -120,32 +121,8 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
   assert.match(deploy, /REPOSITORY: \$\{\{ github\.repository \}\}/);
   assert.match(deploy, /base_url.*!= https:\/\/\*[\s\S]*?page_authority.*== \*'@'\*[\s\S]*?unsafe deployment URL/);
   assert.match(deploy, /if \[\[ "\$REPOSITORY" == 'herehigher\/resume' \]\]; then\s*\n\s*test "\$base_url" = "\$EXPECTED_PAGE_URL"/);
-  assert.match(deploy, /node scripts\/validate-pages-smoke\.mjs[\s\S]*?--analytics-mode "\$ANALYTICS_MODE"[\s\S]*?--provider-fingerprint "\$PROVIDER_FINGERPRINT"/);
+  assert.match(deploy, /node scripts\/validate-pages-smoke\.mjs[\s\S]*?--base-url "\$base_url"[\s\S]*?--release-sha "\$RELEASE_SHA"[\s\S]*?--analytics-mode "\$ANALYTICS_MODE"[\s\S]*?--provider-fingerprint "\$PROVIDER_FINGERPRINT"/);
   assert.doesNotMatch(deploy, /check_analytics\(/);
-  assert.match(deploy, /local attempts=4[\s\S]*?for \(\(attempt = 1; attempt <= attempts; attempt \+= 1\)\); do/);
-  assert.match(deploy, /if response_metadata="\$\(curl[\s\S]*?if grep --fixed-strings --quiet[\s\S]*?return 0/);
-  assert.match(deploy, /if \(\(attempt < attempts\)\); then\s*\n\s*sleep 3/);
-  assert.match(deploy, /Pages smoke failed for[\s\S]*?return 1/);
-  assert.doesNotMatch(deploy, /--retry(?:\s|$)/);
-  for (const publicPath of [
-    "fetch_and_check '' root.html",
-    "fetch_and_check 'ja/'",
-    "fetch_and_check 'zh-cn/'",
-    "fetch_and_check 'en/'",
-    "fetch_and_check 'editor/'",
-    "fetch_and_check 'sitemap.xml'",
-    "fetch_and_check 'schema/resume-studio-web-v1.schema.json'",
-    "fetch_and_check 'schema/resume-studio-web-v1.example.json'",
-    "fetch_and_check 'assets/js/config.js'"
-  ]) assert.match(deploy, new RegExp(publicPath.replaceAll('.', '\\.')));
-  assert.match(deploy, /mkdir -p "\$smoke_dir\/ja" "\$smoke_dir\/zh-cn" "\$smoke_dir\/en" "\$smoke_dir\/editor" "\$smoke_dir\/assets\/js"/);
-  for (const relocation of [
-    'mv "$smoke_dir/root.html" "$smoke_dir/index.html"',
-    'mv "$smoke_dir/ja.html" "$smoke_dir/ja/index.html"',
-    'mv "$smoke_dir/zh-cn.html" "$smoke_dir/zh-cn/index.html"',
-    'mv "$smoke_dir/en.html" "$smoke_dir/en/index.html"',
-    'mv "$smoke_dir/editor.html" "$smoke_dir/editor/index.html"',
-    'mv "$smoke_dir/config.js" "$smoke_dir/assets/js/config.js"'
-  ]) assert.ok(deploy.includes(relocation), `${relocation} is missing`);
-  assert.match(deploy, /validate-pages-smoke\.mjs[\s\S]*?--directory "\$smoke_dir"[\s\S]*?--package-version "\$PACKAGE_VERSION"/);
+  assert.doesNotMatch(deploy, /fetch_and_check|smoke_dir|curl --fail/);
+  assert.ok(DEPLOYMENT_PATH_CONTRACTS.some((contract) => contract.artifactPath === 'editor/index.html'));
 });
