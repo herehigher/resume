@@ -275,6 +275,6 @@ test('helper uses metadata-only gate verification and keeps token values outside
   assert.match(readFileSync(path.join(root, 'package.json'), 'utf8'), /"release:publish-tag"/);
 
   const workflow = readFileSync(path.join(root, '.github/workflows/pre-tag-artifact-gate.yml'), 'utf8');
-  assert.match(workflow, /^run-name: Pre-tag artifact gate: \$\{\{ inputs\.release_tag \}\} -> \$\{\{ inputs\.release_sha \}\}$/m);
+  assert.match(workflow, /^run-name: "Pre-tag artifact gate: \$\{\{ inputs\.release_tag \}\} -> \$\{\{ inputs\.release_sha \}\}"$/m);
   assert.doesNotMatch(workflow, /GITHUB_STEP_SUMMARY[\s\S]*CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
 });

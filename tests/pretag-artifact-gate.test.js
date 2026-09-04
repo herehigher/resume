@@ -73,6 +73,7 @@ test('pre-tag gate fails closed for repository, dispatch, SHA, ancestry, and ver
 
 test('pre-tag workflow remains read-only and writes only non-secret summary evidence', () => {
   const workflow = readFileSync(path.join(root, '.github/workflows/pre-tag-artifact-gate.yml'), 'utf8');
+  assert.match(workflow, /^run-name: "Pre-tag artifact gate: \$\{\{ inputs\.release_tag \}\} -> \$\{\{ inputs\.release_sha \}\}"$/m);
   assert.match(workflow, /^on:\n {2}workflow_dispatch:/m);
   assert.match(workflow, /release_tag:[\s\S]*required: true/);
   assert.match(workflow, /release_sha:[\s\S]*required: true/);
