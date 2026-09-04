@@ -1,5 +1,6 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
+import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
 import { expect, openLocale, revealField, test } from './fixtures.js';
 
 const A4 = { width: 595.28, height: 841.89 };
@@ -46,6 +47,39 @@ async function printPdf(page) {
     printBackground: true
   });
 }
+
+async function printFixturePdf(page, fixtureCase) {
+  const { state, endMarker } = createPdfFixture(fixtureCase);
+  const previewSelector = fixtureCase.locale === 'ja'
+    ? '#documentPreview'
+    : fixtureCase.locale === 'zh-CN' ? '[data-zh-preview]' : '[data-en-preview]';
+  await openLocale(page, fixtureCase.locale);
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'pdf-pagination-fixture.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(state))
+  });
+  await expect(page.locator(previewSelector)).toContainText(endMarker);
+  return { endMarker, pages: await inspectPdf(await printPdf(page)) };
+}
+
+test('PDF pagination: 三言語のページ境界データは末尾内容を保持し空白ページを作らない @pdf', async ({ page }) => {
+  const cases = [
+    { fixtureCase: { locale: 'ja', length: 'standard', documentType: 'resume', pageSize: 'A4' }, pages: 3, pageSize: A4 },
+    { fixtureCase: { locale: 'ja', length: 'extra-long', documentType: 'resume', pageSize: 'A4' }, pages: 11, pageSize: A4 },
+    { fixtureCase: { locale: 'zh-CN', length: 'near-boundary', pageSize: 'A4' }, pages: 2, pageSize: A4 },
+    { fixtureCase: { locale: 'en', length: 'near-boundary', pageSize: 'A4' }, pages: 2, pageSize: A4 },
+    { fixtureCase: { locale: 'en', length: 'near-boundary', pageSize: 'LETTER' }, pages: 2, pageSize: LETTER }
+  ];
+
+  for (const expected of cases) {
+    const { endMarker, pages } = await printFixturePdf(page, expected.fixtureCase);
+    expect(pages).toHaveLength(expected.pages);
+    expectPageSize(pages, expected.pageSize);
+    expect(pages.at(-1)?.text.trim()).not.toBe('');
+    expect(pages.at(-1)?.text).toContain(endMarker);
+  }
+});
 
 test('PDF short: English の短いデータは 1 ページの Letter でテキスト抽出できる @pdf', async ({ page }) => {
   await openLocale(page, 'en');

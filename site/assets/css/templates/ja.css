@@ -125,5 +125,8 @@
   #japaneseWorkspace .resume-social-links,
   #japaneseWorkspace .paper-table-row,
   #japaneseWorkspace .career-company { break-inside: avoid-page; }
-  #japaneseWorkspace .paper-text-section { break-inside: auto; }
+  #japaneseWorkspace .paper-text-section {
+    break-inside: auto;
+    min-height: 0;
+  }
 }

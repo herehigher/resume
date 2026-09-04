@@ -14,9 +14,9 @@ const renderers = {
   en: renderEnglishResume
 };
 
-test('PDF pagination fixtures cover short, standard, and extra-long documents', () => {
+test('PDF pagination fixtures cover short, near-boundary, standard, and extra-long documents', () => {
   const cases = pdfFixtureCases();
-  assert.equal(cases.length, 15);
+  assert.equal(cases.length, 20);
 
   for (const fixtureCase of cases) {
     const { state, endMarker } = createPdfFixture(fixtureCase);
@@ -51,6 +51,7 @@ test('print styles use physical page sizes without a clipping container', () => 
     assert.match(css, /break-inside:\s*avoid-page/);
   }
   assert.match(japaneseCss, /\.paper-text-section\s*\{\s*break-inside:\s*auto;/);
+  assert.match(japaneseCss, /#japaneseWorkspace \.paper-text-section\s*\{[^}]*min-height:\s*0;/s);
 });
 
 test('browser PDF fixture exposes every supported print parameter', () => {

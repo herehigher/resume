@@ -1,9 +1,10 @@
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 
-export const PDF_LENGTHS = Object.freeze(['short', 'standard', 'extra-long']);
+export const PDF_LENGTHS = Object.freeze(['short', 'near-boundary', 'standard', 'extra-long']);
 
 const LINE_COUNTS = Object.freeze({
   short: 2,
+  'near-boundary': 12,
   standard: 24,
   'extra-long': 180
 });
@@ -50,7 +51,7 @@ function fillJapanese(state, length, documentType, endMarker) {
     selfPromotion: lines('自己PRの検証行', length, endMarker)
   };
 
-  const rows = length === 'short' ? 2 : length === 'standard' ? 18 : 70;
+  const rows = length === 'short' ? 2 : length === 'near-boundary' ? 8 : length === 'standard' ? 18 : 70;
   document.education = Array.from({ length: rows }, (_, index) => ({
     date: `20${String(index % 20).padStart(2, '0')}-04`,
     detail: `学歴の検証行 ${index + 1}`
@@ -103,7 +104,7 @@ function fillChinese(state, length, endMarker) {
     details: '教育经历测试内容'
   }];
   resume.skills = lines('专业技能测试行', length, `${endMarker}-SKILLS`);
-  resume.certifications = [{ date: '2025-01', name: '打印质量认证', url: '' }];
+  resume.certifications = [{ date: '2025-01', name: `打印质量认证 ${endMarker}`, url: '' }];
 }
 
 function fillEnglish(state, length, endMarker) {
@@ -134,7 +135,7 @@ function fillEnglish(state, length, endMarker) {
     details: 'Education pagination fixture'
   }];
   resume.skills = lines('Skill test line', length, `${endMarker}-SKILLS`);
-  resume.certifications = [{ date: '2025-01', name: 'Print Quality Certificate', url: '' }];
+  resume.certifications = [{ date: '2025-01', name: `Print Quality Certificate ${endMarker}`, url: '' }];
 }
 
 export function createPdfFixture({ locale, length, documentType = 'resume', pageSize } = {}) {
