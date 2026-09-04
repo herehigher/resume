@@ -1,4 +1,5 @@
 name: Pre-tag artifact gate
+run-name: Pre-tag artifact gate: ${{ inputs.release_tag }} -> ${{ inputs.release_sha }}
 
 on:
   workflow_dispatch:
