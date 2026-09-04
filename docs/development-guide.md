@@ -89,7 +89,7 @@ Chrome で editor の `http://localhost:8000/editor/`、public entry の `http:/
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
 | `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、source の外部通信拒否、disabled / enabled / configuration error の privacy status、合成 token で作る enabled artifact の固定 Cloudflare request、PDF page size・pagination・抽出 text の Playwright acceptance。Live provider には依存しない |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
-| `npm run release:assets -- --source-sha <SHA>` | 指定 commit の Git archive から一時候補として三言語 screenshot、PDF sample、provenance manifest を生成・検査し、source SHA・site hash・対象ファイルを表示する |
+| `npm run release:assets -- --source-sha <SHA>` | 指定 commit の Git archive から一時候補として三言語 screenshot、PDF sample、provenance manifest を生成・検査し、source SHA・site hash・対象7ファイルと SHA-256 を表示する |
 | `npm run test:release-assets` | Release asset が最終 RC の `site/` と一致し、既存の文書・画像・PDF 検査を通ることを確認 |
 | `npm run release:preflight -- --release-tag <TAG> --release-sha <SHA>` | Tag 作成前に immutable release SHA の version、tag absence、main ancestry、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証 |
 
@@ -113,8 +113,9 @@ Screenshot と PDF sample は release の snapshot として扱い、日常開�
 
 ```bash
 npm run release:assets -- --source-sha '<RELEASE_SHA>'
-# owner が表示された source SHA、site hash、7つの対象ファイルを確認して明示承認した後だけ実行する。
-npm run release:assets -- --source-sha '<RELEASE_SHA>' --owner-approval
+# 表示された bundle path、source SHA、site hash、7つの対象ファイルと SHA-256 を owner が目視確認する。
+# 明示承認後は同じ bundle だけを再検証して promote する。
+npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval
 git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf
 npm run test:release-assets
 git lfs ls-files
@@ -126,7 +127,7 @@ git lfs ls-files
 
 - `docs/screenshots/` の三言語 screenshot が同一 release candidate 由来であること。
 - `output/pdf/` の日本語 A4、中国語 A4、English Letter を全 page render し、文字切れ、重なり、空白・重複 page、壊れた glyph がないこと。
-- Git archive は tracked commit だけを入力にするため、ignored / untracked file は候補生成に入らない。promote 前に既存の release asset check と PNG / PDF content check をすべて通し、owner approval がない限り tracked output は変えないこと。
+- Git archive は tracked commit だけを入力にするため、ignored / untracked file は候補生成に入らない。stage は permission-restricted owner temporary bundle を保持して候補を目視可能にし、promote は同じ bundle の source commit・site hash・対象7ファイルの SHA-256 を再表示・再検証する。owner approval がない限り tracked output は変えないこと。
 - `docs/assets-manifest.json` の source commit・site hash、Chromium version、output hash が生成物と一致すること。promote 中の失敗では対象7ファイルを backup から復元すること。
 - Fixture、sample、生成 asset に、実在する個人・organization・account と誤認される data を含めないこと。
 

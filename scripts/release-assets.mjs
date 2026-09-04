@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,8 @@ import { computeSiteHash, generateReleaseAssets } from './generate-doc-assets.mj
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const fullCommitPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+const bundleMetadataName = 'release-assets-bundle.json';
+const bundlePrefix = 'resume-release-assets-';
 const targets = Object.freeze([
   'docs/assets-manifest.json',
   'docs/screenshots/ja.png',
@@ -55,6 +57,13 @@ async function assertNoSymlinks(directory) {
 
 async function sha256(file) {
   return createHash('sha256').update(await readFile(file)).digest('hex');
+}
+
+async function assetHashes(assetRoot) {
+  return Object.fromEntries(await Promise.all(targets.map(async (target) => [
+    target,
+    await sha256(checkedPath(assetRoot, target))
+  ])));
 }
 
 async function validatePng(file, output) {
@@ -187,6 +196,7 @@ export async function promoteReleaseAssets({ candidateRoot, cwd, operations = {}
   const removeTemporaryDirectory = operations.rm || rm;
   const backup = await createTemporaryDirectory(path.join(os.tmpdir(), 'resume-release-assets-backup-'));
   const restored = [];
+  let keepBackup = false;
   try {
     for (const target of targets) {
       const original = checkedPath(cwd, target);
@@ -200,48 +210,148 @@ export async function promoteReleaseAssets({ candidateRoot, cwd, operations = {}
       }
     } catch (error) {
       for (const target of targets) {
-        await copy(path.join(backup, target), checkedPath(cwd, target));
-        restored.push(target);
+        try {
+          await copy(path.join(backup, target), checkedPath(cwd, target));
+          restored.push(target);
+        } catch {
+          keepBackup = true;
+        }
+      }
+      if (keepBackup) {
+        fail(`promotion failed; restoration is incomplete (${restored.length}/${targets.length}). Backup retained at ${backup}`);
       }
       fail(`promotion failed and original outputs were restored (${restored.length}/${targets.length}): ${error.message}`);
     }
   } finally {
-    await removeTemporaryDirectory(backup, { force: true, recursive: true });
+    if (!keepBackup) await removeTemporaryDirectory(backup, { force: true, recursive: true });
   }
+}
+
+function bundleMetadataPath(bundlePath) {
+  return path.join(bundlePath, bundleMetadataName);
+}
+
+async function assertBundlePath(bundlePath) {
+  const temporaryRoot = path.resolve(os.tmpdir());
+  const resolved = path.resolve(bundlePath || '');
+  if (!path.isAbsolute(bundlePath || '') || !resolved.startsWith(`${temporaryRoot}${path.sep}`)) {
+    fail('bundle path is outside the restricted temporary directory');
+  }
+  if (!path.basename(resolved).startsWith(bundlePrefix)) fail('bundle path has an unexpected name');
+  let metadata;
+  try {
+    metadata = await lstat(resolved);
+  } catch {
+    fail('bundle path is unavailable');
+  }
+  if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail('bundle path is unsafe');
+  return resolved;
+}
+
+async function writeBundleMetadata({ bundlePath, sourceCommit, siteHash }) {
+  const metadata = {
+    assetHashes: await assetHashes(path.join(bundlePath, 'candidate')),
+    schemaVersion: 1,
+    siteHash,
+    sourceCommit,
+    targets
+  };
+  await writeFile(bundleMetadataPath(bundlePath), `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+  return metadata;
+}
+
+function validateBundleMetadata(metadata) {
+  if (metadata?.schemaVersion !== 1 || !fullCommitPattern.test(metadata.sourceCommit || '')) {
+    fail('bundle metadata is invalid');
+  }
+  if (!/^[0-9a-f]{64}$/.test(metadata.siteHash || '')) fail('bundle metadata site hash is invalid');
+  if (!Array.isArray(metadata.targets) || metadata.targets.length !== targets.length) fail('bundle metadata target set is invalid');
+  if (metadata.targets.some((target, index) => target !== targets[index])) fail('bundle metadata target order is invalid');
+  if (!metadata.assetHashes || typeof metadata.assetHashes !== 'object') fail('bundle metadata hashes are invalid');
+  for (const target of targets) {
+    if (!/^[0-9a-f]{64}$/.test(metadata.assetHashes[target] || '')) fail('bundle metadata hashes are invalid');
+  }
+  if (Object.keys(metadata.assetHashes).length !== targets.length) fail('bundle metadata hashes are invalid');
+}
+
+export async function verifyReleaseAssetBundle({ bundlePath, operations = {} }) {
+  const resolvedBundle = await assertBundlePath(bundlePath);
+  await assertNoSymlinks(resolvedBundle);
+  const metadataFile = bundleMetadataPath(resolvedBundle);
+  await assertRegularFile(metadataFile);
+  let metadata;
+  try {
+    metadata = JSON.parse(await readFile(metadataFile, 'utf8'));
+  } catch {
+    fail('bundle metadata is unreadable');
+  }
+  validateBundleMetadata(metadata);
+  const sourceRoot = path.join(resolvedBundle, 'source');
+  const candidateRoot = path.join(resolvedBundle, 'candidate');
+  const checked = await (operations.verifyReleaseAssets || verifyReleaseAssets)({
+    assetRoot: candidateRoot,
+    sourceCommit: metadata.sourceCommit,
+    sourceRoot
+  });
+  if (checked.siteHash !== metadata.siteHash) fail('bundle site hash no longer matches its metadata');
+  const currentHashes = await assetHashes(candidateRoot);
+  for (const target of targets) {
+    if (currentHashes[target] !== metadata.assetHashes[target]) fail('bundle asset hash no longer matches its metadata');
+  }
+  return {
+    ...checked,
+    assetHashes: metadata.assetHashes,
+    bundlePath: resolvedBundle,
+    sourceCommit: metadata.sourceCommit
+  };
 }
 
 export async function stageReleaseAssets({
   cwd = root,
   onCandidateReady,
-  ownerApproval = false,
   sourceSha,
   operations = {}
 }) {
   const runCommand = operations.command || command;
   const sourceCommit = resolveCommit(cwd, sourceSha, runCommand);
-  const temporary = await (operations.mkdtemp || mkdtemp)(path.join(os.tmpdir(), 'resume-release-assets-'));
+  const bundlePath = await (operations.mkdtemp || mkdtemp)(path.join(os.tmpdir(), bundlePrefix));
+  let keepBundle = false;
   try {
-    const sourceRoot = path.join(temporary, 'source');
+    await (operations.chmod || chmod)(bundlePath, 0o700);
+    const sourceRoot = path.join(bundlePath, 'source');
     await mkdir(sourceRoot);
     archiveCommit(cwd, sourceCommit, sourceRoot, runCommand);
     await assertNoSymlinks(sourceRoot);
-    const candidateRoot = path.join(temporary, 'candidate');
+    const candidateRoot = path.join(bundlePath, 'candidate');
     await mkdir(candidateRoot);
     await (operations.generateReleaseAssets || generateReleaseAssets)({ outputRoot: candidateRoot, sourceCommit, sourceRoot });
     const checked = await (operations.verifyReleaseAssets || verifyReleaseAssets)({ assetRoot: candidateRoot, sourceCommit, sourceRoot });
-    const result = { ...checked, sourceCommit, promoted: false };
+    const metadata = await writeBundleMetadata({ bundlePath, sourceCommit, siteHash: checked.siteHash });
+    const result = { ...checked, assetHashes: metadata.assetHashes, bundlePath, sourceCommit };
+    keepBundle = true;
     if (onCandidateReady) await onCandidateReady(result);
-    if (!ownerApproval) return result;
-    await assertPromotionPaths(cwd, runCommand);
-    await promoteReleaseAssets({ candidateRoot, cwd, operations });
-    return { ...result, promoted: true };
+    return result;
   } finally {
-    await (operations.rm || rm)(temporary, { force: true, recursive: true });
+    if (!keepBundle) await (operations.rm || rm)(bundlePath, { force: true, recursive: true });
   }
 }
 
+export async function promoteReleaseAssetBundle({
+  bundlePath,
+  cwd = root,
+  onCandidateReady,
+  operations = {}
+}) {
+  const result = await verifyReleaseAssetBundle({ bundlePath, operations });
+  if (onCandidateReady) await onCandidateReady(result);
+  await assertPromotionPaths(cwd, operations.command || command);
+  await promoteReleaseAssets({ candidateRoot: path.join(result.bundlePath, 'candidate'), cwd, operations });
+  await (operations.rm || rm)(result.bundlePath, { force: true, recursive: true });
+  return { ...result, promoted: true };
+}
+
 export function parseArguments(args) {
-  const values = { ownerApproval: false };
+  const values = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === '--owner-approval' && !values.ownerApproval) {
@@ -253,10 +363,16 @@ export function parseArguments(args) {
       index += 1;
       continue;
     }
+    if (argument === '--bundle' && !values.bundlePath && args[index + 1] && !args[index + 1].startsWith('--')) {
+      values.bundlePath = args[index + 1];
+      index += 1;
+      continue;
+    }
     fail('invalid command arguments');
   }
-  if (!values.sourceSha) fail('source SHA is required');
-  return values;
+  if (values.sourceSha && !values.bundlePath && !values.ownerApproval) return values;
+  if (values.bundlePath && !values.sourceSha && values.ownerApproval) return values;
+  fail('provide --source-sha to stage, or --bundle with --owner-approval to promote');
 }
 
 async function main() {
@@ -264,11 +380,17 @@ async function main() {
   const printCandidate = (result) => {
     console.log(`Release assets staged from ${result.sourceCommit}.`);
     console.log(`Site hash: ${result.siteHash}`);
-    console.log(`Promotion targets: ${result.targets.join(', ')}`);
+    console.log('Promotion targets and SHA-256:');
+    for (const target of result.targets) console.log(`- ${target}: ${result.assetHashes[target]}`);
   };
-  const result = await stageReleaseAssets({ ...values, onCandidateReady: printCandidate });
-  if (result.promoted) console.log('Owner-approved promotion completed.');
-  else console.log('No tracked output was changed. Re-run with --owner-approval only after owner review.');
+  if (values.sourceSha) {
+    const result = await stageReleaseAssets({ ...values, onCandidateReady: printCandidate });
+    console.log(`Bundle retained for owner inspection: ${result.bundlePath}`);
+    console.log('No tracked output was changed. Re-run with --bundle and --owner-approval only after owner review.');
+    return;
+  }
+  await promoteReleaseAssetBundle({ bundlePath: values.bundlePath, onCandidateReady: printCandidate });
+  console.log('Owner-approved promotion completed.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

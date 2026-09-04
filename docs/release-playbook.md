@@ -8,7 +8,7 @@
 - Production tag は安定版 `vMAJOR.MINOR.PATCH` のみとし、leading zero、prerelease、build metadata は使用しない。`package.json` の version と完全一致させる。
 - Release commit は `main` の履歴に含め、Pull Request と `main` の `Quality / quality`、release workflow の validate → quality → artifact → deploy → smoke をすべて通す。
 - Tag は immutable とする。作成済み tag を移動・上書き・削除しない。Release 内容の修正には Pull Request と新しい version を使用する。
-- Command output や記録に token、secret、credential、実在する résumé data を含めない。
+- Command output や記録に token、secret、credential、実在する résumé data を含めない。credential を扱う検証は owner-approved trusted release host 上だけで行う。
 
 この文書の `<RELEASE_VERSION>`、`<RELEASE_DATE>`、`<RELEASE_TAG>`、`<RELEASE_SHA>`、`<PR_NUMBER>`、`<PR_URL>`、`<ISSUE_URL>`、`<WORKFLOW_RUN_URL>` は placeholder です。実値を別途確認して置き換え、`<` または `>` が残る command は実行しません。
 
@@ -16,7 +16,7 @@
 
 Release candidate（RC）は application version、`site/`、public sample、release notes、release 対象の文書と workflow が確定した時点で freeze します。Tag 前の Pull Request で、対象項目を `CHANGELOG.md` の `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ移し、release date を確定します。将来の変更を記録する空の `Unreleased` section は残します。Freeze 後は release 判定に必要な修正以外を混ぜません。
 
-新 version の release では、version を含むすべての画面内容を確定した最終 RC commit を pin し、merge と tag の前に `npm run release:assets -- --source-sha '<RELEASE_SHA>'` を実行します。Git archive から一時 staging に三言語 screenshot、PDF、`docs/assets-manifest.json` の候補を生成し、既存 release asset check と PNG / PDF content check を通します。表示された source commit、site hash、7つの対象ファイルを owner が明示承認した場合だけ、同じ command に `--owner-approval` を付けて promote します。promote は全対象を backup してから行い、途中で失敗すれば元の tracked output を復元します。三言語 screenshot、PDF、`docs/assets-manifest.json` を Git LFS object として commit して目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。その場合は新しい pinned commit を source にします。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では再生成しません。
+新 version の release では、version を含むすべての画面内容を確定した最終 RC commit を pin し、merge と tag の前に `npm run release:assets -- --source-sha '<RELEASE_SHA>'` を実行します。Git archive から permission-restricted owner temporary bundle に三言語 screenshot、PDF、`docs/assets-manifest.json` の候補を生成し、既存 release asset check と PNG / PDF content check を通します。表示された bundle path、source commit、site hash、7つの対象ファイルと SHA-256 を owner が明示承認した場合だけ、その同じ bundle を `--bundle '<BUNDLE_PATH>' --owner-approval` で再表示・再検証して promote します。promote は全対象を backup してから行い、途中で失敗すれば全対象の復元を試み、復元が不完全なら backup を保持して fail-closed します。三言語 screenshot、PDF、`docs/assets-manifest.json` を Git LFS object として commit して目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。その場合は新しい pinned commit を source にします。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では再生成しません。
 
 Screenshot に誤りが見つかった場合は tag 前に RC を修正して再生成します。Tag 後は tag を動かさず、修正を新しい version として release します。
 
@@ -45,7 +45,7 @@ git fetch --tags origin main || { echo 'Unable to refresh origin/main and tags; 
 git log -1 --oneline origin/main || { echo 'Unable to read origin/main; stop the release.' >&2; exit 1; }
 ```
 
-期待する remote が `https://github.com/herehigher/resume.git`、active account が release 権限を持つ owner、作業 tree が意図した状態であることを確認します。認証出力を Issue に貼らず、token や credential は記録しません。
+期待する remote が `https://github.com/herehigher/resume.git`、active account が release 権限を持つ owner、作業 tree が意図した状態であることを確認します。認証出力を Issue に貼らず、token や credential は記録しません。credential を扱う確認は owner-approved trusted release host 上だけで行います。
 
 Pinned `<RELEASE_SHA>` と `<RELEASE_TAG>` が決まったら、tag 作成直前に次の単一 command を実行します。これは tag、repository variable、Pages deployment を変更せず、remote tag query、main ancestry、`package.json` / `APP_VERSION` / `CHANGELOG.md`、tagged manifest、source / adapter / final artifact digest、prepared artifact の semantic smoke を fail-closed で検証します。enabled artifact では承認済み repository variable を stdout に出さずに読み、取得・network・digest のいずれかを確認できなければ失敗します。
 
@@ -84,8 +84,8 @@ sed -n '1,80p' CHANGELOG.md \
 ```bash
 npm run release:assets -- --source-sha '<RELEASE_SHA>' \
   || { echo 'Release asset staging failed; stop the release.' >&2; exit 1; }
-# Displayed source commit, site hash, and all seven paths require owner approval before this step.
-npm run release:assets -- --source-sha '<RELEASE_SHA>' --owner-approval \
+# Displayed bundle path, source commit, site hash, and SHA-256 for all seven paths require owner approval before this step.
+npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval \
   || { echo 'Owner-approved release asset promotion failed; original outputs were restored; stop the release.' >&2; exit 1; }
 git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf \
   || { echo 'Unable to stage release assets; stop the release.' >&2; exit 1; }
@@ -110,7 +110,7 @@ git diff --check origin/main...HEAD \
 
 `site/` source、clone、fork は `disabled/none` で Analytics runtime を含みません。`.github/pages-release-manifest.json` は release tag に固定され、`(disabled, none, null)` または `(enabled, cloudflare-web-analytics, SHA-256 fingerprint)` のどちらかだけを許可します。Manifest は provider URL、script、command、環境変数名、自由記述 config を保持せず、source tree と最終 artifact tree の digest を固定します。
 
-Enabled release では owner の明示承認後、PR 前にも `herehigher/resume` の実際の repository variable を読み、token を表示・記録せずに fingerprint と artifact digest を独立復元します。Shell xtrace が有効な端末、認証未確認、variable を読む権限がない状態では実行しません。この working tree 上の確認は manifest を review 可能にするための開発検証であり、merge 後の pinned `<RELEASE_SHA>` に対する最終 gate の代わりにはなりません。
+Enabled release では owner の明示承認後、owner-approved trusted release host 上でだけ `herehigher/resume` の実際の repository variable を読み、token を表示・記録せずに fingerprint と artifact digest を独立復元します。Shell xtrace が有効な端末、認証未確認、variable を読む権限がない状態では実行しません。この working tree 上の確認は manifest を review 可能にするための開発検証であり、merge 後の pinned `<RELEASE_SHA>` に対する最終 gate の代わりにはなりません。
 
 ```bash
 case "$-" in *x*) echo 'Disable shell xtrace before reading the provider token.' >&2; exit 1 ;; esac
@@ -314,7 +314,7 @@ Smoke failure は deploy 後の未受入状態です。直前の正常な site �
 
 ## Evidence 記録 template
 
-Issue または Pull Request に次を記録します。Placeholder を実値または `該当なし` に置き換え、token、secret、credential は貼りません。
+Issue または Pull Request に次を記録します。Placeholder を実値または `該当なし` に置き換え、token、secret、credential は貼りません。credential の確認記録は owner-approved trusted release host を示す非機密の結果だけにします。
 
 ```markdown
 ## Release evidence / リリース記録
