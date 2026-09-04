@@ -17,6 +17,12 @@ import { CLOUDFLARE_PROVIDER } from './prepare-pages-artifact.mjs';
 
 const digestPattern = /^[0-9a-f]{64}$/;
 const tokenPattern = /^[0-9a-f]{32}$/;
+const publicHreflangAlternates = Object.freeze([
+  Object.freeze({ hreflang: 'ja', href: DEPLOYMENT_ORIGIN }),
+  Object.freeze({ hreflang: 'zh-CN', href: `${DEPLOYMENT_ORIGIN}zh-cn/` }),
+  Object.freeze({ hreflang: 'en', href: `${DEPLOYMENT_ORIGIN}en/` }),
+  Object.freeze({ hreflang: 'x-default', href: DEPLOYMENT_ORIGIN })
+]);
 
 function fail(message) {
   throw new Error(`Deployment artifact smoke failed: ${message}`);
@@ -47,11 +53,14 @@ function assertCanonicalLinks(html, contract, metadata) {
   if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) {
     failure(contract, metadata, 'canonical URL is invalid');
   }
-  for (const alternate of publicDocumentContracts()) {
-    const locale = alternate.lang === 'ja' && !alternate.urlPath ? 'x-default' : alternate.lang;
+  const alternates = links.filter((item) => item.get('rel') === 'alternate');
+  if (alternates.length !== publicHreflangAlternates.length) {
+    failure(contract, metadata, 'alternate URL set is invalid');
+  }
+  for (const alternate of publicHreflangAlternates) {
     const matches = links.filter((item) => item.get('rel') === 'alternate'
-      && item.get('hreflang') === locale && item.get('href') === alternate.canonical);
-    if (matches.length !== 1) failure(contract, metadata, `${locale} alternate URL is invalid`);
+      && item.get('hreflang') === alternate.hreflang && item.get('href') === alternate.href);
+    if (matches.length !== 1) failure(contract, metadata, `${alternate.hreflang} alternate URL is invalid`);
   }
 }
 
