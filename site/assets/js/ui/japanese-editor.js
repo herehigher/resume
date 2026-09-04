@@ -30,6 +30,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   const completionLabel = document.getElementById('completionLabel');
   const confirmDialog = document.getElementById('confirmDialog');
   const clearButton = document.getElementById('clearButton');
+  const workspace = document.getElementById('japaneseWorkspace');
   let zoom = 1;
   let saveTimer;
   let draftMessageTimer;
@@ -508,6 +509,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     applyZoom();
   });
   window.addEventListener('resize', fitPreviewForViewport);
+  window.addEventListener('beforeprint', () => workspace.classList.add('is-printing'));
+  window.addEventListener('afterprint', () => {
+    workspace.classList.remove('is-printing');
+    window.requestAnimationFrame(fitPreviewForViewport);
+  });
   window.addEventListener('pagehide', () => {
     window.clearTimeout(saveTimer);
     if (sampleMode || !shouldPersistDraft) return;

@@ -37,6 +37,31 @@ async function screenGeometry(page, selector) {
   return page.evaluate(documentGeometry, selector);
 }
 
+async function beforePrintGeometry(page) {
+  return page.evaluate(() => new Promise((resolve) => {
+    window.addEventListener('beforeprint', () => {
+      const workspace = document.getElementById('japaneseWorkspace');
+      const preview = document.getElementById('documentPreview');
+      const documentPage = document.querySelector('.resume-document');
+      const section = document.querySelector('.paper-text-section');
+      resolve({
+        media: { print: matchMedia('print').matches, screen: matchMedia('screen').matches },
+        prepared: workspace.classList.contains('is-printing'),
+        preview: {
+          marginBottom: getComputedStyle(preview).marginBottom,
+          transform: getComputedStyle(preview).transform
+        },
+        documentPage: {
+          minHeight: getComputedStyle(documentPage).minHeight,
+          padding: getComputedStyle(documentPage).padding
+        },
+        sectionMinHeight: getComputedStyle(section).minHeight
+      });
+    }, { once: true });
+    window.print();
+  }));
+}
+
 async function inspectPdf(buffer) {
   const loadingTask = getDocument({ data: new Uint8Array(buffer), disableFontFace: true, isEvalSupported: false, useSystemFonts: true });
   const document = await loadingTask.promise;
@@ -106,4 +131,18 @@ test('@mobile 日本語: smartphone 幅でも A4 の内部版面を reflow し�
   await page.setViewportSize({ width: 1440, height: 1000 });
   const desktop = await screenGeometry(page, '.resume-document');
   expect(mobile).toEqual(desktop);
+});
+
+test('日本語: visible print lifecycle は screen の予約版面を引き継がない', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 1000 });
+  await loadJapaneseSample(page);
+
+  const geometry = await beforePrintGeometry(page);
+  expect(geometry).toEqual({
+    media: { print: false, screen: true },
+    prepared: true,
+    preview: { marginBottom: '0px', transform: 'none' },
+    documentPage: { minHeight: '0px', padding: '0px' },
+    sectionMinHeight: '0px'
+  });
 });
