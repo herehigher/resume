@@ -229,13 +229,12 @@ Enabled の場合だけ owner が承認した実 repository variable を読み�
 
 ### Owner-approved trusted release host
 
-Tag の作成・push は、owner-approved trusted release host で実行します。helper は認証済みの `gh` session と、その identity / `ADMIN` permission だけを確認し、OS の credential API を呼びません。agent-assisted な sensitive step で `GH_TOKEN` または `GITHUB_TOKEN` が直接 environment に存在する場合は、値を読まずに owner の隔離 session へ defer します。空の変数も fail-closed とします。この制約は、人間が owner-approved trusted release host で行う操作や、CI が自身の承認済み credential を使うことを禁止するものではありません。Pages の OIDC は独立した deployment 権限であり、この helper の credential 確認には使用しません。
+Tag の作成・push は、owner-approved trusted release host で実行します。helper は認証済みの `gh` session と、その identity / `ADMIN` permission だけを確認し、OS の credential API を呼びません。`GH_TOKEN` または `GITHUB_TOKEN` が直接 environment に存在する場合は、値を読まず、query や mutation より前に常に fail-closed で停止します。空の変数も同じです。owner の隔離 session は raw token を process へ直接注入せず、認証済みの `gh` session を使います。この helper の fail-closed 制約は、他の human 操作や CI workflow が承認済み token 認証を使うことを禁止するものではありません。Pages の OIDC は独立した deployment 権限であり、この helper の credential 確認には使用しません。
 
 Owner の隔離 session から helper を実行する場合は、pre-tag gate の成功 run ID と pinned tuple を渡します。
 
 ```bash
-npm run release:publish-tag -- --owner-isolated-session \
-  --release-tag '<RELEASE_TAG>' \
+npm run release:publish-tag -- --release-tag '<RELEASE_TAG>' \
   --release-sha '<RELEASE_SHA>' \
   --pre-tag-gate-run '<PRE_TAG_GATE_RUN_ID>'
 ```
