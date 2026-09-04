@@ -363,12 +363,10 @@ test('release playbook is canonical and covers publication, evidence, and recove
     /gh run list --repo herehigher\/resume --workflow ci\.yml.*--commit "\$release_sha".*--status success/s,
     /gh run view "\$quality_run_id".*\.name == "quality".*\.conclusion == "success"/s,
     /main` push の `Quality` run が成功/s,
-    /Pages Analytics manifest の PR 前開発検証/,
+    /GitHub runner の pre-tag artifact gate/,
     /Pinned release SHA の最終 artifact gate/,
-    /gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher\/resume/,
-    /derive-cloudflare --source site/,
-    /owner の明示承認後、owner-approved trusted release host 上でだけ.*token を表示・記録せず/s,
-    /Enabled のまま先に tag を作ることは禁止/,
+    /GitHub runner 内だけで読み.*agent process.*release host.*log.*summary.*artifact/s,
+    /Enabled のまま gate を通さず tag を作ることは禁止/,
     /Source を `GitHub Actions`.*`Enforce HTTPS`/s,
     /if ! remote_tag_result="\$\(git ls-remote --tags origin/,
     /test -z "\$remote_tag_result".*Release tag already exists remotely/s,
@@ -426,10 +424,8 @@ test('release playbook is canonical and covers publication, evidence, and recove
     playbook.indexOf('git ls-remote --tags origin') < playbook.indexOf('test -z "$remote_tag_result"'),
     'remote tag absence must be checked only after a successful query'
   );
-  assert.match(playbook, /npm run release:preflight --[\s\S]*?--release-tag '<RELEASE_TAG>'[\s\S]*?--release-sha '<RELEASE_SHA>'/);
-  assert.match(playbook, /remote tag query、main ancestry、.*prepared artifact の semantic smoke を fail-closed/s);
-  assert.match(playbook, /remote main の明示 refspec 更新/);
-  assert.match(playbook, /Git archive を一時領域へ展開して artifact を復元/);
+  assert.match(playbook, /npm run release:publish-tag.*--pre-tag-gate-run.*--release-tag.*--release-sha/s);
+  assert.match(playbook, /GitHub runner.*pre-tag artifact gate.*semantic smoke.*hard failure/s);
   assert.doesNotMatch(playbook, /FINAL_RELEASE_ARTIFACT_GATE_START|git worktree add --detach "\$final_gate_tree"/);
   assert.doesNotMatch(playbook, /git rev-parse --verify 'origin\/main\^\{commit\}'/);
   assert.doesNotMatch(playbook, /一度だけ `npm run generate:docs`/);

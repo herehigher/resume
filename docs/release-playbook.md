@@ -2,6 +2,21 @@
 
 この playbook は Resume Studio の version release と GitHub Pages production deployment の canonical な操作手順です。Release ごとの合否判定は [受入チェックリスト](acceptance-checklist.md)、repository 全体の mandatory rules は [AGENTS.md](../AGENTS.md) に従います。
 
+## 実行層、credential、approval の境界
+
+Release は次の四つの実行層を混同しない。各層の結果は GitHub object（Pull Request、workflow run、tag、deployment）を authoritative source とし、新しい tracked release state は作らない。
+
+1. **Local sandbox** — credential を持たない offline 作業環境。文書、code、test、候補の確認だけを行う。credential provider が利用できない GitHub 操作は失敗を回避して代替認証を探さず、owner の手元へ deferred とする。
+2. **Owner-approved trusted release host** — owner が承認した、利用者管理の安全な credential provider を使う実行環境。認証済みの `gh` session で GitHub query、workflow dispatch、exact tag push を行う。macOS Keychain は現在の maintainer 環境における非規範的な例にすぎず、Windows Credential Manager、Linux Secret Service 等の安全な provider も同じ契約を満たす。特定 OS または backend を必須にしない。
+3. **GitHub runner** — pre-tag artifact gate と release workflow が実行される環境。Analytics provider の raw value が必要な場合は runner 内だけで使用し、log、summary、artifact、release host へ出さない。
+4. **Pages deployment job** — `pages: write` と `id-token: write` による GitHub Pages deployment。Pages OIDC は release host の OS credential provider と独立しており、host の credential store を利用しない。
+
+Release tooling は `gh auth status` と GitHub API により identity と repository permission を確認するだけで、Keychain、Credential Manager、Secret Service その他の OS credential API を直接呼ばない。token の export、OS credential store からの raw secret 抽出、credential file への複製も行わない。
+
+AI agent の environment に raw `GH_TOKEN` または `GITHUB_TOKEN` が直接注入されている場合、agent-assisted の sensitive step は owner 管理の隔離 session へ deferred とする。この制約は human が安全な方法で認証すること、または CI がその用途に認証を使用することを禁止するものではない。
+
+承認は少なくとも二つに分ける。**Approval A** は pinned RC の clean staging で検証済み screenshot、PDF、manifest を tracked path へ promote する判断である。**Approval B** は repository、exact tag、full SHA、version を再照合して remote へ push する判断である。Pages settings、existing-tag の redeploy、rollback、final acceptance は A/B から独立した owner decision とし、暗黙に承認済みと扱わない。
+
 ## 権限と release gate
 
 - Public release、tag の作成・push、GitHub Pages settings、repository visibility の変更は、owner の明示承認がある場合だけ実行する。
@@ -35,28 +50,19 @@ Official deployment で Analytics が enabled であることを示す screensho
 - Owner approval: 承認者と日時
 - Pages Analytics manifest: `.github/pages-release-manifest.json` の mode / provider / fingerprint / source / artifact digest
 
-Repository、account、作業 tree を確認します。Tag や deployment を変更しない read-only preflight です。
+Repository、account、作業 tree を owner-approved trusted release host で確認します。Tag や deployment を変更しない read-only preflight です。
 
 ```bash
 git remote get-url origin || { echo 'Unable to read origin; stop the release.' >&2; exit 1; }
 gh auth status || { echo 'GitHub authentication is unavailable; stop the release.' >&2; exit 1; }
+gh api user --jq '.login' || { echo 'Unable to verify the active GitHub identity; stop the release.' >&2; exit 1; }
+gh api repos/herehigher/resume --jq '.permissions' || { echo 'Unable to verify repository permission; stop the release.' >&2; exit 1; }
 git status --short --branch || { echo 'Unable to read the working tree; stop the release.' >&2; exit 1; }
 git fetch --tags origin main || { echo 'Unable to refresh origin/main and tags; stop the release.' >&2; exit 1; }
 git log -1 --oneline origin/main || { echo 'Unable to read origin/main; stop the release.' >&2; exit 1; }
 ```
 
 期待する remote が `https://github.com/herehigher/resume.git`、active account が release 権限を持つ owner、作業 tree が意図した状態であることを確認します。認証出力を Issue に貼らず、token や credential は記録しません。credential を扱う確認は owner-approved trusted release host 上だけで行います。
-
-Pinned `<RELEASE_SHA>` と `<RELEASE_TAG>` が決まったら、tag 作成直前に次の単一 command を実行します。これは tag、repository variable、Pages deployment を変更せず、remote tag query、main ancestry、`package.json` / `APP_VERSION` / `CHANGELOG.md`、tagged manifest、source / adapter / final artifact digest、prepared artifact の semantic smoke を fail-closed で検証します。enabled artifact では承認済み repository variable を stdout に出さずに読み、取得・network・digest のいずれかを確認できなければ失敗します。
-
-```bash
-case "$-" in *x*) echo 'Disable shell xtrace before release preflight.' >&2; exit 1 ;; esac
-npm run release:preflight -- \
-  --release-tag '<RELEASE_TAG>' \
-  --release-sha '<RELEASE_SHA>'
-```
-
-成功時の version、release SHA、source / adapter / final artifact digest、provider fingerprint だけを evidence に記録します。手動の確認は owner approval、RC の目視確認、Quality run、release date、tag 作成前の最終照合に限定します。
 
 RC branch で dependency と version / release notes の整合を確認します。`package.json`、`site/assets/js/config.js` の `APP_VERSION`、`CHANGELOG.md` の対象 version は同じ `<RELEASE_VERSION>` でなければなりません。
 
@@ -79,14 +85,20 @@ sed -n '1,80p' CHANGELOG.md \
 
 `CHANGELOG.md` の対象 section に今回の release notes が入り、日付が実際の release date と一致し、`Unreleased` が将来分として残っていることを確認します。Date が変わる場合は merge / tag 前に Pull Request を更新します。
 
-`<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。新 version の最終 RC 上で次を実行し、生成物と Git LFS tracking を目視します。
+`<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。stage は 0700 temporary bundle を保持し、bundle path、source SHA、site hash、7 output hash を表示するだけで tracked output を変更しません。owner が表示内容を承認した後、同じ bundle を再検証して promote します。
+
+`npm run release:assets -- --source-sha '<RELEASE_SHA>'`
+
+`npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval`
+
+Promotion failure は全対象を復元し、完全に復元できない場合は recovery の backup path を表示します。別 bundle、別 source SHA、または未承認の input を promote に使いません。
 
 ```bash
 npm run release:assets -- --source-sha '<RELEASE_SHA>' \
   || { echo 'Release asset staging failed; stop the release.' >&2; exit 1; }
 # Displayed bundle path, source commit, site hash, and SHA-256 for all seven paths require owner approval before this step.
 npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval \
-  || { echo 'Owner-approved release asset promotion failed; original outputs were restored; stop the release.' >&2; exit 1; }
+  || { echo 'Release asset promotion did not complete cleanly; inspect the reported promotion and recovery state before continuing.' >&2; exit 1; }
 git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf \
   || { echo 'Unable to stage release assets; stop the release.' >&2; exit 1; }
 git lfs ls-files \
@@ -106,45 +118,20 @@ git diff --check origin/main...HEAD \
 
 `git diff --check` は現在の unstaged working tree、`git diff --check origin/main...HEAD` は fetch 済み `origin/main` から HEAD までの committed Pull Request range を検査します。前者が clean でも後者の代わりにはなりません。両方の結果を記録します。
 
-### Pages Analytics manifest の PR 前開発検証
+### GitHub runner の pre-tag artifact gate
 
 `site/` source、clone、fork は `disabled/none` で Analytics runtime を含みません。`.github/pages-release-manifest.json` は release tag に固定され、`(disabled, none, null)` または `(enabled, cloudflare-web-analytics, SHA-256 fingerprint)` のどちらかだけを許可します。Manifest は provider URL、script、command、環境変数名、自由記述 config を保持せず、source tree と最終 artifact tree の digest を固定します。
 
-Enabled release では owner の明示承認後、owner-approved trusted release host 上でだけ `herehigher/resume` の実際の repository variable を読み、token を表示・記録せずに fingerprint と artifact digest を独立復元します。Shell xtrace が有効な端末、認証未確認、variable を読む権限がない状態では実行しません。この working tree 上の確認は manifest を review 可能にするための開発検証であり、merge 後の pinned `<RELEASE_SHA>` に対する最終 gate の代わりにはなりません。
+Merged `<RELEASE_SHA>` と `<RELEASE_TAG>` を pin した後、owner-approved trusted release host から default branch の read-only `Pre-tag artifact gate` を dispatch する。gate は official repository、default branch、exact merged SHA、main ancestry、version、tagged manifest、#77 の online path contract、source / adapter / final artifact digest、prepared artifact の semantic smoke を fail-closed で検証する。tag 作成、push、deploy、Issue mutation は行わない。
 
 ```bash
-case "$-" in *x*) echo 'Disable shell xtrace before reading the provider token.' >&2; exit 1 ;; esac
-gh auth status || { echo 'GitHub authentication is unavailable; stop the release.' >&2; exit 1; }
-verification_output="$(mktemp)" \
-  || { echo 'Unable to create a private verification output.' >&2; exit 1; }
-trap 'rm -f "$verification_output"' EXIT
-analytics_token="$(gh variable get CLOUDFLARE_WEB_ANALYTICS_TOKEN --repo herehigher/resume)" \
-  || { echo 'Unable to read the approved repository variable; stop the release.' >&2; exit 1; }
-test -n "$analytics_token" \
-  || { echo 'The approved repository variable is empty; stop the release.' >&2; exit 1; }
-CLOUDFLARE_WEB_ANALYTICS_TOKEN="$analytics_token" GITHUB_OUTPUT="$verification_output" \
-  node scripts/prepare-pages-artifact.mjs derive-cloudflare --source site \
-  || { unset analytics_token; echo 'Artifact derivation failed; stop the release.' >&2; exit 1; }
-unset analytics_token
-node -e '
-  const fs = require("node:fs");
-  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  const output = Object.fromEntries(fs.readFileSync(process.argv[2], "utf8").trim().split("\n").map((line) => line.split("=", 2)));
-  const expected = {
-    provider_fingerprint: manifest.providerTokenSha256,
-    source_digest: manifest.sourceTreeSha256,
-    final_digest: manifest.artifactTreeSha256
-  };
-  for (const [key, value] of Object.entries(expected)) {
-    if (output[key] !== value) throw new Error(`${key} mismatch`);
-  }
-  if (!/^[0-9a-f]{64}$/.test(output.adapter_digest || "")) throw new Error("adapter digest missing");
-  process.stdout.write(`Verified source=${output.source_digest}, adapter=${output.adapter_digest}, artifact=${output.final_digest}\n`);
-' .github/pages-release-manifest.json "$verification_output" \
-  || { echo 'Tagged manifest does not reproduce; stop the release.' >&2; exit 1; }
+gh workflow run pre-tag-artifact-gate.yml --ref main \
+  --field "release_tag=<RELEASE_TAG>" \
+  --field "release_sha=<RELEASE_SHA>" \
+  || { echo 'Pre-tag artifact gate dispatch failed; stop the release.' >&2; exit 1; }
 ```
 
-Output に raw token は含めず、4 digest / fingerprint だけを evidence に記録します。Owner が variable access を承認していない、variable が読めない、または mismatch の場合は tag を作成しません。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直します。Enabled のまま先に tag を作ることは禁止です。artifact の document allowlist は公開首頁、三言語 landing page、`/editor/` の5 HTMLだけとし、editor は `noindex,follow` でも disclosure と beacon contract の対象です。
+Enabled artifact の provider raw value は GitHub runner 内だけで読み、local sandbox、agent process、release host、log、summary、artifact へ出さない。成功した gate の non-secret summary（tag、SHA、provider fingerprint、artifact digest、run URL）を GitHub Actions から確認し、evidence に記録する。Query、dispatch、summary のいずれかを確認できない場合は tag を作成しない。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直す。Enabled のまま gate を通さず tag を作ることは禁止する。artifact の document allowlist は公開首頁、三言語 landing page、`/editor/` の5 HTMLだけとし、editor は `noindex,follow` でも disclosure と beacon contract の対象である。
 
 ## Pull Request、Quality、merge
 
@@ -211,11 +198,11 @@ printf 'Pinned main Quality: %s\n' "$quality_url"
 
 ### Pinned release SHA の最終 artifact gate
 
-Main `Quality / quality` の成功確認後、tag preflight より前に、review 済み `<RELEASE_SHA>` そのものへ前節の `npm run release:preflight` を実行します。command は Git archive を一時領域へ展開して artifact を復元するため、PR 前の working tree、現在の `main` tip、別 commit を代用しません。remote main の明示 refspec 更新、manifest、provider variable、source / adapter / final artifact digest、semantic smoke の不一致はすべて tag 作成前の hard failure です。
+Main `Quality / quality` の成功確認後、tag 作成より前に、review 済み `<RELEASE_SHA>` そのものへ前節の GitHub runner pre-tag artifact gate を dispatch する。gate は Git archive を一時領域へ展開して artifact を復元するため、PR 前の working tree、現在の `main` tip、別 commit を代用しない。remote main の明示 refspec 更新、manifest、#77 の path contract、source / adapter / final artifact digest、semantic smoke の不一致はすべて tag 作成前の hard failure である。
 
-Enabled の場合だけ owner が承認した実 repository variable を読みます。Token は command argument、stdout、evidence に出しません。Disabled の場合は provider variable を読まず、validated source digest が source-identical final digest と一致することを確認します。
+Enabled の場合だけ GitHub runner が owner 承認済み repository variable を読む。Disabled の場合は provider variable を読まず、validated source digest が source-identical final digest と一致することを確認する。
 
-前節の単一 preflight command を再実行し、手動では owner approval、RC の目視確認、pinned main Quality URL、release date、tag 作成直前の最終照合を確認します。成功 marker、pinned SHA、source / provider / adapter / final digest を evidence に記録します。この gate を通過しない限り tag を作成しません。
+手動では owner approval、RC の目視確認、pinned main Quality URL、release date、tag 作成直前の最終照合を確認する。成功 summary、pinned SHA、source / provider / adapter / final digest を evidence に記録する。この gate を通過しない限り tag を作成しない。
 
 ## 初回 Pages と HTTPS 設定
 
@@ -225,7 +212,7 @@ Enabled の場合だけ owner が承認した実 repository variable を読み�
 
 ## Annotated immutable tag の作成と push
 
-以下は production release を開始する操作です。実行直前に、owner approval、`<RELEASE_TAG>`、`<RELEASE_SHA>`、package version、`origin/main` ancestry を読み上げて照合します。Placeholder が残っていれば停止します。
+以下は production release を開始する owner-approved trusted release host の操作です。`release:publish-tag` は認証済み `gh` session で account identity と official repository の `ADMIN` permission を確認し、repository、exact tag、full SHA、package version、main ancestry、成功した default-branch pre-tag gate run を再検証する。表示された tuple への interactive な Approval B が必要で、承認後にも同じ tuple を再検証する。
 
 ### Owner-approved trusted release host
 
@@ -234,12 +221,16 @@ Tag の作成・push は、owner-approved trusted release host で実行しま�
 Owner の隔離 session から helper を実行する場合は、pre-tag gate の成功 run ID と pinned tuple を渡します。
 
 ```bash
-npm run release:publish-tag -- --release-tag '<RELEASE_TAG>' \
-  --release-sha '<RELEASE_SHA>' \
-  --pre-tag-gate-run '<PRE_TAG_GATE_RUN_ID>'
+npm run release:publish-tag -- --pre-tag-gate-run '<PRE_TAG_GATE_RUN_ID>' \
+  --release-tag '<RELEASE_TAG>' \
+  --release-sha '<RELEASE_SHA>'
 ```
 
 まず tag が local と remote のどちらにも存在しないことを確認します。既に存在する場合は tag を再作成・移動・削除せず、原因を調査します。Remote query の network、authentication、server error を「tag がない」と解釈してはいけません。
+
+Helper は absent local tag を annotated exact tag として作成するか same-object tag を resume し、absent remote exact ref だけを push します。same remote object は already published として成功します。別 object、または承認済み repository / tag / SHA / version tuple の変更は新しい approval を必要とする hard failure です。force、move、delete、broad-refspec push は使用しません。local pre-check は race-free ではありません。
+
+次の shell block は validation logic を説明する historical fixture であり、current release procedure ではありません。tag の作成・push は上記 helper だけを使います。
 
 ```bash
 ### RELEASE_TAG_PREFLIGHT_START
@@ -305,7 +296,7 @@ git push origin "refs/tags/${release_tag}:refs/tags/${release_tag}" \
 
 ## Actions の監視と online acceptance
 
-GitHub Actions の `Deploy Pages` run を開き、validate → quality → artifact → deploy → smoke の順に成功することを確認します。Artifact は検証済み `<RELEASE_SHA>` の `site/` だけで、`github-pages` environment に deployment result と URL が表示されます。Workflow run URL を `<WORKFLOW_RUN_URL>` として記録します。
+GitHub Actions の `Deploy Pages` run を開き、validate → quality → artifact → deploy → smoke の順に成功することを確認します。`pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` なので実行中の production deployment を自動 cancel しません。release host の local pre-check は tag publish や dispatch の競合を race-free にする保証ではありません。Artifact は検証済み `<RELEASE_SHA>` の `site/` だけで、`github-pages` environment に deployment result と URL が表示されます。Workflow run URL を `<WORKFLOW_RUN_URL>` として記録します。
 
 Smoke 成功後も、private window の最新 Chrome / Chromium で `https://herehigher.github.io/resume/` を開き、[受入チェックリスト](acceptance-checklist.md) の online 項目を実施します。少なくとも root、`/ja/`、`/zh-cn/`、`/en/`、`sitemap.xml`、JSON Schema、import example、表示 version、canonical / hreflang、editor CTA、GitHub source link、Privacy link、許可された network request を確認します。
 

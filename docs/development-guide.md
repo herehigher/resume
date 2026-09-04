@@ -91,7 +91,7 @@ Chrome で editor の `http://localhost:8000/editor/`、public entry の `http:/
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run release:assets -- --source-sha <SHA>` | 指定 commit の Git archive から一時候補として三言語 screenshot、PDF sample、provenance manifest を生成・検査し、source SHA・site hash・対象7ファイルと SHA-256 を表示する |
 | `npm run test:release-assets` | Release asset が最終 RC の `site/` と一致し、既存の文書・画像・PDF 検査を通ることを確認 |
-| `npm run release:preflight -- --release-tag <TAG> --release-sha <SHA>` | Tag 作成前に immutable release SHA の version、tag absence、main ancestry、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証 |
+| GitHub `Pre-tag artifact gate` | Tag 作成前に immutable release SHA の version、main ancestry、#77 の online path contract、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証。raw provider value は GitHub runner 外へ出さない |
 
 ### 変更種別ごとの route
 
@@ -110,6 +110,8 @@ CI の `Quality` workflow も `npm test`、lint、Playwright E2E を実行しま
 ## 公開文書 asset の更新
 
 Screenshot と PDF sample は release の snapshot として扱い、日常開発、通常の feature Pull Request、`main` push では更新しません。新 version の `site/`、public sample、version 表示を確定して最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ screenshot、PDF、manifest を同じ commit に更新します。Tag workflow は immutable な tag から deploy するだけで、生成物を repository へ書き戻しません。
+
+Release asset は working tree から直接順次上書きしません。Pinned RC の clean export を一時 staging にして全 output を検査し、source SHA、site hash、対象 file list を表示します。Approval A の後だけ screenshot 3件、PDF 3件、manifest 1件をまとめて promote します。途中の生成・検査・promotion が失敗した場合は既存 tracked output を維持または復元し、partial update を残しません。実装済み interface の具体的な invocation 以外をこの文書から推測して実行しません。
 
 ```bash
 npm run release:assets -- --source-sha '<RELEASE_SHA>'
@@ -137,6 +139,10 @@ git lfs ls-files
 - Pull Request と `main` の quality check は `.github/workflows/ci.yml` で実行します。通常の `main` push は application を deploy しません。
 - Production release tag は leading zero、prerelease、build metadata を含まない安定版 `vMAJOR.MINOR.PATCH` だけを使用します。Tag と `package.json` の version は一致させ、tag の commit は `main` の履歴に含めます。
 - `.github/workflows/deploy-pages.yml` は tag の exact ref を commit まで解決し、同じ full commit SHA を reusable `Quality` workflow と Pages artifact checkout に渡します。Quality が失敗した場合は artifact 作成と deploy を実行しません。Artifact は `site/` だけを含みます。
+- Release の実行層は local sandbox、owner-approved trusted release host、GitHub runner、Pages deployment job の四つです。release host は認証済み `gh` session と GitHub API で identity / permission を確認し、OS credential API を直接呼びません。macOS Keychain は一例であり、Windows Credential Manager、Linux Secret Service 等も同じ安全な provider contract を満たします。Pages OIDC は release host の credential provider と独立します。
+- AI agent environment に raw `GH_TOKEN` / `GITHUB_TOKEN` が直接ある場合、agent-assisted sensitive step は owner 管理の隔離 session へ deferred とします。これは human または CI の認証方法全体を禁止する規則ではありません。
+- Approval A（clean staged release assets の promotion）と Approval B（repository / exact tag / full SHA / version の再照合後の remote push）は別です。Pages settings、redeploy、rollback、final acceptance も個別の owner decision を要します。
+- `.github/workflows/deploy-pages.yml` の `pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` で実行中 deployment を自動 cancel しません。release host の local pre-check は race-free guarantee ではありません。
 - Public release、tag、Pages settings、repository visibility を変更するには、owner の明示承認が必要です。Release tag は移動または削除せず、修正が必要な場合は新しい version を発行します。
 - Release workflow の smoke は production URL、公開 path、version marker を bounded retry で確認します。Smoke failure は「deploy 済み・未受入」であり、自動 rollback を意味しません。
 - 初回 Pages / HTTPS、RC screenshot の時点、annotated tag、manual existing-tag redeploy / rollback、README follow-up は playbook の順序に従います。
