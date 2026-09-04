@@ -6,6 +6,12 @@ English: This file records notable changes. Release dates are added only when th
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-04
+
+### Fixed / 修正
+
+- GitHub Pages の enabled Analytics artifact を、masked repository secret を CLI argument に展開せず tagged module API から再構築するよう修正。
+
 ## [0.2.1] - 2026-09-04
 
 ### Added / 追加

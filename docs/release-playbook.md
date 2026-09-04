@@ -318,7 +318,7 @@ gh workflow run deploy-pages.yml --ref main --field "release_tag=${existing_tag}
   || { echo 'Manual redeploy dispatch failed; inspect Actions before retrying.' >&2; exit 1; }
 ```
 
-Manual run も exact tag、version、main ancestry、Quality、tagged manifest、最終 artifact digest を再検証します。Enabled tag は fingerprint と一致する provider token を保持している場合だけ決定的に再構築できます。旧 token が利用不能または variable が変更されていれば redeploy は失敗し、同じ tag を別 token で再構築しません。修正には新しい version/tag を使用します。完了後は Actions、environment URL、online smoke、manual browser の証拠を新しい記録として残します。Rollback は tag を変更する操作ではなく、既存 tag の検証済み `site/` を再 deployment する操作です。
+Manual run も exact tag、version、main ancestry、Quality、tagged manifest、最終 artifact digest を再検証します。Enabled tag は fingerprint と一致する provider token を保持している場合だけ決定的に再構築できます。Default branch の workflow は tagged `prepare-pages-artifact.mjs` が export する API を呼び、secret を CLI argument へ展開しません。旧 token が利用不能または repository secret が変更されていれば redeploy は失敗し、同じ tag を別 token で再構築しません。修正には新しい version/tag を使用します。完了後は Actions、environment URL、online smoke、manual browser の証拠を新しい記録として残します。Rollback は tag を変更する操作ではなく、既存 tag の検証済み `site/` を再 deployment する操作です。
 
 ## 失敗時の判断
 

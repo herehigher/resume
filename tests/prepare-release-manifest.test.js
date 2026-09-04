@@ -46,7 +46,7 @@ function fixture(overrides = {}) {
 test('release manifest preparation derives only non-secret digest metadata on the default branch runner', async () => {
   const prepared = fixture();
   const result = await prepared.run();
-  assert.equal(result.packageVersion, '0.2.1');
+  assert.equal(result.packageVersion, '0.2.2');
   assert.equal(result.releaseSha, '1'.repeat(40));
   assert.equal(result.providerFingerprint, fingerprint);
   assert.equal(prepared.calls.length, 1);
