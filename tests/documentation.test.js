@@ -1,17 +1,11 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
-  chmodSync,
   existsSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
-  rmSync,
-  writeFileSync
 } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -368,14 +362,12 @@ test('release playbook is canonical and covers publication, evidence, and recove
     /GitHub runner 内だけで読み.*agent process.*release host.*log.*summary.*artifact/s,
     /Enabled のまま gate を通さず tag を作ることは禁止/,
     /Source を `GitHub Actions`.*`Enforce HTTPS`/s,
-    /if ! remote_tag_result="\$\(git ls-remote --tags origin/,
-    /test -z "\$remote_tag_result".*Release tag already exists remotely/s,
-    /local_tag_status.*-eq 1/s,
-    /package_json="\$\(git show.*"\$\{release_sha}:package\.json"\)"/s,
-    /\^v\(0\|\[1-9\]\\d\*\).*expected_tag/s,
-    /test "\$release_tag" = "\$expected_tag".*does not exactly match/s,
-    /git tag --annotate "\$release_tag" "\$release_sha"/,
-    /git push origin "refs\/tags\/\$\{release_tag}:refs\/tags\/\$\{release_tag}"/,
+    /npm run release:publish-tag --/,
+    /same-object tag を resume/,
+    /same remote object は already published/,
+    /別 object.*hard failure/s,
+    /force、move、delete、broad-refspec push は使用しません/,
+    /手作業 shell fixture は current procedure から削除しました/,
     /validate → quality → artifact → deploy → smoke/,
     /Smoke failure は deploy 後の未受入状態/,
     /gh workflow run deploy-pages\.yml --ref main --field "release_tag=\$\{existing_tag}"/,
@@ -420,10 +412,7 @@ test('release playbook is canonical and covers publication, evidence, and recove
     playbook.indexOf('git fetch --tags origin main') < playbook.indexOf('git diff --check origin/main...HEAD'),
     'the committed range check must follow the base fetch'
   );
-  assert.ok(
-    playbook.indexOf('git ls-remote --tags origin') < playbook.indexOf('test -z "$remote_tag_result"'),
-    'remote tag absence must be checked only after a successful query'
-  );
+  assert.match(playbook, /remote query の network、authentication、server error を「tag がない」と解釈しません/);
   assert.match(playbook, /npm run release:publish-tag.*--pre-tag-gate-run.*--release-tag.*--release-sha/s);
   assert.match(playbook, /GitHub runner.*pre-tag artifact gate.*semantic smoke.*hard failure/s);
   assert.doesNotMatch(playbook, /FINAL_RELEASE_ARTIFACT_GATE_START|git worktree add --detach "\$final_gate_tree"/);
@@ -455,65 +444,12 @@ test('tracked text tree contains no migrated raw analytics token', () => {
   }
 });
 
-test('release tag shell preflight fails closed before its success marker', (t) => {
+test('release playbook delegates tag publication to the maintained helper only', () => {
   const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
-  const block = playbook.match(
-    /```bash\n### RELEASE_TAG_PREFLIGHT_START\n([\s\S]*?)\n### RELEASE_TAG_PREFLIGHT_END\n```/
-  );
-  assert.ok(block, 'executable release tag preflight block is missing');
-
-  const fakeBin = mkdtempSync(path.join(os.tmpdir(), 'resume-release-playbook-'));
-  t.after(() => rmSync(fakeBin, { force: true, recursive: true }));
-  const fakeGit = path.join(fakeBin, 'git');
-  writeFileSync(fakeGit, `#!/bin/sh
-case "$1" in
-  merge-base) exit 0 ;;
-  show) printf '{"version":"%s"}\\n' "\${FAKE_PACKAGE_VERSION:-0.1.0}"; exit 0 ;;
-  rev-parse) exit 1 ;;
-  ls-remote)
-    if [ "\${FAKE_LS_REMOTE_FAIL:-0}" = "1" ]; then exit 2; fi
-    if [ "\${FAKE_REMOTE_TAG_EXISTS:-0}" = "1" ]; then printf 'deadbeef\\trefs/tags/v0.1.0\\n'; fi
-    exit 0
-    ;;
-  *) printf 'Unexpected git command: %s\\n' "$*" >&2; exit 99 ;;
-esac
-`);
-  chmodSync(fakeGit, 0o755);
-
-  const runPreflight = (overrides = {}) => spawnSync('bash', ['-c', block[1]], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      PATH: `${fakeBin}:${process.env.PATH}`,
-      RELEASE_SHA: 'a'.repeat(40),
-      RELEASE_TAG: 'v0.1.0',
-      ...overrides
-    }
-  });
-  const assertRejectedBeforeSuccess = (result, message) => {
-    assert.notEqual(result.status, 0, message);
-    assert.doesNotMatch(result.stdout, /Release tag preflight passed/);
-  };
-
-  const success = runPreflight();
-  assert.equal(success.status, 0, success.stderr);
-  assert.match(success.stdout, /Release tag preflight passed: v0\.1\.0 -> [a-f0-9]{40}/);
-
-  const mismatch = runPreflight({ RELEASE_TAG: 'v0.1.1' });
-  assertRejectedBeforeSuccess(mismatch, 'package/tag mismatch must fail');
-  assert.match(mismatch.stderr, /does not exactly match the pinned package version/);
-
-  const invalidPackageVersion = runPreflight({ FAKE_PACKAGE_VERSION: '01.0.0' });
-  assertRejectedBeforeSuccess(invalidPackageVersion, 'leading-zero package version must fail');
-  assert.match(invalidPackageVersion.stderr, /not stable SemVer/);
-
-  const queryFailure = runPreflight({ FAKE_LS_REMOTE_FAIL: '1' });
-  assertRejectedBeforeSuccess(queryFailure, 'remote tag query failure must fail');
-  assert.match(queryFailure.stderr, /Unable to query remote tags/);
-
-  const existingRemoteTag = runPreflight({ FAKE_REMOTE_TAG_EXISTS: '1' });
-  assertRejectedBeforeSuccess(existingRemoteTag, 'an existing remote tag must fail');
-  assert.match(existingRemoteTag.stderr, /already exists remotely/);
+  assert.match(playbook, /npm run release:publish-tag --/);
+  assert.doesNotMatch(playbook, /^git tag /m);
+  assert.doesNotMatch(playbook, /^git push /m);
+  assert.doesNotMatch(playbook, /RELEASE_TAG_PREFLIGHT_START/);
 });
 
 test('privacy has stable tri-lingual anchors and one effective version', () => {

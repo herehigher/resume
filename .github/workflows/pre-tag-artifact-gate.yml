@@ -58,46 +58,33 @@ jobs:
           --source site
           --manifest .github/pages-release-manifest.json
 
-      - name: Prepare enabled artifact in runner temporary storage
+      - name: Run enabled immutable release preflight in runner temporary storage
         if: ${{ steps.manifest.outputs.analytics_mode == 'enabled' && steps.manifest.outputs.analytics_provider == 'cloudflare-web-analytics' }}
+        id: artifact_enabled
         env:
           CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
         run: >-
-          node scripts/prepare-pages-artifact.mjs prepare
-          --source site
-          --output "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          --manifest .github/pages-release-manifest.json
-          --repository "${GITHUB_REPOSITORY}"
+          npm run release:preflight --
+          --release-sha "${RELEASE_SHA}"
+          --release-tag "${RELEASE_TAG}"
 
-      - name: Prepare disabled artifact in runner temporary storage
+      - name: Run disabled immutable release preflight in runner temporary storage
         if: ${{ steps.manifest.outputs.analytics_mode == 'disabled' && steps.manifest.outputs.analytics_provider == 'none' }}
+        id: artifact_disabled
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
         run: >-
-          node scripts/prepare-pages-artifact.mjs prepare
-          --source site
-          --output "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          --manifest .github/pages-release-manifest.json
-          --repository "${GITHUB_REPOSITORY}"
-
-      - name: Verify final artifact digest
-        id: artifact
-        run: >-
-          node scripts/prepare-pages-artifact.mjs verify
-          --directory "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          --manifest .github/pages-release-manifest.json
-
-      - name: Verify prepared artifact semantics
-        run: >-
-          node scripts/validate-pages-smoke.mjs
-          --directory "${RUNNER_TEMP}/resume-pretag-artifact-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          --analytics-mode "${{ steps.manifest.outputs.analytics_mode }}"
-          --analytics-provider "${{ steps.manifest.outputs.analytics_provider }}"
-          --package-version "${{ steps.release.outputs.package_version }}"
-          --provider-fingerprint "${{ steps.manifest.outputs.provider_fingerprint }}"
+          npm run release:preflight --
+          --release-sha "${RELEASE_SHA}"
+          --release-tag "${RELEASE_TAG}"
 
       - name: Write non-secret gate summary
         env:
-          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.final_digest }}
-          PROVIDER_FINGERPRINT: ${{ steps.manifest.outputs.provider_fingerprint }}
+          ARTIFACT_DIGEST: ${{ steps.artifact_enabled.outputs.final_digest || steps.artifact_disabled.outputs.final_digest }}
+          PROVIDER_FINGERPRINT: ${{ steps.artifact_enabled.outputs.provider_fingerprint || steps.artifact_disabled.outputs.provider_fingerprint }}
           RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
           RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
         shell: bash

@@ -47,7 +47,7 @@ Issue には再現手順、期待結果、実際の結果、browser/OS を記載
 
 - Title/body: 日本語を主とし、English summary を補助として使用。
 - Review comment: 必要な technical comment は English を主にしてよい。
-- Secret、credential、access token、実在する履歴書 data、Analytics provider token の raw value を commit しない。Tagged manifest には provider token の SHA-256 fingerprint だけを記録し、実値は owner-approved trusted release host 上の release 前検証と公式 deployment の限定 step だけへ渡す。
+- Secret、credential、access token、実在する履歴書 data、Analytics provider token の raw value を commit しない。Tagged manifest には provider token の SHA-256 fingerprint だけを記録し、実値は GitHub runner 内の pre-tag artifact gate と公式 deployment の限定 step だけへ渡す。owner-approved trusted release host は認証済み `gh` session による identity / permission 確認と tag publish に使用し、provider raw value は取得しない。
 - Public release、tag、Pages 設定、repository visibility の変更は、owner の明示承認なしに行わない。
 - Owner の承認を得た version 公開は [Version release playbook](docs/release-playbook.md) の preflight、gate、証拠記録、失敗時判断に従う。
 

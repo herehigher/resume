@@ -14,7 +14,7 @@ English: This file records notable changes. Release dates are added only when th
 - 日本語・简体中文・English の紹介ページと、`/editor/` に分離した編集画面。表示 locale の独立した端末内 preference。
 - GitHub、LinkedIn、GitLab、Qiita などを自動判定する、最大3件の共通 profile link 入力。
 - Desktop、Apple touch icon、Android 向けの複数サイズ favicon。
-- Release SHA、Analytics manifest、artifact digest、Pages semantic smoke を一括検証する release preflight。
+- GitHub runner 内で Release SHA、Analytics manifest、artifact digest、Pages semantic smoke を一括検証する read-only release preflight / pre-tag artifact gate。
 - 1 MiB を超える repository snapshot も固定 SHA から安全に検証できる release archive gate。
 
 ### Changed / 変更

@@ -226,73 +226,9 @@ npm run release:publish-tag -- --pre-tag-gate-run '<PRE_TAG_GATE_RUN_ID>' \
   --release-sha '<RELEASE_SHA>'
 ```
 
-まず tag が local と remote のどちらにも存在しないことを確認します。既に存在する場合は tag を再作成・移動・削除せず、原因を調査します。Remote query の network、authentication、server error を「tag がない」と解釈してはいけません。
-
 Helper は absent local tag を annotated exact tag として作成するか same-object tag を resume し、absent remote exact ref だけを push します。same remote object は already published として成功します。別 object、または承認済み repository / tag / SHA / version tuple の変更は新しい approval を必要とする hard failure です。force、move、delete、broad-refspec push は使用しません。local pre-check は race-free ではありません。
 
-次の shell block は validation logic を説明する historical fixture であり、current release procedure ではありません。tag の作成・push は上記 helper だけを使います。
-
-```bash
-### RELEASE_TAG_PREFLIGHT_START
-release_tag="${RELEASE_TAG:-<RELEASE_TAG>}"
-release_sha="${RELEASE_SHA:-<RELEASE_SHA>}"
-case "$release_tag$release_sha" in *'<'*|*'>'*) echo 'Replace every release placeholder first.' >&2; exit 1 ;; esac
-case "$release_sha" in ''|*[!0-9a-f]*) echo 'Release SHA must be a full lowercase hexadecimal commit id.' >&2; exit 1 ;; esac
-case "${#release_sha}" in 40|64) ;; *) echo 'Release SHA must be a full commit id.' >&2; exit 1 ;; esac
-git merge-base --is-ancestor --end-of-options "$release_sha" origin/main \
-  || { echo 'Pinned release SHA is not on origin/main; stop the release.' >&2; exit 1; }
-package_json="$(git show --no-ext-diff --format= --no-textconv --end-of-options "${release_sha}:package.json")" \
-  || { echo 'Unable to read package.json from the pinned release SHA.' >&2; exit 1; }
-package_version="$(node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")).version; if (typeof value !== "string") process.exit(1); process.stdout.write(value);' <<< "$package_json")" \
-  || { echo 'Pinned package.json has no valid string version.' >&2; exit 1; }
-expected_tag="v${package_version}"
-node -e 'process.exit(/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(process.argv[1]) ? 0 : 1)' "$expected_tag" \
-  || { echo 'Pinned package version is not stable SemVer.' >&2; exit 1; }
-test "$release_tag" = "$expected_tag" \
-  || { echo 'Release tag does not exactly match the pinned package version.' >&2; exit 1; }
-if git rev-parse --verify --quiet --end-of-options "refs/tags/${release_tag}" >/dev/null; then
-  echo 'Release tag already exists locally; stop the release.' >&2
-  exit 1
-else
-  local_tag_status=$?
-  test "$local_tag_status" -eq 1 || { echo 'Unable to query the local tag; stop the release.' >&2; exit 1; }
-fi
-if ! remote_tag_result="$(git ls-remote --tags origin "refs/tags/${release_tag}")"; then
-  echo 'Unable to query remote tags; stop the release.' >&2
-  exit 1
-fi
-test -z "$remote_tag_result" || { echo 'Release tag already exists remotely; stop the release.' >&2; exit 1; }
-printf 'Release tag preflight passed: %s -> %s\n' "$release_tag" "$release_sha"
-### RELEASE_TAG_PREFLIGHT_END
-```
-
-Pinned SHA の `package.json` から version を読み、workflow validator と同じ stable SemVer 規則で `expected_tag` を導出します。`release_tag` と完全一致しない場合は停止します。Local query は missing tag の status `1` だけを許可します。Remote query は command 自体の成功を先に要求し、その成功 output が空であることを別に検査します。成功 marker、package version、`<RELEASE_VERSION>` が一致することを確認し、同じ shell session で annotated tag を作成します。
-
-```bash
-test "$release_tag" = "$expected_tag" \
-  || { echo 'Validated tag state is missing; stop the release.' >&2; exit 1; }
-git tag --annotate "$release_tag" "$release_sha" --message "Resume Studio ${release_tag}" \
-  || { echo 'Annotated tag creation failed; stop the release.' >&2; exit 1; }
-git show --no-patch --decorate --end-of-options "$release_tag" \
-  || { echo 'Unable to inspect the new annotated tag; stop the release.' >&2; exit 1; }
-tag_commit="$(git rev-parse --verify --end-of-options "${release_tag}^{commit}")" \
-  || { echo 'Unable to peel the new tag to a commit; stop the release.' >&2; exit 1; }
-test "$tag_commit" = "$release_sha" \
-  || { echo 'New tag does not resolve to the pinned release SHA; do not push it.' >&2; exit 1; }
-```
-
-表示された tag、version、full commit SHA を再確認します。正しければ owner の最終承認後、exact tag ref だけを push します。
-
-```bash
-test "$release_tag" = "$expected_tag" \
-  || { echo 'Validated tag state is missing; do not push.' >&2; exit 1; }
-test "$(git rev-parse --verify --end-of-options "${release_tag}^{commit}")" = "$release_sha" \
-  || { echo 'Tag commit changed or cannot be verified; do not push.' >&2; exit 1; }
-git push origin "refs/tags/${release_tag}:refs/tags/${release_tag}" \
-  || { echo 'Exact tag push failed; inspect the remote before retrying.' >&2; exit 1; }
-```
-
-`--force`、tag update、tag delete は使用しません。
+以前の手作業 shell fixture は current procedure から削除しました。Validation、same-object resume、annotated exact tag の作成、exact ref push は上記 helper に一元化し、remote query の network、authentication、server error を「tag がない」と解釈しません。
 
 ## Actions の監視と online acceptance
 
