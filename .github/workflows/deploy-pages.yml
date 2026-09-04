@@ -56,6 +56,7 @@ jobs:
     needs: [validate, quality]
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     outputs:
       adapter_digest: ${{ steps.manifest.outputs.adapter_digest }}
@@ -92,13 +93,8 @@ jobs:
       - name: Prepare official Cloudflare-enabled artifact
         if: ${{ github.repository == 'herehigher/resume' && steps.manifest.outputs.analytics_mode == 'enabled' && steps.manifest.outputs.analytics_provider == 'cloudflare-web-analytics' }}
         env:
-          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
-        run: >-
-          node scripts/prepare-pages-artifact.mjs prepare
-          --source site
-          --output "${RUNNER_TEMP}/resume-pages-site"
-          --manifest .github/pages-release-manifest.json
-          --repository "${GITHUB_REPOSITORY}"
+          RELEASE_GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/prepare-official-pages-artifact.mjs
 
       - name: Prepare analytics-disabled artifact
         if: ${{ steps.manifest.outputs.analytics_mode == 'disabled' && steps.manifest.outputs.analytics_provider == 'none' }}

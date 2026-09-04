@@ -11,7 +11,7 @@ Release は次の四つの実行層を混同しない。各層の結果は GitHu
 3. **GitHub runner** — pre-tag artifact gate と release workflow が実行される環境。Analytics provider の raw value が必要な場合は runner 内だけで使用し、log、summary、artifact、release host へ出さない。
 4. **Pages deployment job** — `pages: write` と `id-token: write` による GitHub Pages deployment。Pages OIDC は release host の OS credential provider と独立しており、host の credential store を利用しない。
 
-Release tooling は `gh auth status` と GitHub API により identity と repository permission を確認するだけで、Keychain、Credential Manager、Secret Service その他の OS credential API を直接呼ばない。token の export、OS credential store からの raw secret 抽出、credential file への複製も行わない。
+Release tooling は `gh auth status` と GitHub API により identity と repository permission を確認するだけで、Keychain、Credential Manager、Secret Service その他の OS credential API を直接呼ばない。token の export、OS credential store からの raw secret 抽出、credential file への複製も行わない。GitHub runner は provider value を step environment へ直接 mapping せず、`actions: read` の masked automatic token で repository variable API から process 内へ読み、format 検証後ただちに workflow mask を登録してから使用する。
 
 AI agent の environment に raw `GH_TOKEN` または `GITHUB_TOKEN` が直接注入されている場合、agent-assisted の sensitive step は owner 管理の隔離 session へ deferred とする。この制約は human が安全な方法で認証すること、または CI がその用途に認証を使用することを禁止するものではない。
 

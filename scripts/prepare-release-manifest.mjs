@@ -2,6 +2,7 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readRunnerProviderValue } from './github-provider-variable.mjs';
 import {
   CLOUDFLARE_PROVIDER,
   OFFICIAL_REPOSITORY,
@@ -38,6 +39,7 @@ export async function prepareReleaseManifest({
   assertTrustedRunner(environment);
   const readFile = operations.readFile || readFileSync;
   const deriveArtifact = operations.deriveArtifact || deriveCloudflareArtifact;
+  const readProviderValue = operations.readProviderValue || readRunnerProviderValue;
   let manifest;
   let packageJson;
   try {
@@ -50,7 +52,7 @@ export async function prepareReleaseManifest({
     fail('the runner-only preparation workflow is only valid for the enabled Cloudflare manifest');
   }
   if (!stableVersionPattern.test(packageJson.version || '')) fail('package version must be stable SemVer');
-  const token = environment.CLOUDFLARE_WEB_ANALYTICS_TOKEN || '';
+  const token = await readProviderValue({ environment });
   if (!token) fail('provider variable is unavailable in the GitHub runner');
   const derived = await deriveArtifact({ sourceDirectory: path.join(cwd, 'site'), token });
   if (derived.provider_fingerprint !== manifest.providerTokenSha256) {

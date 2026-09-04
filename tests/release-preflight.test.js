@@ -22,6 +22,7 @@ test('release preflight archives the complete release repository', async (t) => 
 
 function mockPreflight({
   commandFailure,
+  origin = 'https://github.com/herehigher/resume.git',
   remoteTag = '',
   statusOverrides = {},
   version = '0.1.0',
@@ -36,7 +37,7 @@ function mockPreflight({
   const command = (name, args) => {
     calls.push([name, args]);
     if (commandFailure?.(name, args)) throw new Error('simulated command failure');
-    if (args[0] === 'remote') return 'https://github.com/herehigher/resume.git';
+    if (args[0] === 'remote') return origin;
     if (args[0] === 'rev-parse') return remoteMainSha;
     if (args[0] === 'ls-remote') return remoteTag;
     if (args[0] === 'show') {
@@ -59,6 +60,7 @@ function mockPreflight({
       artifactCalls.push(['prepare', input]);
       return { sourceDigest: '3'.repeat(64) };
     },
+    readProviderValue: async () => providerToken,
     rm: async () => {},
     validateDeploymentArtifact: async (input) => artifactCalls.push(['smoke', input]),
     validateReleaseSource: async () => ({
@@ -81,7 +83,6 @@ function mockPreflight({
     releaseSha,
     run: (environmentOverrides = {}) => runReleasePreflight({
       environment: {
-        CLOUDFLARE_WEB_ANALYTICS_TOKEN: providerToken,
         GITHUB_ACTIONS: 'true',
         GITHUB_EVENT_NAME: 'workflow_dispatch',
         GITHUB_RUN_ID: '12345',
@@ -121,6 +122,12 @@ test('release preflight refreshes remote main and verifies the complete immutabl
   }]);
 });
 
+test('release preflight accepts the canonical Actions checkout origin without a dot-git suffix', async () => {
+  const fixture = mockPreflight({ origin: 'https://github.com/herehigher/resume' });
+  const result = await fixture.run();
+  assert.equal(result.releaseSha, fixture.releaseSha);
+});
+
 test('release preflight fails closed for stale main, network failure, tag conflict, and missing runner provider value', async () => {
   await assert.rejects(mockPreflight({ statusOverrides: { 'merge-base': 1 } }).run(), /not on origin\/main/);
   await assert.rejects(mockPreflight({ statusOverrides: { fetch: 1 } }).run(), /unable to refresh remote main/);
@@ -129,7 +136,7 @@ test('release preflight fails closed for stale main, network failure, tag confli
   await assert.rejects(mockPreflight({ statusOverrides: { 'show-ref': 0 } }).run(), /tag already exists locally/);
   await assert.rejects(mockPreflight({ version: '0.1.1' }).run(), /does not match package version/);
   await assert.rejects(
-    mockPreflight().run({ CLOUDFLARE_WEB_ANALYTICS_TOKEN: '' }),
+    mockPreflight({ providerToken: '' }).run(),
     /provider variable is unavailable in the GitHub pre-tag runner/
   );
   await assert.rejects(mockPreflight({ verifyFailure: true }).run(), /final artifact digest mismatch/);
@@ -157,6 +164,7 @@ test('release preflight never queries, returns, or prints a raw provider token a
   const preflight = readFileSync(path.join(root, 'scripts/release-preflight.mjs'), 'utf8');
   assert.doesNotMatch(preflight, /git tag|git push|gh variable (?:get|set)|workflow run/);
   assert.doesNotMatch(preflight, /readProviderToken/);
+  assert.doesNotMatch(preflight, /environment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   assert.doesNotMatch(preflight, /console\.log\([^\n]*token/i);
 });
 

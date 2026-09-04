@@ -78,17 +78,17 @@ test('pre-tag workflow remains read-only and writes only non-secret summary evid
   assert.match(workflow, /release_tag:[\s\S]*required: true/);
   assert.match(workflow, /release_sha:[\s\S]*required: true/);
   assert.match(workflow, /^permissions: \{\}$/m);
-  assert.match(workflow, /permissions:\n {6}contents: read/);
+  assert.match(workflow, /permissions:\n {6}actions: read\n {6}contents: read/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}[\s\S]*fetch-depth: 0[\s\S]*persist-credentials: false/);
   assert.match(workflow, /ref: \$\{\{ steps\.release\.outputs\.release_sha \}\}/);
   assert.match(workflow, /validate-pretag-release\.mjs/);
   assert.match(workflow, /npm run release:preflight --/);
   assert.match(workflow, /if: \$\{\{ steps\.manifest\.outputs\.analytics_mode == 'enabled'/);
   assert.match(workflow, /if: \$\{\{ steps\.manifest\.outputs\.analytics_mode == 'disabled'/);
-  assert.match(workflow, /CLOUDFLARE_WEB_ANALYTICS_TOKEN: \$\{\{ vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN \}\}/);
+  assert.match(workflow, /RELEASE_GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(workflow, /Provider fingerprint:[\s\S]*Artifact digest:[\s\S]*Run:/);
   assert.doesNotMatch(workflow, /upload-artifact|upload-pages-artifact|deploy-pages|git tag|git push|gh issue|gh api/i);
-  assert.equal((workflow.match(/vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/g) || []).length, 1);
+  assert.doesNotMatch(workflow, /vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   const summary = workflow.slice(workflow.indexOf('- name: Write non-secret gate summary'));
   assert.doesNotMatch(summary, /CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   const disabledStep = workflow.slice(
@@ -102,4 +102,5 @@ test('pre-tag workflow remains read-only and writes only non-secret summary evid
   assert.match(preflight, /verifyArtifact/);
   assert.match(preflight, /validateDeploymentArtifact/);
   assert.doesNotMatch(preflight, /gh variable get/);
+  assert.doesNotMatch(preflight, /environment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
 });
