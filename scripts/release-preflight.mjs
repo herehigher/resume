@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +17,15 @@ const fullCommitPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
 function fail(message) {
   throw new Error(`Release preflight failed: ${message}`);
+}
+
+function assertPreTagRunner(environment) {
+  if (environment.GITHUB_ACTIONS !== 'true' || environment.GITHUB_EVENT_NAME !== 'workflow_dispatch') {
+    fail('release artifact verification must run in the GitHub pre-tag gate');
+  }
+  if (!environment.GITHUB_RUN_ID || !path.isAbsolute(environment.RUNNER_TEMP || '')) {
+    fail('GitHub pre-tag runner metadata is incomplete');
+  }
 }
 
 function command(commandName, args, { cwd, input } = {}) {
@@ -80,7 +89,7 @@ export async function runReleasePreflight({
   releaseSha,
   releaseTag,
   repository = OFFICIAL_REPOSITORY,
-  readProviderToken,
+  environment = process.env,
   operations = {}
 }) {
   const runCommand = operations.command || command;
@@ -92,6 +101,7 @@ export async function runReleasePreflight({
   const prepare = operations.prepareArtifact || prepareArtifact;
   const verify = operations.verifyArtifact || verifyArtifact;
   const validateSmoke = operations.validateDeploymentArtifact || validateDeploymentArtifact;
+  assertPreTagRunner(environment);
   if (repository !== OFFICIAL_REPOSITORY) fail('preflight is restricted to the official repository');
   if (!isStableReleaseTag(releaseTag)) fail('release tag must be stable SemVer');
   if (!fullCommitPattern.test(releaseSha || '')) fail('release SHA must be a full lowercase commit id');
@@ -131,7 +141,7 @@ export async function runReleasePreflight({
     packageVersion
   });
 
-  const temporary = await createTemporaryDirectory(path.join(os.tmpdir(), 'resume-release-preflight-'));
+  const temporary = await createTemporaryDirectory(path.join(environment.RUNNER_TEMP, 'resume-release-preflight-'));
   try {
     await archive(cwd, releaseSha, temporary);
     const sourceDirectory = path.join(temporary, 'site');
@@ -139,13 +149,8 @@ export async function runReleasePreflight({
     const release = await validateSource({ manifestPath, sourceDirectory });
     let token = '';
     if (release.manifest.analyticsMode === 'enabled') {
-      if (typeof readProviderToken !== 'function') fail('provider variable query is unavailable');
-      try {
-        token = await readProviderToken();
-      } catch {
-        fail('provider variable query failed');
-      }
-      if (!token) fail('provider variable is empty');
+      token = environment.CLOUDFLARE_WEB_ANALYTICS_TOKEN || '';
+      if (!token) fail('provider variable is unavailable in the GitHub pre-tag runner');
     }
     const artifactDirectory = path.join(temporary, 'artifact');
     const prepared = await prepare({
@@ -178,6 +183,16 @@ export async function runReleasePreflight({
   }
 }
 
+function writeActionsOutput(outputPath, result) {
+  appendFileSync(outputPath, [
+    `adapter_digest=${result.adapterDigest}`,
+    `final_digest=${result.finalDigest}`,
+    `provider_fingerprint=${result.providerFingerprint}`,
+    `source_digest=${result.sourceDigest}`,
+    ''
+  ].join('\n'));
+}
+
 function parseArguments(args) {
   const values = {};
   for (let index = 0; index < args.length; index += 2) {
@@ -194,11 +209,13 @@ function parseArguments(args) {
 
 async function main() {
   const values = parseArguments(process.argv.slice(2));
+  if (!process.env.GITHUB_OUTPUT) fail('GITHUB_OUTPUT is required in the GitHub pre-tag gate');
   const result = await runReleasePreflight({
     releaseSha: values['release-sha'],
     releaseTag: values['release-tag'],
-    readProviderToken: () => command('gh', ['variable', 'get', 'CLOUDFLARE_WEB_ANALYTICS_TOKEN', '--repo', OFFICIAL_REPOSITORY])
+    repository: process.env.GITHUB_REPOSITORY
   });
+  writeActionsOutput(process.env.GITHUB_OUTPUT, result);
   console.log(`Release preflight passed: ${result.releaseTag} -> ${result.releaseSha}`);
   console.log(`Verified digests: source=${result.sourceDigest}, adapter=${result.adapterDigest}, artifact=${result.finalDigest}`);
   console.log(`Provider fingerprint: ${result.providerFingerprint}`);

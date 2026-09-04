@@ -25,7 +25,6 @@ function mockPreflight({
   remoteTag = '',
   statusOverrides = {},
   version = '0.1.0',
-  providerFailure = false,
   providerToken = 'a'.repeat(32),
   verifyFailure = false
 } = {}) {
@@ -80,12 +79,16 @@ function mockPreflight({
     statusCalls,
     artifactCalls,
     releaseSha,
-    run: () => runReleasePreflight({
-      operations,
-      readProviderToken: async () => {
-        if (providerFailure) throw new Error('simulated provider failure');
-        return providerToken;
+    run: (environmentOverrides = {}) => runReleasePreflight({
+      environment: {
+        CLOUDFLARE_WEB_ANALYTICS_TOKEN: providerToken,
+        GITHUB_ACTIONS: 'true',
+        GITHUB_EVENT_NAME: 'workflow_dispatch',
+        GITHUB_RUN_ID: '12345',
+        RUNNER_TEMP: '/tmp',
+        ...environmentOverrides
       },
+      operations,
       releaseSha,
       releaseTag: 'v0.1.0'
     })
@@ -118,23 +121,42 @@ test('release preflight refreshes remote main and verifies the complete immutabl
   }]);
 });
 
-test('release preflight fails closed for stale main, network failure, tag conflict, and provider failure', async () => {
+test('release preflight fails closed for stale main, network failure, tag conflict, and missing runner provider value', async () => {
   await assert.rejects(mockPreflight({ statusOverrides: { 'merge-base': 1 } }).run(), /not on origin\/main/);
   await assert.rejects(mockPreflight({ statusOverrides: { fetch: 1 } }).run(), /unable to refresh remote main/);
   await assert.rejects(mockPreflight({ commandFailure: (_name, args) => args[0] === 'ls-remote' }).run(), /simulated command failure/);
   await assert.rejects(mockPreflight({ remoteTag: 'deadbeef\trefs/tags/v0.1.0' }).run(), /already exists remotely/);
   await assert.rejects(mockPreflight({ statusOverrides: { 'show-ref': 0 } }).run(), /tag already exists locally/);
   await assert.rejects(mockPreflight({ version: '0.1.1' }).run(), /does not match package version/);
-  await assert.rejects(mockPreflight({ providerFailure: true }).run(), /provider variable query failed/);
+  await assert.rejects(
+    mockPreflight().run({ CLOUDFLARE_WEB_ANALYTICS_TOKEN: '' }),
+    /provider variable is unavailable in the GitHub pre-tag runner/
+  );
   await assert.rejects(mockPreflight({ verifyFailure: true }).run(), /final artifact digest mismatch/);
 });
 
-test('release preflight never returns or prints a raw provider token and contains no release mutation command', async () => {
+test('release preflight rejects non-runner execution before queries or artifact work', async () => {
+  for (const environment of [
+    { GITHUB_ACTIONS: 'false' },
+    { GITHUB_EVENT_NAME: 'push' },
+    { GITHUB_RUN_ID: '' },
+    { RUNNER_TEMP: 'relative/temp' }
+  ]) {
+    const fixture = mockPreflight();
+    await assert.rejects(fixture.run(environment), /GitHub pre-tag|runner metadata/);
+    assert.deepEqual(fixture.calls, []);
+    assert.deepEqual(fixture.statusCalls, []);
+    assert.deepEqual(fixture.artifactCalls, []);
+  }
+});
+
+test('release preflight never queries, returns, or prints a raw provider token and contains no release mutation command', async () => {
   const token = 'b'.repeat(32);
   const result = await mockPreflight({ providerToken: token }).run();
   assert.doesNotMatch(JSON.stringify(result), new RegExp(token));
   const preflight = readFileSync(path.join(root, 'scripts/release-preflight.mjs'), 'utf8');
-  assert.doesNotMatch(preflight, /git tag|git push|gh variable set|workflow run/);
+  assert.doesNotMatch(preflight, /git tag|git push|gh variable (?:get|set)|workflow run/);
+  assert.doesNotMatch(preflight, /readProviderToken/);
   assert.doesNotMatch(preflight, /console\.log\([^\n]*token/i);
 });
 
