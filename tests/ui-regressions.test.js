@@ -108,7 +108,8 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
   assert.match(deploy, /Validate tagged Pages manifest without provider token[\s\S]*?id: manifest[\s\S]*?prepare-pages-artifact\.mjs validate/);
   assert.match(deploy, /github\.repository != 'herehigher\/resume'.*analytics_mode == 'enabled'[\s\S]*?exit 1/);
   assert.match(deploy, /artifact:\s*\n\s*needs: \[validate, quality\][\s\S]*?permissions:\s*\n\s*contents: read/);
-  assert.match(deploy, /github\.repository == 'herehigher\/resume'.*analytics_mode == 'enabled'.*cloudflare-web-analytics[\s\S]*?CLOUDFLARE_WEB_ANALYTICS_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WEB_ANALYTICS_TOKEN \}\}[\s\S]*?prepare-pages-artifact\.mjs prepare/);
+  assert.match(deploy, /github\.repository == 'herehigher\/resume'.*analytics_mode == 'enabled'.*cloudflare-web-analytics[\s\S]*?CLOUDFLARE_WEB_ANALYTICS_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WEB_ANALYTICS_TOKEN \}\}[\s\S]*?import \{ prepareArtifact \} from '\.\/scripts\/prepare-pages-artifact\.mjs';[\s\S]*?token: process\.env\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
+  assert.doesNotMatch(deploy, /--provider-value/);
   assert.doesNotMatch(deploy, /vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   assert.doesNotMatch(deploy, /RELEASE_GITHUB_TOKEN|github\.token/);
   assert.match(deploy, /Prepare analytics-disabled artifact[\s\S]*?analytics_mode == 'disabled'.*analytics_provider == 'none'/);

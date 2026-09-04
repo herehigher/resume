@@ -3,6 +3,6 @@
   "analyticsMode": "enabled",
   "analyticsProvider": "cloudflare-web-analytics",
   "providerTokenSha256": "8a1bd3491d2b1100e92a33a5efec9c976923e131b50c326a9172d9dc6650c38e",
-  "sourceTreeSha256": "2b69d430c1daec97d711b18218ac54a30671ef47ce5aec2c33111815f5b35a05",
+  "sourceTreeSha256": "fdf7d6e37d02ace2db783bb4e91ea26311a8403e4823968827ace72757034060",
   "artifactTreeSha256": "846a1b898b401a180a0f26dd0c90e26ea67956cf420d1570832c61613c452622"
 }
