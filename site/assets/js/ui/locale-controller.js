@@ -3,7 +3,7 @@ import { getMessages } from '../i18n/index.js';
 import { saveLocalePreference } from '../state/locale-preference.js';
 
 const publicEntryPaths = Object.freeze({
-  ja: '../ja/',
+  ja: '../',
   'zh-CN': '../zh-cn/',
   en: '../en/'
 });

@@ -2,10 +2,10 @@ export const DEPLOYMENT_ORIGIN = 'https://herehigher.github.io/resume/';
 
 export const DEPLOYMENT_PATH_CONTRACTS = Object.freeze([
   Object.freeze({
-    artifactPath: 'index.html', canonical: DEPLOYMENT_ORIGIN, kind: 'html', lang: 'ja', marker: '<title>Resume Studio', semantic: 'public-document', urlPath: ''
+    artifactPath: 'index.html', canonical: DEPLOYMENT_ORIGIN, kind: 'html', lang: 'ja', marker: '<title>', semantic: 'public-document', urlPath: ''
   }),
   Object.freeze({
-    artifactPath: 'ja/index.html', canonical: `${DEPLOYMENT_ORIGIN}ja/`, kind: 'html', lang: 'ja', marker: '<title>', semantic: 'public-document', urlPath: 'ja/'
+    artifactPath: 'ja/index.html', canonical: DEPLOYMENT_ORIGIN, kind: 'html', lang: 'ja', marker: '<title>', semantic: 'compatibility-document', urlPath: 'ja/'
   }),
   Object.freeze({
     artifactPath: 'zh-cn/index.html', canonical: `${DEPLOYMENT_ORIGIN}zh-cn/`, kind: 'html', lang: 'zh-CN', marker: '<title>', semantic: 'public-document', urlPath: 'zh-cn/'
