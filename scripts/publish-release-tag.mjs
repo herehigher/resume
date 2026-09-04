@@ -83,9 +83,9 @@ export function hasDirectGitHubTokenVariable(environment = process.env) {
   return directGitHubTokenVariables.some((name) => Object.hasOwn(environment, name));
 }
 
-export function assertAgentSensitiveStepCanRun({ agentAssisted = true, environment = process.env } = {}) {
-  if (agentAssisted && hasDirectGitHubTokenVariable(environment)) {
-    fail('agent-assisted sensitive release step is deferred to an owner-approved trusted release host isolated session because a direct GitHub token variable is present');
+function assertNoDirectGitHubTokenVariable(environment = process.env) {
+  if (hasDirectGitHubTokenVariable(environment)) {
+    fail('release tag helper is deferred to an owner-approved trusted release host because a direct GitHub token variable is present');
   }
 }
 
@@ -135,11 +135,10 @@ export async function validateTagPublication({
   releaseSha,
   releaseTag,
   repository = OFFICIAL_REPOSITORY,
-  agentAssisted = true,
   environment = process.env,
   operations = {}
 }) {
-  assertAgentSensitiveStepCanRun({ agentAssisted, environment });
+  assertNoDirectGitHubTokenVariable(environment);
   const runCommand = operations.command || command;
   const runCommandStatus = operations.commandStatus || commandStatus;
   const getAccount = operations.readAccount || readAccount;
@@ -209,14 +208,13 @@ export async function publishReleaseTag({
   releaseSha,
   releaseTag,
   repository = OFFICIAL_REPOSITORY,
-  agentAssisted = true,
   environment = process.env,
   operations = {}
 }) {
   if (typeof confirm !== 'function') fail('explicit owner approval is required');
-  assertAgentSensitiveStepCanRun({ agentAssisted, environment });
+  assertNoDirectGitHubTokenVariable(environment);
   const initial = await validateTagPublication({
-    agentAssisted, cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
+    cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
   });
   const tuple = tupleOf(initial);
   if (!await confirm(Object.freeze({ ...tuple, approvalPhrase: approvalPhrase(tuple) }))) {
@@ -224,12 +222,12 @@ export async function publishReleaseTag({
   }
 
   let refreshed = await validateTagPublication({
-    agentAssisted, cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
+    cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
   });
   assertApprovedTuple(initial, refreshed);
   let localAction = 'resumed';
   if (refreshed.localTag === 'absent') {
-    assertAgentSensitiveStepCanRun({ agentAssisted, environment });
+    assertNoDirectGitHubTokenVariable(environment);
     runCommand(operations, 'git', [
       'tag', '--annotate', '--no-sign', releaseTag, releaseSha, '--message', `Resume Studio ${releaseTag}`
     ], { cwd });
@@ -237,14 +235,14 @@ export async function publishReleaseTag({
   }
 
   refreshed = await validateTagPublication({
-    agentAssisted, cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
+    cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
   });
   assertApprovedTuple(initial, refreshed);
   if (refreshed.remoteTag === 'same') {
     return Object.freeze({ ...tuple, gateRunUrl: refreshed.gate.url, localAction, remoteAction: 'already-published' });
   }
   if (refreshed.localTag !== 'same') fail('local exact tag is unavailable for publication');
-  assertAgentSensitiveStepCanRun({ agentAssisted, environment });
+  assertNoDirectGitHubTokenVariable(environment);
   runCommand(operations, 'git', [
     'push', 'origin', `refs/tags/${releaseTag}:refs/tags/${releaseTag}`
   ], { cwd });
@@ -255,16 +253,10 @@ function runCommand(operations, commandName, args, options) {
   return (operations.command || command)(commandName, args, options);
 }
 
-function parseArguments(args) {
+export function parseArguments(args) {
   const values = {};
   for (let index = 0; index < args.length;) {
     const name = args[index];
-    if (name === '--owner-isolated-session') {
-      if ('ownerIsolatedSession' in values) fail('duplicate command argument');
-      values.ownerIsolatedSession = true;
-      index += 1;
-      continue;
-    }
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('invalid command arguments');
     const key = name.slice(2);
@@ -294,7 +286,6 @@ async function promptForApproval(tuple) {
 async function main() {
   const values = parseArguments(process.argv.slice(2));
   const result = await publishReleaseTag({
-    agentAssisted: !values.ownerIsolatedSession,
     confirm: promptForApproval,
     preTagGateRunId: values['pre-tag-gate-run'],
     releaseSha: values['release-sha'],
