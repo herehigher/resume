@@ -24,7 +24,7 @@ English: This file records notable changes. Release dates are added only when th
 
 - 日本語 preview と印刷時の A4 版面差異、および多言語 PDF の末尾空白 page、資格・証書 section の不安定な改 page を修正。
 - 下書き復旧中の競合と、pre-tag workflow の YAML / provider 検証経路を修正。
-- Actions variable の provider value が step environment として log に表示される経路と、GitHub runner の origin URL 表記差で pre-tag gate が停止する問題を修正。
+- Actions variable の provider value が step environment として log に表示される経路を masked repository secret へ移行し、GitHub runner の origin URL 表記差で pre-tag gate が停止する問題を修正。
 
 ### Security / Privacy
 

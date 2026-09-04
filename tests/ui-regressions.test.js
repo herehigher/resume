@@ -107,9 +107,10 @@ test('Pages releases use the validated commit and cannot bypass the reusable qua
   assert.match(deploy, /ref: \$\{\{ needs\.validate\.outputs\.release_sha \}\}/);
   assert.match(deploy, /Validate tagged Pages manifest without provider token[\s\S]*?id: manifest[\s\S]*?prepare-pages-artifact\.mjs validate/);
   assert.match(deploy, /github\.repository != 'herehigher\/resume'.*analytics_mode == 'enabled'[\s\S]*?exit 1/);
-  assert.match(deploy, /artifact:\s*\n\s*needs: \[validate, quality\][\s\S]*?permissions:\s*\n\s*actions: read\s*\n\s*contents: read/);
-  assert.match(deploy, /github\.repository == 'herehigher\/resume'.*analytics_mode == 'enabled'.*cloudflare-web-analytics[\s\S]*?RELEASE_GITHUB_TOKEN: \$\{\{ github\.token \}\}[\s\S]*?prepare-official-pages-artifact\.mjs/);
+  assert.match(deploy, /artifact:\s*\n\s*needs: \[validate, quality\][\s\S]*?permissions:\s*\n\s*contents: read/);
+  assert.match(deploy, /github\.repository == 'herehigher\/resume'.*analytics_mode == 'enabled'.*cloudflare-web-analytics[\s\S]*?CLOUDFLARE_WEB_ANALYTICS_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WEB_ANALYTICS_TOKEN \}\}[\s\S]*?prepare-pages-artifact\.mjs prepare/);
   assert.doesNotMatch(deploy, /vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
+  assert.doesNotMatch(deploy, /RELEASE_GITHUB_TOKEN|github\.token/);
   assert.match(deploy, /Prepare analytics-disabled artifact[\s\S]*?analytics_mode == 'disabled'.*analytics_provider == 'none'/);
   assert.match(deploy, /git diff --exit-code -- site[\s\S]*?status --porcelain=v1 --untracked-files=all -- site/);
   assert.match(deploy, /Verify final artifact digest[\s\S]*?prepare-pages-artifact\.mjs verify[\s\S]*?uses: actions\/upload-pages-artifact@v5\s*\n\s*with:\s*\n\s*path: \$\{\{ runner\.temp \}\}\/resume-pages-site/);

@@ -128,7 +128,7 @@ test('release preflight accepts the canonical Actions checkout origin without a 
   assert.equal(result.releaseSha, fixture.releaseSha);
 });
 
-test('release preflight fails closed for stale main, network failure, tag conflict, and missing runner provider value', async () => {
+test('release preflight fails closed for stale main, network failure, tag conflict, and missing runner provider secret', async () => {
   await assert.rejects(mockPreflight({ statusOverrides: { 'merge-base': 1 } }).run(), /not on origin\/main/);
   await assert.rejects(mockPreflight({ statusOverrides: { fetch: 1 } }).run(), /unable to refresh remote main/);
   await assert.rejects(mockPreflight({ commandFailure: (_name, args) => args[0] === 'ls-remote' }).run(), /simulated command failure/);
@@ -137,7 +137,7 @@ test('release preflight fails closed for stale main, network failure, tag confli
   await assert.rejects(mockPreflight({ version: '0.1.1' }).run(), /does not match package version/);
   await assert.rejects(
     mockPreflight({ providerToken: '' }).run(),
-    /provider variable is unavailable in the GitHub pre-tag runner/
+    /provider secret is unavailable in the GitHub pre-tag runner/
   );
   await assert.rejects(mockPreflight({ verifyFailure: true }).run(), /final artifact digest mismatch/);
 });
@@ -164,7 +164,7 @@ test('release preflight never queries, returns, or prints a raw provider token a
   const preflight = readFileSync(path.join(root, 'scripts/release-preflight.mjs'), 'utf8');
   assert.doesNotMatch(preflight, /git tag|git push|gh variable (?:get|set)|workflow run/);
   assert.doesNotMatch(preflight, /readProviderToken/);
-  assert.doesNotMatch(preflight, /environment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
+  assert.match(preflight, /runtimeEnvironment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   assert.doesNotMatch(preflight, /console\.log\([^\n]*token/i);
 });
 

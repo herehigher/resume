@@ -75,14 +75,15 @@ test('manifest preparation workflow is read-only and never exposes the provider 
   const script = readFileSync(path.join(root, 'scripts/prepare-release-manifest.mjs'), 'utf8');
   assert.match(workflow, /^on:\n {2}workflow_dispatch:$/m);
   assert.match(workflow, /^permissions: \{\}$/m);
-  assert.match(workflow, /permissions:\n {6}actions: read\n {6}contents: read/);
+  assert.match(workflow, /permissions:\n {6}contents: read/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
   assert.doesNotMatch(workflow, /vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
-  assert.match(workflow, /RELEASE_GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(workflow, /CLOUDFLARE_WEB_ANALYTICS_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WEB_ANALYTICS_TOKEN \}\}/);
+  assert.doesNotMatch(workflow, /RELEASE_GITHUB_TOKEN|github\.token/);
   const summary = workflow.slice(workflow.indexOf('- name: Write non-secret preparation summary'));
   assert.doesNotMatch(summary, /CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   assert.doesNotMatch(workflow, /upload-artifact|deploy-pages|git tag|git push|gh issue|gh api/i);
   assert.doesNotMatch(script, /gh variable|get.*token|console\.log\([^\n]*token|git push|git tag/i);
-  assert.doesNotMatch(script, /environment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
+  assert.match(script, /runtimeEnvironment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
 });
