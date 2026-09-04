@@ -258,6 +258,10 @@
 
   .en-entry-heading { break-after: avoid-page; }
 
+  .en-certification-list li { display: block; }
+  .en-certification-date { margin-left: 10px; }
+  .en-certification-link { display: block; margin-top: 2px; }
+
   .en-achievement-list li,
   .en-certification-list li { break-inside: avoid-page; }
 }

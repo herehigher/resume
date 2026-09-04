@@ -341,6 +341,9 @@
   .zh-timeline-content > h3,
   .zh-project-heading { break-after: avoid-page; }
 
+  .zh-certifications ul { display: block; }
+  .zh-certifications li + li { margin-top: 7px; }
+
   .zh-achievement-list li,
   .zh-certifications li { break-inside: avoid-page; }
 }

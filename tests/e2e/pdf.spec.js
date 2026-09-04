@@ -1,4 +1,5 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { createEnglishSampleState } from '../../site/assets/js/data/en-sample.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
 import { expect, openLocale, revealField, test } from './fixtures.js';
@@ -77,6 +78,71 @@ test('PDF pagination: 三言語のページ境界データは末尾内容を保�
     expect(pages).toHaveLength(expected.pages);
     expectPageSize(pages, expected.pageSize);
     expect(pages.at(-1)?.text.trim()).not.toBe('');
+    expect(pages.at(-1)?.text).toContain(endMarker);
+  }
+});
+
+test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、空白末尾ページを作らない @pdf', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  await page.locator('[data-zh-action="sample"]').click();
+  await expect(page.locator('[data-zh-preview]')).toContainText('数据分析专业证书');
+  await page.emulateMedia({ media: 'print' });
+  const layout = await page.evaluate(() => {
+    const certifications = document.querySelector('.zh-certifications');
+    const certificationItems = certifications?.querySelectorAll('li') || [];
+    return {
+      display: getComputedStyle(certifications?.querySelector('ul')).display,
+      gap: getComputedStyle(certificationItems[1]).marginTop
+    };
+  });
+  expect(layout).toEqual({ display: 'block', gap: '7px' });
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages).toHaveLength(2);
+  expectPageSize(pages, A4);
+  expect(pages.every((item) => item.text.trim())).toBe(true);
+  const text = pages.map((item) => item.text).join(' ');
+  expect(text.indexOf('PMP')).toBeLessThan(text.indexOf('数据分析专业证书'));
+  expect(pages.at(-1)?.text).toContain('数据分析专业证书');
+});
+
+test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と末尾を保つ @pdf', async ({ page }) => {
+  for (const [pageSize, expectedPageSize] of [
+    ['A4', A4],
+    ['LETTER', LETTER]
+  ]) {
+    await page.emulateMedia({ media: 'screen' });
+    const state = createEnglishSampleState(createDefaultState('en'));
+    state.settings.pageSizeByLocale.en = pageSize;
+    const endMarker = `EN-CERTIFICATION-END-${pageSize}`;
+    state.documents.en.resume.certifications = Array.from({ length: 3 }, (_, index) => ({
+      date: `202${index}-11`,
+      name: `Boundary Certification ${index + 1}${index === 0 ? ` ${endMarker}` : ''}`,
+      url: `https://example.com/${'long-verification-path-'.repeat(8)}${index}`
+    }));
+    await openLocale(page, 'en');
+    await page.locator('#importDataInput').setInputFiles({
+      name: 'english-certification-boundary.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(state))
+    });
+    await expect(page.locator('[data-en-preview]')).toContainText(endMarker);
+    await page.emulateMedia({ media: 'print' });
+    const layout = await page.evaluate(() => {
+      const item = document.querySelector('.en-certification-list li');
+      return {
+        dateMargin: getComputedStyle(item?.querySelector('.en-certification-date')).marginLeft,
+        display: getComputedStyle(item).display,
+        linkDisplay: getComputedStyle(item?.querySelector('.en-certification-link')).display
+      };
+    });
+    expect(layout).toEqual({ dateMargin: '10px', display: 'block', linkDisplay: 'block' });
+    const pages = await inspectPdf(await printPdf(page));
+    expectPageSize(pages, expectedPageSize);
+    expect(pages.every((item) => item.text.trim())).toBe(true);
+    const text = pages.map((item) => item.text).join(' ');
+    expect(text.indexOf('Boundary Certification 3')).toBeLessThan(text.indexOf('Boundary Certification 2'));
+    expect(text.indexOf('Boundary Certification 2')).toBeLessThan(text.indexOf(endMarker));
+    expect(text.replace(/\s/g, '')).toContain('example.com/long-verification-path-');
     expect(pages.at(-1)?.text).toContain(endMarker);
   }
 });
