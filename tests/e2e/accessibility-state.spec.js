@@ -100,6 +100,10 @@ test('localized public pages remain useful when JavaScript is disabled', async (
     await expect(page.locator('.entry-trust-dot').first()).toHaveCSS('height', '19px');
     await expect(page.locator('[data-analytics-disclosure="status"]')).toHaveCount(1);
     await expect(page.locator('.entry-button')).toBeVisible();
+    const xContact = page.locator('.x-contact-link');
+    await expect(xContact).toBeVisible();
+    await expect(xContact).toHaveAccessibleName('X: @kanhigher');
+    await expect(xContact).toHaveAttribute('href', 'https://x.com/kanhigher');
   }
   await context.close();
 });
@@ -145,6 +149,7 @@ test('@mobile 320px localized public entries keep the centered brand, heading, a
     await expect(page.locator('.entry-main h1')).toHaveCSS('font-size', '23px');
     await expect(page.locator('.entry-lede')).toHaveCSS('font-size', '15px');
     await expect(page.locator('.entry-button')).toHaveCSS('min-height', '46px');
+    await expect(page.locator('.x-contact-link')).toBeVisible();
     await expectNoPageOverflow(page);
   }
 });

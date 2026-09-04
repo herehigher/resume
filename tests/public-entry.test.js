@@ -37,6 +37,7 @@ const alternateLinks = Object.freeze({
   'x-default': base
 });
 const licenseUrl = 'https://github.com/herehigher/resume/blob/main/LICENSE';
+const xProfileUrl = 'https://x.com/kanhigher';
 
 function source(file) {
   return readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -124,6 +125,19 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
   }
+});
+
+test('public routes show the X contact link beside the copyright notice', () => {
+  for (const route of routes) {
+    const html = source(route.file);
+    assert.match(html, new RegExp(
+      `<p class="entry-legal">[\\s\\S]*?<a class="x-contact-link" href="${xProfileUrl.replaceAll('/', '\\/')}" target="_blank" rel="noopener noreferrer" aria-label="X: @kanhigher">[\\s\\S]*?<svg class="x-contact-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">[\\s\\S]*?<span>@kanhigher<\\/span>[\\s\\S]*?<\\/a>[\\s\\S]*?<\\/p>`
+    ));
+  }
+
+  const css = source('site/assets/css/public-entry.css');
+  assert.match(css, /\.x-contact-link\s*\{[\s\S]*?align-items: center;[\s\S]*?display: inline-flex;[\s\S]*?white-space: nowrap;/);
+  assert.match(css, /\.x-contact-icon\s*\{[\s\S]*?fill: currentColor;[\s\S]*?height: 1em;[\s\S]*?width: 1em;/);
 });
 
 test('editor brand opens the active locale entry and public entries use the shared decorative mark', () => {

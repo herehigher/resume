@@ -254,7 +254,7 @@ test('三言語の入力例モードはstickyな下書きコンポーネント�
   }
 });
 
-test('三言語エディターは Analytics 表示の下に著作権と MIT License を常設する', async ({ page }) => {
+test('三言語エディターは Analytics 表示の下に著作権、MIT License、X 連絡先を常設する', async ({ page }) => {
   for (const [locale, workspace] of [
     ['ja', '#japaneseWorkspace'],
     ['zh-CN', '#chineseWorkspace'],
@@ -262,7 +262,8 @@ test('三言語エディターは Analytics 表示の下に著作権と MIT Lice
   ]) {
     await openLocale(page, locale);
     const legal = page.locator(`${workspace} .editor-legal`);
-    const license = legal.locator('a');
+    const license = legal.locator('a[href="https://github.com/herehigher/resume/blob/main/LICENSE"]');
+    const xContact = legal.locator('.x-contact-link');
     await expect(page.locator(`${workspace} .editor-footer .editor-legal`)).toHaveCount(1);
     await expect(page.locator(`${workspace} .editor-footer #clearButton`)).toHaveCount(0);
     await expect(legal.locator('[data-analytics-disclosure="status"], [data-editor-analytics-disclosure="status"]')).toBeVisible();
@@ -270,6 +271,13 @@ test('三言語エディターは Analytics 表示の下に著作権と MIT Lice
     await expect(license).toHaveAttribute('href', 'https://github.com/herehigher/resume/blob/main/LICENSE');
     await expect(license).toHaveAttribute('target', '_blank');
     await expect(license).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(xContact).toBeVisible();
+    await expect(xContact).toHaveText('@kanhigher');
+    await expect(xContact).toHaveAccessibleName('X: @kanhigher');
+    await expect(xContact).toHaveAttribute('href', 'https://x.com/kanhigher');
+    await expect(xContact).toHaveAttribute('target', '_blank');
+    await expect(xContact).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(xContact.locator('.x-contact-icon')).toHaveAttribute('aria-hidden', 'true');
   }
 
   await openLocale(page, 'ja');

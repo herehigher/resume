@@ -54,6 +54,8 @@ body {
 .entry-button:focus-visible, a:focus-visible { outline: 3px solid #e69b2d; outline-offset: 3px; }
 .entry-legal { color: #687386; font-size: 12px; margin: 0; text-align: center; }
 .entry-legal a { color: #526d91; font-weight: 700; }
+.x-contact-link { align-items: center; display: inline-flex; gap: 4px; white-space: nowrap; }
+.x-contact-icon { fill: currentColor; flex: 0 0 auto; height: 1em; width: 1em; }
 .entry-links { margin: 24px 0 0; text-align: center; }
 
 @media (max-width: 620px) {
