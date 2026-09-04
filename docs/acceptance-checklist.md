@@ -1,4 +1,4 @@
-# v0.1 リリース受入チェックリスト / Release acceptance checklist
+# リリース受入チェックリスト / Release acceptance checklist
 
 自動テストで検出しにくい文字切れ、改ページ、印刷ダイアログ差異を、リリース候補ごとに確認する。個人情報を含む実データは使用せず、テスト用データのみで実施する。Version 公開の実行順と証拠 template は [Version release playbook](release-playbook.md) に従う。
 
@@ -6,8 +6,10 @@
 
 - `npm ci`、`npm test`、`npm run lint`、`npx playwright install chromium`、`npm run test:e2e` が成功する。
 - 安定版 Tag（`vMAJOR.MINOR.PATCH`）の Pages release は、tag が `v${package.json version}` と一致し、再利用可能な `Quality` workflow が成功し、対象 commit が `main` の履歴に含まれる場合だけ deploy job へ進む。Leading zero、prerelease、build metadata、不正な ref 形式は拒否する。
+- Pinned release SHA の `Pre-tag artifact gate` は default branch から manual dispatch され、#77 の online path contract、version、main ancestry、manifest、artifact semantic smoke を read-only で検証する。provider raw value は必要な場合でも GitHub runner 内だけに留め、summary には tag、SHA、fingerprint、artifact digest、run URL だけが出る。
 - `main` の通常 push は `.github/workflows/ci.yml` の Quality だけを実行し、Pages を deploy しない。`Quality / quality` を main の必須 status check とし、失敗した Pull Request の merge を禁止する。
 - Pages artifact は検証済み full commit SHA の `site/` だけを含み、deploy は artifact と Quality の両方に依存する。GitHub Actions の `github-pages` environment に結果と URL が表示される。
+- `pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` なので実行中の production deployment を自動 cancel しない。release host の local pre-check は競合を race-free にする保証ではない。
 - Manual rollback / redeploy は default branch の `Deploy Pages` workflow へ既存 tag を入力し、自動 release と同じ exact tag、version、main ancestry、Quality gate を通す。
 - Playwright の失敗時は GitHub Actions の `playwright-results` artifact で trace と screenshot を確認する。
 - PDF ゲートは short（英語1ページ）、standard（日本語2ページ）、long（英語複数ページ）について、ページ数、用紙寸法、先頭・末尾の抽出テキストを確認する。
@@ -23,8 +25,8 @@
 - [ ] 初回 deployment 後に HTTPS で接続でき、`Enforce HTTPS` の状態を確認した。
 - [ ] 設定者、確認日時、Source、custom domain、HTTPS 状態を Issue または Pull Request に記録した。Secret / token は記録していない。
 - [ ] `Deploy Pages` の workflow run URL、environment に表示された Pages URL、online smoke の結果を記録した。
-- [ ] `main` の通常 commit で `Deploy Pages` が起動せず、`v0.1.0` tag で validate → quality → artifact → deploy → smoke が起動した。
-- [ ] `workflow_dispatch` で既存 tag `v0.1.0` を指定し、同じ tag commit を再検証・再 deployment できることを確認した。
+- [ ] `main` の通常 commit で `Deploy Pages` が起動せず、対象 stable tag で validate → quality → artifact → deploy → smoke が起動した。
+- [ ] `workflow_dispatch` で既存の accepted stable tag を指定し、同じ tag commit を再検証・再 deployment できることを確認した。
 
 Smoke が失敗した場合、deployment 自体は完了しているため「deploy 済み・未受入」と記録する。CDN 反映など一時的な失敗は rerun または同じ既存 tag の manual redeploy で再確認する。同一 origin の file 欠落や version 不一致では tag を移動せず、修正版を新しい version として release する。
 
@@ -52,8 +54,8 @@ Smoke が失敗した場合、deployment 自体は完了しているため「dep
 - [ ] Root を直接開き、JavaScript を無効にしても `lang`、title、description、H1、主要説明、三言語への導線を読める。browser language による強制 redirect がない。
 - [ ] 三言語 public entry は JavaScript を無効にしても対応する `lang`、title、description、H1、主要説明、editor CTA、JSON Schema link を読める。
 - [ ] Root と三言語 public entry の canonical が実 deployment URL と一致し、`ja`、`zh-CN`、`en`、`x-default` の hreflang が全 page で reciprocal になっている。`/editor/` は `noindex,follow` で、public hreflang cluster に含まれない。
-- [ ] `sitemap.xml` が HTTP 200 と XML content type で取得でき、root と三言語の canonical URL だけを含む。
-- [ ] `schema/resume-studio-web-v1.schema.json` と架空 example JSON が HTTP 200 で取得でき、example を editor へ import できる。
+- [ ] `sitemap.xml` が HTTP 200 と XML content type で取得でき、root と三言語の canonical URL だけを含む。browser が XML を直接表示できない場合は response header と raw response body を evidence として確認する。
+- [ ] `schema/resume-studio-web-v1.schema.json` と架空 example JSON が HTTP 200 で取得でき、example を editor へ import できる。browser が JSON を直接表示できない場合は response header と raw response body を evidence として確認する。
 - [ ] Public JSON Schema が現在の runtime import contract と一致し、無効 version / locale / missing field / remote photo URL を拒否する。
 - [ ] 三言語 public entry が、application は data を upload しないこと、export file は写真や個人情報を含み得ること、利用者の明示承認なしに Agent が upload / transmit / share してはいけないことを区別して説明する。
 - [ ] Public entry から `/editor/` へ移動したとき、`?lang=ja`、`?lang=zh-CN`、`?lang=en` が正しく適用される。editor の brand から active locale の紹介ページへ戻れる。
@@ -78,4 +80,4 @@ Smoke が失敗した場合、deployment 自体は完了しているため「dep
 
 ## 判定記録
 
-リリース候補の commit SHA、確認日、確認者、OS / Chrome バージョン、各項目の結果、既知の差異と関連issueをPRへ記録する。未確認項目がある場合は理由と影響範囲を明記し、リリース可否を判断する。[Release evidence template](release-playbook.md#evidence-記録-template) の各 field を実値または `該当なし` で埋める。
+リリース候補の commit SHA、確認日、確認者、OS / Chrome バージョン、各項目の結果、既知の差異と関連issueをPRへ記録する。自動ゲートの evidence と、人が確認して受入と判断した evidence を区別する。未確認項目がある場合は理由と影響範囲を明記し、Pages settings、redeploy、rollback とは独立した owner decision として final acceptance を判断する。[Release evidence template](release-playbook.md#evidence-記録-template) の各 field を実値または `該当なし` で埋める。
