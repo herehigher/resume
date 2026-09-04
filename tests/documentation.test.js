@@ -179,7 +179,7 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
     /Neither localStorage nor exported files are encrypted/
   ];
   const localeFacts = {
-    'README.md': [/## Web版/, /入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
+    'README.md': [/## Web版/, /公開首頁の CTA から日本語 editor を直接開く/, /入力例/, /自動保存/, /手動保存/, /再読込/, /削除/, /profile・連絡先・写真は三言語で共有/],
     'README.en.md': [
       /## Web App/,
       /Example mode|example/i,
@@ -187,14 +187,16 @@ test('root Japanese guide and localized README fact matrix stay complete', () =>
       /manual save/i,
       /Reload/i,
       /delete/i,
+      /Start the Japanese editor directly from the public homepage/i,
       /profile, contact details, and photo are shared across locales/i
     ],
-    'README.zh-CN.md': [/## 在线版/, /示例/, /自动保存/, /手动保存/, /重新载入/, /删除/, /profile、联系方式和照片由三种语言共享/]
+    'README.zh-CN.md': [/## 在线版/, /从公开首页直接开始日语 editor/, /示例/, /自动保存/, /手动保存/, /重新载入/, /删除/, /profile、联系方式和照片由三种语言共享/]
   };
   for (const relativePath of detailedReadmes) {
     const markdown = readFileSync(path.join(root, relativePath), 'utf8');
     assert.doesNotMatch(markdown, /\bDemo\b/, `${relativePath} must describe the production Web App, not a demo`);
     assert.doesNotMatch(markdown, /Issue #9/, `${relativePath} must not describe the published Web App as pending`);
+    assert.doesNotMatch(markdown, /select a language|选择语言|公開首頁で日本語、简体中文、English を選びます/i, `${relativePath} must not describe the root page as a language selector`);
     for (const pattern of obsoletePlaintextClaims) {
       assert.doesNotMatch(markdown, pattern, `${relativePath} contains obsolete plaintext-storage copy`);
     }

@@ -34,13 +34,13 @@ Node.js 和 npx：
 npx --yes http-server site --port 8000
 ```
 
-使用 Chrome 打开 `http://localhost:8000/` 选择语言，或打开 editor：`http://localhost:8000/editor/`。
+使用 Chrome 打开 `http://localhost:8000/` 可直接开始日语 editor，或选择简体中文、English 介绍页；也可打开 editor：`http://localhost:8000/editor/`。
 
 草稿的 AES-GCM 加密需要 secure context。请使用 `https://`、`http://localhost` 或 `http://127.0.0.1`；不要打开 server 显示的 `http://0.0.0.0` 或 LAN IP URL。
 
 ## 只通过 README 开始使用
 
-1. 在公开首页选择日本語、简体中文或 English。editor 内可使用右上角的语言 selector，也可以直接打开 `/editor/?lang=ja`、`/editor/?lang=zh-CN`、`/editor/?lang=en`。
+1. 从公开首页直接开始日语 editor，或从简体中文、English 介绍页进入对应 editor。editor 内可使用右上角的语言 selector，也可以直接打开 `/editor/?lang=ja`、`/editor/?lang=zh-CN`、`/editor/?lang=en`。
 2. 修改输入栏后，preview 会立即更新。若想先了解成品，可选择“查看填写示例”。示例不会覆盖已保存的草稿。
 3. 输入会自动保存到当前 browser profile 的 `localStorage`。可用“保存草稿”手动保存，并用“重新载入草稿”恢复已保存内容。
 4. 选择“导出 PDF”，在 Chrome 打印界面选择“另存为 PDF”。纸张和打印选项请参照下面的限制说明。
