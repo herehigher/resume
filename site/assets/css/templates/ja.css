@@ -101,6 +101,12 @@
 .paper-section-first .resume-section-title { margin-top: 0; }
 .requests-section { border-bottom: 0; min-height: 145px; }
 
+@media screen {
+  #japaneseWorkspace .document-page { min-height: 297mm; padding: 14mm 15mm; width: 210mm; }
+  #japaneseWorkspace .paper-text-section,
+  #japaneseWorkspace .requests-section { min-height: 0; }
+}
+
 @page japanese-a4 {
   margin: 14mm 15mm;
   size: A4 portrait;
