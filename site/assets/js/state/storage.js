@@ -10,6 +10,12 @@ const KEY_ID = 'draft-encryption-key';
 const NONCE_BYTES = 12;
 const MAX_ENVELOPE_CHARACTERS = 4 * 1024 * 1024;
 const MAX_CIPHERTEXT_BYTES = (3 * 1024 * 1024) - 1024;
+const PERMANENTLY_UNREADABLE_DRAFT_ERROR_CODES = new Set([
+  'corrupt-envelope',
+  'decrypt-failed',
+  'key-invalid',
+  'key-missing'
+]);
 
 export class DraftStorageError extends Error {
   constructor(code, cause) {
@@ -30,6 +36,10 @@ export function getDraftStorageCapabilityError({
 
 export function isDraftStorageCompatibilityError(error) {
   return error instanceof DraftStorageError && error.code === 'crypto-unavailable';
+}
+
+function isPermanentlyUnreadableDraftError(error) {
+  return error instanceof DraftStorageError && PERMANENTLY_UNREADABLE_DRAFT_ERROR_CODES.has(error.code);
 }
 
 function toBase64(bytes) {
@@ -204,9 +214,12 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
       throw error instanceof DraftStorageError ? error : new DraftStorageError('corrupt-envelope', error);
     }
   }
-  async function load() {
+  function readRawDraft() {
     let raw;
     try { raw = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+    return raw;
+  }
+  async function loadRawDraft(raw) {
     if (!raw) return null;
     if (raw.length > MAX_ENVELOPE_CHARACTERS) throw new DraftStorageError('corrupt-envelope');
     let parsed;
@@ -216,6 +229,9 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
       return parsed;
     }
     return decrypt(parsed);
+  }
+  async function load() {
+    return loadRawDraft(readRawDraft());
   }
   function save(state) {
     const snapshot = cloneData(assertValidState(state));
@@ -246,10 +262,11 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
       }
     });
   }
-  function remove() {
+  function remove({ expectedRaw } = {}) {
     return enqueue(async () => {
       let existing;
       try { existing = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+      if (expectedRaw !== undefined && existing !== expectedRaw) throw new DraftStorageError('storage-changed');
       try { storage.removeItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
       try {
         await keys().remove();
@@ -263,7 +280,22 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
       }
     });
   }
-  return { load, save, remove, flush: () => persistenceTail };
+  async function loadAndRecoverUnreadableDraft() {
+    const raw = readRawDraft();
+    try {
+      return { state: await loadRawDraft(raw), recovered: false };
+    } catch (error) {
+      if (!isPermanentlyUnreadableDraftError(error)) throw error;
+      try {
+        await remove({ expectedRaw: raw });
+      } catch (recoveryError) {
+        if (recoveryError.code === 'storage-changed') return { state: await load(), recovered: false };
+        throw recoveryError;
+      }
+      return { state: null, recovered: true };
+    }
+  }
+  return { load, loadAndRecoverUnreadableDraft, save, remove, flush: () => persistenceTail };
 }
 
 export async function loadStoredState(storage, options) {

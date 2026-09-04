@@ -24,6 +24,26 @@ function memoryKeyStore() {
   };
 }
 
+function controllableKeyStore(initialKey = null) {
+  let key = initialKey;
+  let beforeNextRead = null;
+  let removals = 0;
+  return {
+    async read() {
+      const callback = beforeNextRead;
+      beforeNextRead = null;
+      if (callback) await callback();
+      return key;
+    },
+    async write(next) { key = next; },
+    async remove() { removals += 1; key = null; },
+    replace(next) { key = next; },
+    runBeforeNextRead(callback) { beforeNextRead = callback; },
+    current() { return key; },
+    removals() { return removals; }
+  };
+}
+
 function persistence(storage, keyStore = memoryKeyStore(), options = {}) {
   return createDraftStorage(storage, { crypto: webcrypto, keyStore, ...options });
 }
@@ -138,6 +158,125 @@ test('a different valid non-extractable key cannot overwrite an existing ciphert
   editedDefault.profile.fields.fullName = 'Do not overwrite original';
   await assert.rejects(() => afterLoadFailure.save(editedDefault), (error) => error.code === 'decrypt-failed');
   assert.equal(storage.getItem(STORAGE_KEY), original);
+});
+
+test('startup recovery does not clear a newer draft that replaces the unreadable envelope during decryption', async () => {
+  const storage = memoryStorage();
+  const keys = controllableKeyStore();
+  const draftStorage = persistence(storage, keys);
+  const unreadableState = createDefaultState();
+  unreadableState.profile.fields.fullName = 'Unreadable draft';
+  await draftStorage.save(unreadableState);
+
+  const newestKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const newestStorage = memoryStorage();
+  const newestState = createDefaultState();
+  newestState.profile.fields.fullName = 'Newest draft';
+  await persistence(newestStorage, controllableKeyStore(newestKey)).save(newestState);
+  const newestEnvelope = newestStorage.getItem(STORAGE_KEY);
+
+  keys.runBeforeNextRead(async () => {
+    storage.setItem(STORAGE_KEY, newestEnvelope);
+    keys.replace(newestKey);
+  });
+
+  const result = await draftStorage.loadAndRecoverUnreadableDraft();
+  assert.equal(result.recovered, false);
+  assert.equal(result.state.profile.fields.fullName, 'Newest draft');
+  assert.equal(storage.getItem(STORAGE_KEY), newestEnvelope);
+  assert.equal(keys.current(), newestKey);
+  assert.equal(keys.removals(), 0);
+  assert.equal((await draftStorage.load()).profile.fields.fullName, 'Newest draft');
+});
+
+test('startup clears only permanently unreadable drafts and returns a saveable default state', async () => {
+  const legacy = JSON.stringify({ keep: 'legacy' });
+  const scenarios = [
+    {
+      name: 'corrupt envelope',
+      setup: async () => ({
+        storage: memoryStorage({ [STORAGE_KEY]: '{not-json', 'resume-studio-data-v1': legacy }),
+        keyStore: memoryKeyStore()
+      })
+    },
+    {
+      name: 'missing key',
+      setup: async () => {
+        const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+        const originalKeys = memoryKeyStore();
+        await persistence(storage, originalKeys).save(createDefaultState());
+        return { storage, keyStore: memoryKeyStore() };
+      }
+    },
+    {
+      name: 'invalid key',
+      setup: async () => {
+        const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+        const keyStore = memoryKeyStore();
+        await persistence(storage, keyStore).save(createDefaultState());
+        await keyStore.write({ type: 'secret', extractable: true, algorithm: { name: 'AES-GCM' }, usages: ['encrypt', 'decrypt'] });
+        return { storage, keyStore };
+      }
+    },
+    {
+      name: 'decrypt failure',
+      setup: async () => {
+        const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+        const keyStore = memoryKeyStore();
+        await persistence(storage, keyStore).save(createDefaultState());
+        await keyStore.write(await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+        return { storage, keyStore };
+      }
+    }
+  ];
+
+  for (const scenario of scenarios) {
+    const { storage, keyStore } = await scenario.setup();
+    const result = await persistence(storage, keyStore).loadAndRecoverUnreadableDraft();
+    assert.equal(result.state, null, scenario.name);
+    assert.equal(result.recovered, true, scenario.name);
+    assert.equal(storage.getItem(STORAGE_KEY), null, scenario.name);
+    assert.equal(storage.getItem('resume-studio-data-v1'), legacy, scenario.name);
+
+    const defaultState = createDefaultState();
+    defaultState.profile.fields.fullName = `Recovered ${scenario.name}`;
+    await persistence(storage, keyStore).save(defaultState);
+    assert.equal((await persistence(storage, keyStore).load()).profile.fields.fullName, `Recovered ${scenario.name}`);
+  }
+});
+
+test('startup recovery preserves the draft when cleanup or the storage environment fails', async () => {
+  const storage = memoryStorage({ [STORAGE_KEY]: '{not-json' });
+  const keyStore = memoryKeyStore();
+  keyStore.remove = async () => { throw new Error('IndexedDB failure'); };
+
+  await assert.rejects(() => persistence(storage, keyStore).loadAndRecoverUnreadableDraft(), (error) => error.code === 'indexeddb-unavailable');
+  assert.equal(storage.getItem(STORAGE_KEY), '{not-json');
+
+  const unavailableStorage = memoryStorage({ [STORAGE_KEY]: '{not-json' });
+  unavailableStorage.getItem = () => { throw new Error('site data blocked'); };
+  await assert.rejects(() => persistence(unavailableStorage, memoryKeyStore()).loadAndRecoverUnreadableDraft(), (error) => error.code === 'storage-unavailable');
+
+  const encryptedStorage = memoryStorage();
+  const validKeys = memoryKeyStore();
+  await persistence(encryptedStorage, validKeys).save(createDefaultState());
+  const encryptedDraft = encryptedStorage.getItem(STORAGE_KEY);
+
+  await assert.rejects(() => createDraftStorage(encryptedStorage, { crypto: {}, keyStore: validKeys }).loadAndRecoverUnreadableDraft(), (error) => error.code === 'crypto-unavailable');
+  assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedDraft);
+
+  await assert.rejects(() => createDraftStorage(encryptedStorage, { crypto: webcrypto, indexedDB: null }).loadAndRecoverUnreadableDraft(), (error) => error.code === 'indexeddb-unavailable');
+  assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedDraft);
+
+  let removeCalled = false;
+  const unknownKeyStore = {
+    async read() { throw new DraftStorageError('unexpected'); },
+    async write() {},
+    async remove() { removeCalled = true; }
+  };
+  await assert.rejects(() => createDraftStorage(encryptedStorage, { crypto: webcrypto, keyStore: unknownKeyStore }).loadAndRecoverUnreadableDraft(), (error) => error.code === 'unexpected');
+  assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedDraft);
+  assert.equal(removeCalled, false);
 });
 
 test('clear keeps the encrypted draft when key deletion fails and never touches legacy storage', async () => {
