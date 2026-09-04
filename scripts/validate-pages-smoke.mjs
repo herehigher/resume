@@ -136,6 +136,17 @@ function assertSemanticContract(contract, content, metadata, options) {
     assertAnalytics(content, contract, metadata, options);
     return;
   }
+  if (contract.semantic === 'compatibility-document') {
+    const htmlAttributes = openingHtml(content, contract, metadata);
+    if (htmlAttributes.get('lang') !== contract.lang) failure(contract, metadata, 'language is invalid');
+    const links = [...content.matchAll(/<link\b[^>]*>/gi)].map((match) => attributes(match[0]));
+    const canonical = links.filter((item) => item.get('rel') === 'canonical');
+    if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) failure(contract, metadata, 'canonical URL is invalid');
+    if (!/<meta\s+name="robots"\s+content="noindex,follow">/i.test(content)) failure(contract, metadata, 'must be noindex,follow');
+    if (/hreflang=/i.test(content)) failure(contract, metadata, 'must not join the public hreflang cluster');
+    assertAnalytics(content, contract, metadata, options);
+    return;
+  }
   if (contract.semantic === 'sitemap') {
     if (!/^<\?xml version="1\.0" encoding="UTF-8"\?>\s*<urlset\b[\s\S]*<\/urlset>\s*$/.test(content)) {
       failure(contract, metadata, 'is not a complete sitemap document');

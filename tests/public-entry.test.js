@@ -12,8 +12,7 @@ import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const routePresentation = Object.freeze({
   'en/index.html': { h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/' },
-  'index.html': { h1: '履歴書・職務経歴書を、この端末で作成', assetPath: './assets/favicon/' },
-  'ja/index.html': { h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: '../assets/favicon/' },
+  'index.html': { h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: './assets/favicon/' },
   'zh-cn/index.html': { h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/' }
 });
 const routes = Object.freeze(publicDocumentContracts().map((contract) => ({
@@ -31,7 +30,7 @@ const faviconAssets = Object.freeze([
   { rel: 'apple-touch-icon', file: 'resume-studio-180.png', sizes: '180x180', width: 180 }
 ]);
 const alternateLinks = Object.freeze({
-  ja: `${base}ja/`,
+  ja: base,
   'zh-CN': `${base}zh-cn/`,
   en: `${base}en/`,
   'x-default': base
@@ -108,14 +107,16 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.deepEqual(findExternalRuntimeAssets(html), []);
   }
 
-  for (const route of routes.slice(1)) {
+  for (const route of routes) {
     const html = source(route.file);
     assert.match(html, /source build|official release/);
     assert.match(html, /PDF/i);
     assert.match(html, /JSON/i);
-    assert.match(html, /<a class="entry-button" href="\.\.\/editor\/\?lang=/);
-    assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
-    assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="\\.\\.\\/assets\\/favicon\\/resume-studio-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
+    const localPrefix = route.file === 'site/index.html' ? './' : '../';
+    const escapedLocalPrefix = localPrefix.replace('.', '\\.');
+    assert.match(html, new RegExp(`<a class="entry-button" href="${escapedLocalPrefix}editor\\/\\?lang=`));
+    assert.match(html, new RegExp(`href="${escapedLocalPrefix}schema\\/resume-studio-web-v1\\.schema\\.json"`));
+    assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="${escapedLocalPrefix}assets\\/favicon\\/resume-studio-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
     assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
     assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
     assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
@@ -126,11 +127,20 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
   }
 });
 
+test('/ja/ remains a noindex compatibility entry consolidated under the root canonical URL', () => {
+  const html = source('site/ja/index.html');
+  assert.match(html, /<html\s+lang="ja"/i);
+  assert.equal(linkTarget(html, 'canonical'), base);
+  assert.match(html, /<meta\s+name="robots"\s+content="noindex,follow">/i);
+  assert.doesNotMatch(html, /hreflang=/i);
+  assert.match(html, /<a class="entry-button" href="\.\.\/">/);
+});
+
 test('editor brand opens the active locale entry and public entries use the shared decorative mark', () => {
   const html = source('site/editor/index.html');
   assert.match(html, /<meta name="robots" content="noindex,follow">/);
   assert.doesNotMatch(html, /hreflang=/);
-  assert.match(html, /<a class="brand" href="\.\.\/ja\/" aria-label="Resume Studio の紹介ページを開く">/);
+  assert.match(html, /<a class="brand" href="\.\.\/" aria-label="Resume Studio の紹介ページを開く">/);
   assert.match(html, /<img class="brand-mark" src="\.\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="38" height="38">/);
   assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
   assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
@@ -157,7 +167,7 @@ test('editor brand opens the active locale entry and public entries use the shar
     ['Resume Studio の紹介ページを開く', '打开 Resume Studio 简介页', 'Open the Resume Studio introduction']
   );
   const controller = source('site/assets/js/ui/locale-controller.js');
-  assert.match(controller, /const publicEntryPaths = Object\.freeze\(\{[\s\S]*?ja: '\.\.\/ja\/',[\s\S]*?'zh-CN': '\.\.\/zh-cn\/',[\s\S]*?en: '\.\.\/en\/'/);
+  assert.match(controller, /const publicEntryPaths = Object\.freeze\(\{[\s\S]*?ja: '\.\.\/',[\s\S]*?'zh-CN': '\.\.\/zh-cn\/',[\s\S]*?en: '\.\.\/en\/'/);
   assert.match(controller, /brand\.href = publicEntryPaths\[locale\];/);
   assert.match(controller, /brand\.setAttribute\('aria-label', copy\.brandEntry\)/);
 });
