@@ -1,7 +1,7 @@
 import { STORAGE_KEY } from './config.js';
 import { resolveLocale } from './i18n/index.js';
 import { createDefaultState, cloneData } from './state/defaults.js';
-import { createDraftStorage, getDraftStorageCapabilityError, loadAndRecoverUnreadableDraft } from './state/storage.js';
+import { createDraftStorage, getDraftStorageCapabilityError } from './state/storage.js';
 import { loadLocalePreference } from './state/locale-preference.js';
 import { createStore } from './state/store.js';
 import { messageForDraftStorageError } from './ui/draft-storage-error.js';
@@ -21,7 +21,7 @@ let storageError = getDraftStorageCapabilityError({
 let recoveredDraft = false;
 if (!storageError) {
   try {
-    const result = await loadAndRecoverUnreadableDraft(persistence);
+    const result = await persistence.loadAndRecoverUnreadableDraft();
     storedState = result.state;
     recoveredDraft = result.recovered;
   } catch (error) {

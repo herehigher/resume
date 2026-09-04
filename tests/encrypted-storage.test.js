@@ -4,7 +4,7 @@ import { webcrypto } from 'node:crypto';
 
 import { STORAGE_KEY } from '../site/assets/js/config.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
-import { createDraftStorage, DraftStorageError, ENCRYPTED_DRAFT_ALGORITHM, ENCRYPTED_DRAFT_FORMAT, loadAndRecoverUnreadableDraft } from '../site/assets/js/state/storage.js';
+import { createDraftStorage, DraftStorageError, ENCRYPTED_DRAFT_ALGORITHM, ENCRYPTED_DRAFT_FORMAT } from '../site/assets/js/state/storage.js';
 
 function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -21,6 +21,26 @@ function memoryKeyStore() {
     async read() { return key; },
     async write(next) { key = next; },
     async remove() { key = null; }
+  };
+}
+
+function controllableKeyStore(initialKey = null) {
+  let key = initialKey;
+  let beforeNextRead = null;
+  let removals = 0;
+  return {
+    async read() {
+      const callback = beforeNextRead;
+      beforeNextRead = null;
+      if (callback) await callback();
+      return key;
+    },
+    async write(next) { key = next; },
+    async remove() { removals += 1; key = null; },
+    replace(next) { key = next; },
+    runBeforeNextRead(callback) { beforeNextRead = callback; },
+    current() { return key; },
+    removals() { return removals; }
   };
 }
 
@@ -140,6 +160,35 @@ test('a different valid non-extractable key cannot overwrite an existing ciphert
   assert.equal(storage.getItem(STORAGE_KEY), original);
 });
 
+test('startup recovery does not clear a newer draft that replaces the unreadable envelope during decryption', async () => {
+  const storage = memoryStorage();
+  const keys = controllableKeyStore();
+  const draftStorage = persistence(storage, keys);
+  const unreadableState = createDefaultState();
+  unreadableState.profile.fields.fullName = 'Unreadable draft';
+  await draftStorage.save(unreadableState);
+
+  const newestKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const newestStorage = memoryStorage();
+  const newestState = createDefaultState();
+  newestState.profile.fields.fullName = 'Newest draft';
+  await persistence(newestStorage, controllableKeyStore(newestKey)).save(newestState);
+  const newestEnvelope = newestStorage.getItem(STORAGE_KEY);
+
+  keys.runBeforeNextRead(async () => {
+    storage.setItem(STORAGE_KEY, newestEnvelope);
+    keys.replace(newestKey);
+  });
+
+  const result = await draftStorage.loadAndRecoverUnreadableDraft();
+  assert.equal(result.recovered, false);
+  assert.equal(result.state.profile.fields.fullName, 'Newest draft');
+  assert.equal(storage.getItem(STORAGE_KEY), newestEnvelope);
+  assert.equal(keys.current(), newestKey);
+  assert.equal(keys.removals(), 0);
+  assert.equal((await draftStorage.load()).profile.fields.fullName, 'Newest draft');
+});
+
 test('startup clears only permanently unreadable drafts and returns a saveable default state', async () => {
   const legacy = JSON.stringify({ keep: 'legacy' });
   const scenarios = [
@@ -183,7 +232,7 @@ test('startup clears only permanently unreadable drafts and returns a saveable d
 
   for (const scenario of scenarios) {
     const { storage, keyStore } = await scenario.setup();
-    const result = await loadAndRecoverUnreadableDraft(persistence(storage, keyStore));
+    const result = await persistence(storage, keyStore).loadAndRecoverUnreadableDraft();
     assert.equal(result.state, null, scenario.name);
     assert.equal(result.recovered, true, scenario.name);
     assert.equal(storage.getItem(STORAGE_KEY), null, scenario.name);
@@ -201,30 +250,32 @@ test('startup recovery preserves the draft when cleanup or the storage environme
   const keyStore = memoryKeyStore();
   keyStore.remove = async () => { throw new Error('IndexedDB failure'); };
 
-  await assert.rejects(() => loadAndRecoverUnreadableDraft(persistence(storage, keyStore)), (error) => error.code === 'indexeddb-unavailable');
+  await assert.rejects(() => persistence(storage, keyStore).loadAndRecoverUnreadableDraft(), (error) => error.code === 'indexeddb-unavailable');
   assert.equal(storage.getItem(STORAGE_KEY), '{not-json');
 
   const unavailableStorage = memoryStorage({ [STORAGE_KEY]: '{not-json' });
   unavailableStorage.getItem = () => { throw new Error('site data blocked'); };
-  await assert.rejects(() => loadAndRecoverUnreadableDraft(persistence(unavailableStorage, memoryKeyStore())), (error) => error.code === 'storage-unavailable');
+  await assert.rejects(() => persistence(unavailableStorage, memoryKeyStore()).loadAndRecoverUnreadableDraft(), (error) => error.code === 'storage-unavailable');
 
   const encryptedStorage = memoryStorage();
   const validKeys = memoryKeyStore();
   await persistence(encryptedStorage, validKeys).save(createDefaultState());
   const encryptedDraft = encryptedStorage.getItem(STORAGE_KEY);
 
-  await assert.rejects(() => loadAndRecoverUnreadableDraft(createDraftStorage(encryptedStorage, { crypto: {}, keyStore: validKeys })), (error) => error.code === 'crypto-unavailable');
+  await assert.rejects(() => createDraftStorage(encryptedStorage, { crypto: {}, keyStore: validKeys }).loadAndRecoverUnreadableDraft(), (error) => error.code === 'crypto-unavailable');
   assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedDraft);
 
-  await assert.rejects(() => loadAndRecoverUnreadableDraft(createDraftStorage(encryptedStorage, { crypto: webcrypto, indexedDB: null })), (error) => error.code === 'indexeddb-unavailable');
+  await assert.rejects(() => createDraftStorage(encryptedStorage, { crypto: webcrypto, indexedDB: null }).loadAndRecoverUnreadableDraft(), (error) => error.code === 'indexeddb-unavailable');
   assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedDraft);
 
   let removeCalled = false;
-  const unknownPersistence = {
-    async load() { throw new DraftStorageError('unexpected'); },
+  const unknownKeyStore = {
+    async read() { throw new DraftStorageError('unexpected'); },
+    async write() {},
     async remove() { removeCalled = true; }
   };
-  await assert.rejects(() => loadAndRecoverUnreadableDraft(unknownPersistence), (error) => error.code === 'unexpected');
+  await assert.rejects(() => createDraftStorage(encryptedStorage, { crypto: webcrypto, keyStore: unknownKeyStore }).loadAndRecoverUnreadableDraft(), (error) => error.code === 'unexpected');
+  assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedDraft);
   assert.equal(removeCalled, false);
 });
 
