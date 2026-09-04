@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { htmlDocumentContracts } from './deployment-path-contract.mjs';
+
 export const OFFICIAL_REPOSITORY = 'herehigher/resume';
 export const CLOUDFLARE_PROVIDER = 'cloudflare-web-analytics';
 export const CLOUDFLARE_BEACON_URL = 'https://static.cloudflareinsights.com/beacon.min.js';
@@ -12,13 +14,7 @@ export const CLOUDFLARE_RUM_URL = 'https://cloudflareinsights.com/cdn-cgi/rum';
 const adapterPath = fileURLToPath(import.meta.url);
 const digestPattern = /^[0-9a-f]{64}$/;
 const cloudflareTokenPattern = /^[0-9a-f]{32}$/;
-const htmlPaths = Object.freeze([
-  'editor/index.html',
-  'en/index.html',
-  'index.html',
-  'ja/index.html',
-  'zh-cn/index.html'
-]);
+const htmlPaths = Object.freeze(htmlDocumentContracts().map(({ artifactPath }) => artifactPath).sort(compareUtf8));
 const disclosureCopy = Object.freeze({
   'editor/index.html': Object.freeze({
     disabled: 'この source build では Analytics は無効で、解析用の外部 request は発生しません。',

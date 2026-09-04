@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
 
+import { documentUrlPaths } from '../../scripts/deployment-path-contract.mjs';
+
 const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
 export const DRAFT_STORAGE_KEY = 'resume-studio-web-v1';
 export const LOCALE_PREFERENCE_KEY = 'resume-studio-locale-v1';
@@ -16,6 +18,7 @@ function collectStaticPaths(directory = siteRoot) {
 }
 
 const staticPaths = new Set(collectStaticPaths());
+const documentPaths = documentUrlPaths();
 
 export async function installNetworkGuard(context, baseURL) {
   const expectedOrigin = new URL(baseURL).origin;
@@ -38,7 +41,7 @@ export async function installNetworkGuard(context, baseURL) {
     const resourceType = request.resourceType();
     const query = [...url.searchParams.entries()];
     const isDocument = resourceType === 'document'
-      && ['/', '/index.html', '/ja/', '/zh-cn/', '/en/', '/editor/', '/editor/index.html'].includes(url.pathname)
+      && documentPaths.has(url.pathname)
       && (query.length === 0 || (
         query.length === 1
         && query[0][0] === 'lang'

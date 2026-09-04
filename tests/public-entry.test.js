@@ -3,19 +3,26 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { findExternalRuntimeAssets } from '../scripts/check-site.mjs';
+import { publicDocumentContracts } from '../scripts/deployment-path-contract.mjs';
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { parseImportedState } from '../site/assets/js/state/storage.js';
 
-const base = 'https://herehigher.github.io/resume/';
-const routes = Object.freeze([
-  { file: 'site/index.html', lang: 'ja', canonical: base, h1: '履歴書・職務経歴書を、この端末で作成', assetPath: './assets/favicon/' },
-  { file: 'site/ja/index.html', lang: 'ja', canonical: `${base}ja/`, h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: '../assets/favicon/' },
-  { file: 'site/zh-cn/index.html', lang: 'zh-CN', canonical: `${base}zh-cn/`, h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/' },
-  { file: 'site/en/index.html', lang: 'en', canonical: `${base}en/`, h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/' }
-]);
+const routePresentation = Object.freeze({
+  'en/index.html': { h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/' },
+  'index.html': { h1: '履歴書・職務経歴書を、この端末で作成', assetPath: './assets/favicon/' },
+  'ja/index.html': { h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: '../assets/favicon/' },
+  'zh-cn/index.html': { h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/' }
+});
+const routes = Object.freeze(publicDocumentContracts().map((contract) => ({
+  ...routePresentation[contract.artifactPath],
+  canonical: contract.canonical,
+  file: `site/${contract.artifactPath}`,
+  lang: contract.lang
+})));
+const base = routes[0].canonical;
 const faviconAssets = Object.freeze([
   { rel: 'icon', file: 'resume-studio-16.png', sizes: '16x16', width: 16 },
   { rel: 'icon', file: 'resume-studio-32.png', sizes: '32x32', width: 32 },
