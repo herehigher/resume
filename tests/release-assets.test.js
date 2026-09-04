@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { mkdir, readdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  computeReleaseSourceTreeDigest,
   parseArguments,
   promoteReleaseAssetBundle,
   promoteReleaseAssets,
@@ -83,6 +85,13 @@ async function writeTargets(directory, prefix) {
   }
 }
 
+function approvedHashes(candidateRoot) {
+  return Object.fromEntries(targets.map((target) => [
+    target,
+    createHash('sha256').update(readFileSync(path.join(candidateRoot, target))).digest('hex')
+  ]));
+}
+
 test('a failed promotion restores every original tracked output', async (t) => {
   const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-release-assets-promotion-test-'));
   t.after(() => rmSync(temporary, { force: true, recursive: true }));
@@ -96,6 +105,7 @@ test('a failed promotion restores every original tracked output', async (t) => {
       candidateRoot,
       cwd: workingRoot,
       operations: {
+        approvedAssetHashes: approvedHashes(candidateRoot),
         copyFile: async (source, destination) => {
           if (source.startsWith(candidateRoot) && destination.endsWith('docs/screenshots/zh-CN.png')) {
             throw new Error('simulated copy failure');
@@ -121,7 +131,11 @@ test('a successful promotion replaces the complete target set', async (t) => {
   await writeTargets(candidateRoot, 'candidate');
   await writeTargets(workingRoot, 'original');
 
-  await promoteReleaseAssets({ candidateRoot, cwd: workingRoot });
+  await promoteReleaseAssets({
+    candidateRoot,
+    cwd: workingRoot,
+    operations: { approvedAssetHashes: approvedHashes(candidateRoot) }
+  });
   for (const target of targets) {
     assert.equal(readFileSync(path.join(workingRoot, target), 'utf8'), `candidate:${target}`);
   }
@@ -142,6 +156,7 @@ test('promotion retains a backup and attempts every restoration after a restorat
     candidateRoot,
     cwd: workingRoot,
     operations: {
+      approvedAssetHashes: approvedHashes(candidateRoot),
       copyFile: async (source, destination) => {
         if (source.startsWith(candidateRoot) && destination.endsWith('docs/screenshots/zh-CN.png')) {
           throw new Error('simulated promotion failure');
@@ -180,7 +195,7 @@ test('promotion revalidates and binds approval to the staged candidate bundle', 
   const workingRoot = path.join(temporary, 'working');
   await writeTargets(workingRoot, 'original');
   initializeWorkingRepository(workingRoot);
-  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workingRoot, encoding: 'utf8' }).trim();
   const verifier = async ({ sourceCommit, sourceRoot }) => ({
     siteHash: 'b'.repeat(64),
     sourceCommit,
@@ -188,7 +203,7 @@ test('promotion revalidates and binds approval to the staged candidate bundle', 
     targets: [...targets]
   });
   const staged = await stageReleaseAssets({
-    cwd: root,
+    cwd: workingRoot,
     sourceSha,
     operations: {
       generateReleaseAssets: async ({ outputRoot }) => writeTargets(outputRoot, 'candidate'),
@@ -199,6 +214,7 @@ test('promotion revalidates and binds approval to the staged candidate bundle', 
   writeFileSync(stagedTarget, 'tampered candidate');
   await assert.rejects(verifyReleaseAssetBundle({
     bundlePath: staged.bundlePath,
+    cwd: workingRoot,
     operations: { verifyReleaseAssets: verifier }
   }), /bundle asset hash no longer matches its metadata/);
   await assert.rejects(promoteReleaseAssetBundle({
@@ -210,4 +226,152 @@ test('promotion revalidates and binds approval to the staged candidate bundle', 
     assert.equal(readFileSync(path.join(workingRoot, target), 'utf8'), `original:${target}`);
   }
   assert.equal(existsSync(staged.bundlePath), true);
+});
+
+test('promotion rejects a forged bundle source even when its metadata digest is rewritten', async (t) => {
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-release-assets-source-binding-test-'));
+  t.after(() => rmSync(temporary, { force: true, recursive: true }));
+  const workingRoot = path.join(temporary, 'working');
+  await writeTargets(workingRoot, 'original');
+  initializeWorkingRepository(workingRoot);
+  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workingRoot, encoding: 'utf8' }).trim();
+  const verifier = async ({ sourceCommit, sourceRoot }) => ({
+    siteHash: 'b'.repeat(64), sourceCommit, sourceRoot, targets: [...targets]
+  });
+  const staged = await stageReleaseAssets({
+    cwd: workingRoot,
+    sourceSha,
+    operations: {
+      generateReleaseAssets: async ({ outputRoot }) => writeTargets(outputRoot, 'candidate'),
+      verifyReleaseAssets: verifier
+    }
+  });
+  const sourceFile = path.join(staged.bundlePath, 'source', targets[0]);
+  writeFileSync(sourceFile, 'forged source tree');
+  const metadataPath = path.join(staged.bundlePath, 'release-assets-bundle.json');
+  const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+  metadata.sourceTreeSha256 = await computeReleaseSourceTreeDigest(path.join(staged.bundlePath, 'source'));
+  writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+
+  await assert.rejects(verifyReleaseAssetBundle({
+    bundlePath: staged.bundlePath,
+    cwd: workingRoot,
+    operations: { verifyReleaseAssets: verifier }
+  }), /bundle source tree does not match a fresh archive/);
+});
+
+test('promotion rejects a bundle whose claimed source commit has changed', async (t) => {
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-release-assets-commit-binding-test-'));
+  t.after(() => rmSync(temporary, { force: true, recursive: true }));
+  const workingRoot = path.join(temporary, 'working');
+  await writeTargets(workingRoot, 'original');
+  initializeWorkingRepository(workingRoot);
+  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workingRoot, encoding: 'utf8' }).trim();
+  const verifier = async ({ sourceCommit, sourceRoot }) => ({
+    siteHash: 'b'.repeat(64), sourceCommit, sourceRoot, targets: [...targets]
+  });
+  const staged = await stageReleaseAssets({
+    cwd: workingRoot,
+    sourceSha,
+    operations: {
+      generateReleaseAssets: async ({ outputRoot }) => writeTargets(outputRoot, 'candidate'),
+      verifyReleaseAssets: verifier
+    }
+  });
+  writeFileSync(path.join(workingRoot, 'later-commit.txt'), 'different archive');
+  execFileSync('git', ['add', 'later-commit.txt'], { cwd: workingRoot });
+  execFileSync('git', ['commit', '-m', 'later source'], { cwd: workingRoot, stdio: 'ignore' });
+  const metadataPath = path.join(staged.bundlePath, 'release-assets-bundle.json');
+  const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+  metadata.sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workingRoot, encoding: 'utf8' }).trim();
+  writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+
+  await assert.rejects(verifyReleaseAssetBundle({
+    bundlePath: staged.bundlePath,
+    cwd: workingRoot,
+    operations: { verifyReleaseAssets: verifier }
+  }), /bundle source tree does not match a fresh archive/);
+});
+
+test('candidate bytes are rechecked immediately before each promotion copy', async (t) => {
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-release-assets-rehash-test-'));
+  t.after(() => rmSync(temporary, { force: true, recursive: true }));
+  const candidateRoot = path.join(temporary, 'candidate');
+  const workingRoot = path.join(temporary, 'working');
+  await writeTargets(candidateRoot, 'candidate');
+  await writeTargets(workingRoot, 'original');
+  const hashes = approvedHashes(candidateRoot);
+  writeFileSync(path.join(candidateRoot, targets[0]), 'changed after approval');
+
+  await assert.rejects(promoteReleaseAssets({
+    candidateRoot,
+    cwd: workingRoot,
+    operations: { approvedAssetHashes: hashes }
+  }), /candidate asset changed after approval/);
+  for (const target of targets) {
+    assert.equal(readFileSync(path.join(workingRoot, target), 'utf8'), `original:${target}`);
+  }
+});
+
+test('successful promotion reports a retained backup when cleanup fails', async (t) => {
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-release-assets-cleanup-test-'));
+  const backup = path.join(temporary, 'resume-release-assets-backup-retained');
+  t.after(() => rmSync(temporary, { force: true, recursive: true }));
+  const candidateRoot = path.join(temporary, 'candidate');
+  const workingRoot = path.join(temporary, 'working');
+  await writeTargets(candidateRoot, 'candidate');
+  await writeTargets(workingRoot, 'original');
+
+  const result = await promoteReleaseAssets({
+    candidateRoot,
+    cwd: workingRoot,
+    operations: {
+      approvedAssetHashes: approvedHashes(candidateRoot),
+      mkdtemp: async () => backup,
+      rm: async () => { throw new Error('simulated cleanup failure'); }
+    }
+  });
+
+  assert.deepEqual(result, { backupCleanup: 'retained', backupPath: backup });
+  for (const target of targets) {
+    assert.equal(readFileSync(path.join(workingRoot, target), 'utf8'), `candidate:${target}`);
+    assert.equal(readFileSync(path.join(backup, target), 'utf8'), `original:${target}`);
+  }
+});
+
+test('bundle path rejects a symlinked parent directory', { skip: process.platform === 'win32' }, async (t) => {
+  const outside = mkdtempSync(path.join(os.tmpdir(), 'resume-release-assets-outside-'));
+  const link = path.join(os.tmpdir(), `resume-release-assets-link-${process.pid}-${Date.now()}`);
+  const bundle = path.join(outside, 'resume-release-assets-bundle');
+  writeFileSync(path.join(outside, 'placeholder'), 'outside');
+  await mkdir(bundle);
+  symlinkSync(outside, link, 'dir');
+  t.after(() => {
+    unlinkSync(link);
+    rmSync(outside, { force: true, recursive: true });
+  });
+
+  await assert.rejects(verifyReleaseAssetBundle({ bundlePath: path.join(link, path.basename(bundle)) }), /bundle path is unsafe/);
+});
+
+test('bundle path requires owner-only permissions on POSIX hosts', { skip: process.platform === 'win32' || typeof process.getuid !== 'function' }, async (t) => {
+  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const verifier = async ({ sourceCommit, sourceRoot }) => ({
+    siteHash: 'b'.repeat(64), sourceCommit, sourceRoot, targets: [...targets]
+  });
+  const staged = await stageReleaseAssets({
+    cwd: root,
+    sourceSha,
+    operations: {
+      generateReleaseAssets: async ({ outputRoot }) => writeTargets(outputRoot, 'candidate'),
+      verifyReleaseAssets: verifier
+    }
+  });
+  t.after(() => rmSync(staged.bundlePath, { force: true, recursive: true }));
+  assert.equal(statSync(staged.bundlePath).uid, process.getuid());
+  chmodSync(staged.bundlePath, 0o755);
+  await assert.rejects(verifyReleaseAssetBundle({
+    bundlePath: staged.bundlePath,
+    operations: { verifyReleaseAssets: verifier }
+  }), /owned by the current user with mode 0700/);
 });

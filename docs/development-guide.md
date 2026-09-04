@@ -130,7 +130,7 @@ git lfs ls-files
 - `docs/screenshots/` の三言語 screenshot が同一 release candidate 由来であること。
 - `output/pdf/` の日本語 A4、中国語 A4、English Letter を全 page render し、文字切れ、重なり、空白・重複 page、壊れた glyph がないこと。
 - Git archive は tracked commit だけを入力にするため、ignored / untracked file は候補生成に入らない。stage は permission-restricted owner temporary bundle を保持して候補を目視可能にし、promote は同じ bundle の source commit・site hash・対象7ファイルの SHA-256 を再表示・再検証する。owner approval がない限り tracked output は変えないこと。
-- `docs/assets-manifest.json` の source commit・site hash、Chromium version、output hash が生成物と一致すること。promote 中の失敗では対象7ファイルを backup から復元すること。
+- `docs/assets-manifest.json` の source commit・site hash、Chromium version、output hash が生成物と一致すること。promote 中の copy failure では対象7ファイルを backup から復元すること。成功後の backup / bundle cleanup failure は復元 failure ではないため、保持された path を記録して cleanup 状態を確認すること。
 - Fixture、sample、生成 asset に、実在する個人・organization・account と誤認される data を含めないこと。
 
 ## Release と責任範囲
