@@ -16,7 +16,7 @@
 
 Release candidate（RC）は application version、`site/`、public sample、release notes、release 対象の文書と workflow が確定した時点で freeze します。Tag 前の Pull Request で、対象項目を `CHANGELOG.md` の `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ移し、release date を確定します。将来の変更を記録する空の `Unreleased` section は残します。Freeze 後は release 判定に必要な修正以外を混ぜません。
 
-新 version の release では、version を含むすべての画面内容を確定した最終 RC で、merge と tag の前に `npm run release:assets` を実行します。三言語 screenshot、PDF、`docs/assets-manifest.json` を同じ RC commit に含め、Git LFS object として commit して目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では再生成しません。
+新 version の release では、version を含むすべての画面内容を確定した最終 RC commit を pin し、merge と tag の前に `npm run release:assets -- --source-sha '<RELEASE_SHA>'` を実行します。Git archive から一時 staging に三言語 screenshot、PDF、`docs/assets-manifest.json` の候補を生成し、既存 release asset check と PNG / PDF content check を通します。表示された source commit、site hash、7つの対象ファイルを owner が明示承認した場合だけ、同じ command に `--owner-approval` を付けて promote します。promote は全対象を backup してから行い、途中で失敗すれば元の tracked output を復元します。三言語 screenshot、PDF、`docs/assets-manifest.json` を Git LFS object として commit して目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。その場合は新しい pinned commit を source にします。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では再生成しません。
 
 Screenshot に誤りが見つかった場合は tag 前に RC を修正して再生成します。Tag 後は tag を動かさず、修正を新しい version として release します。
 
@@ -82,7 +82,11 @@ sed -n '1,80p' CHANGELOG.md \
 `<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。新 version の最終 RC 上で次を実行し、生成物と Git LFS tracking を目視します。
 
 ```bash
-npm run release:assets || { echo 'Release asset generation failed; stop the release.' >&2; exit 1; }
+npm run release:assets -- --source-sha '<RELEASE_SHA>' \
+  || { echo 'Release asset staging failed; stop the release.' >&2; exit 1; }
+# Displayed source commit, site hash, and all seven paths require owner approval before this step.
+npm run release:assets -- --source-sha '<RELEASE_SHA>' --owner-approval \
+  || { echo 'Owner-approved release asset promotion failed; original outputs were restored; stop the release.' >&2; exit 1; }
 git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf \
   || { echo 'Unable to stage release assets; stop the release.' >&2; exit 1; }
 git lfs ls-files \

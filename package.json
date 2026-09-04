@@ -7,7 +7,7 @@
     "check": "node scripts/check-site.mjs",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "release:assets": "node scripts/generate-doc-assets.mjs",
+    "release:assets": "node scripts/release-assets.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "release:publish-tag": "node scripts/publish-release-tag.mjs",
     "test": "node --test tests/*.test.js && npm run check",

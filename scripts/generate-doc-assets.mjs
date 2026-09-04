@@ -3,19 +3,11 @@ import { createReadStream } from 'node:fs';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
-
-import { createEnglishSampleState } from '../site/assets/js/data/en-sample.js';
-import {
-  createDefaultState,
-  createJapaneseSampleState
-} from '../site/assets/js/state/defaults.js';
-import { createChineseSampleState } from '../site/assets/js/state/zh-CN.js';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const siteRoot = path.join(root, 'site');
-const manifestPath = path.join(root, 'docs/assets-manifest.json');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
 const generatorVersion = '1.1.0';
@@ -74,10 +66,10 @@ async function collectFiles(directory) {
   return files;
 }
 
-export async function computeSiteHash() {
+export async function computeSiteHash(rootDirectory = siteRoot) {
   const hash = createHash('sha256');
-  for (const file of await collectFiles(siteRoot)) {
-    hash.update(path.relative(siteRoot, file).split(path.sep).join('/'));
+  for (const file of await collectFiles(rootDirectory)) {
+    hash.update(path.relative(rootDirectory, file).split(path.sep).join('/'));
     hash.update('\0');
     hash.update(await readFile(file));
     hash.update('\0');
@@ -89,14 +81,14 @@ async function fileHash(file) {
   return createHash('sha256').update(await readFile(file)).digest('hex');
 }
 
-function createServerForSite() {
+function createServerForSite(sourceSiteRoot) {
   return createServer(async (request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
     const relativePath = pathname === '/'
       ? 'index.html'
       : `${pathname.slice(1)}${pathname.endsWith('/') ? 'index.html' : ''}`;
-    const target = path.resolve(siteRoot, relativePath);
-    if (target !== siteRoot && !target.startsWith(`${siteRoot}${path.sep}`)) {
+    const target = path.resolve(sourceSiteRoot, relativePath);
+    if (target !== sourceSiteRoot && !target.startsWith(`${sourceSiteRoot}${path.sep}`)) {
       response.writeHead(403).end('Forbidden');
       return;
     }
@@ -114,7 +106,18 @@ function createServerForSite() {
   });
 }
 
-function createPdfState(locale, marker, firstText) {
+async function loadSampleFactories(sourceRoot) {
+  const sourceUrl = (relativePath) => pathToFileURL(path.join(sourceRoot, relativePath)).href;
+  const [{ createEnglishSampleState }, defaults, { createChineseSampleState }] = await Promise.all([
+    import(sourceUrl('site/assets/js/data/en-sample.js')),
+    import(sourceUrl('site/assets/js/state/defaults.js')),
+    import(sourceUrl('site/assets/js/state/zh-CN.js'))
+  ]);
+  return { createChineseSampleState, createEnglishSampleState, ...defaults };
+}
+
+function createPdfState(locale, marker, firstText, factories) {
+  const { createChineseSampleState, createDefaultState, createEnglishSampleState, createJapaneseSampleState } = factories;
   const source = createDefaultState(locale);
   let state;
   if (locale === 'ja') state = createJapaneseSampleState(source);
@@ -148,7 +151,7 @@ async function waitForSample(page, variant) {
   await page.evaluate(() => document.fonts.ready);
 }
 
-async function generateVariant(browser, baseURL, siteHash, variant) {
+async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot, factories }) {
   const marker = `RESUME-STUDIO-SAMPLE-${variant.locale.toUpperCase()}-${siteHash.slice(0, 12).toUpperCase()}`;
   const context = await browser.newContext({
     colorScheme: 'light',
@@ -187,10 +190,10 @@ async function generateVariant(browser, baseURL, siteHash, variant) {
       }
     });
 
-    const screenshotAbsolute = path.join(root, variant.screenshotPath);
+    const screenshotAbsolute = path.join(outputRoot, variant.screenshotPath);
     await page.screenshot({ animations: 'disabled', fullPage: false, path: screenshotAbsolute });
 
-    const pdfState = createPdfState(variant.locale, marker, variant.firstText);
+    const pdfState = createPdfState(variant.locale, marker, variant.firstText, factories);
     await page.locator('#importDataInput').setInputFiles({
       buffer: Buffer.from(JSON.stringify(pdfState)),
       mimeType: 'application/json',
@@ -202,7 +205,7 @@ async function generateVariant(browser, baseURL, siteHash, variant) {
     );
     await page.evaluate(() => document.fonts.ready);
     await page.emulateMedia({ media: 'print' });
-    const pdfAbsolute = path.join(root, variant.pdfPath);
+    const pdfAbsolute = path.join(outputRoot, variant.pdfPath);
     await page.pdf({
       displayHeaderFooter: false,
       path: pdfAbsolute,
@@ -235,12 +238,19 @@ async function generateVariant(browser, baseURL, siteHash, variant) {
   }
 }
 
-async function main() {
-  await mkdir(path.join(root, 'docs/screenshots'), { recursive: true });
-  await mkdir(path.join(root, 'output/pdf'), { recursive: true });
+export async function generateReleaseAssets({
+  outputRoot = root,
+  sourceCommit,
+  sourceRoot = root
+} = {}) {
+  await mkdir(path.join(outputRoot, 'docs/screenshots'), { recursive: true });
+  await mkdir(path.join(outputRoot, 'output/pdf'), { recursive: true });
 
-  const siteHash = await computeSiteHash();
-  const server = createServerForSite();
+  const sourceSiteRoot = path.join(sourceRoot, 'site');
+  const manifestPath = path.join(outputRoot, 'docs/assets-manifest.json');
+  const siteHash = await computeSiteHash(sourceSiteRoot);
+  const factories = await loadSampleFactories(sourceRoot);
+  const server = createServerForSite(sourceSiteRoot);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -253,7 +263,7 @@ async function main() {
     browser = await chromium.launch({ headless: true });
     const outputs = [];
     for (const variant of variants) {
-      outputs.push(await generateVariant(browser, baseURL, siteHash, variant));
+      outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot }));
     }
     const manifest = {
       schemaVersion: 1,
@@ -263,6 +273,7 @@ async function main() {
         version: generatorVersion
       },
       source: {
+        ...(sourceCommit ? { commit: sourceCommit } : {}),
         fixedDate,
         markerHashLength: 12,
         markerPrefix: 'RESUME-STUDIO-SAMPLE',
@@ -285,5 +296,5 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await main();
+  await generateReleaseAssets();
 }
