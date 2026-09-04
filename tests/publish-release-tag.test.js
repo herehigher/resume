@@ -6,7 +6,12 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { publishReleaseTag, validateTagPublication } from '../scripts/publish-release-tag.mjs';
+import {
+  assertAgentSensitiveStepCanRun,
+  hasDirectGitHubTokenVariable,
+  publishReleaseTag,
+  validateTagPublication
+} from '../scripts/publish-release-tag.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const repository = 'herehigher/resume';
@@ -78,6 +83,7 @@ function fixtureOperations() {
 function input(fixture, overrides = {}) {
   return {
     cwd: fixture.work,
+    agentAssisted: false,
     operations: fixtureOperations(),
     preTagGateRunId: '123',
     releaseSha: fixture.releaseSha,
@@ -190,11 +196,63 @@ test('validation requires the official repository, strict tuple, account, and pr
   }), /gate failed/);
 });
 
-test('helper does not access provider values or use mutable tag publication commands', () => {
+function environmentWithDirectToken(name) {
+  return new Proxy({}, {
+    get() {
+      throw new Error('raw environment values must not be read');
+    },
+    getOwnPropertyDescriptor(_target, property) {
+      if (property === name) return { configurable: true, enumerable: true, value: '' };
+      return undefined;
+    }
+  });
+}
+
+test('agent-assisted steps defer on direct token-variable presence without reading the value or mutating', async (t) => {
+  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN']) {
+    const environment = environmentWithDirectToken(name);
+    assert.equal(hasDirectGitHubTokenVariable(environment), true);
+    assert.throws(
+      () => assertAgentSensitiveStepCanRun({ agentAssisted: true, environment }),
+      /deferred to an owner-approved trusted release host isolated session/
+    );
+  }
+
+  const fixture = createFixture(t);
+  let confirmationCalls = 0;
+  let commandCalls = 0;
+  await assert.rejects(publishReleaseTag({
+    ...input(fixture),
+    agentAssisted: true,
+    environment: environmentWithDirectToken('GH_TOKEN'),
+    confirm: async () => {
+      confirmationCalls += 1;
+      return true;
+    },
+    operations: {
+      command: () => {
+        commandCalls += 1;
+        throw new Error('commands must not run after deferral');
+      }
+    }
+  }), /deferred to an owner-approved trusted release host isolated session/);
+  assert.equal(confirmationCalls, 0);
+  assert.equal(commandCalls, 0);
+  assert.equal(hasLocalTag(fixture.work), false);
+  assert.equal(git(fixture.work, 'ls-remote', '--tags', fixture.remote, `refs/tags/${tag}`), '');
+});
+
+test('helper uses metadata-only gate verification and keeps token values outside outputs and commands', () => {
   const source = readFileSync(path.join(root, 'scripts/publish-release-tag.mjs'), 'utf8');
   assert.match(source, /Pre-tag artifact gate/);
-  assert.match(source, /pre-tag artifact gate log does not attest/);
+  assert.match(source, /headBranch,headSha,url,workflowName,displayTitle/);
+  assert.match(source, /displayTitle !== `Pre-tag artifact gate: \$\{releaseTag\} -> \$\{releaseSha\}`/);
   assert.match(source, /refs\/tags\/\$\{releaseTag\}:refs\/tags\/\$\{releaseTag\}/);
-  assert.doesNotMatch(source, /CLOUDFLARE_WEB_ANALYTICS_TOKEN|gh variable|get.*token|--force|delete-ref|push origin --all/i);
+  assert.match(source, /Object\.hasOwn\(environment, name\)/);
+  assert.doesNotMatch(source, /--log|CLOUDFLARE_WEB_ANALYTICS_TOKEN|gh variable|get.*token|--force|delete-ref|push origin --all/i);
   assert.match(readFileSync(path.join(root, 'package.json'), 'utf8'), /"release:publish-tag"/);
+
+  const workflow = readFileSync(path.join(root, '.github/workflows/pre-tag-artifact-gate.yml'), 'utf8');
+  assert.match(workflow, /^run-name: Pre-tag artifact gate: \$\{\{ inputs\.release_tag \}\} -> \$\{\{ inputs\.release_sha \}\}$/m);
+  assert.doesNotMatch(workflow, /GITHUB_STEP_SUMMARY[\s\S]*CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
 });

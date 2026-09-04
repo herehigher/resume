@@ -7,6 +7,7 @@ import { OFFICIAL_REPOSITORY } from './prepare-pages-artifact.mjs';
 import { isStableReleaseTag } from './validate-release-ref.mjs';
 
 const DEFAULT_BRANCH = 'main';
+const directGitHubTokenVariables = Object.freeze(['GH_TOKEN', 'GITHUB_TOKEN']);
 const fullCommitPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 const runIdPattern = /^[1-9]\d*$/;
 
@@ -78,6 +79,16 @@ function approvalPhrase(tuple) {
   return `publish ${tuple.repository} ${tuple.releaseTag} ${tuple.releaseSha} ${tuple.packageVersion}`;
 }
 
+export function hasDirectGitHubTokenVariable(environment = process.env) {
+  return directGitHubTokenVariables.some((name) => Object.hasOwn(environment, name));
+}
+
+export function assertAgentSensitiveStepCanRun({ agentAssisted = true, environment = process.env } = {}) {
+  if (agentAssisted && hasDirectGitHubTokenVariable(environment)) {
+    fail('agent-assisted sensitive release step is deferred to an owner-approved trusted release host isolated session because a direct GitHub token variable is present');
+  }
+}
+
 function parseGateRun(value, releaseTag, releaseSha) {
   let run;
   try {
@@ -88,12 +99,13 @@ function parseGateRun(value, releaseTag, releaseSha) {
   if (run?.conclusion !== 'success'
     || run.event !== 'workflow_dispatch'
     || run.headBranch !== DEFAULT_BRANCH
+    || !fullCommitPattern.test(run.headSha || '')
     || run.workflowName !== 'Pre-tag artifact gate'
+    || run.displayTitle !== `Pre-tag artifact gate: ${releaseTag} -> ${releaseSha}`
     || typeof run.url !== 'string') {
     fail('pre-tag artifact gate run is not a successful default-branch gate');
   }
-  const marker = `Validated pre-tag artifact gate input: ${releaseTag} -> ${releaseSha}.`;
-  return { marker, url: run.url };
+  return { url: run.url };
 }
 
 async function readAccount({ repository, runCommand }) {
@@ -112,12 +124,8 @@ async function verifyPreTagGate({ releaseSha, releaseTag, repository, runCommand
   if (!runIdPattern.test(runId || '')) fail('pre-tag artifact gate run id must be a decimal identifier');
   const details = parseGateRun(runCommand('gh', [
     'run', 'view', runId, '--repo', repository,
-    '--json', 'conclusion,event,headBranch,url,workflowName'
+    '--json', 'conclusion,event,headBranch,headSha,url,workflowName,displayTitle'
   ]), releaseTag, releaseSha);
-  const log = runCommand('gh', ['run', 'view', runId, '--repo', repository, '--log']);
-  if (!log.split('\n').some((line) => line.includes(details.marker))) {
-    fail('pre-tag artifact gate log does not attest to the requested tag and SHA');
-  }
   return Object.freeze({ runId, url: details.url });
 }
 
@@ -127,8 +135,11 @@ export async function validateTagPublication({
   releaseSha,
   releaseTag,
   repository = OFFICIAL_REPOSITORY,
+  agentAssisted = true,
+  environment = process.env,
   operations = {}
 }) {
+  assertAgentSensitiveStepCanRun({ agentAssisted, environment });
   const runCommand = operations.command || command;
   const runCommandStatus = operations.commandStatus || commandStatus;
   const getAccount = operations.readAccount || readAccount;
@@ -198,11 +209,14 @@ export async function publishReleaseTag({
   releaseSha,
   releaseTag,
   repository = OFFICIAL_REPOSITORY,
+  agentAssisted = true,
+  environment = process.env,
   operations = {}
 }) {
   if (typeof confirm !== 'function') fail('explicit owner approval is required');
+  assertAgentSensitiveStepCanRun({ agentAssisted, environment });
   const initial = await validateTagPublication({
-    cwd, operations, preTagGateRunId, releaseSha, releaseTag, repository
+    agentAssisted, cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
   });
   const tuple = tupleOf(initial);
   if (!await confirm(Object.freeze({ ...tuple, approvalPhrase: approvalPhrase(tuple) }))) {
@@ -210,11 +224,12 @@ export async function publishReleaseTag({
   }
 
   let refreshed = await validateTagPublication({
-    cwd, operations, preTagGateRunId, releaseSha, releaseTag, repository
+    agentAssisted, cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
   });
   assertApprovedTuple(initial, refreshed);
   let localAction = 'resumed';
   if (refreshed.localTag === 'absent') {
+    assertAgentSensitiveStepCanRun({ agentAssisted, environment });
     runCommand(operations, 'git', [
       'tag', '--annotate', '--no-sign', releaseTag, releaseSha, '--message', `Resume Studio ${releaseTag}`
     ], { cwd });
@@ -222,13 +237,14 @@ export async function publishReleaseTag({
   }
 
   refreshed = await validateTagPublication({
-    cwd, operations, preTagGateRunId, releaseSha, releaseTag, repository
+    agentAssisted, cwd, environment, operations, preTagGateRunId, releaseSha, releaseTag, repository
   });
   assertApprovedTuple(initial, refreshed);
   if (refreshed.remoteTag === 'same') {
     return Object.freeze({ ...tuple, gateRunUrl: refreshed.gate.url, localAction, remoteAction: 'already-published' });
   }
   if (refreshed.localTag !== 'same') fail('local exact tag is unavailable for publication');
+  assertAgentSensitiveStepCanRun({ agentAssisted, environment });
   runCommand(operations, 'git', [
     'push', 'origin', `refs/tags/${releaseTag}:refs/tags/${releaseTag}`
   ], { cwd });
@@ -241,27 +257,34 @@ function runCommand(operations, commandName, args, options) {
 
 function parseArguments(args) {
   const values = {};
-  for (let index = 0; index < args.length; index += 2) {
+  for (let index = 0; index < args.length;) {
     const name = args[index];
+    if (name === '--owner-isolated-session') {
+      if ('ownerIsolatedSession' in values) fail('duplicate command argument');
+      values.ownerIsolatedSession = true;
+      index += 1;
+      continue;
+    }
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('invalid command arguments');
     const key = name.slice(2);
     if (!['pre-tag-gate-run', 'release-sha', 'release-tag'].includes(key) || key in values) fail('unknown or duplicate command argument');
     values[key] = value;
+    index += 2;
   }
-  if (Object.keys(values).length !== 3 || Object.values(values).some((value) => !value)) fail('release tag, SHA, and pre-tag gate run are required');
+  if (!values['pre-tag-gate-run'] || !values['release-sha'] || !values['release-tag']) fail('release tag, SHA, and pre-tag gate run are required');
   return values;
 }
 
 async function promptForApproval(tuple) {
   if (!process.stdin.isTTY || !process.stdout.isTTY) fail('owner approval requires an interactive terminal');
   console.log(`Repository: ${tuple.repository}`);
-  console.log(`Exact tag: ${tuple.releaseTag}`);
-  console.log(`Full SHA: ${tuple.releaseSha}`);
+  console.log(`対象 tag: ${tuple.releaseTag}`);
+  console.log(`完全 SHA: ${tuple.releaseSha}`);
   console.log(`Version: ${tuple.packageVersion}`);
   const readline = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const response = await readline.question(`Owner approval required. Type exactly "${tuple.approvalPhrase}": `);
+    const response = await readline.question(`Owner approval is required. 次を完全一致で入力してください: "${tuple.approvalPhrase}": `);
     return response === tuple.approvalPhrase;
   } finally {
     readline.close();
@@ -271,6 +294,7 @@ async function promptForApproval(tuple) {
 async function main() {
   const values = parseArguments(process.argv.slice(2));
   const result = await publishReleaseTag({
+    agentAssisted: !values.ownerIsolatedSession,
     confirm: promptForApproval,
     preTagGateRunId: values['pre-tag-gate-run'],
     releaseSha: values['release-sha'],
