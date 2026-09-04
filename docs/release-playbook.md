@@ -11,7 +11,7 @@ Release は次の四つの実行層を混同しない。各層の結果は GitHu
 3. **GitHub runner** — pre-tag artifact gate と release workflow が実行される環境。Analytics provider の raw value が必要な場合は runner 内だけで使用し、log、summary、artifact、release host へ出さない。
 4. **Pages deployment job** — `pages: write` と `id-token: write` による GitHub Pages deployment。Pages OIDC は release host の OS credential provider と独立しており、host の credential store を利用しない。
 
-Release tooling は `gh auth status` と GitHub API により identity と repository permission を確認するだけで、Keychain、Credential Manager、Secret Service その他の OS credential API を直接呼ばない。token の export、OS credential store からの raw secret 抽出、credential file への複製も行わない。GitHub runner は provider value を step environment へ直接 mapping せず、`actions: read` の masked automatic token で repository variable API から process 内へ読み、format 検証後ただちに workflow mask を登録してから使用する。
+Release tooling は `gh auth status` と GitHub API により identity と repository permission を確認するだけで、Keychain、Credential Manager、Secret Service その他の OS credential API を直接呼ばない。token の export、OS credential store からの raw secret 抽出、credential file への複製も行わない。GitHub runner は owner 承認済み provider value を repository secret として受け取り、GitHub Actions の automatic masking が有効な step environment 内だけで使用する。repository variable や workflow command への raw value 展開は行わない。
 
 AI agent の environment に raw `GH_TOKEN` または `GITHUB_TOKEN` が直接注入されている場合、agent-assisted の sensitive step は owner 管理の隔離 session へ deferred とする。この制約は human が安全な方法で認証すること、または CI がその用途に認証を使用することを禁止するものではない。
 
@@ -39,7 +39,7 @@ Official deployment で Analytics が enabled であることを示す screensho
 
 ### Runner-only manifest digest preparation
 
-Enabled Analytics release で `site/` が変わった場合は、version と release notes を固定した RC を review して `main` へ merge した後、default branch から `Prepare release manifest` workflow を手動実行します。この read-only workflow は owner-approved repository variable を GitHub runner 内だけで使用し、raw provider value を log、summary、artifact、release host へ出さず、review 済み provider fingerprint と一致することを確認して source / adapter / final artifact digest だけを summary に書きます。
+Enabled Analytics release で `site/` が変わった場合は、version と release notes を固定した RC を review して `main` へ merge した後、default branch から `Prepare release manifest` workflow を手動実行します。この read-only workflow は owner-approved repository secret を GitHub runner 内だけで使用し、raw provider value を log、summary、artifact、release host へ出さず、review 済み provider fingerprint と一致することを確認して source / adapter / final artifact digest だけを summary に書きます。
 
 ```bash
 gh workflow run prepare-release-manifest.yml --ref main \
@@ -211,7 +211,7 @@ printf 'Pinned main Quality: %s\n' "$quality_url"
 
 Main `Quality / quality` の成功確認後、tag 作成より前に、review 済み `<RELEASE_SHA>` そのものへ前節の GitHub runner pre-tag artifact gate を dispatch する。gate は Git archive を一時領域へ展開して artifact を復元するため、PR 前の working tree、現在の `main` tip、別 commit を代用しない。remote main の明示 refspec 更新、manifest、#77 の path contract、source / adapter / final artifact digest、semantic smoke の不一致はすべて tag 作成前の hard failure である。
 
-Enabled の場合だけ GitHub runner が owner 承認済み repository variable を読む。Disabled の場合は provider variable を読まず、validated source digest が source-identical final digest と一致することを確認する。
+Enabled の場合だけ GitHub runner が owner 承認済み repository secret を使用する。Disabled の場合は provider secret を読まず、validated source digest が source-identical final digest と一致することを確認する。
 
 手動では owner approval、RC の目視確認、pinned main Quality URL、release date、tag 作成直前の最終照合を確認する。成功 summary、pinned SHA、source / provider / adapter / final digest を evidence に記録する。この gate を通過しない限り tag を作成しない。
 

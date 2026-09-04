@@ -12,7 +12,6 @@ import {
 } from './prepare-pages-artifact.mjs';
 import { isStableReleaseTag } from './validate-release-ref.mjs';
 import { validateDeploymentArtifact } from './validate-pages-smoke.mjs';
-import { readRunnerProviderValue } from './github-provider-variable.mjs';
 
 const fullCommitPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
@@ -102,7 +101,8 @@ export async function runReleasePreflight({
   const prepare = operations.prepareArtifact || prepareArtifact;
   const verify = operations.verifyArtifact || verifyArtifact;
   const validateSmoke = operations.validateDeploymentArtifact || validateDeploymentArtifact;
-  const readProviderValue = operations.readProviderValue || readRunnerProviderValue;
+  const readProviderValue = operations.readProviderValue
+    || (({ environment: runtimeEnvironment }) => runtimeEnvironment.CLOUDFLARE_WEB_ANALYTICS_TOKEN || '');
   assertPreTagRunner(environment);
   if (repository !== OFFICIAL_REPOSITORY) fail('preflight is restricted to the official repository');
   if (!isStableReleaseTag(releaseTag)) fail('release tag must be stable SemVer');
@@ -154,7 +154,7 @@ export async function runReleasePreflight({
     let token = '';
     if (release.manifest.analyticsMode === 'enabled') {
       token = await readProviderValue({ environment });
-      if (!token) fail('provider variable is unavailable in the GitHub pre-tag runner');
+      if (!token) fail('provider secret is unavailable in the GitHub pre-tag runner');
     }
     const artifactDirectory = path.join(temporary, 'artifact');
     const prepared = await prepare({

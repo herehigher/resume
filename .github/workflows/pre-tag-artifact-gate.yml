@@ -19,7 +19,6 @@ jobs:
   pretag-artifact:
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
     steps:
       - name: Checkout default branch dispatch commit
@@ -63,7 +62,7 @@ jobs:
         if: ${{ steps.manifest.outputs.analytics_mode == 'enabled' && steps.manifest.outputs.analytics_provider == 'cloudflare-web-analytics' }}
         id: artifact_enabled
         env:
-          RELEASE_GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ secrets.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
           RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
           RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
         run: >-
