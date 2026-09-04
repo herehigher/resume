@@ -112,7 +112,7 @@ async function readAccount({ repository, runCommand }) {
   runCommand('gh', ['auth', 'status', '--hostname', 'github.com']);
   const login = runCommand('gh', ['api', 'user', '--jq', '.login']);
   const permission = runCommand('gh', [
-    'repo', 'view', '--repo', repository, '--json', 'viewerPermission', '--jq', '.viewerPermission'
+    'repo', 'view', repository, '--json', 'viewerPermission', '--jq', '.viewerPermission'
   ]);
   if (!/^[A-Za-z0-9-]+$/.test(login) || permission !== 'ADMIN') {
     fail('authenticated account does not have owner-level access to the official repository');

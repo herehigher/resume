@@ -269,6 +269,8 @@ test('helper uses metadata-only gate verification and keeps token values outside
   assert.match(source, /headBranch,headSha,url,workflowName,displayTitle/);
   assert.match(source, /displayTitle !== `Pre-tag artifact gate: \$\{releaseTag\} -> \$\{releaseSha\}`/);
   assert.match(source, /refs\/tags\/\$\{releaseTag\}:refs\/tags\/\$\{releaseTag\}/);
+  assert.match(source, /'repo', 'view', repository, '--json', 'viewerPermission'/);
+  assert.doesNotMatch(source, /'repo', 'view', '--repo'/);
   assert.match(source, /Object\.hasOwn\(environment, name\)/);
   assert.doesNotMatch(source, /agentAssisted|owner-isolated-session/);
   assert.doesNotMatch(source, /--log|CLOUDFLARE_WEB_ANALYTICS_TOKEN|gh variable|get.*token|--force|delete-ref|push origin --all/i);
