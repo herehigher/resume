@@ -39,7 +39,7 @@ npm run test:acceptance
 
 PDF や responsive layout を変更した場合は [release acceptance checklist](docs/acceptance-checklist.md) に従い、全対象 page を目視確認します。
 
-README の screenshot と PDF sample は通常の feature Pull Request では更新しません。新 version の最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ `npm run release:assets` と `npm run test:release-assets` を実行し、Git LFS object として commit します。
+README の screenshot と PDF sample は通常の feature Pull Request では更新しません。新 version の最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ `npm run release:assets -- --source-sha <SHA>` で clean Git archive の候補を確認します。表示された source commit、site hash、対象ファイルを owner が明示承認した場合だけ `--owner-approval` を付けて promote し、`npm run test:release-assets` を通して Git LFS object として commit します。
 
 ## Issue と Pull Request
 
