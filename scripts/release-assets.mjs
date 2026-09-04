@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +53,42 @@ async function assertNoSymlinks(directory) {
     if (entry.isSymbolicLink()) fail(`archive contains a symbolic link: ${entryPath}`);
     if (entry.isDirectory()) await assertNoSymlinks(entryPath);
   }
+}
+
+async function collectTreeFiles(rootDirectory, directory = rootDirectory) {
+  const files = [];
+  const entries = await readdir(directory, { withFileTypes: true });
+  entries.sort((left, right) => Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)));
+  for (const entry of entries) {
+    const absolute = path.join(directory, entry.name);
+    const metadata = await lstat(absolute);
+    if (metadata.isSymbolicLink()) fail(`archive contains a symbolic link: ${absolute}`);
+    if (metadata.isDirectory()) {
+      files.push(...await collectTreeFiles(rootDirectory, absolute));
+      continue;
+    }
+    if (!metadata.isFile()) fail(`archive contains an unsupported file type: ${absolute}`);
+    const relative = path.relative(rootDirectory, absolute).split(path.sep).join('/');
+    if (!relative || relative.startsWith('../') || path.posix.isAbsolute(relative)) {
+      fail(`archive file path is unsafe: ${relative}`);
+    }
+    files.push({ absolute, relative });
+  }
+  return files;
+}
+
+export async function computeReleaseSourceTreeDigest(directory) {
+  const hash = createHash('sha256');
+  for (const { absolute, relative } of await collectTreeFiles(directory)) {
+    const contents = await readFile(absolute);
+    hash.update(relative);
+    hash.update('\0');
+    hash.update(String(contents.byteLength));
+    hash.update('\0');
+    hash.update(contents);
+    hash.update('\0');
+  }
+  return hash.digest('hex');
 }
 
 async function sha256(file) {
@@ -194,9 +230,14 @@ export async function promoteReleaseAssets({ candidateRoot, cwd, operations = {}
   const copy = operations.copyFile || copyFile;
   const createTemporaryDirectory = operations.mkdtemp || mkdtemp;
   const removeTemporaryDirectory = operations.rm || rm;
+  const approvedAssetHashes = operations.approvedAssetHashes;
+  if (!approvedAssetHashes || typeof approvedAssetHashes !== 'object') {
+    fail('approved candidate hashes are required for promotion');
+  }
+  for (const target of targets) {
+    if (!/^[0-9a-f]{64}$/.test(approvedAssetHashes[target] || '')) fail('approved candidate hashes are invalid');
+  }
   const backup = await createTemporaryDirectory(path.join(os.tmpdir(), 'resume-release-assets-backup-'));
-  const restored = [];
-  let keepBackup = false;
   try {
     for (const target of targets) {
       const original = checkedPath(cwd, target);
@@ -204,26 +245,49 @@ export async function promoteReleaseAssets({ candidateRoot, cwd, operations = {}
       await mkdir(path.dirname(saved), { recursive: true });
       await copy(original, saved);
     }
+  } catch {
     try {
-      for (const target of targets) {
-        await copy(checkedPath(candidateRoot, target), checkedPath(cwd, target));
-      }
-    } catch (error) {
-      for (const target of targets) {
-        try {
-          await copy(path.join(backup, target), checkedPath(cwd, target));
-          restored.push(target);
-        } catch {
-          keepBackup = true;
-        }
-      }
-      if (keepBackup) {
-        fail(`promotion failed; restoration is incomplete (${restored.length}/${targets.length}). Backup retained at ${backup}`);
-      }
-      fail(`promotion failed and original outputs were restored (${restored.length}/${targets.length}): ${error.message}`);
+      await removeTemporaryDirectory(backup, { force: true, recursive: true });
+    } catch {
+      fail(`unable to create a complete promotion backup; no outputs were changed. Partial backup retained at ${backup}`);
     }
-  } finally {
-    if (!keepBackup) await removeTemporaryDirectory(backup, { force: true, recursive: true });
+    fail('unable to create a complete promotion backup; no outputs were changed');
+  }
+
+  try {
+    for (const target of targets) {
+      const candidate = checkedPath(candidateRoot, target);
+      if (await sha256(candidate) !== approvedAssetHashes[target]) {
+        fail(`candidate asset changed after approval: ${target}`);
+      }
+      await copy(candidate, checkedPath(cwd, target));
+    }
+  } catch (error) {
+    const restored = [];
+    for (const target of targets) {
+      try {
+        await copy(path.join(backup, target), checkedPath(cwd, target));
+        restored.push(target);
+      } catch {
+        // Continue every restore attempt so the retained backup can recover the remainder.
+      }
+    }
+    if (restored.length !== targets.length) {
+      fail(`promotion failed; restoration is incomplete (${restored.length}/${targets.length}). Backup retained at ${backup}`);
+    }
+    try {
+      await removeTemporaryDirectory(backup, { force: true, recursive: true });
+    } catch {
+      fail(`promotion failed and original outputs were restored (${restored.length}/${targets.length}). Backup retained at ${backup}`);
+    }
+    fail(`promotion failed and original outputs were restored (${restored.length}/${targets.length}): ${error.message}`);
+  }
+
+  try {
+    await removeTemporaryDirectory(backup, { force: true, recursive: true });
+    return { backupCleanup: 'removed' };
+  } catch {
+    return { backupCleanup: 'retained', backupPath: backup };
   }
 }
 
@@ -237,23 +301,49 @@ async function assertBundlePath(bundlePath) {
   if (!path.isAbsolute(bundlePath || '') || !resolved.startsWith(`${temporaryRoot}${path.sep}`)) {
     fail('bundle path is outside the restricted temporary directory');
   }
-  if (!path.basename(resolved).startsWith(bundlePrefix)) fail('bundle path has an unexpected name');
+  const relative = path.relative(temporaryRoot, resolved);
+  if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    fail('bundle path is outside the restricted temporary directory');
+  }
+  let segment = temporaryRoot;
+  for (const part of relative.split(path.sep)) {
+    segment = path.join(segment, part);
+    const segmentMetadata = await lstat(segment);
+    if (segmentMetadata.isSymbolicLink() || !segmentMetadata.isDirectory()) fail('bundle path is unsafe');
+  }
+  let canonicalTemporaryRoot;
+  let canonicalBundle;
+  try {
+    [canonicalTemporaryRoot, canonicalBundle] = await Promise.all([realpath(temporaryRoot), realpath(resolved)]);
+  } catch {
+    fail('bundle path is unavailable');
+  }
+  if (!canonicalBundle.startsWith(`${canonicalTemporaryRoot}${path.sep}`)) {
+    fail('bundle path escapes the restricted temporary directory');
+  }
+  if (!path.basename(canonicalBundle).startsWith(bundlePrefix)) fail('bundle path has an unexpected name');
   let metadata;
   try {
-    metadata = await lstat(resolved);
+    metadata = await lstat(canonicalBundle);
   } catch {
     fail('bundle path is unavailable');
   }
   if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail('bundle path is unsafe');
-  return resolved;
+  if (typeof process.getuid === 'function') {
+    if (metadata.uid !== process.getuid() || (metadata.mode & 0o777) !== 0o700) {
+      fail('bundle path must be owned by the current user with mode 0700');
+    }
+  }
+  return canonicalBundle;
 }
 
 async function writeBundleMetadata({ bundlePath, sourceCommit, siteHash }) {
   const metadata = {
     assetHashes: await assetHashes(path.join(bundlePath, 'candidate')),
-    schemaVersion: 1,
+    schemaVersion: 2,
     siteHash,
     sourceCommit,
+    sourceTreeSha256: await computeReleaseSourceTreeDigest(path.join(bundlePath, 'source')),
     targets
   };
   await writeFile(bundleMetadataPath(bundlePath), `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
@@ -261,10 +351,11 @@ async function writeBundleMetadata({ bundlePath, sourceCommit, siteHash }) {
 }
 
 function validateBundleMetadata(metadata) {
-  if (metadata?.schemaVersion !== 1 || !fullCommitPattern.test(metadata.sourceCommit || '')) {
+  if (metadata?.schemaVersion !== 2 || !fullCommitPattern.test(metadata.sourceCommit || '')) {
     fail('bundle metadata is invalid');
   }
   if (!/^[0-9a-f]{64}$/.test(metadata.siteHash || '')) fail('bundle metadata site hash is invalid');
+  if (!/^[0-9a-f]{64}$/.test(metadata.sourceTreeSha256 || '')) fail('bundle metadata source tree hash is invalid');
   if (!Array.isArray(metadata.targets) || metadata.targets.length !== targets.length) fail('bundle metadata target set is invalid');
   if (metadata.targets.some((target, index) => target !== targets[index])) fail('bundle metadata target order is invalid');
   if (!metadata.assetHashes || typeof metadata.assetHashes !== 'object') fail('bundle metadata hashes are invalid');
@@ -274,7 +365,27 @@ function validateBundleMetadata(metadata) {
   if (Object.keys(metadata.assetHashes).length !== targets.length) fail('bundle metadata hashes are invalid');
 }
 
-export async function verifyReleaseAssetBundle({ bundlePath, operations = {} }) {
+async function verifyBundleSourceAgainstArchive({ bundleSourceRoot, cwd, sourceCommit, sourceTreeSha256, operations }) {
+  const runCommand = operations.command || command;
+  const exactCommit = resolveCommit(cwd, sourceCommit, runCommand);
+  if (exactCommit !== sourceCommit) fail('bundle source commit does not resolve exactly in the current repository');
+  if (await computeReleaseSourceTreeDigest(bundleSourceRoot) !== sourceTreeSha256) {
+    fail('bundle source tree no longer matches its metadata');
+  }
+  const temporary = await (operations.mkdtemp || mkdtemp)(path.join(os.tmpdir(), 'resume-release-assets-verify-'));
+  try {
+    await (operations.chmod || chmod)(temporary, 0o700);
+    archiveCommit(cwd, exactCommit, temporary, runCommand);
+    await assertNoSymlinks(temporary);
+    if (await computeReleaseSourceTreeDigest(temporary) !== sourceTreeSha256) {
+      fail('bundle source tree does not match a fresh archive of the source commit');
+    }
+  } finally {
+    await (operations.rm || rm)(temporary, { force: true, recursive: true });
+  }
+}
+
+export async function verifyReleaseAssetBundle({ bundlePath, cwd = root, operations = {} }) {
   const resolvedBundle = await assertBundlePath(bundlePath);
   await assertNoSymlinks(resolvedBundle);
   const metadataFile = bundleMetadataPath(resolvedBundle);
@@ -288,6 +399,13 @@ export async function verifyReleaseAssetBundle({ bundlePath, operations = {} }) 
   validateBundleMetadata(metadata);
   const sourceRoot = path.join(resolvedBundle, 'source');
   const candidateRoot = path.join(resolvedBundle, 'candidate');
+  await verifyBundleSourceAgainstArchive({
+    bundleSourceRoot: sourceRoot,
+    cwd,
+    operations,
+    sourceCommit: metadata.sourceCommit,
+    sourceTreeSha256: metadata.sourceTreeSha256
+  });
   const checked = await (operations.verifyReleaseAssets || verifyReleaseAssets)({
     assetRoot: candidateRoot,
     sourceCommit: metadata.sourceCommit,
@@ -342,12 +460,20 @@ export async function promoteReleaseAssetBundle({
   onCandidateReady,
   operations = {}
 }) {
-  const result = await verifyReleaseAssetBundle({ bundlePath, operations });
+  const result = await verifyReleaseAssetBundle({ bundlePath, cwd, operations });
   if (onCandidateReady) await onCandidateReady(result);
   await assertPromotionPaths(cwd, operations.command || command);
-  await promoteReleaseAssets({ candidateRoot: path.join(result.bundlePath, 'candidate'), cwd, operations });
-  await (operations.rm || rm)(result.bundlePath, { force: true, recursive: true });
-  return { ...result, promoted: true };
+  const promotion = await promoteReleaseAssets({
+    candidateRoot: path.join(result.bundlePath, 'candidate'),
+    cwd,
+    operations: { ...operations, approvedAssetHashes: result.assetHashes }
+  });
+  try {
+    await (operations.rm || rm)(result.bundlePath, { force: true, recursive: true });
+    return { ...result, ...promotion, bundleCleanup: 'removed', promoted: true };
+  } catch {
+    return { ...result, ...promotion, bundleCleanup: 'retained', promoted: true };
+  }
 }
 
 export function parseArguments(args) {
@@ -389,8 +515,14 @@ async function main() {
     console.log('No tracked output was changed. Re-run with --bundle and --owner-approval only after owner review.');
     return;
   }
-  await promoteReleaseAssetBundle({ bundlePath: values.bundlePath, onCandidateReady: printCandidate });
+  const result = await promoteReleaseAssetBundle({ bundlePath: values.bundlePath, onCandidateReady: printCandidate });
   console.log('Owner-approved promotion completed.');
+  if (result.backupCleanup === 'retained') {
+    console.log(`Backup cleanup failed; backup retained at ${result.backupPath}.`);
+  }
+  if (result.bundleCleanup === 'retained') {
+    console.log(`Bundle cleanup failed; bundle retained at ${result.bundlePath}.`);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
