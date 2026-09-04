@@ -151,7 +151,7 @@ test('disabled artifacts and non-official repositories remain byte-identical to 
   assert.deepEqual(collectFiles(output), collectFiles(sourceSite));
 });
 
-test('enabled official artifact changes only the four canonical HTML files', async (t) => {
+test('enabled official artifact changes only the five allowlisted HTML documents', async (t) => {
   const temporary = temporaryDirectory(t);
   const sourceDigest = await computeTreeDigest(sourceSite);
   const derived = await deriveCloudflareArtifact({ sourceDirectory: sourceSite, token });

@@ -68,7 +68,7 @@ test('@mobile 320px header keeps readable locale choices and separate controls i
 
 test('brand link follows the active editor locale', async ({ page }) => {
   for (const [locale, entryPath, accessibleName] of [
-    ['ja', '../ja/', 'Resume Studio の紹介ページを開く'],
+    ['ja', '../', 'Resume Studio の紹介ページを開く'],
     ['zh-CN', '../zh-cn/', '打开 Resume Studio 简介页'],
     ['en', '../en/', 'Open the Resume Studio introduction']
   ]) {
@@ -82,7 +82,7 @@ test('localized public pages remain useful when JavaScript is disabled', async (
   const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
   const page = await context.newPage();
   for (const [path, language, heading] of [
-    ['/ja/', 'ja', '日本語の履歴書・職務経歴書を作成'],
+    ['/', 'ja', '日本語の履歴書・職務経歴書を作成'],
     ['/zh-cn/', 'zh-CN', '创建简体中文简历'],
     ['/en/', 'en', 'Create an English resume']
   ]) {
@@ -108,13 +108,29 @@ test('localized public pages remain useful when JavaScript is disabled', async (
   await context.close();
 });
 
+test('legacy Japanese URL remains useful without joining the public hreflang cluster', async ({ baseURL, browser }) => {
+  const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto('/ja/');
+  await expect(page).toHaveURL(/\/ja\/$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('h1')).toHaveText('日本語の履歴書・職務経歴書を作成');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://herehigher.github.io/resume/');
+  await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
+  await expect(page.locator('.entry-button')).toHaveAttribute('href', '../editor/?lang=ja');
+  await context.close();
+});
+
 test('homepage and locale CTAs lead to the matching editor locale', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#localeSelect')).toHaveCount(0);
-  await expect(page.locator('a[href="./ja/"]')).toHaveCount(3);
+  await expect(page.locator('a[href="./ja/"]')).toHaveCount(0);
+  await expect(page.locator('.entry-button')).toHaveAttribute('href', './editor/?lang=ja');
+  await page.locator('.entry-button').click();
+  await expect(page.locator('#localeSelect')).toHaveValue('ja');
+  await expect(page.locator('.brand')).toHaveAttribute('href', '../');
 
   for (const [landingPath, locale] of [
-    ['/ja/', 'ja'],
     ['/zh-cn/', 'zh-CN'],
     ['/en/', 'en']
   ]) {
@@ -128,7 +144,7 @@ test('homepage and locale CTAs lead to the matching editor locale', async ({ pag
 
 test('@mobile 320px localized public entries keep the centered brand, heading, and primary button separate', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
-  for (const path of ['/', '/ja/', '/zh-cn/', '/en/']) {
+  for (const path of ['/', '/zh-cn/', '/en/']) {
     await page.goto(path);
     const layout = await page.evaluate(() => {
       const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();

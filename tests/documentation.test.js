@@ -253,9 +253,9 @@ test('development docs cover localized public entry and machine-readable contrac
     assert.match(acceptance, new RegExp(fact.replaceAll('.', '\\.')));
   }
 
-  assert.equal(hasAcceptanceItem('三言語 public entry', 'JavaScript', 'editor CTA', 'JSON Schema link'), true);
-  assert.equal(hasAcceptanceItem('Root', 'JavaScript', 'H1', '三言語への導線'), true);
-  assert.equal(hasAcceptanceItem('三言語 public entry', 'JavaScript', 'editor CTA', 'JSON Schema link'), true);
+  assert.equal(hasAcceptanceItem('Root', '/zh-cn/', '/en/', 'editor CTA', 'JSON Schema link'), true);
+  assert.equal(hasAcceptanceItem('Root', 'JavaScript', 'H1', '?lang=ja'), true);
+  assert.equal(hasAcceptanceItem('/ja/', 'canonical', 'root'), true);
   assert.equal(hasAcceptanceItem('Public entry', '/editor/', '?lang=ja', '?lang=zh-CN', '?lang=en'), true);
   for (const document of [guide, contributing]) {
     assert.match(document, /provider.*template.*endpoint.*privacy.*network policy.*Pull Request.*version.*tag/is);

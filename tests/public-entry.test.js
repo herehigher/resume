@@ -12,8 +12,7 @@ import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const routePresentation = Object.freeze({
   'en/index.html': { h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/' },
-  'index.html': { h1: '履歴書・職務経歴書を、この端末で作成', assetPath: './assets/favicon/' },
-  'ja/index.html': { h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: '../assets/favicon/' },
+  'index.html': { h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: './assets/favicon/' },
   'zh-cn/index.html': { h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/' }
 });
 const routes = Object.freeze(publicDocumentContracts().map((contract) => ({
@@ -31,7 +30,7 @@ const faviconAssets = Object.freeze([
   { rel: 'apple-touch-icon', file: 'resume-studio-marmot-180.png', sizes: '180x180', width: 180 }
 ]);
 const alternateLinks = Object.freeze({
-  ja: `${base}ja/`,
+  ja: base,
   'zh-CN': `${base}zh-cn/`,
   en: `${base}en/`,
   'x-default': base
@@ -140,11 +139,24 @@ test('public routes show the X contact link beside the copyright notice', () => 
   assert.match(css, /\.x-contact-icon\s*\{[\s\S]*?fill: currentColor;[\s\S]*?height: 1em;[\s\S]*?width: 1em;/);
 });
 
+test('default Japanese entry opens the editor directly and the legacy Japanese URL consolidates to it', () => {
+  const root = source('site/index.html');
+  assert.match(root, /<a class="entry-button" href="\.\/editor\/\?lang=ja">日本語で編集を始める/);
+  assert.match(root, /href="\.\/schema\/resume-studio-web-v1\.schema\.json"/);
+  assert.match(root, /各言語の書類内容は独立して保存されます/);
+  assert.doesNotMatch(root, /\.\/ja\//);
+
+  const legacy = source('site/ja/index.html');
+  assert.match(legacy, /<link rel="canonical" href="https:\/\/herehigher\.github\.io\/resume\/">/);
+  assert.doesNotMatch(legacy, /hreflang=/);
+  assert.match(legacy, /<a class="entry-button" href="\.\.\/editor\/\?lang=ja">/);
+});
+
 test('editor brand opens the active locale entry and public entries use the shared decorative mark', () => {
   const html = source('site/editor/index.html');
   assert.match(html, /<meta name="robots" content="noindex,follow">/);
   assert.doesNotMatch(html, /hreflang=/);
-  assert.match(html, /<a class="brand" href="\.\.\/ja\/" aria-label="Resume Studio の紹介ページを開く">/);
+  assert.match(html, /<a class="brand" href="\.\.\/" aria-label="Resume Studio の紹介ページを開く">/);
   assert.match(html, /<img class="brand-mark" src="\.\.\/assets\/favicon\/resume-studio-marmot-192\.png" alt="" width="38" height="38">/);
   assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
   assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
@@ -171,7 +183,7 @@ test('editor brand opens the active locale entry and public entries use the shar
     ['Resume Studio の紹介ページを開く', '打开 Resume Studio 简介页', 'Open the Resume Studio introduction']
   );
   const controller = source('site/assets/js/ui/locale-controller.js');
-  assert.match(controller, /const publicEntryPaths = Object\.freeze\(\{[\s\S]*?ja: '\.\.\/ja\/',[\s\S]*?'zh-CN': '\.\.\/zh-cn\/',[\s\S]*?en: '\.\.\/en\/'/);
+  assert.match(controller, /const publicEntryPaths = Object\.freeze\(\{[\s\S]*?ja: '\.\.\/',[\s\S]*?'zh-CN': '\.\.\/zh-cn\/',[\s\S]*?en: '\.\.\/en\/'/);
   assert.match(controller, /brand\.href = publicEntryPaths\[locale\];/);
   assert.match(controller, /brand\.setAttribute\('aria-label', copy\.brandEntry\)/);
 });

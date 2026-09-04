@@ -112,6 +112,8 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
     ['language', 'en/index.html', (html) => html.replace('lang="en"', 'lang="ja"'), /language is invalid/],
     ['tuple', 'ja/index.html', (html) => html.replace('data-analytics-provider="none"', 'data-analytics-provider="other"'), /analytics tuple/],
     ['duplicate tuple', 'ja/index.html', (html) => html.replace('<html ', '<html data-analytics-mode="disabled" '), /must appear exactly once/],
+    ['legacy canonical', 'ja/index.html', (html) => html.replace('https://herehigher.github.io/resume/', 'https://example.invalid/'), /canonical URL/],
+    ['legacy hreflang', 'ja/index.html', (html) => html.replace('</head>', '<link rel="alternate" hreflang="ja" href="https://herehigher.github.io/resume/">\n</head>'), /must not join the public hreflang cluster/],
     ['canonical', 'zh-cn/index.html', (html) => html.replace('https://herehigher.github.io/resume/zh-cn/', 'https://example.invalid/'), /canonical URL/],
     ['editor', 'editor/index.html', (html) => html.replace('noindex,follow', 'index,follow'), /editor\/ \[artifact=editor\/index\.html; status=local; content-type=text\/html\]: must be noindex,follow/],
     ['schema identity', 'schema/resume-studio-web-v1.schema.json', (schema) => schema.replace('https://herehigher.github.io/resume/schema/', 'https://example.invalid/'), /identity or title is invalid/],

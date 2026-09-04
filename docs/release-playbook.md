@@ -131,7 +131,7 @@ gh workflow run pre-tag-artifact-gate.yml --ref main \
   || { echo 'Pre-tag artifact gate dispatch failed; stop the release.' >&2; exit 1; }
 ```
 
-Enabled artifact の provider raw value は GitHub runner 内だけで読み、local sandbox、agent process、release host、log、summary、artifact へ出さない。成功した gate の non-secret summary（tag、SHA、provider fingerprint、artifact digest、run URL）を GitHub Actions から確認し、evidence に記録する。Query、dispatch、summary のいずれかを確認できない場合は tag を作成しない。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直す。Enabled のまま gate を通さず tag を作ることは禁止する。artifact の document allowlist は公開首頁、三言語 landing page、`/editor/` の5 HTMLだけとし、editor は `noindex,follow` でも disclosure と beacon contract の対象である。
+Enabled artifact の provider raw value は GitHub runner 内だけで読み、local sandbox、agent process、release host、log、summary、artifact へ出さない。成功した gate の non-secret summary（tag、SHA、provider fingerprint、artifact digest、run URL）を GitHub Actions から確認し、evidence に記録する。Query、dispatch、summary のいずれかを確認できない場合は tag を作成しない。Analytics を使用しない判断へ変える場合は manifest を `disabled/none/null` と source-identical artifact digest に更新し、Pull Request の test と review をやり直す。Enabled のまま gate を通さず tag を作ることは禁止する。artifact の document allowlist は root、`/zh-cn/`、`/en/` の3 public entry、`/ja/` 互換入口、`/editor/` の5 HTMLだけとし、canonical ではない `/ja/` と `noindex,follow` の editor も disclosure と beacon contract の対象である。
 
 ## Pull Request、Quality、merge
 
@@ -234,7 +234,7 @@ Helper は absent local tag を annotated exact tag として作成するか sam
 
 GitHub Actions の `Deploy Pages` run を開き、validate → quality → artifact → deploy → smoke の順に成功することを確認します。`pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` なので実行中の production deployment を自動 cancel しません。release host の local pre-check は tag publish や dispatch の競合を race-free にする保証ではありません。Artifact は検証済み `<RELEASE_SHA>` の `site/` だけで、`github-pages` environment に deployment result と URL が表示されます。Workflow run URL を `<WORKFLOW_RUN_URL>` として記録します。
 
-Smoke 成功後も、private window の最新 Chrome / Chromium で `https://herehigher.github.io/resume/` を開き、[受入チェックリスト](acceptance-checklist.md) の online 項目を実施します。少なくとも root、`/ja/`、`/zh-cn/`、`/en/`、`sitemap.xml`、JSON Schema、import example、表示 version、canonical / hreflang、editor CTA、GitHub source link、Privacy link、許可された network request を確認します。
+Smoke 成功後も、private window の最新 Chrome / Chromium で `https://herehigher.github.io/resume/` を開き、[受入チェックリスト](acceptance-checklist.md) の online 項目を実施します。少なくとも root、`/zh-cn/`、`/en/`、互換入口の `/ja/`、`sitemap.xml`、JSON Schema、import example、表示 version、canonical / hreflang、editor CTA、GitHub source link、Privacy link、許可された network request を確認します。
 
 Smoke failure は deploy 後の未受入状態です。直前の正常な site が自動で復元されたとは判断しません。
 
