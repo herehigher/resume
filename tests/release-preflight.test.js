@@ -17,7 +17,7 @@ test('release preflight archives the complete release repository', async (t) => 
 
   const packageJson = JSON.parse(readFileSync(path.join(target, 'package.json'), 'utf8'));
   assert.equal(packageJson.name, 'resume-studio');
-  assert.equal(readFileSync(path.join(target, 'site/assets/favicon/resume-studio.png')).byteLength > 200_000, true);
+  assert.equal(readFileSync(path.join(target, 'site/assets/favicon/resume-studio-marmot-512.png')).byteLength > 200_000, true);
 });
 
 function mockPreflight({

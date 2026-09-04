@@ -24,11 +24,11 @@ const routes = Object.freeze(publicDocumentContracts().map((contract) => ({
 })));
 const base = routes[0].canonical;
 const faviconAssets = Object.freeze([
-  { rel: 'icon', file: 'resume-studio-16.png', sizes: '16x16', width: 16 },
-  { rel: 'icon', file: 'resume-studio-32.png', sizes: '32x32', width: 32 },
-  { rel: 'icon', file: 'resume-studio-192.png', sizes: '192x192', width: 192 },
-  { rel: 'icon', file: 'resume-studio.png', sizes: '512x512', width: 512 },
-  { rel: 'apple-touch-icon', file: 'resume-studio-180.png', sizes: '180x180', width: 180 }
+  { rel: 'icon', file: 'resume-studio-marmot-16.png', sizes: '16x16', width: 16 },
+  { rel: 'icon', file: 'resume-studio-marmot-32.png', sizes: '32x32', width: 32 },
+  { rel: 'icon', file: 'resume-studio-marmot-192.png', sizes: '192x192', width: 192 },
+  { rel: 'icon', file: 'resume-studio-marmot-512.png', sizes: '512x512', width: 512 },
+  { rel: 'apple-touch-icon', file: 'resume-studio-marmot-180.png', sizes: '180x180', width: 180 }
 ]);
 const alternateLinks = Object.freeze({
   ja: `${base}ja/`,
@@ -57,7 +57,7 @@ function linkAttributes(html) {
 function pngDimensions(file) {
   const png = readFileSync(file);
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
-  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+  return { colorType: png[25], width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
 }
 
 function resolvePointer(root, reference) {
@@ -94,7 +94,7 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
       assert.deepEqual(link, { rel: asset.rel, type: 'image/png', sizes: asset.sizes, href }, `${route.file} must expose ${asset.file}`);
       const file = new URL(href, new URL(`../${route.file}`, import.meta.url));
       assert.equal(existsSync(file), true);
-      assert.deepEqual(pngDimensions(file), { width: asset.width, height: asset.width });
+      assert.deepEqual(pngDimensions(file), { colorType: 6, width: asset.width, height: asset.width });
     }
     assert.equal(linkTarget(html, 'canonical'), route.canonical);
     for (const [locale, url] of Object.entries(alternateLinks)) {
@@ -116,7 +116,7 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/editor\/\?lang=/);
     assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
-    assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="\\.\\.\\/assets\\/favicon\\/resume-studio-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
+    assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="\\.\\.\\/assets\\/favicon\\/resume-studio-marmot-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
     assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
     assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
     assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
@@ -145,7 +145,7 @@ test('editor brand opens the active locale entry and public entries use the shar
   assert.match(html, /<meta name="robots" content="noindex,follow">/);
   assert.doesNotMatch(html, /hreflang=/);
   assert.match(html, /<a class="brand" href="\.\.\/ja\/" aria-label="Resume Studio の紹介ページを開く">/);
-  assert.match(html, /<img class="brand-mark" src="\.\.\/assets\/favicon\/resume-studio-192\.png" alt="" width="38" height="38">/);
+  assert.match(html, /<img class="brand-mark" src="\.\.\/assets\/favicon\/resume-studio-marmot-192\.png" alt="" width="38" height="38">/);
   assert.match(source('site/assets/css/base.css'), /\.brand-mark\s*\{[\s\S]*?border-radius: 10px;[\s\S]*?height: 38px;[\s\S]*?object-fit: cover;[\s\S]*?width: 38px;/);
   assert.match(source('site/assets/css/responsive.css'), /\.brand-mark\s*\{ border-radius: 9px; height: 34px; width: 34px; \}/);
   const publicEntryCss = source('site/assets/css/public-entry.css');
