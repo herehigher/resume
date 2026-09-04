@@ -13,7 +13,6 @@ const fingerprint = '8a1bd3491d2b1100e92a33a5efec9c976923e131b50c326a9172d9dc665
 function fixture(overrides = {}) {
   const calls = [];
   const environment = {
-    CLOUDFLARE_WEB_ANALYTICS_TOKEN: token,
     GITHUB_ACTIONS: 'true',
     GITHUB_EVENT_NAME: 'workflow_dispatch',
     GITHUB_OUTPUT: '/tmp/release-manifest-output',
@@ -37,7 +36,8 @@ function fixture(overrides = {}) {
             provider_fingerprint: overrides.derivedFingerprint || fingerprint,
             source_digest: '4'.repeat(64)
           };
-        }
+        },
+        readProviderValue: async () => overrides.providerValue ?? token
       }
     })
   };
@@ -63,7 +63,7 @@ test('release manifest preparation fails closed outside the trusted runner contr
     { GITHUB_REF: 'refs/heads/feature' },
     { GITHUB_REPOSITORY: 'fork/resume' },
     { GITHUB_SHA: 'short' },
-    { CLOUDFLARE_WEB_ANALYTICS_TOKEN: '' },
+    { providerValue: '' },
     { derivedFingerprint: 'f'.repeat(64) }
   ]) {
     await assert.rejects(fixture(overrides).run(), /Release manifest preparation failed/);
@@ -75,12 +75,14 @@ test('manifest preparation workflow is read-only and never exposes the provider 
   const script = readFileSync(path.join(root, 'scripts/prepare-release-manifest.mjs'), 'utf8');
   assert.match(workflow, /^on:\n {2}workflow_dispatch:$/m);
   assert.match(workflow, /^permissions: \{\}$/m);
-  assert.match(workflow, /permissions:\n {6}contents: read/);
+  assert.match(workflow, /permissions:\n {6}actions: read\n {6}contents: read/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
-  assert.equal((workflow.match(/vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/g) || []).length, 1);
+  assert.doesNotMatch(workflow, /vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
+  assert.match(workflow, /RELEASE_GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
   const summary = workflow.slice(workflow.indexOf('- name: Write non-secret preparation summary'));
   assert.doesNotMatch(summary, /CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
   assert.doesNotMatch(workflow, /upload-artifact|deploy-pages|git tag|git push|gh issue|gh api/i);
   assert.doesNotMatch(script, /gh variable|get.*token|console\.log\([^\n]*token|git push|git tag/i);
+  assert.doesNotMatch(script, /environment\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
 });

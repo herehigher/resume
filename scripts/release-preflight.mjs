@@ -12,6 +12,7 @@ import {
 } from './prepare-pages-artifact.mjs';
 import { isStableReleaseTag } from './validate-release-ref.mjs';
 import { validateDeploymentArtifact } from './validate-pages-smoke.mjs';
+import { readRunnerProviderValue } from './github-provider-variable.mjs';
 
 const fullCommitPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
@@ -101,12 +102,15 @@ export async function runReleasePreflight({
   const prepare = operations.prepareArtifact || prepareArtifact;
   const verify = operations.verifyArtifact || verifyArtifact;
   const validateSmoke = operations.validateDeploymentArtifact || validateDeploymentArtifact;
+  const readProviderValue = operations.readProviderValue || readRunnerProviderValue;
   assertPreTagRunner(environment);
   if (repository !== OFFICIAL_REPOSITORY) fail('preflight is restricted to the official repository');
   if (!isStableReleaseTag(releaseTag)) fail('release tag must be stable SemVer');
   if (!fullCommitPattern.test(releaseSha || '')) fail('release SHA must be a full lowercase commit id');
   const origin = runCommand('git', ['remote', 'get-url', 'origin'], { cwd });
-  if (origin !== `https://github.com/${repository}.git`) fail('origin does not match the official repository');
+  if (!new Set([`https://github.com/${repository}`, `https://github.com/${repository}.git`]).has(origin)) {
+    fail('origin does not match the official repository');
+  }
   if (runCommandStatus('git', ['show-ref', '--verify', '--quiet', `refs/tags/${releaseTag}`], cwd) !== 1) {
     fail('release tag already exists locally or local tag state is unreadable');
   }
@@ -149,7 +153,7 @@ export async function runReleasePreflight({
     const release = await validateSource({ manifestPath, sourceDirectory });
     let token = '';
     if (release.manifest.analyticsMode === 'enabled') {
-      token = environment.CLOUDFLARE_WEB_ANALYTICS_TOKEN || '';
+      token = await readProviderValue({ environment });
       if (!token) fail('provider variable is unavailable in the GitHub pre-tag runner');
     }
     const artifactDirectory = path.join(temporary, 'artifact');
