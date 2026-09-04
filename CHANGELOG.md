@@ -6,6 +6,29 @@ English: This file records notable changes. Release dates are added only when th
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-04
+
+### Added / 追加
+
+- 壊れた暗号化下書きを起動時に検出し、既存 data を保持したまま安全に復旧できる操作。
+- 公開ページと editor の footer に、repository owner の X 連絡先への導線。
+- GitHub runner 内だけで Analytics provider value を使用し、release manifest 用の非機密 digest を生成する read-only workflow。
+
+### Changed / 変更
+
+- Resume Studio の brand logo と desktop / mobile favicon をマーモットの artwork に更新。
+- `/` を日本語紹介ページとして統合し、重複していた既定入口と locale metadata、README の案内を整理。
+- Release asset の staging / approval / promotion と tag publish を、固定 bundle、exact SHA、明示 approval による fail-closed 手順へ強化。
+
+### Fixed / 修正
+
+- 日本語 preview と印刷時の A4 版面差異、および多言語 PDF の末尾空白 page、資格・証書 section の不安定な改 page を修正。
+- 下書き復旧中の競合と、pre-tag workflow の YAML / provider 検証経路を修正。
+
+### Security / Privacy
+
+- GitHub 操作を owner-approved trusted release host の認証済み session に限定し、OS credential API と raw provider value を agent process から分離。
+
 ## [0.2.0] - 2026-09-03
 
 ### Added / 追加
