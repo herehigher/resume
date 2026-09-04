@@ -39,7 +39,7 @@ npm run test:acceptance
 
 PDF や responsive layout を変更した場合は [release acceptance checklist](docs/acceptance-checklist.md) に従い、全対象 page を目視確認します。
 
-README の screenshot と PDF sample は通常の feature Pull Request では更新しません。新 version の最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ `npm run release:assets -- --source-sha <SHA>` で clean Git archive の候補を確認します。表示された source commit、site hash、対象ファイルを owner が明示承認した場合だけ `--owner-approval` を付けて promote し、`npm run test:release-assets` を通して Git LFS object として commit します。
+README の screenshot と PDF sample は通常の feature Pull Request では更新しません。新 version の最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ `npm run release:assets -- --source-sha <SHA>` で clean Git archive の temporary bundle を確認します。表示された bundle path、source commit、site hash、対象7ファイルと SHA-256 を owner が明示承認した場合だけ、同じ bundle を `npm run release:assets -- --bundle <BUNDLE_PATH> --owner-approval` で再検証して promote し、`npm run test:release-assets` を通して Git LFS object として commit します。
 
 ## Issue と Pull Request
 
@@ -47,7 +47,7 @@ Issue には再現手順、期待結果、実際の結果、browser/OS を記載
 
 - Title/body: 日本語を主とし、English summary を補助として使用。
 - Review comment: 必要な technical comment は English を主にしてよい。
-- Secret、credential、access token、実在する履歴書 data、Analytics provider token の raw value を commit しない。Tagged manifest には provider token の SHA-256 fingerprint だけを記録し、実値は release 前の承認済み検証と公式 deployment の限定 step だけへ渡す。
+- Secret、credential、access token、実在する履歴書 data、Analytics provider token の raw value を commit しない。Tagged manifest には provider token の SHA-256 fingerprint だけを記録し、実値は owner-approved trusted release host 上の release 前検証と公式 deployment の限定 step だけへ渡す。
 - Public release、tag、Pages 設定、repository visibility の変更は、owner の明示承認なしに行わない。
 - Owner の承認を得た version 公開は [Version release playbook](docs/release-playbook.md) の preflight、gate、証拠記録、失敗時判断に従う。
 
