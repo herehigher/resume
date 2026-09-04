@@ -107,6 +107,11 @@
   #japaneseWorkspace .requests-section { min-height: 0; }
 }
 
+#japaneseWorkspace.is-printing .document-preview { margin-bottom: 0 !important; transform: none !important; transition: none !important; }
+#japaneseWorkspace.is-printing .document-page { min-height: 0 !important; padding: 0 !important; width: auto !important; }
+#japaneseWorkspace.is-printing .paper-text-section,
+#japaneseWorkspace.is-printing .requests-section { min-height: 0 !important; }
+
 @page japanese-a4 {
   margin: 14mm 15mm;
   size: A4 portrait;
