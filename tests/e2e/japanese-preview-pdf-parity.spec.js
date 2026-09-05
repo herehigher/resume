@@ -1,4 +1,5 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { expect, openLocale, test } from './fixtures.js';
 
 function documentGeometry(selector) {
@@ -86,6 +87,23 @@ function pdfLineCount(items, fragments) {
   return [...lines.values()].filter((line) => fragments.some((fragment) => line.includes(fragment))).length;
 }
 
+function textAndFontHeight(pages, fragment) {
+  const items = pages.flatMap((page) => page.items);
+  const item = items.find((candidate) => candidate.str.includes(fragment));
+  return {
+    fontHeight: item?.height,
+    text: items.map((candidate) => candidate.str).join('').replace(/\s/g, '')
+  };
+}
+
+async function importJapaneseState(page, state) {
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'japanese-pdf-layout-fixture.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(state))
+  });
+}
+
 test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を保つ', async ({ page }) => {
   const snapshots = [];
   for (const width of [1440, 1024]) {
@@ -112,7 +130,8 @@ test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を�
     [expect.closeTo(595.28, 0), expect.closeTo(841.89, 0)],
     [expect.closeTo(595.28, 0), expect.closeTo(841.89, 0)]
   ]);
-  expect(pdfLineCount(printed[1].items, ['これまで培った', 'から課題を整理'])).toBe(snapshots[0].lineCount);
+  expect(pdfLineCount(printed.flatMap((printedPage) => printedPage.items), ['これまで培った', 'から課題を整理']))
+    .toBe(snapshots[0].lineCount);
 
   await page.emulateMedia({ media: 'screen' });
   await page.locator('#careerDocumentTab').click();
@@ -145,4 +164,47 @@ test('日本語: visible print lifecycle は screen の予約版面を引き継�
     documentPage: { minHeight: '0px', padding: '0px' },
     sectionMinHeight: '0px'
   });
+});
+
+test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の本文を縮小しない @pdf', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const longUrl = `https://example.invalid/${'longpath'.repeat(50)}`;
+
+  for (const activeDocument of ['resume', 'career']) {
+    const baseline = createDefaultState('ja');
+    baseline.documents.ja.activeDocument = activeDocument;
+    baseline.documents.ja.fields.motivation = 'https://example.invalid/BASELINE-MOTIVATION';
+    baseline.documents.ja.fields.careerSummary = 'https://example.invalid/BASELINE-SUMMARY';
+    baseline.documents.ja.careers = [{
+      company: '印刷検証株式会社',
+      role: '検証担当',
+      startDate: '2020-01',
+      endDate: '',
+      companyInfo: '架空の検証データ',
+      responsibilities: 'https://example.invalid/BASELINE-RESPONSIBILITIES',
+      achievements: 'https://example.invalid/BASELINE-ACHIEVEMENTS'
+    }];
+    await importJapaneseState(page, baseline);
+    const baselinePdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+    const documentTitle = activeDocument === 'resume' ? '履' : '職務';
+    const baselineResult = textAndFontHeight(baselinePdf, documentTitle);
+
+    const longInput = structuredClone(baseline);
+    if (activeDocument === 'resume') {
+      longInput.documents.ja.fields.motivation = longUrl;
+    } else {
+      longInput.documents.ja.fields.careerSummary = longUrl;
+      longInput.documents.ja.careers[0].responsibilities = longUrl;
+      longInput.documents.ja.careers[0].achievements = longUrl;
+    }
+    await importJapaneseState(page, longInput);
+    const longPdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+    const longResult = textAndFontHeight(longPdf, documentTitle);
+
+    expect(longResult.text.match(/longpath/g)).toHaveLength(activeDocument === 'resume' ? 50 : 150);
+    expect(longResult.fontHeight).toBeCloseTo(baselineResult.fontHeight, 2);
+    expect(await page.locator(activeDocument === 'resume' ? '.paper-text-content' : '.career-body').first().evaluate(
+      (element) => getComputedStyle(element).fontSize
+    )).toBe(activeDocument === 'resume' ? '10.5px' : '10px');
+  }
 });
