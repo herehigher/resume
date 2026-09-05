@@ -133,6 +133,36 @@ jobs:
             --analytics-mode "$ANALYTICS_MODE" --analytics-provider "$ANALYTICS_PROVIDER" \
             --package-version "$(jq -r .version "$SOURCE_ROOT/package.json")"
 
+      - name: Install live provider compatibility dependencies
+        if: ${{ steps.release.outputs.analytics_mode == 'enabled' }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Check actual provider compatibility before publication approval
+        if: ${{ steps.release.outputs.analytics_mode == 'enabled' }}
+        run: >-
+          node scripts/check-cloudflare-analytics-compatibility.mjs
+          --directory "${{ runner.temp }}/pages-site"
+          --output "${{ runner.temp }}/provider-compatibility.json"
+
+      - name: Record provider observation scope
+        if: ${{ always() && steps.release.outputs.analytics_mode == 'enabled' }}
+        env:
+          PROVIDER_REPORT: ${{ runner.temp }}/provider-compatibility.json
+        run: |
+          {
+            echo '## Live provider compatibility'
+            echo 'Actual provider script; RUM intercepted locally. Provider receipt is not checked.'
+            if test -f "$PROVIDER_REPORT"; then
+              echo '```json'
+              cat "$PROVIDER_REPORT"
+              echo '```'
+            else
+              echo 'Compatibility evidence unavailable; preparation cannot be accepted.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Export non-secret artifact evidence
         id: evidence
         env:
@@ -164,6 +194,7 @@ jobs:
           path: |
             ${{ runner.temp }}/pages-site
             ${{ runner.temp }}/release-evidence.json
+            ${{ runner.temp }}/provider-compatibility.json
           if-no-files-found: error
           retention-days: 30
 

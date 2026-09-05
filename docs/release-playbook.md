@@ -27,7 +27,7 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 
 [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を main から実行します。通常の準備は `mode=prepare` と merged `pr_number` を指定し、他の入力は空欄にします。対象 SHA の main Quality が実行中・失敗・未存在なら準備を停止するので、その Quality を完了・再実行してから準備を再開します。
 
-準備 summary の version / SHA、配布物、必要な画像・PDF を確認します。公開承認後は、summary が生成した公開 command を担当者がそのまま実行します。Command には `mode=publish`、`release_tag`、`prepared_run_id`、`prepared_artifact_id` が設定済みで、所有者による ID / digest の転記は不要です。GitHub の画面から実行する場合も同じ4項目を使います。
+準備 summary の version / SHA、配布物、必要な画像・PDF を確認します。Analytics 有効時は、生成した配布物で実際の provider script を動かす互換性検査も準備に含まれます。未知の payload 契約や予期しない通信は準備を失敗させます。公開承認後は、summary が生成した公開 command を担当者がそのまま実行します。Command には `mode=publish`、`release_tag`、`prepared_run_id`、`prepared_artifact_id` が設定済みで、所有者による ID / digest の転記は不要です。GitHub の画面から実行する場合も同じ4項目を使います。
 
 準備 artifact は30日間保持します。同じ run を再実行しても artifact ID は変わるため、新しい準備結果を確認してください。公開時は指定した run / artifact ID の保存済み bytes を再検証して配布し、失効した artifact の代わりを自動生成しません。確認用画像・PDF は Quality run の7日間保持 artifact です。必要な目視の前に失効した場合は、対象 Quality を再実行してから確認します。
 
@@ -45,7 +45,7 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 
 CI は保存・読込・言語分離・PDF・データ保護、version、source SHA と artifact bytes の一致を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
 
-Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。Third-party provider への実送信・受信の確認は deterministic mock / intercept test と区別します。[#108](https://github.com/herehigher/resume/issues/108) の live provider 契約は別途追跡し、自動 test 成功を包括的な実 provider 検証と呼びません。
+Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。アプリの deterministic mock test と、準備時の実 provider script による互換性検査を区別します。後者は架空 data の操作・再読込・移動を行い、headless browser で自然には発生しないページ非表示は明示的に模擬します。RUM を送信前に intercept するため、Cloudflare 側の受信成功を検証しません。観測範囲は summary と準備 artifact に同梱した `provider-compatibility.json` に記録し、自動 test 成功を包括的な実 provider 検証と呼びません。
 
 ## Analytics の扱い
 
@@ -54,6 +54,8 @@ Source は既定で無効です。公式 CI だけが設定 manifest の mode / 
 公開 beacon site token は repository variable `CLOUDFLARE_WEB_ANALYTICS_TOKEN` から渡す通常の site 設定です。存在、書式、安全な埋込みを検証し、専用の秘密管理・fingerprint・承認・ログ検査は設けません。GitHub 認証情報やアカウント操作用 API token は実 credential として保護します。
 
 許可する外部 runtime は `https://static.cloudflareinsights.com/beacon.min.js` の GET と `https://cloudflareinsights.com/cdn-cgi/rum` の標準 POST です。履歴書入力・写真・import/export JSON・草稿・custom event・利用者単位 ID を送信する変更は認めません。Cookie、localStorage、fingerprinting を追加しません。固定 URL や HTML digest は第三者 script 内容を固定するものではありません。利用者向け説明は [PRIVACY.md](../PRIVACY.md) を参照します。
+
+Field の根拠と互換性検査の範囲は [provider contract](cloudflare-analytics-contract.md) にまとめています。
 
 Artifact 全体の整合性は site token の秘密性と別に検証し、生成後の digest は CI evidence に記録します。事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
 

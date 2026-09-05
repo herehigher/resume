@@ -2,9 +2,20 @@
 
 この project の重要な変更を記録します。形式は [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) を参考にし、version は [Semantic Versioning](https://semver.org/) に従います。
 
-English: This file records notable changes. Release dates are added only when the corresponding release is created.
+English: This file records notable changes. Dates mark release-candidate freeze; GitHub records the actual publication time.
 
 ## [Unreleased]
+
+### Changed / 変更
+
+- 公開準備・承認・配布・smoke を一つの Actions 入口へ統合し、同じ main commit の Quality と準備済み artifact を再利用するよう整理。
+- 毎 version の展示 screenshot / PDF 更新、独立 asset 承認、手動 digest 転記と未使用の旧 release helper を廃止し、検証出力を一時 Actions artifact に分離。
+- 開発・公開文書を統合し、文言や現在 version を固定する test と docs-only の一律 browser gate を削減。
+
+### Fixed / 修正
+
+- Cloudflare RUM の browser / engine / OS 情報 `bi` を提供者の根拠に基づいて検証し、実 provider script の互換性確認を公開準備へ接続。
+- 履歴書の入力・写真・JSON・暗号化草稿から再読込・離脱までの通信検査と、同一 origin の不正 request / WebSocket を検出する回帰 test を補完。
 
 ## [0.2.2] - 2026-09-05
 

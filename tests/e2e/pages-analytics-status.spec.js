@@ -16,6 +16,8 @@ import {
   OFFICIAL_REPOSITORY,
   prepareArtifact
 } from '../../scripts/prepare-pages-artifact.mjs';
+import { observeNetwork } from '../../scripts/network-contract.mjs';
+import { exercisePrivacyCanary } from '../../scripts/privacy-canary-check.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const sourceSite = path.join(root, 'site');
@@ -80,19 +82,10 @@ test.afterAll(async () => {
   if (temporary) rmSync(temporary, { force: true, recursive: true });
 });
 
-test('enabled artifact exposes fixed status and only the standard analytics requests', async ({ context, page }) => {
-  const requests = [];
+test('enabled artifact keeps fictional resume canaries out of every observed request across reload and leave', async ({ context, page }) => {
   const pageErrors = [];
-  const webSockets = [];
-  const enabledOrigin = new URL(enabledBaseURL).origin;
-  context.on('request', (request) => {
-    const url = new URL(request.url());
-    if (['http:', 'https:'].includes(url.protocol) && url.origin !== enabledOrigin) {
-      requests.push(`${request.method()} ${request.url()}`);
-    }
-  });
+  const network = observeNetwork(context, { baseUrl: enabledBaseURL, expectedToken: token });
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  page.on('websocket', (socket) => webSockets.push(socket.url()));
   await context.route(CLOUDFLARE_BEACON_URL, (route) => route.fulfill({
     body: cloudflareAnalyticsMockScript(token),
     contentType: 'text/javascript; charset=utf-8',
@@ -107,15 +100,18 @@ test('enabled artifact exposes fixed status and only the standard analytics requ
   const beacon = page.locator(`script[src="${CLOUDFLARE_BEACON_URL}"]`);
   await expect(beacon).toHaveCount(1);
   await expect(beacon).toHaveAttribute('data-cf-beacon', JSON.stringify({ token }));
-  await expect.poll(() => requests).toContain(`GET ${CLOUDFLARE_BEACON_URL}`);
-  await expect.poll(() => requests).toContain(`POST ${CLOUDFLARE_RUM_URL}`);
-  expect(requests).toHaveLength(2);
-  expect(webSockets).toEqual([]);
-  expect(pageErrors).toEqual([]);
 
   await page.locator('#privacySecurityButton').click();
   await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
   await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('標準 RUM endpoint');
+  await page.keyboard.press('Escape');
+
+  const { canaries } = await exercisePrivacyCanary(page, { leaveUrl: `${enabledBaseURL}/en/` });
+  await expect(page.locator('[data-analytics-disclosure="status"]')).toContainText('official release');
+  await expect.poll(() => network.requests.some((request) => request.url === CLOUDFLARE_RUM_URL)).toBe(true);
+  network.assertClean({ canaries });
+  expect(pageErrors).toEqual([]);
+  network.dispose();
 });
 
 test('enabled no-JavaScript entry preserves the tagged disclosure and beacon markup', async ({ browser }) => {
