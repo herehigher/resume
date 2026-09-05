@@ -15,7 +15,7 @@ Release tooling は `gh auth status` と GitHub API により identity と repos
 
 AI agent の environment に raw `GH_TOKEN` または `GITHUB_TOKEN` が直接注入されている場合、agent-assisted の sensitive step は owner 管理の隔離 session へ deferred とする。この制約は human が安全な方法で認証すること、または CI がその用途に認証を使用することを禁止するものではない。
 
-承認は少なくとも二つに分ける。**Approval A** は pinned RC の clean staging で検証済み screenshot、PDF、manifest を tracked path へ promote する判断である。**Approval B** は repository、exact tag、full SHA、version を再照合して remote へ push する判断である。Pages settings、existing-tag の redeploy、rollback、final acceptance は A/B から独立した owner decision とし、暗黙に承認済みと扱わない。
+Repository、exact tag、full SHA、version の再照合、Pages settings、existing-tag の redeploy、rollback、final acceptance はそれぞれ owner の明示 decision を要し、暗黙に承認済みと扱わない。
 
 ## 権限と release gate
 
@@ -31,7 +31,7 @@ AI agent の environment に raw `GH_TOKEN` または `GITHUB_TOKEN` が直接�
 
 Release candidate（RC）は application version、`site/`、public sample、release notes、release 対象の文書と workflow が確定した時点で freeze します。Tag 前の Pull Request で、対象項目を `CHANGELOG.md` の `Unreleased` から `## [<RELEASE_VERSION>] - <RELEASE_DATE>` へ移し、release date を確定します。将来の変更を記録する空の `Unreleased` section は残します。Freeze 後は release 判定に必要な修正以外を混ぜません。
 
-新 version の release では、version を含むすべての画面内容を確定した最終 RC commit を pin し、merge と tag の前に `npm run release:assets -- --source-sha '<RELEASE_SHA>'` を実行します。Git archive から permission-restricted owner temporary bundle に三言語 screenshot、PDF、`docs/assets-manifest.json` の候補を生成し、既存 release asset check と PNG / PDF content check を通します。表示された bundle path、source commit、site hash、7つの対象ファイルと SHA-256 を owner が明示承認した場合だけ、その同じ bundle を `--bundle '<BUNDLE_PATH>' --owner-approval` で再表示・再検証して promote します。promote は全対象を backup してから行い、途中で失敗すれば全対象の復元を試み、復元が不完全なら backup を保持して fail-closed します。三言語 screenshot、PDF、`docs/assets-manifest.json` を Git LFS object として commit して目視確認します。生成後に `site/` または public sample が変わった場合は再生成します。その場合は新しい pinned commit を source にします。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では再生成しません。
+新 version の release では、version を含むすべての画面内容を確定した最終 RC commit を pin します。Quality workflow は exact SHA から三言語 screenshot、PDF、manifest を source checkout と独立した空の一時 directory に生成・検証し、Actions artifact として保存します。生成 output を tracked path へ promote せず、asset 専用 Pull Request や毎 version の binary 更新を行いません。UI、layout、template、font、公開 sample data を変更する場合だけ、展示 sample を provenance とともに更新します。日常開発、通常の feature Pull Request、`main` push、Workflow / Markdown だけの変更では展示 sample を更新しません。
 
 Screenshot に誤りが見つかった場合は tag 前に RC を修正して再生成します。Tag 後は tag を動かさず、修正を新しい version として release します。
 
@@ -96,29 +96,11 @@ sed -n '1,80p' CHANGELOG.md \
 
 `CHANGELOG.md` の対象 section に今回の release notes が入り、日付が実際の release date と一致し、`Unreleased` が将来分として残っていることを確認します。Date が変わる場合は merge / tag 前に Pull Request を更新します。
 
-`<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。stage は 0700 temporary bundle を保持し、bundle path、source SHA、site hash、7 output hash を表示するだけで tracked output を変更しません。owner が表示内容を承認した後、同じ bundle を再検証して promote します。
+`<RELEASE_TAG>` が stable tag であり、package version と一致することを目視で二重確認します。
 
-`npm run release:assets -- --source-sha '<RELEASE_SHA>'`
+Screenshot と PDF の検証は Quality workflow が対象 SHA から独立した一時 directory へ生成し、検証済み output を Actions artifact として保存する。Approval A、asset 専用 Pull Request、tracked sample の promotion、毎 version の binary 更新は行わない。既存の展示 sample は UI、layout、template、font、公開 sample data を変更する場合だけ、provenance とともに更新する。
 
-`npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval`
-
-Promotion failure は全対象を復元し、完全に復元できない場合は recovery の backup path を表示します。別 bundle、別 source SHA、または未承認の input を promote に使いません。
-
-```bash
-npm run release:assets -- --source-sha '<RELEASE_SHA>' \
-  || { echo 'Release asset staging failed; stop the release.' >&2; exit 1; }
-# Displayed bundle path, source commit, site hash, and SHA-256 for all seven paths require owner approval before this step.
-npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval \
-  || { echo 'Release asset promotion did not complete cleanly; inspect the reported promotion and recovery state before continuing.' >&2; exit 1; }
-git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf \
-  || { echo 'Unable to stage release assets; stop the release.' >&2; exit 1; }
-git lfs ls-files \
-  || { echo 'Unable to verify Git LFS assets; stop the release.' >&2; exit 1; }
-npm run test:release-assets \
-  || { echo 'Documentation verification failed; stop the release.' >&2; exit 1; }
-```
-
-生成 asset を含む RC の最終状態で full gate を実行します。
+生成 asset を repository へ書き戻さず、最終 RC で full gate を実行します。
 
 ```bash
 npm run test:acceptance || { echo 'Acceptance gate failed; stop the release.' >&2; exit 1; }
@@ -343,4 +325,4 @@ README follow-up の merge、release evidence、Pages / HTTPS 設定記録、未
 
 ## English summary
 
-Only an explicitly authorized owner may publish. Freeze the RC, generate screenshots after all site/version changes and before tagging, pass every Quality and acceptance gate, then create one immutable annotated `vMAJOR.MINOR.PATCH` tag on the verified main commit. Record the Actions, Pages, HTTPS, smoke, and browser evidence. Redeploy only an existing accepted tag; never move or delete a release tag, and ship content fixes under a new version.
+Only an explicitly authorized owner may publish. Quality generates and verifies temporary documentation assets for the exact commit, then release validation runs against the verified main commit before one immutable annotated `vMAJOR.MINOR.PATCH` tag is created. Record the Actions, Pages, HTTPS, smoke, and browser evidence. Redeploy only an existing accepted tag; never move or delete a release tag, and ship content fixes under a new version.

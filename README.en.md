@@ -67,7 +67,7 @@ AES-GCM draft encryption requires a secure context. Use `https://`, `http://loca
 - [Simplified Chinese A4 PDF sample](output/pdf/zh-CN-a4.pdf)
 - [English US Letter PDF sample](output/pdf/en-letter.pdf)
 
-All assets use fictional sample data. Their source and Chromium version are recorded in the [asset manifest](docs/assets-manifest.json).
+These historical showcase samples use fictional data. Their source at generation time and Chromium version are recorded in the [asset manifest](docs/assets-manifest.json).
 
 ## Data and privacy
 
