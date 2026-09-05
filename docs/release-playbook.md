@@ -27,7 +27,7 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 
 [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を main から実行します。通常の準備は `mode=prepare` と merged `pr_number` を指定し、他の入力は空欄にします。対象 SHA の main Quality が実行中・失敗・未存在なら準備を停止するので、その Quality を完了・再実行してから準備を再開します。
 
-準備 summary の version / SHA、配布物、必要な画像・PDF を確認します。公開承認後は、summary が生成した公開 command を担当者がそのまま実行します。Command には `mode=publish`、`release_tag`、`prepared_run_id`、`prepared_artifact_id` が設定済みで、所有者による ID / digest の転記は不要です。GitHub の画面から実行する場合も同じ4項目を使います。
+準備 summary の version / SHA、配布物、必要な画像・PDF を確認します。Analytics 有効時は、生成した配布物で実際の provider script を動かす互換性検査も準備に含まれます。未知の payload 契約や予期しない通信は準備を失敗させます。公開承認後は、summary が生成した公開 command を担当者がそのまま実行します。Command には `mode=publish`、`release_tag`、`prepared_run_id`、`prepared_artifact_id` が設定済みで、所有者による ID / digest の転記は不要です。GitHub の画面から実行する場合も同じ4項目を使います。
 
 準備 artifact は30日間保持します。同じ run を再実行しても artifact ID は変わるため、新しい準備結果を確認してください。公開時は指定した run / artifact ID の保存済み bytes を再検証して配布し、失効した artifact の代わりを自動生成しません。確認用画像・PDF は Quality run の7日間保持 artifact です。必要な目視の前に失効した場合は、対象 Quality を再実行してから確認します。
 
@@ -45,7 +45,7 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 
 CI は保存・読込・言語分離・PDF・データ保護、version、source SHA と artifact bytes の一致を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
 
-Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。Third-party provider への実送信・受信の確認は deterministic mock / intercept test と区別します。[#108](https://github.com/herehigher/resume/issues/108) の live provider 契約は別途追跡し、自動 test 成功を包括的な実 provider 検証と呼びません。
+Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。アプリの deterministic mock test と、準備時の実 provider script による互換性検査を区別します。後者は RUM を送信前に intercept し、Cloudflare 側の受信成功を検証しません。観測範囲は summary と準備 artifact に同梱した `provider-compatibility.json` に記録し、自動 test 成功を包括的な実 provider 検証と呼びません。
 
 ## Analytics の扱い
 
