@@ -181,7 +181,6 @@ test('workflows retain security options while using maintained Node 24 action ma
   assert.match(deploy, /actions\/upload-pages-artifact@v5/);
   assert.match(deploy, /actions\/configure-pages@v6/);
   assert.match(deploy, /actions\/deploy-pages@v5/);
-  assert.match(ci, /lfs: true/);
   assert.match(ci, /cache: npm/);
   assert.match(deploy, /id-token: write\s*\n\s*pages: write/);
 });

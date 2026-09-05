@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -10,7 +11,8 @@ const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const siteRoot = path.join(root, 'site');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
-const generatorVersion = '1.1.0';
+const generatorVersion = '1.2.0';
+const fullCommitPattern = /^[0-9a-f]{40}$/;
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -81,6 +83,70 @@ async function fileHash(file) {
   return createHash('sha256').update(await readFile(file)).digest('hex');
 }
 
+function isWithin(directory, candidate) {
+  return candidate === directory || candidate.startsWith(`${directory}${path.sep}`);
+}
+
+export function resolveSourceCommit(sourceRoot, sourceCommit) {
+  if (!fullCommitPattern.test(sourceCommit || '')) {
+    throw new Error('Documentation assets require a full lowercase source SHA.');
+  }
+  let currentCommit;
+  try {
+    currentCommit = execFileSync('git', ['-C', sourceRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    throw new Error('Documentation asset source directory must be a Git checkout.');
+  }
+  if (currentCommit !== sourceCommit) {
+    throw new Error('Documentation asset source SHA does not match the source checkout.');
+  }
+  let siteStatus;
+  try {
+    siteStatus = execFileSync(
+      'git',
+      ['-C', sourceRoot, 'status', '--porcelain=v1', '--untracked-files=all', '--', 'site'],
+      { encoding: 'utf8' }
+    ).trim();
+  } catch {
+    throw new Error('Documentation asset source checkout could not be checked for site changes.');
+  }
+  if (siteStatus) {
+    throw new Error('Documentation asset source checkout has uncommitted site changes.');
+  }
+  return currentCommit;
+}
+
+export async function prepareDocumentationOutputDirectory({ outputRoot, sourceRoot }) {
+  if (!outputRoot) throw new Error('Documentation asset generation requires an output directory.');
+  const resolvedOutput = path.resolve(outputRoot);
+  const resolvedSource = await realpath(sourceRoot);
+
+  if (isWithin(resolvedSource, resolvedOutput) || isWithin(resolvedOutput, resolvedSource)) {
+    throw new Error('Documentation asset output directory must be independent from the source checkout.');
+  }
+
+  let metadata;
+  try {
+    metadata = await lstat(resolvedOutput);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    await mkdir(resolvedOutput, { recursive: true });
+    metadata = await lstat(resolvedOutput);
+  }
+  if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+    throw new Error('Documentation asset output directory must be a real directory.');
+  }
+
+  const canonicalOutput = await realpath(resolvedOutput);
+  if (isWithin(resolvedSource, canonicalOutput) || isWithin(canonicalOutput, resolvedSource)) {
+    throw new Error('Documentation asset output directory must be independent from the source checkout.');
+  }
+  if ((await readdir(canonicalOutput)).length) {
+    throw new Error('Documentation asset output directory must be empty.');
+  }
+  return canonicalOutput;
+}
+
 function createServerForSite(sourceSiteRoot) {
   return createServer(async (request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
@@ -141,14 +207,27 @@ function createPdfState(locale, marker, firstText, factories) {
   return state;
 }
 
-async function waitForSample(page, variant) {
-  await page.locator(variant.sampleSelector).click();
-  await page.locator(variant.previewSelector).waitFor({ state: 'visible' });
-  await page.waitForFunction(
-    ({ previewSelector, sampleIdentity }) => document.querySelector(previewSelector)?.textContent.includes(sampleIdentity),
-    { previewSelector: variant.previewSelector, sampleIdentity: variant.sampleIdentity }
-  );
-  await page.evaluate(() => document.fonts.ready);
+function documentationState(locale, marker, firstText, factories) {
+  const state = createPdfState(locale, marker, firstText, factories);
+  const labels = {
+    ja: ['架空 履歴書例', '架空企業（検証用）', '架空大学（検証用）'],
+    'zh-CN': ['虚构 简历示例', '虚构企业（测试用）', '虚构大学（测试用）'],
+    en: ['Fictional Resume Example', 'Fictional Example Company', 'Fictional Example University']
+  }[locale];
+  state.profile.fields.fullName = labels[0];
+  state.profile.fields.address = '';
+  state.profile.fields.postalCode = '';
+  state.profile.fields.phone = '';
+  state.profile.fields.links = ['https://example.invalid/profile'];
+  const resume = state.documents[locale].resume;
+  if (resume) {
+    for (const item of resume.experience) item.company = labels[1];
+    for (const item of resume.education) item.school = labels[2];
+    for (const item of [...resume.projects, ...resume.certifications]) {
+      if (item.url) item.url = 'https://example.invalid/reference';
+    }
+  }
+  return state;
 }
 
 async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot, factories }) {
@@ -181,7 +260,17 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
     if (await page.locator('#localeSelect').inputValue() !== variant.locale) {
       throw new Error(`Locale did not resolve to ${variant.locale}`);
     }
-    await waitForSample(page, variant);
+    const pdfState = documentationState(variant.locale, marker, variant.firstText, factories);
+    await page.locator('#importDataInput').setInputFiles({
+      buffer: Buffer.from(JSON.stringify(pdfState)),
+      mimeType: 'application/json',
+      name: `fictional-${variant.locale}.json`
+    });
+    await page.waitForFunction(
+      ({ previewSelector, markerText }) => document.querySelector(previewSelector)?.textContent.includes(markerText),
+      { markerText: marker, previewSelector: variant.previewSelector }
+    );
+    await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => {
       document.documentElement.scrollLeft = 0;
       document.body.scrollLeft = 0;
@@ -193,17 +282,6 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
     const screenshotAbsolute = path.join(outputRoot, variant.screenshotPath);
     await page.screenshot({ animations: 'disabled', fullPage: false, path: screenshotAbsolute });
 
-    const pdfState = createPdfState(variant.locale, marker, variant.firstText, factories);
-    await page.locator('#importDataInput').setInputFiles({
-      buffer: Buffer.from(JSON.stringify(pdfState)),
-      mimeType: 'application/json',
-      name: `resume-studio-${variant.locale}-sample.json`
-    });
-    await page.waitForFunction(
-      ({ previewSelector, markerText }) => document.querySelector(previewSelector)?.textContent.includes(markerText),
-      { markerText: marker, previewSelector: variant.previewSelector }
-    );
-    await page.evaluate(() => document.fonts.ready);
     await page.emulateMedia({ media: 'print' });
     const pdfAbsolute = path.join(outputRoot, variant.pdfPath);
     await page.pdf({
@@ -226,7 +304,7 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
         sha256: await fileHash(pdfAbsolute)
       },
       screenshot: {
-        fixture: 'built-in-example',
+        fixture: 'fictional-documentation-example',
         height: viewport.height,
         path: variant.screenshotPath,
         sha256: await fileHash(screenshotAbsolute),
@@ -238,16 +316,18 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
   }
 }
 
-export async function generateReleaseAssets({
-  outputRoot = root,
+export async function generateDocumentationAssets({
+  outputRoot,
   sourceCommit,
   sourceRoot = root
 } = {}) {
-  await mkdir(path.join(outputRoot, 'docs/screenshots'), { recursive: true });
-  await mkdir(path.join(outputRoot, 'output/pdf'), { recursive: true });
+  const verifiedSourceCommit = resolveSourceCommit(sourceRoot, sourceCommit);
+  const verifiedOutputRoot = await prepareDocumentationOutputDirectory({ outputRoot, sourceRoot });
+  await mkdir(path.join(verifiedOutputRoot, 'docs/screenshots'), { recursive: true });
+  await mkdir(path.join(verifiedOutputRoot, 'output/pdf'), { recursive: true });
 
   const sourceSiteRoot = path.join(sourceRoot, 'site');
-  const manifestPath = path.join(outputRoot, 'docs/assets-manifest.json');
+  const manifestPath = path.join(verifiedOutputRoot, 'docs/assets-manifest.json');
   const siteHash = await computeSiteHash(sourceSiteRoot);
   const factories = await loadSampleFactories(sourceRoot);
   const server = createServerForSite(sourceSiteRoot);
@@ -263,17 +343,17 @@ export async function generateReleaseAssets({
     browser = await chromium.launch({ headless: true });
     const outputs = [];
     for (const variant of variants) {
-      outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot }));
+      outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot: verifiedOutputRoot }));
     }
     const manifest = {
       schemaVersion: 1,
       generator: {
-        command: 'npm run release:assets',
+        command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA>',
         path: 'scripts/generate-doc-assets.mjs',
         version: generatorVersion
       },
       source: {
-        ...(sourceCommit ? { commit: sourceCommit } : {}),
+        commit: verifiedSourceCommit,
         fixedDate,
         markerHashLength: 12,
         markerPrefix: 'RESUME-STUDIO-SAMPLE',
@@ -295,6 +375,28 @@ export async function generateReleaseAssets({
   }
 }
 
+export function parseArguments(args) {
+  const values = {};
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '--output-dir' && !values.outputRoot && args[index + 1] && !args[index + 1].startsWith('--')) {
+      values.outputRoot = path.resolve(args[index + 1]);
+      index += 1;
+      continue;
+    }
+    if (argument === '--source-sha' && !values.sourceCommit && args[index + 1] && !args[index + 1].startsWith('--')) {
+      values.sourceCommit = args[index + 1];
+      index += 1;
+      continue;
+    }
+    throw new Error('Invalid documentation asset arguments.');
+  }
+  if (!values.outputRoot || !values.sourceCommit) {
+    throw new Error('Provide --output-dir and --source-sha for temporary documentation assets.');
+  }
+  return values;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await generateReleaseAssets();
+  await generateDocumentationAssets(parseArguments(process.argv.slice(2)));
 }

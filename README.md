@@ -67,7 +67,7 @@ Chrome で `http://localhost:8000/` を開いて日本語 editor を直接始め
 - [简体中文 A4 PDF sample](output/pdf/zh-CN-a4.pdf)
 - [English US Letter PDF sample](output/pdf/en-letter.pdf)
 
-すべて架空の入力例を使用しています。生成元と Chromium version は [asset manifest](docs/assets-manifest.json) に記録しています。
+すべて架空の入力例を使用した過去の展示 sample です。生成時点の source と Chromium version は [asset manifest](docs/assets-manifest.json) に記録しています。
 
 ## データと privacy
 
