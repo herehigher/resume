@@ -38,7 +38,7 @@ jobs:
 
   quality:
     needs: scope
-    if: ${{ github.event_name != 'pull_request' || needs.scope.outputs.docs_only != 'true' }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,21 +56,27 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         run: npm ci
 
       - name: Unit and static tests
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         run: npm test
 
       - name: Lint
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         run: npm run lint
 
       - name: Install Chromium
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: Browser and PDF acceptance tests
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         run: npm run test:e2e
 
       - name: Generate temporary documentation assets
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
           SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
@@ -80,6 +86,7 @@ jobs:
           --source-sha "${SOURCE_SHA}"
 
       - name: Verify temporary documentation assets
+        if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
           SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
@@ -90,6 +97,7 @@ jobs:
           --source-sha "${SOURCE_SHA}"
 
       - name: Upload documentation asset evidence
+        if: ${{ (github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true') && success() }}
         uses: actions/upload-artifact@v7
         with:
           name: documentation-assets-${{ inputs.checkout_ref || github.sha }}
@@ -106,22 +114,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  documentation:
-    needs: scope
-    if: ${{ github.event_name == 'pull_request' && needs.scope.outputs.docs_only == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      - name: Verify documentation links and release version contract
-        run: node --test tests/documentation.test.js tests/quality-scope.test.js
+      - name: Verify documentation-only pull request
+        if: ${{ github.event_name == 'pull_request' && needs.scope.result == 'success' && needs.scope.outputs.docs_only == 'true' }}
+        run: |
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+          node --test tests/documentation.test.js tests/quality-scope.test.js

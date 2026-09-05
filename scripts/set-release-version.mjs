@@ -43,6 +43,9 @@ export async function setReleaseVersion({ date, rootDirectory, version }) {
   const nextConfig = replaceOnce(configText, /APP_VERSION = '[^']+'/, `APP_VERSION = '${version}'`, 'APP_VERSION');
   const unreleased = '## [Unreleased]\n';
   if (!changelogText.includes(unreleased)) fail('CHANGELOG must contain an Unreleased section');
+  if (new RegExp(`^## \\[${version.replaceAll('.', '\\.')}\\] - `, 'm').test(changelogText)) {
+    fail('CHANGELOG already contains this release version');
+  }
   const nextChangelog = changelogText.replace(unreleased, `${unreleased}\n## [${version}] - ${date}\n`);
   await Promise.all([
     writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`),

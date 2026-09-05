@@ -38,7 +38,7 @@ export async function ensureImmutableReleaseTag({ artifactDirectory, cwd, eviden
   if (tagExists(cwd, tag)) {
     let existing;
     try {
-      existing = git(cwd, 'rev-parse', '--verify', '--end-of-options', `${tag}^{commit}`);
+      existing = git(cwd, 'rev-parse', '--verify', '--end-of-options', `refs/tags/${tag}^{commit}`);
     } catch (error) {
       fail(`unable to resolve existing release tag: ${error.message}`);
     }

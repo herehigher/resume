@@ -25,6 +25,7 @@ test('one version operation synchronizes package, lock, application, and changel
   assert.equal(JSON.parse(readFileSync(path.join(directory, 'package-lock.json'))).version, '0.2.3');
   assert.match(readFileSync(path.join(directory, 'site/assets/js/config.js'), 'utf8'), /APP_VERSION = '0\.2\.3'/);
   assert.match(readFileSync(path.join(directory, 'CHANGELOG.md'), 'utf8'), /## \[0\.2\.3\] - 2026-09-05/);
+  await assert.rejects(setReleaseVersion({ date: '2026-09-05', rootDirectory: directory, version: '0.2.3' }), /already contains/);
 });
 
 test('version operation rejects prereleases and malformed dates', async (t) => {
