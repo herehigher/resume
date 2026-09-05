@@ -8,6 +8,7 @@ test('source build は analytics を含むすべての外部 runtime request を
   await page.evaluate(() => {
     fetch('http://127.0.0.1:9/leak').catch(() => {});
     fetch('/collect', { method: 'POST', body: 'fictional-network-guard-body' }).catch(() => {});
+    fetch('/unknown-network-path').catch(() => {});
     fetch('/assets/js/main.js?personal-data').catch(() => {});
     fetch('https://cloudflareinsights.com/cdn-cgi/rum', {
       method: 'POST',
@@ -23,6 +24,7 @@ test('source build は analytics を含むすべての外部 runtime request を
   });
 
   await expect.poll(() => guard.requests.some((request) => request.method === 'POST' && new URL(request.url).pathname === '/collect')).toBe(true);
+  await expect.poll(() => guard.requests.some((request) => new URL(request.url).pathname === '/unknown-network-path')).toBe(true);
   await expect.poll(() => guard.requests.some((request) => request.url.includes('/assets/js/main.js?personal-data'))).toBe(true);
   await expect.poll(() => guard.requests.some((request) => request.url.includes('cloudflareinsights.com/cdn-cgi/rum'))).toBe(true);
   await expect.poll(() => guard.webSockets.length).toBeGreaterThan(0);
