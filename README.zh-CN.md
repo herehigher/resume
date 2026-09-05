@@ -75,7 +75,7 @@ npx --yes http-server site --port 8000
 - 草稿正文以 AES-GCM 加密后保存在 localStorage。导出的 JSON 和 PDF 不加密，并可能包含照片等个人信息，请安全保管。
 - 清除 browser data、结束 private browsing、存储容量不足或 browser storage eviction 都可能导致草稿丢失。重要草稿请导出 JSON backup。
 - 应用内删除只清除 v1 state，不会删除旧 `resume-studio-data-v1`、已下载的 JSON/PDF 或 browser download history。
-- Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics，不会向同一 origin 静态 asset 以外的地址发送统计请求。只有 `herehigher/resume` 的已验证 stable tag，才可在 tagged manifest 启用时由 deployment-only adapter 向 artifact 确定性加入标准 Cloudflare Web Analytics。它不使用 Cookie、localStorage、用户级 ID 或 custom event，也不会发送简历输入、照片、JSON 或设备草稿。可通过页面 status 与 Network panel 核查当前 mode。
+- Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics，不会向同一 origin 静态 asset 以外的地址发送统计请求。仅官方 CI 可按待验证 commit 的配置 manifest，在发布前向产物加入标准 Cloudflare Web Analytics；批准后将同一产物与 immutable stable tag 对应发布。它不使用 Cookie、localStorage、用户级 ID 或 custom event，也不会发送简历输入、照片、JSON 或设备草稿。可通过页面 status 与 Network panel 核查当前 mode。
 
 详情请阅读 [隐私说明 / 简体中文](PRIVACY.md#privacy-zh-cn)。
 
@@ -94,7 +94,7 @@ npm ci
 npm run test:acceptance
 ```
 
-请勿向 `site/` source 加入外部 API、CDN、外部 font 或 analytics。唯一例外是 deployment-only adapter 根据 tagged manifest，为官方 repository 的已验证 stable tag artifact 加入标准 Cloudflare Web Analytics。详情参见 [Contributing](CONTRIBUTING.md) 和 [release acceptance checklist](docs/acceptance-checklist.md)。
+开发约束见 [AGENTS.md](AGENTS.md)，环境与验证见 [开发指南](docs/development-guide.md)，提交方式见 [Contributing](CONTRIBUTING.md)，发布操作见 [发布手册](docs/release-playbook.md)。
 
 ## 仓库资料
 

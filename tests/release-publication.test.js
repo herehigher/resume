@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -20,8 +20,9 @@ function git(cwd, ...args) {
 function fixture(t) {
   const cwd = mkdtempSync(path.join(os.tmpdir(), 'resume-publication-'));
   t.after(() => rmSync(cwd, { force: true, recursive: true }));
-  cpSync(path.join(root, 'site'), path.join(cwd, 'site'), { recursive: true });
-  writeFileSync(path.join(cwd, 'package.json'), readFileSync(path.join(root, 'package.json')));
+  mkdirSync(path.join(cwd, 'site'));
+  writeFileSync(path.join(cwd, 'site/index.html'), '<p>Fictional release fixture</p>');
+  writeFileSync(path.join(cwd, 'package.json'), JSON.stringify({ version: '7.4.2' }));
   git(cwd, 'init', '--initial-branch=main');
   git(cwd, 'config', 'user.email', 'release@example.invalid');
   git(cwd, 'config', 'user.name', 'Release test');
@@ -36,9 +37,9 @@ function fixture(t) {
 test('publication creates an immutable tag and safely resumes the same tag', async (t) => {
   const { artifact, cwd, evidence, sha } = fixture(t);
   await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
-  const created = await ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' });
+  const created = await ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v7.4.2' });
   assert.equal(created.resumed, false);
-  const resumed = await ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' });
+  const resumed = await ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v7.4.2' });
   assert.equal(resumed.resumed, true);
 });
 
@@ -50,8 +51,8 @@ test('publication rejects tag and artifact mismatches', async (t) => {
   git(cwd, 'add', 'different.txt');
   git(cwd, 'commit', '--no-gpg-sign', '-m', 'different commit');
   const differentSha = git(cwd, 'rev-parse', 'HEAD');
-  git(cwd, '-c', 'tag.gpgSign=false', 'tag', '-a', 'v0.2.2', '-m', 'wrong', differentSha);
-  await assert.rejects(ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' }), /different commit/);
+  git(cwd, '-c', 'tag.gpgSign=false', 'tag', '-a', 'v7.4.2', '-m', 'wrong', differentSha);
+  await assert.rejects(ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v7.4.2' }), /different commit/);
 });
 
 test('publication CLI accepts only historical rollback targets and excludes v0.2.1', () => {
@@ -68,13 +69,13 @@ test('publication CLI creates and resumes a real annotated tag from a temporary 
   await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
   const invoke = () => spawnSync(process.execPath, [command, 'publish',
     '--artifact-dir', artifact, '--cwd', cwd, '--evidence', evidence,
-    '--source-dir', cwd, '--source-sha', sha, '--tag', 'v0.2.2'
+    '--source-dir', cwd, '--source-sha', sha, '--tag', 'v7.4.2'
   ], { encoding: 'utf8' });
   const created = invoke();
   assert.equal(created.status, 0, created.stderr);
-  assert.match(created.stdout, /Created immutable v0\.2\.2/);
-  assert.equal(git(cwd, 'rev-parse', 'v0.2.2^{commit}'), sha);
+  assert.match(created.stdout, /Created immutable v7\.4\.2/);
+  assert.equal(git(cwd, 'rev-parse', 'v7.4.2^{commit}'), sha);
   const resumed = invoke();
   assert.equal(resumed.status, 0, resumed.stderr);
-  assert.match(resumed.stdout, /Resumed immutable v0\.2\.2/);
+  assert.match(resumed.stdout, /Resumed immutable v7\.4\.2/);
 });

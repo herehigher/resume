@@ -75,7 +75,7 @@ These historical showcase samples use fictional data. Their source at generation
 - Draft content is AES-GCM encrypted in localStorage. Exported JSON and PDF files are not encrypted and may contain photos or other personal information, so store them securely.
 - Clearing browser data, ending a private-browsing session, exceeding the storage quota, or browser storage eviction can remove a draft. Export important drafts as JSON backups.
 - In-app deletion clears the v1 state. It does not delete the legacy `resume-studio-data-v1` key, downloaded JSON/PDF files, or browser download history.
-- The repository `site/`, clones, and forks disable analytics by default and make no analytics requests beyond same-origin static assets. Only a validated stable tag in `herehigher/resume` may have the deployment-only adapter deterministically add standard Cloudflare Web Analytics when its tagged manifest enables it. It uses no cookies, localStorage, user-level IDs, or custom events and sends no resume input, photo, JSON, or on-device draft. The page status and Network panel expose the active mode.
+- The repository `site/`, clones, and forks disable analytics by default and make no analytics requests beyond same-origin static assets. Only official CI adds standard Cloudflare Web Analytics to a prepared artifact when the source commit’s configuration manifest enables it. After approval, that same artifact is published with its immutable stable tag. It uses no cookies, localStorage, user-level IDs, or custom events and sends no resume input, photo, JSON, or on-device draft. The page status and Network panel expose the active mode.
 
 Read [Privacy / English](PRIVACY.md#privacy-en) for the complete policy.
 
@@ -94,7 +94,7 @@ npm ci
 npm run test:acceptance
 ```
 
-Do not add external APIs, CDNs, external fonts, or analytics to the `site/` source. The sole exception is the deployment-only adapter adding standard Cloudflare Web Analytics to a validated stable-tag artifact in the official repository when its tagged manifest matches. See [Contributing](CONTRIBUTING.md) and the [release acceptance checklist](docs/acceptance-checklist.md).
+See [AGENTS.md](AGENTS.md) for repository rules, the [development guide](docs/development-guide.md) for setup and checks, [Contributing](CONTRIBUTING.md) for PRs, and the [release playbook](docs/release-playbook.md) for publication.
 
 ## Repository information
 

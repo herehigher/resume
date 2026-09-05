@@ -75,7 +75,7 @@ Chrome で `http://localhost:8000/` を開いて日本語 editor を直接始め
 - 下書き本文は localStorage に AES-GCM で暗号化して保存します。JSON export と PDF は暗号化されず、写真その他の個人情報を含む場合があるため、安全に保管してください。
 - browser data の消去、private browsing の終了、保存容量不足、browser による storage eviction で下書きを失うことがあります。重要な下書きは JSON で backup してください。
 - アプリ内削除は v1 state を消しますが、旧 `resume-studio-data-v1`、download 済み JSON/PDF、browser の download 履歴までは削除しません。
-- Repository の `site/`、clone、fork は Analytics 無効で、同一 origin の静的 asset 以外へ解析 request を送りません。`herehigher/resume` の検証済み stable tag だけは、tag に固定した manifest が有効な場合に deployment artifact へ標準 Cloudflare Web Analytics を決定的に追加します。Cookie、localStorage、利用者単位 ID、custom event は使わず、履歴書入力、写真、JSON、local draft は送信しません。画面の status 表示と Network panel で現在の mode を確認できます。
+- Repository の `site/`、clone、fork は Analytics 無効で、同一 origin の静的 asset 以外へ解析 request を送りません。公式 CI は検証対象 commit の設定 manifest が有効な場合だけ、公開前の配布物へ標準 Cloudflare Web Analytics を追加します。承認後は同じ配布物を immutable stable tag と対応付けて公開します。Cookie、localStorage、利用者単位 ID、custom event は使わず、履歴書入力、写真、JSON、local draft は送信しません。画面の status 表示と Network panel で現在の mode を確認できます。
 
 詳細は [Privacy / 日本語](PRIVACY.md#privacy-ja) を確認してください。
 
@@ -94,7 +94,7 @@ npm ci
 npm run test:acceptance
 ```
 
-`site/` source に外部 API、CDN、外部 font、analytics を追加しないでください。唯一の例外は、公式 repository の検証済み stable tag から作る artifact に、tagged manifest と一致する標準 Cloudflare Web Analytics を deployment-only adapter が追加する経路です。詳しくは [開発ガイド](docs/development-guide.md)、[Contributing](CONTRIBUTING.md)、[release acceptance checklist](docs/acceptance-checklist.md) を参照してください。
+開発の制約は [AGENTS.md](AGENTS.md)、環境と検証は [開発ガイド](docs/development-guide.md)、提出方法は [Contributing](CONTRIBUTING.md)、公開は [リリース手順](docs/release-playbook.md) を参照してください。
 
 ## Repository information
 

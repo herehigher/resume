@@ -39,7 +39,7 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 | 画面、文言、操作 | 対象言語と desktop / smartphone 相当幅の変更画面 |
 | PDF、template、font、公開 sample | 対象言語・用紙の全 PDF page。文字切れ、重なり、改ページ、末尾欠落 |
 
-詳しい確認条件と展示 sample の扱いは[受入チェックリスト](acceptance-checklist.md)を参照します。必要な結果と差異だけを PR / run に残し、自動 test、agent の目視、人の受入判断、未確認を分けます。確認用画像・PDF は CI artifact から取得し、展示 sample を毎 version commit し直しません。
+詳しい確認条件と展示 sample の扱いは[開発ガイド](development-guide.md#表示pdf-の目視)を参照します。必要な結果と差異だけを PR / run に残し、自動 test、agent の目視、人の受入判断、未確認を分けます。確認用画像・PDF は CI artifact から取得し、展示 sample を毎 version commit し直しません。
 
 ## 自動で確認・記録すること
 
