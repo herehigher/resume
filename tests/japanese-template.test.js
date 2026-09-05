@@ -101,7 +101,7 @@ test('Japanese profile and credential links only activate HTTP URLs', () => {
   assert.match(html, /Website · javascript:alert\(1\)/);
 });
 
-test('Japanese resume prints local link icons, readable URLs, and symmetric history headings', () => {
+test('Japanese resume prints local link icons and repeated semantic history headings', () => {
   const state = createJapaneseSampleState(createDefaultState('ja'));
   const html = renderJapaneseDocument(state);
 
@@ -109,20 +109,22 @@ test('Japanese resume prints local link icons, readable URLs, and symmetric hist
   assert.match(html, /profile-link-icon--github/);
   assert.match(html, /Website · example\.com/);
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
-  assert.match(japaneseCss, /\.resume-links \{[^}]*margin-bottom:\s*16px/s);
-  assert.match(html, /class="paper-table-date">年月<\/div><div class="paper-table-detail">学歴<\/div>/);
-  assert.match(html, /class="paper-table-date">年月<\/div><div class="paper-table-detail">職歴<\/div>/);
-  assert.doesNotMatch(html, /<div class="paper-table-header"><div>年月<\/div><div>学歴・職歴<\/div>/);
+  assert.match(japaneseCss, /\.resume-links \{[^}]*margin:\s*0 0 16px/s);
+  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>履歴書 · 山田 太郎 · 学歴<\/th>/);
+  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>履歴書 · 山田 太郎 · 職歴<\/th>/);
+  assert.match(html, /<tr class="paper-table-row"><td class="paper-table-date">/);
 });
 
-test('Japanese resume grid shares one track and keeps long contact values inside their cells', () => {
+test('Japanese resume uses unified personal-information borders and a fixed photo frame', () => {
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
 
   assert.match(japaneseCss, /--ja-key-column:\s*88px/);
-  assert.match(japaneseCss, /grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\) var\(--ja-key-column\) minmax\(0, 1fr\)/);
-  assert.match(japaneseCss, /\.resume-contact \.paper-label:nth-child\(3\)\s*\{[^}]*border-left:\s*1px solid var\(--ja-line-strong\)/s);
+  assert.match(japaneseCss, /\.resume-profile\s*\{[^}]*border:\s*\.75pt solid var\(--ja-line-strong\);[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 30mm/s);
+  assert.match(japaneseCss, /\.profile-photo\s*\{[^}]*height:\s*40mm;[^}]*width:\s*30mm;/s);
+  assert.match(japaneseCss, /\.resume-contact > div\s*\{[^}]*grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\)/s);
   assert.match(japaneseCss, /\.resume-contact \.paper-value\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s);
-  assert.match(japaneseCss, /\.paper-table-row\s*\{[^}]*grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\)/s);
+  assert.match(japaneseCss, /\.paper-history-table\s*\{[^}]*table-layout:\s*fixed;/s);
+  assert.match(japaneseCss, /\.paper-table-date\s*\{[^}]*vertical-align:\s*top;/s);
 });
 
 test('Japanese sample data is isolated from the current draft', () => {
@@ -149,7 +151,8 @@ test('Japanese template keeps A4 print dimensions without clipping long content'
   const documentPageRule = printCss.match(/\.document-page\s*\{([^}]*)\}/s)?.[1] || '';
   assert.doesNotMatch(documentPageRule, /(?:^|;)\s*(?:height:\s*297mm|overflow:\s*hidden)/s);
   assert.match(japaneseCss, /#japaneseWorkspace \.document-page\s*\{[^}]*height:\s*auto;[^}]*overflow:\s*visible;[^}]*page:\s*japanese-a4;/s);
-  assert.match(japaneseCss, /\.paper-table-row,[\s\S]*\.career-company\s*\{\s*break-inside:\s*avoid-page;/);
+  assert.match(japaneseCss, /\.paper-history-table,[\s\S]*\.career-company\s*\{\s*break-inside:\s*auto;/);
+  assert.match(japaneseCss, /\.paper-history-table thead\s*\{\s*display:\s*table-header-group;/);
   assert.match(japaneseCss, /\.paper-text-section\s*\{\s*break-inside:\s*auto;/);
   assert.match(japaneseCss, /#japaneseWorkspace \.empty-preview\s*\{\s*display:\s*none;/s);
 });
