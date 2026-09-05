@@ -12,10 +12,16 @@ function achievementLines(value) {
     .filter(Boolean);
 }
 
-function renderAchievements(value) {
+const CONTINUATION_CHUNK_SIZE = 12;
+
+function renderAchievements(value, continuationLabel = '', leading = '') {
   const items = achievementLines(value);
   if (!items.length) return '';
-  return `<ul class="zh-achievement-list">${items.map((item) => `<li>${escapeHTML(item)}</li>`).join('')}</ul>`;
+  const groups = Array.from(
+    { length: Math.ceil(items.length / CONTINUATION_CHUNK_SIZE) },
+    (_, index) => items.slice(index * CONTINUATION_CHUNK_SIZE, (index + 1) * CONTINUATION_CHUNK_SIZE)
+  );
+  return groups.map((group, index) => `<div class="zh-achievement-group">${index ? `<div class="zh-entry-continuation">${escapeHTML(continuationLabel)}</div>` : leading}<ul class="zh-achievement-list">${group.map((item) => `<li>${escapeHTML(item)}</li>`).join('')}</ul></div>`).join('');
 }
 
 export function formatChineseMonth(value) {
@@ -109,15 +115,15 @@ function renderTimeline(title, items, { kind, keys }) {
   const rows = entered.map((item) => {
     const heading = kind === 'education' ? item.school : item.company;
     const subheading = kind === 'education' ? item.degree : item.role;
+    const headingMarkup = `<div class="zh-entry-heading-block"><h3>${displayText(heading, kind === 'education' ? '学校名称' : '公司名称')}</h3>${hasText(subheading) ? `<div class="zh-timeline-role">${escapeHTML(subheading)}</div>` : ''}</div>`;
+    const details = kind === 'experience'
+      ? renderAchievements(item.details, `工作经历（续） · ${[heading, subheading].filter(hasText).join(' · ') || '未填写'}`, headingMarkup)
+      : hasText(item.details) ? `<div class="zh-timeline-details">${displayText(item.details)}</div>` : '';
     return `
       <article class="zh-timeline-item">
         <div class="zh-timeline-date">${escapeHTML(formatChineseRange(item.startDate, item.endDate))}</div>
         <div class="zh-timeline-content">
-          <h3>${displayText(heading, kind === 'education' ? '学校名称' : '公司名称')}</h3>
-          ${hasText(subheading) ? `<div class="zh-timeline-role">${escapeHTML(subheading)}</div>` : ''}
-          ${kind === 'experience'
-            ? renderAchievements(item.details)
-            : hasText(item.details) ? `<div class="zh-timeline-details">${displayText(item.details)}</div>` : ''}
+          ${kind === 'experience' ? (details || headingMarkup) : `${headingMarkup}${details}`}
         </div>
       </article>`;
   }).join('');
@@ -135,7 +141,7 @@ function renderProjects(projects) {
         <div><h3>${displayText(project.name, '项目名称')}</h3>${hasText(project.role) ? `<span>${escapeHTML(project.role)}</span>` : ''}</div>
         ${(hasText(project.startDate) || hasText(project.endDate)) ? `<time>${escapeHTML(formatChineseRange(project.startDate, project.endDate))}</time>` : ''}
       </div>
-      ${renderAchievements(project.details)}
+      ${renderAchievements(project.details, `项目经历（续） · ${[project.name, project.role].filter(hasText).join(' · ') || '未填写'}`)}
       ${renderLink(project.url, '', 'zh-project-link')}
     </article>`).join('');
   return `<section class="zh-section"><h2>项目经历</h2><div class="zh-project-list">${rows}</div></section>`;
