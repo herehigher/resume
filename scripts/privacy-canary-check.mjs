@@ -38,6 +38,7 @@ export async function exercisePrivacyCanary(page, { leaveUrl }) {
   const photoCanary = exported.profile.photo;
   if (!/^data:image\/jpeg;base64,/.test(photoCanary || '')) throw new Error('The fictional photo was not exported.');
   exported.profile.fields.fullName = importCanary;
+  const envelopeBeforeImport = await page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY);
   await page.locator('#importDataInput').setInputFiles({
     buffer: Buffer.from(JSON.stringify(exported)),
     mimeType: 'application/json',
@@ -45,10 +46,21 @@ export async function exercisePrivacyCanary(page, { leaveUrl }) {
   });
   await page.locator('[name="fullName"]').waitFor({ state: 'visible' });
   await page.waitForFunction((value) => document.querySelector('[name="fullName"]')?.value === value, importCanary);
-  await page.waitForFunction((key) => Boolean(localStorage.getItem(key)), DRAFT_STORAGE_KEY);
+  await page.waitForFunction(({ before, key }) => {
+    const raw = localStorage.getItem(key);
+    if (!raw || raw === before) return false;
+    try {
+      const envelope = JSON.parse(raw);
+      return envelope.format === 'resume-studio-local-encrypted-v1' && typeof envelope.ciphertext === 'string' && envelope.ciphertext.length > 0;
+    } catch {
+      return false;
+    }
+  }, { before: envelopeBeforeImport, key: DRAFT_STORAGE_KEY });
 
   await page.reload();
   await page.waitForFunction((value) => document.querySelector('[name="fullName"]')?.value === value, importCanary);
+  await page.waitForFunction((value) => document.querySelector('[name="motivation"]')?.value === value, draftCanary);
+  await page.locator('#photoThumbnail img').waitFor({ state: 'visible' });
   await page.goto(leaveUrl);
   return Object.freeze({ canaries: Object.freeze([...PRIVACY_CANARIES, photoCanary]) });
 }
