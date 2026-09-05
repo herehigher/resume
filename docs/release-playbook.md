@@ -45,7 +45,7 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 
 CI は保存・読込・言語分離・PDF・データ保護、version、source SHA と artifact bytes の一致を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
 
-Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。アプリの deterministic mock test と、準備時の実 provider script による互換性検査を区別します。後者は RUM を送信前に intercept し、Cloudflare 側の受信成功を検証しません。観測範囲は summary と準備 artifact に同梱した `provider-compatibility.json` に記録し、自動 test 成功を包括的な実 provider 検証と呼びません。
+Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。アプリの deterministic mock test と、準備時の実 provider script による互換性検査を区別します。後者は架空 data の操作・再読込・移動を行い、headless browser で自然には発生しないページ非表示は明示的に模擬します。RUM を送信前に intercept するため、Cloudflare 側の受信成功を検証しません。観測範囲は summary と準備 artifact に同梱した `provider-compatibility.json` に記録し、自動 test 成功を包括的な実 provider 検証と呼びません。
 
 ## Analytics の扱い
 
