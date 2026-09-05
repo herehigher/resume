@@ -10,7 +10,7 @@ export const PRIVACY_CANARIES = Object.freeze([
 const DRAFT_STORAGE_KEY = 'resume-studio-web-v1';
 const PHOTO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-export async function exercisePrivacyCanary(page, { leaveUrl }) {
+export async function exercisePrivacyCanary(page, { beforeReload, leaveUrl }) {
   if (!leaveUrl) throw new Error('A leave URL is required for the privacy canary lifecycle.');
   const [inputCanary, importCanary, photoFileName, draftCanary] = PRIVACY_CANARIES;
   const motivation = page.locator('[name="motivation"]');
@@ -57,6 +57,7 @@ export async function exercisePrivacyCanary(page, { leaveUrl }) {
     }
   }, { before: envelopeBeforeImport, key: DRAFT_STORAGE_KEY });
 
+  await beforeReload?.(page);
   await page.reload();
   await page.waitForFunction((value) => document.querySelector('[name="fullName"]')?.value === value, importCanary);
   await page.waitForFunction((value) => document.querySelector('[name="motivation"]')?.value === value, draftCanary);
