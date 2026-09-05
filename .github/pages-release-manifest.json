@@ -4,5 +4,5 @@
   "analyticsProvider": "cloudflare-web-analytics",
   "providerTokenSha256": "8a1bd3491d2b1100e92a33a5efec9c976923e131b50c326a9172d9dc6650c38e",
   "sourceTreeSha256": "fdf7d6e37d02ace2db783bb4e91ea26311a8403e4823968827ace72757034060",
-  "artifactTreeSha256": "846a1b898b401a180a0f26dd0c90e26ea67956cf420d1570832c61613c452622"
+  "artifactTreeSha256": "3f9c252a0ecee0d71ab94c502560ef69e68ffd88d1b322bb9b452cc94b859613"
 }

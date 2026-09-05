@@ -270,7 +270,7 @@ test('development docs cover localized public entry and machine-readable contrac
 test('changelog freezes dated releases without losing release notes', () => {
   const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   const unreleased = '## [Unreleased]';
-  const latestRelease = '## [0.2.2] - 2026-09-04';
+  const latestRelease = '## [0.2.2] - 2026-09-05';
   const priorRelease = '## [0.2.1] - 2026-09-04';
   const previousRelease = '## [0.2.0] - 2026-09-03';
   const initialRelease = '## [0.1.0] - 2026-09-01';
@@ -286,7 +286,7 @@ test('changelog freezes dated releases without losing release notes', () => {
   assert.ok(previousReleaseIndex > priorReleaseIndex, 'Releases must remain in descending order');
   assert.ok(initialReleaseIndex > previousReleaseIndex, 'Releases must remain in descending order');
   assert.equal(changelog.slice(unreleasedIndex + unreleased.length, latestReleaseIndex).trim(), '');
-  assert.equal((changelog.match(/^## \[0\.2\.2\] - 2026-09-04$/gm) || []).length, 1);
+  assert.equal((changelog.match(/^## \[0\.2\.2\] - 2026-09-05$/gm) || []).length, 1);
   assert.equal((changelog.match(/^## \[0\.2\.1\] - 2026-09-04$/gm) || []).length, 1);
   assert.equal((changelog.match(/^## \[0\.2\.0\] - 2026-09-03$/gm) || []).length, 1);
   assert.equal((changelog.match(/^## \[0\.1\.0\] - 2026-09-01$/gm) || []).length, 1);
