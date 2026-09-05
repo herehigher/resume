@@ -1,7 +1,7 @@
 .english-document {
   color: #172033;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 11px;
+  font-size: 13.5px;
   line-height: 1.48;
   overflow-wrap: anywhere;
   padding: 54px 58px;
@@ -91,7 +91,7 @@
 }
 
 .en-entry {
-  break-inside: avoid-page;
+  break-inside: auto;
   margin-top: 11px;
 }
 
@@ -106,7 +106,7 @@
 
 .en-entry-heading h3 {
   color: #172033;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.3;
   margin: 0;
   overflow-wrap: anywhere;
@@ -114,7 +114,7 @@
 
 .en-entry-date {
   flex: 0 0 auto;
-  font-size: 10px;
+  font-size: 12px;
   margin: 0;
   white-space: nowrap;
 }
@@ -135,6 +135,9 @@
   margin-top: 2px;
   overflow-wrap: anywhere;
 }
+
+.en-achievement-group { break-inside: avoid-page; }
+.en-entry-continuation { color: #344866; font-size: 12px; font-weight: 700; margin-top: 7px; }
 
 .en-entry-link {
   margin: 4px 0 0;
@@ -257,6 +260,7 @@
   }
 
   .en-entry-heading { break-after: avoid-page; }
+  .en-entry-heading-block { break-after: avoid-page; }
 
   .en-certification-list li { display: block; }
   .en-certification-date { margin-left: 10px; }

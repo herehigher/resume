@@ -57,21 +57,25 @@ function renderCareerProfiles(fields) {
   return links.length ? `<div class="career-profile-links">${links.join('')}</div>` : '';
 }
 
-function renderHistoryRows(items, category) {
-  const enteredItems = items.filter((item) => itemHasContent(item, ['date', 'detail']));
-  if (!enteredItems.length) return '';
-  const rows = [`<div class="paper-table-row category-row"><div class="paper-table-date">年月</div><div class="paper-table-detail">${category}</div></div>`];
-  enteredItems.forEach((item) => {
-    rows.push(`<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}</div></div>`);
-  });
-  return rows.join('');
+function continuationLabel(fields, category) {
+  const name = String(fields.fullName ?? '').trim() || '氏名未入力';
+  return `履歴書 · ${escapeHTML(name)} · ${category}`;
 }
 
-function renderQualificationRows(items) {
-  return items
+function renderHistoryRows(items, category, fields) {
+  const enteredItems = items.filter((item) => itemHasContent(item, ['date', 'detail']));
+  if (!enteredItems.length) return '';
+  const rows = enteredItems.map((item) => `<tr class="paper-table-row"><td class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</td><td class="paper-table-detail">${displayText(item.detail, '未入力')}</td></tr>`).join('');
+  return `<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月</th><th>${continuationLabel(fields, category)}</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderQualificationRows(items, fields) {
+  const rows = items
     .filter((item) => itemHasContent(item, ['date', 'detail', 'url']))
-    .map((item) => `<div class="paper-table-row"><div class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</div><div class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</div></div>`)
+    .map((item) => `<tr class="paper-table-row"><td class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</td><td class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</td></tr>`)
     .join('');
+  if (!rows) return '';
+  return `<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月</th><th>${continuationLabel(fields, '免許・資格')}</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderCareerPeriod(career) {
@@ -80,6 +84,21 @@ function renderCareerPeriod(career) {
   if (start && end) return `${escapeHTML(start)} 〜 ${escapeHTML(end)}`;
   if (start) return `${escapeHTML(start)} 〜 現在`;
   return escapeHTML(end);
+}
+
+function renderCareerDetail(value, fallback, continuationLabel) {
+  const text = String(value ?? '');
+  if (!text.trim()) return displayText(text, fallback);
+  const lines = text.split(/\r?\n/);
+  if (lines.length <= 12) return escapeHTML(text);
+  return Array.from(
+    { length: Math.ceil(lines.length / 12) },
+    (_, index) => {
+      const chunk = lines.slice(index * 12, (index + 1) * 12).join('\n');
+      const label = index ? `<div class="career-entry-continuation">${escapeHTML(continuationLabel)}</div>` : '';
+      return `<div class="career-detail-chunk">${label}${escapeHTML(chunk)}</div>`;
+    }
+  ).join('');
 }
 
 export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
@@ -107,20 +126,20 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
       <section class="resume-contact">
         <div><span class="paper-label">ふりがな</span><span class="paper-value full-contact">${displayText(fields.addressKana)}</span></div>
         <div><span class="paper-label">現住所</span><span class="paper-value full-contact">${fields.postalCode ? `〒${escapeHTML(fields.postalCode)}　` : ''}${displayText(fields.address)}</span></div>
-        <div><span class="paper-label">電話</span><span class="paper-value">${displayText(fields.phone)}</span><span class="paper-label">E-mail</span><span class="paper-value">${displayText(fields.email)}</span></div>
+        <div><span class="paper-label">電話</span><span class="paper-value full-contact">${displayText(fields.phone)}</span></div>
+        <div><span class="paper-label">E-mail</span><span class="paper-value full-contact">${displayText(fields.email)}</span></div>
       </section>
       ${renderResumeProfiles(fields)}
       <section class="paper-section">
         <h3 class="resume-section-title">学歴・職歴</h3>
-        ${renderHistoryRows(document.education, '学歴')}
-        ${renderHistoryRows(document.employment, '職歴')}
+        ${renderHistoryRows(document.education, '学歴', fields)}
+        ${renderHistoryRows(document.employment, '職歴', fields)}
       </section>
     </article>
     <article class="document-page resume-document">
       <section class="paper-section paper-section-first">
         <h3 class="resume-section-title">免許・資格</h3>
-        <div class="paper-table-header"><div>年月</div><div>内容</div></div>
-        ${renderQualificationRows(document.qualification)}
+        ${renderQualificationRows(document.qualification, fields)}
       </section>
       <section class="paper-text-section"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
       <section class="paper-text-section requests-section"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(hasContent(fields.requests) ? fields.requests : '貴社規定に従います。')}</div></section>
@@ -141,14 +160,15 @@ export function renderJapaneseCareer(state) {
     ]))
     .map((career) => {
       const period = renderCareerPeriod(career);
+      const context = [career.company, career.role].map((value) => String(value ?? '').trim()).filter(Boolean).join(' · ') || '未入力';
       return `
     <section class="career-company">
       <div class="career-company-heading"><strong>${displayText(career.company, '会社名未入力')}</strong>${period ? `<span>${period}</span>` : ''}</div>
       <div class="career-company-info">${displayText(career.companyInfo, '事業内容・会社概要')}</div>
       <div class="career-company-grid">
         <div>所属・役職</div><div>${displayText(career.role, '未入力')}</div>
-        <div>担当業務</div><div>${displayText(career.responsibilities, '担当業務を入力してください')}</div>
-        <div>実績・成果</div><div>${displayText(career.achievements, '実績・成果を入力してください')}</div>
+        <div>担当業務</div><div>${renderCareerDetail(career.responsibilities, '担当業務を入力してください', `職務経歴（続き） · ${context} · 担当業務`)}</div>
+        <div>実績・成果</div><div>${renderCareerDetail(career.achievements, '実績・成果を入力してください', `職務経歴（続き） · ${context} · 実績・成果`)}</div>
       </div>
     </section>`;
     }).join('');

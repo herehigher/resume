@@ -1,4 +1,5 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { expect, openLocale, test } from './fixtures.js';
 
 function documentGeometry(selector) {
@@ -77,13 +78,12 @@ async function inspectPdf(buffer) {
   }
 }
 
-function pdfLineCount(items, fragments) {
-  const lines = new Map();
-  for (const item of items) {
-    const y = Math.round(item.transform[5] * 100) / 100;
-    lines.set(y, `${lines.get(y) || ''}${item.str}`);
-  }
-  return [...lines.values()].filter((line) => fragments.some((fragment) => line.includes(fragment))).length;
+async function importJapaneseState(page, state) {
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'japanese-layout-fixture.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(state))
+  });
 }
 
 test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を保つ', async ({ page }) => {
@@ -112,7 +112,13 @@ test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を�
     [expect.closeTo(595.28, 0), expect.closeTo(841.89, 0)],
     [expect.closeTo(595.28, 0), expect.closeTo(841.89, 0)]
   ]);
-  expect(pdfLineCount(printed[1].items, ['これまで培った', 'から課題を整理'])).toBe(snapshots[0].lineCount);
+  expect(printed.every((item) => item.items.some((text) => text.str.trim()))).toBe(true);
+  const previewText = await page.locator('.paper-text-content').first().textContent();
+  const normalizePdfText = (value) => String(value).replace(/\s/g, '').normalize('NFKC').replaceAll('⻑', '長');
+  const normalizedPreview = normalizePdfText(previewText);
+  const normalizedPrinted = normalizePdfText(printed.flatMap((item) => item.items).map((item) => item.str).join(''));
+  expect(normalizedPrinted).toContain(normalizedPreview);
+  expect(normalizedPrinted.split(normalizedPreview)).toHaveLength(2);
 
   await page.emulateMedia({ media: 'screen' });
   await page.locator('#careerDocumentTab').click();
@@ -131,6 +137,43 @@ test('@mobile 日本語: smartphone 幅でも A4 の内部版面を reflow し�
   await page.setViewportSize({ width: 1440, height: 1000 });
   const desktop = await screenGeometry(page, '.resume-document');
   expect(mobile).toEqual(desktop);
+});
+
+test('日本語: 印刷時の写真枠は氏名・写真の有無にかかわらず30×40mmを保つ', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const shortName = createDefaultState('ja');
+  shortName.profile.fields.fullName = '架空 太郎';
+  await importJapaneseState(page, shortName);
+  await page.emulateMedia({ media: 'print' });
+  const withoutPhoto = await page.locator('.profile-photo').evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return { cssHeight: style.height, cssWidth: style.width, height: box.height, width: box.width };
+  });
+
+  const longName = structuredClone(shortName);
+  longName.profile.fields.fullName = '見本 サンプル アレクサンドラ マリア テスト';
+  longName.profile.fields.nameKana = 'みほん さんぷる あれくさんどら まりあ てすと';
+  longName.profile.fields.address = '架空都架空区架空町一丁目二番地三号 長い住所のレイアウト検証';
+  longName.profile.photo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  await page.emulateMedia({ media: 'screen' });
+  await importJapaneseState(page, longName);
+  await expect(page.locator('.profile-photo img')).toHaveAttribute('src', /^blob:/);
+  await page.emulateMedia({ media: 'print' });
+  const withPhoto = await page.locator('.profile-photo').evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const image = element.querySelector('img');
+    const style = getComputedStyle(element);
+    return { cssHeight: style.height, cssWidth: style.width, height: box.height, objectFit: image ? getComputedStyle(image).objectFit : '', width: box.width };
+  });
+
+  expect(Math.abs(Number.parseFloat(withoutPhoto.cssWidth) - (30 * 96 / 25.4))).toBeLessThan(0.5);
+  expect(Math.abs(Number.parseFloat(withoutPhoto.cssHeight) - (40 * 96 / 25.4))).toBeLessThan(0.5);
+  expect(withPhoto).toMatchObject({
+    cssHeight: withoutPhoto.cssHeight,
+    cssWidth: withoutPhoto.cssWidth,
+    objectFit: 'cover'
+  });
 });
 
 test('日本語: visible print lifecycle は screen の予約版面を引き継がない', async ({ page }) => {

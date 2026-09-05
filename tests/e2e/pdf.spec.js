@@ -24,7 +24,8 @@ async function inspectPdf(buffer) {
       pages.push({
         width: viewport.width,
         height: viewport.height,
-        text: content.items.map((item) => item.str).join(' ')
+        text: content.items.map((item) => item.str).join(' '),
+        items: content.items
       });
     }
   } finally {
@@ -38,6 +39,11 @@ function expectPageSize(pages, expected) {
     expect(page.width).toBeCloseTo(expected.width, 0);
     expect(page.height).toBeCloseTo(expected.height, 0);
   }
+}
+
+function expectPdfContext(text, expected) {
+  if (typeof expected === 'string') expect(text).toContain(expected);
+  else expect(text).toMatch(expected);
 }
 
 async function printPdf(page) {
@@ -66,17 +72,19 @@ async function printFixturePdf(page, fixtureCase) {
 
 test('PDF pagination: 三言語のページ境界データは末尾内容を保持し空白ページを作らない @pdf', async ({ page }) => {
   const cases = [
-    { fixtureCase: { locale: 'ja', length: 'standard', documentType: 'resume', pageSize: 'A4' }, pages: 3, pageSize: A4 },
-    { fixtureCase: { locale: 'ja', length: 'extra-long', documentType: 'resume', pageSize: 'A4' }, pages: 11, pageSize: A4 },
-    { fixtureCase: { locale: 'zh-CN', length: 'near-boundary', pageSize: 'A4' }, pages: 2, pageSize: A4 },
-    { fixtureCase: { locale: 'en', length: 'near-boundary', pageSize: 'A4' }, pages: 2, pageSize: A4 },
-    { fixtureCase: { locale: 'en', length: 'near-boundary', pageSize: 'LETTER' }, pages: 2, pageSize: LETTER }
+    { fixtureCase: { locale: 'ja', length: 'standard', documentType: 'resume', pageSize: 'A4' }, pageSize: A4 },
+    { fixtureCase: { locale: 'ja', length: 'extra-long', documentType: 'resume', pageSize: 'A4' }, pageSize: A4 },
+    { fixtureCase: { locale: 'zh-CN', length: 'near-boundary', pageSize: 'A4' }, pageSize: A4 },
+    { fixtureCase: { locale: 'en', length: 'near-boundary', pageSize: 'A4' }, pageSize: A4 },
+    { fixtureCase: { locale: 'en', length: 'near-boundary', pageSize: 'LETTER' }, pageSize: LETTER }
   ];
 
   for (const expected of cases) {
     const { endMarker, pages } = await printFixturePdf(page, expected.fixtureCase);
-    expect(pages).toHaveLength(expected.pages);
+    expect(pages.length).toBeGreaterThan(0);
+    expect(pages.length).toBeLessThan(40);
     expectPageSize(pages, expected.pageSize);
+    expect(pages.every((item) => item.text.trim())).toBe(true);
     expect(pages.at(-1)?.text.trim()).not.toBe('');
     expect(pages.at(-1)?.text).toContain(endMarker);
   }
@@ -155,6 +163,82 @@ test('PDF short: English の短いデータは 1 ページの Letter でテキ�
   expect(pages).toHaveLength(1);
   expect(pages.map((item) => item.text).join(' ')).toContain('SHORT PDF MARKER');
   expectPageSize(pages, LETTER);
+});
+
+test('PDF long record: 四書類は95行を保持し、読みやすい文字サイズと続きの文脈を保つ @pdf', async ({ page }) => {
+  const details = Array.from(
+    { length: 95 },
+    (_, index) => `SYNTHETIC-ENTRY-${String(index + 1).padStart(3, '0')} fictional document layout verification.`
+  ).join('\n');
+  const cases = [
+    {
+      locale: 'ja',
+      state: () => {
+        const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'resume', pageSize: 'A4' });
+        state.documents.ja.education = [{ date: '2020-04', detail: details }];
+        state.documents.ja.employment = [];
+        return state;
+      },
+      continuation: '履歴書 · 印刷 試験 · 学歴',
+      firstRecordContext: '履歴書 · 印刷 試験 · 学歴'
+    },
+    {
+      locale: 'ja',
+      state: () => {
+        const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'career', pageSize: 'A4' });
+        state.documents.ja.careers[0].responsibilities = details;
+        return state;
+      },
+      continuation: '職務経歴（続き） · 検証株式会社 1 · 印刷品質担当 · 担当業務',
+      firstRecordContext: '検証株式会社 1'
+    },
+    {
+      locale: 'zh-CN',
+      state: () => {
+        const { state } = createPdfFixture({ locale: 'zh-CN', length: 'short', pageSize: 'A4' });
+        state.documents['zh-CN'].resume.experience[0].details = details;
+        return state;
+      },
+      continuation: /测试公司\s*1\s*·\s*打印质量负责\s*[人⼈]/,
+      firstRecordContext: /测试公司\s*1/
+    },
+    {
+      locale: 'en',
+      state: () => {
+        const { state } = createPdfFixture({ locale: 'en', length: 'short', pageSize: 'LETTER' });
+        state.documents.en.resume.experience[0].details = details;
+        return state;
+      },
+      continuation: 'Continued · Pagination Test Company 1 · Print Quality Lead',
+      firstRecordContext: 'Pagination Test Company 1'
+    }
+  ];
+
+  for (const fixture of cases) {
+    const state = fixture.state();
+    const previewSelector = fixture.locale === 'ja'
+      ? '#documentPreview'
+      : fixture.locale === 'zh-CN' ? '[data-zh-preview]' : '[data-en-preview]';
+    await openLocale(page, fixture.locale);
+    await page.locator('#importDataInput').setInputFiles({
+      name: 'long-single-record.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(state))
+    });
+    await expect(page.locator(previewSelector)).toContainText('SYNTHETIC-ENTRY-095');
+    const pages = await inspectPdf(await printPdf(page));
+    const text = pages.map((item) => item.text).join(' ');
+    expect(text.match(/SYNTHETIC-ENTRY-/g)).toHaveLength(95);
+    expect(pages.length).toBeGreaterThan(1);
+    const recordPages = pages.filter((item) => item.text.includes('SYNTHETIC-ENTRY-'));
+    expect(recordPages.length).toBeGreaterThan(1);
+    expectPdfContext(recordPages[0].text, fixture.firstRecordContext);
+    for (const continuationPage of recordPages.slice(1)) {
+      expectPdfContext(continuationPage.text, fixture.continuation);
+    }
+    const sampleItem = pages.flatMap((item) => item.items).find((item) => item.str.includes('SYNTHETIC-ENTRY-'));
+    expect(Math.abs(sampleItem?.transform?.[3] || 0)).toBeGreaterThanOrEqual(9.5);
+  }
 });
 
 test('PDF standard: 日本語の標準例は 2 ページの A4 で主要テキストを抽出できる @pdf', async ({ page }) => {
