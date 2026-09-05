@@ -16,8 +16,8 @@ export async function checkOnlineEditor(baseUrl) {
   const browser = await chromium.launch();
   const pageErrors = [];
   const context = await browser.newContext({ serviceWorkers: 'block' });
-  // A valid placeholder permits only the fixed beacon GET while routes below block every external request.
-  const network = observeNetwork(context, { baseUrl, expectedToken: 'a'.repeat(32) });
+  // Routes block the fixed beacon GET; no RUM request is allowed in this deterministic app check.
+  const network = observeNetwork(context, { allowBlockedBeaconScript: true, baseUrl });
   try {
     // Third-party runtime is blocked; this checks the editor, not the live RUM provider.
     await context.route('**/*', async (route) => {

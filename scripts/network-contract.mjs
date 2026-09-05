@@ -2,7 +2,7 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isAllowedCloudflareAnalyticsRequest } from './cloudflare-analytics.mjs';
+import { CLOUDFLARE_BEACON_URL, isAllowedCloudflareAnalyticsRequest } from './cloudflare-analytics.mjs';
 import { documentUrlPaths } from './deployment-path-contract.mjs';
 
 const siteRoot = fileURLToPath(new URL('../site/', import.meta.url));
@@ -42,12 +42,17 @@ export function requestDetails(request) {
   };
 }
 
-export function isAllowedNetworkRequest(request, { baseUrl, expectedToken = '' }) {
+export function isAllowedNetworkRequest(request, { allowBlockedBeaconScript = false, baseUrl, expectedToken = '' }) {
   const base = new URL(baseUrl);
   const url = new URL(request.url);
   if (!['http:', 'https:'].includes(url.protocol)) return true;
   if (url.username || url.password || url.hash) return false;
   if (url.origin !== base.origin) {
+    if (allowBlockedBeaconScript
+      && request.method === 'GET'
+      && request.resourceType === 'script'
+      && request.postData === null
+      && request.url === CLOUDFLARE_BEACON_URL) return true;
     return isAllowedCloudflareAnalyticsRequest({ ...request, expectedOrigin: base.origin, expectedToken });
   }
   const pathname = mountedPath(url, base);
@@ -75,7 +80,7 @@ function includesCanary(request, canaries) {
   return canaries.some((canary) => values.some((value) => value.includes(canary)));
 }
 
-export function observeNetwork(context, { baseUrl, expectedToken = '' }) {
+export function observeNetwork(context, { allowBlockedBeaconScript = false, baseUrl, expectedToken = '' }) {
   const requests = [];
   const webSockets = [];
   const observeRequest = (request) => requests.push(requestDetails(request));
@@ -94,7 +99,9 @@ export function observeNetwork(context, { baseUrl, expectedToken = '' }) {
     requests,
     webSockets,
     assertClean({ canaries = [] } = {}) {
-      const unexpected = requests.filter((request) => !isAllowedNetworkRequest(request, { baseUrl, expectedToken }));
+      const unexpected = requests.filter((request) => !isAllowedNetworkRequest(request, {
+        allowBlockedBeaconScript, baseUrl, expectedToken
+      }));
       const leaked = requests.filter((request) => includesCanary(request, canaries));
       const failures = [];
       if (unexpected.length) failures.push(`unexpected request (${requestSummary(unexpected[0], baseUrl)})`);
