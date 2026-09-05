@@ -179,14 +179,14 @@ jobs:
   publish:
     if: ${{ inputs.mode == 'publish' }}
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       actions: read
       contents: write
-      id-token: write
-      pages: write
+    outputs:
+      release_sha: ${{ steps.prepared.outputs.release_sha }}
+      analytics_mode: ${{ steps.prepared.outputs.analytics_mode }}
+      analytics_provider: ${{ steps.prepared.outputs.analytics_provider }}
+      artifact_digest: ${{ steps.prepared.outputs.artifact_digest }}
     steps:
       - name: Checkout trusted release tooling
         uses: actions/checkout@v7
@@ -278,6 +278,75 @@ jobs:
             exit 1
           fi
 
+      - name: Record tag outcome
+        if: ${{ always() }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
+        run: |
+          {
+            echo '## Immutable tag result'
+            echo "- Tag / SHA: ${RELEASE_TAG} / ${RELEASE_SHA:-unavailable}"
+            echo "- Tag step: ${{ steps.tag.outcome }}"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: publish
+    if: ${{ inputs.mode == 'publish' && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      pages: write
+    steps:
+      - name: Checkout trusted release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Revalidate the selected prepared run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREPARED_RUN_ID: ${{ inputs.prepared_run_id }}
+          PREPARED_ARTIFACT_ID: ${{ inputs.prepared_artifact_id }}
+        run: node scripts/validate-release-run.mjs prepared --run-id "$PREPARED_RUN_ID" --artifact-id "$PREPARED_ARTIFACT_ID"
+
+      - name: Download the same immutable artifact for deployment
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/prepared
+          artifact-ids: ${{ inputs.prepared_artifact_id }}
+          merge-multiple: true
+          run-id: ${{ inputs.prepared_run_id }}
+
+      - name: Verify original bytes against the tagged source
+        env:
+          RELEASE_SHA: ${{ needs.publish.outputs.release_sha }}
+          ANALYTICS_MODE: ${{ needs.publish.outputs.analytics_mode }}
+          ANALYTICS_PROVIDER: ${{ needs.publish.outputs.analytics_provider }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" "origin/${{ github.event.repository.default_branch }}"
+          git worktree add --detach "$RUNNER_TEMP/prepared-source" "$RELEASE_SHA"
+          node scripts/release-artifact-evidence.mjs verify \
+            --analytics-mode "$ANALYTICS_MODE" --analytics-provider "$ANALYTICS_PROVIDER" \
+            --artifact-dir "$RUNNER_TEMP/prepared/pages-site" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
+            --source-dir "$RUNNER_TEMP/prepared-source" --source-sha "$RELEASE_SHA"
+
       - name: Upload the verified original bytes for Pages
         uses: actions/upload-pages-artifact@v5
         with:
@@ -296,10 +365,10 @@ jobs:
         id: smoke
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-          RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
+          RELEASE_SHA: ${{ needs.publish.outputs.release_sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          ANALYTICS_MODE: ${{ steps.prepared.outputs.analytics_mode }}
-          ANALYTICS_PROVIDER: ${{ steps.prepared.outputs.analytics_provider }}
+          ANALYTICS_MODE: ${{ needs.publish.outputs.analytics_mode }}
+          ANALYTICS_PROVIDER: ${{ needs.publish.outputs.analytics_provider }}
         shell: bash
         run: |
           set -euo pipefail
@@ -321,9 +390,9 @@ jobs:
         if: ${{ always() }}
         env:
           ARTIFACT_ID: ${{ inputs.prepared_artifact_id }}
-          ARTIFACT_DIGEST: ${{ steps.prepared.outputs.artifact_digest }}
+          ARTIFACT_DIGEST: ${{ needs.publish.outputs.artifact_digest }}
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-          RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
+          RELEASE_SHA: ${{ needs.publish.outputs.release_sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         shell: bash
         run: |
@@ -335,6 +404,7 @@ jobs:
             echo "- Prepared run / artifact: \`${{ inputs.prepared_run_id }}\` / \`${ARTIFACT_ID}\`"
             echo "- Artifact digest: \`${ARTIFACT_DIGEST:-unavailable}\`"
             echo "- URL: ${PAGE_URL:-unavailable}"
-            echo "- Tag step: ${{ steps.tag.outcome }}; deploy: ${{ steps.deployment.outcome }}; smoke: ${{ steps.smoke.outcome }}"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Tag step: ${{ needs.publish.result }}; deploy: ${{ steps.deployment.outcome }}; smoke: ${{ steps.smoke.outcome }}"
             echo '- Unverified: live RUM receipt and manual browser acceptance.'
           } >> "$GITHUB_STEP_SUMMARY"
