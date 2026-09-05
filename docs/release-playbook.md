@@ -55,6 +55,8 @@ Source は既定で無効です。公式 CI だけが設定 manifest の mode / 
 
 許可する外部 runtime は `https://static.cloudflareinsights.com/beacon.min.js` の GET と `https://cloudflareinsights.com/cdn-cgi/rum` の標準 POST です。履歴書入力・写真・import/export JSON・草稿・custom event・利用者単位 ID を送信する変更は認めません。Cookie、localStorage、fingerprinting を追加しません。固定 URL や HTML digest は第三者 script 内容を固定するものではありません。利用者向け説明は [PRIVACY.md](../PRIVACY.md) を参照します。
 
+Field の根拠と互換性検査の範囲は [provider contract](cloudflare-analytics-contract.md) にまとめています。
+
 Artifact 全体の整合性は site token の秘密性と別に検証し、生成後の digest は CI evidence に記録します。事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
 
 ## 失敗したとき

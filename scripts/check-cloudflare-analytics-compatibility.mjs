@@ -228,13 +228,13 @@ export async function checkCloudflareAnalyticsCompatibility(directory) {
     const beaconConfigurationLoaded = await page.evaluate(() => Boolean(window.__cfBeacon?.token));
     phase = 'waiting-for-rum-lifecycle';
     await waitForRUMLifecycle(requests);
+    await page.close();
     phase = 'validating-network-contract';
     try {
       network.assertClean({ canaries: canary.canaries });
     } catch (error) {
       throw new Error(`${error.message}; ${rumContractObservation(requests)}.`);
     }
-    await page.close();
     const summary = summarizeCloudflareAnalyticsCompatibility({
       beaconStatus: beacon.status(),
       expectedOrigin: origin,
