@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { appendFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,7 +11,6 @@ export const CLOUDFLARE_BEACON_URL = 'https://static.cloudflareinsights.com/beac
 export const CLOUDFLARE_RUM_URL = 'https://cloudflareinsights.com/cdn-cgi/rum';
 
 const adapterPath = fileURLToPath(import.meta.url);
-const digestPattern = /^[0-9a-f]{64}$/;
 const cloudflareTokenPattern = /^[0-9a-f]{32}$/;
 const htmlPaths = Object.freeze(htmlDocumentContracts().map(({ artifactPath }) => artifactPath).sort(compareUtf8));
 const disclosureCopy = Object.freeze({
@@ -40,10 +38,6 @@ const disclosureCopy = Object.freeze({
 
 function fail(message) {
   throw new Error(message);
-}
-
-function sha256(value) {
-  return createHash('sha256').update(value).digest('hex');
 }
 
 function compareUtf8(left, right) {
@@ -200,30 +194,6 @@ async function transformCloudflareArtifact(directory, token) {
   }
 }
 
-export async function deriveCloudflareArtifact({ sourceDirectory, token }) {
-  if (!cloudflareTokenPattern.test(token || '')) fail('Cloudflare Web Analytics token is missing or invalid');
-  await validateSourceSite(sourceDirectory);
-  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'resume-pages-artifact-'));
-  const temporarySite = path.join(temporaryRoot, 'site');
-  try {
-    await cp(path.resolve(sourceDirectory), temporarySite, { errorOnExist: true, force: false, recursive: true });
-    await transformCloudflareArtifact(temporarySite, token);
-    const outputs = {
-      adapter_digest: await adapterDigest(),
-      final_digest: await computeTreeDigest(temporarySite),
-      source_digest: await computeTreeDigest(sourceDirectory)
-    };
-    await writeOutputs(outputs);
-    return outputs;
-  } finally {
-    await rm(temporaryRoot, { force: true, recursive: true });
-  }
-}
-
-async function adapterDigest() {
-  return sha256(await readFile(adapterPath));
-}
-
 async function writeOutputs(values) {
   if (!process.env.GITHUB_OUTPUT) return;
   const lines = Object.entries(values).map(([key, value]) => `${key}=${value}\n`).join('');
@@ -235,7 +205,6 @@ export async function validateReleaseSource({ manifestPath, sourceDirectory }) {
   await validateSourceSite(sourceDirectory);
   const sourceDigest = await computeTreeDigest(sourceDirectory);
   const outputs = {
-    adapter_digest: await adapterDigest(),
     analytics_mode: manifest.analyticsMode,
     analytics_provider: manifest.analyticsProvider,
     source_digest: sourceDigest
@@ -288,17 +257,10 @@ export async function prepareArtifact({
   }
 }
 
-export async function verifyArtifact({ directory, manifestPath }) {
-  await readManifest(manifestPath);
-  const finalDigest = await computeTreeDigest(directory);
-  await writeOutputs({ final_digest: finalDigest });
-  return finalDigest;
-}
-
 function parseArguments(values) {
   const [command, ...args] = values;
-  if (!['derive-cloudflare', 'prepare', 'validate', 'verify'].includes(command)) {
-    fail('Expected derive-cloudflare, validate, prepare, or verify command');
+  if (!['prepare', 'validate'].includes(command)) {
+    fail('Expected validate or prepare command');
   }
   const options = {};
   for (let index = 0; index < args.length; index += 2) {
@@ -306,7 +268,7 @@ function parseArguments(values) {
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('Invalid command arguments');
     const key = name.slice(2);
-    if (!['directory', 'manifest', 'output', 'repository', 'source'].includes(key) || key in options) {
+    if (!['manifest', 'output', 'repository', 'source'].includes(key) || key in options) {
       fail('Unknown or duplicate command argument');
     }
     options[key] = value;
@@ -316,25 +278,12 @@ function parseArguments(values) {
 
 async function main() {
   const { command, options } = parseArguments(process.argv.slice(2));
-  if (command === 'derive-cloudflare') {
-    if (!options.source || Object.keys(options).length !== 1) fail('derive-cloudflare requires only --source');
-    await deriveCloudflareArtifact({
-      sourceDirectory: options.source,
-      token: process.env.CLOUDFLARE_WEB_ANALYTICS_TOKEN || ''
-    });
-    return;
-  }
   if (command === 'validate') {
-    if (!options.source || !options.manifest) fail('validate requires --source and --manifest');
+    if (!options.source || !options.manifest || Object.keys(options).length !== 2) fail('validate requires --source and --manifest');
     await validateReleaseSource({ manifestPath: options.manifest, sourceDirectory: options.source });
     return;
   }
-  if (command === 'verify') {
-    if (!options.directory || !options.manifest) fail('verify requires --directory and --manifest');
-    await verifyArtifact({ directory: options.directory, manifestPath: options.manifest });
-    return;
-  }
-  if (!options.source || !options.output || !options.manifest || !options.repository) {
+  if (!options.source || !options.output || !options.manifest || !options.repository || Object.keys(options).length !== 4) {
     fail('prepare requires --source, --output, --manifest, and --repository');
   }
   await prepareArtifact({

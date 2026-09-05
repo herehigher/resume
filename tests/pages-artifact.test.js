@@ -158,9 +158,8 @@ test('enabled official artifact changes only the five allowlisted HTML documents
   assert.equal(await computeTreeDigest(sourceSite), sourceDigest);
 });
 
-test('enabled preparation rejects token and repository failures without leaking token', async (t) => {
+test('enabled preparation rejects token and repository failures with invalid public configuration', async (t) => {
   const temporary = temporaryDirectory(t);
-  const sourceDigest = await computeTreeDigest(sourceSite);
   const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
   const run = (candidate, repository = OFFICIAL_REPOSITORY) => prepareArtifact({
     manifestPath,
@@ -171,10 +170,7 @@ test('enabled preparation rejects token and repository failures without leaking 
   });
 
   for (const candidate of ['', 'a'.repeat(31), 'g'.repeat(32), `${token} `]) {
-    await assert.rejects(run(candidate), (error) => {
-      assert.doesNotMatch(error.message, new RegExp(token));
-      return /missing or invalid/.test(error.message);
-    });
+    await assert.rejects(run(candidate), /missing or invalid/);
   }
   await assert.rejects(run('', 'fork/example'), /restricted to the official repository/);
 });
@@ -253,38 +249,22 @@ test('prepare CLI refuses an existing output without changing its sentinel', asy
   assert.equal(readFileSync(sentinel, 'utf8'), 'preserve me');
 });
 
-test('derive and prepare CLI boundaries never expose the provider token', async (t) => {
+test('prepare CLI builds the enabled artifact and emits its byte digest', async (t) => {
   const temporary = temporaryDirectory(t);
   const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
-  const commands = [
-    {
-      args: ['derive-cloudflare', '--source', sourceSite],
-      output: path.join(temporary, 'derive-output.txt')
-    },
-    {
-      args: [
-        'prepare', '--source', sourceSite,
-        '--output', path.join(temporary, 'prepared-site'),
-        '--manifest', manifestPath,
-        '--repository', OFFICIAL_REPOSITORY
-      ],
-      output: path.join(temporary, 'prepare-output.txt')
-    }
-  ];
-
-  for (const command of commands) {
-    writeFileSync(command.output, '');
-    const result = spawnSync(process.execPath, [adapterPath, ...command.args], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        CLOUDFLARE_WEB_ANALYTICS_TOKEN: token,
-        GITHUB_OUTPUT: command.output
-      }
-    });
-    assert.equal(result.status, 0, result.stderr);
-    for (const boundary of [result.stdout, result.stderr, readFileSync(command.output, 'utf8')]) {
-      assert.doesNotMatch(boundary, new RegExp(token));
-    }
-  }
+  const output = path.join(temporary, 'prepared-site');
+  const actionsOutput = path.join(temporary, 'actions-output');
+  const result = spawnSync(process.execPath, [adapterPath,
+    'prepare', '--source', sourceSite, '--output', output,
+    '--manifest', manifestPath, '--repository', OFFICIAL_REPOSITORY
+  ], {
+    encoding: 'utf8',
+    env: { ...process.env, CLOUDFLARE_WEB_ANALYTICS_TOKEN: token, GITHUB_OUTPUT: actionsOutput }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const digest = await computeTreeDigest(output);
+  assert.ok(readFileSync(actionsOutput, 'utf8').includes(`final_digest=${digest}\n`));
+  const html = readFileSync(path.join(output, 'editor/index.html'), 'utf8');
+  assert.ok(html.includes(CLOUDFLARE_BEACON_URL));
+  assert.ok(html.includes(`&quot;token&quot;:&quot;${token}&quot;`));
 });
