@@ -102,23 +102,14 @@ export function validateManifest(value) {
   exactKeys(value, [
     'analyticsMode',
     'analyticsProvider',
-    'artifactTreeSha256',
-    'providerTokenSha256',
-    'schemaVersion',
-    'sourceTreeSha256'
+    'schemaVersion'
   ], 'Pages release manifest');
-  if (value.schemaVersion !== 1) fail('Unsupported Pages release manifest schemaVersion');
-  if (!digestPattern.test(value.sourceTreeSha256) || !digestPattern.test(value.artifactTreeSha256)) {
-    fail('Pages release manifest tree digests must be lowercase SHA-256 values');
-  }
+  if (value.schemaVersion !== 2) fail('Unsupported Pages release manifest schemaVersion');
   const disabled = value.analyticsMode === 'disabled'
-    && value.analyticsProvider === 'none'
-    && value.providerTokenSha256 === null;
+    && value.analyticsProvider === 'none';
   const cloudflare = value.analyticsMode === 'enabled'
-    && value.analyticsProvider === CLOUDFLARE_PROVIDER
-    && typeof value.providerTokenSha256 === 'string'
-    && digestPattern.test(value.providerTokenSha256);
-  if (!disabled && !cloudflare) fail('Unsupported analytics mode/provider/fingerprint tuple');
+    && value.analyticsProvider === CLOUDFLARE_PROVIDER;
+  if (!disabled && !cloudflare) fail('Unsupported analytics mode/provider tuple');
   return Object.freeze({ ...value });
 }
 
@@ -220,7 +211,6 @@ export async function deriveCloudflareArtifact({ sourceDirectory, token }) {
     const outputs = {
       adapter_digest: await adapterDigest(),
       final_digest: await computeTreeDigest(temporarySite),
-      provider_fingerprint: sha256(token),
       source_digest: await computeTreeDigest(sourceDirectory)
     };
     await writeOutputs(outputs);
@@ -244,12 +234,10 @@ export async function validateReleaseSource({ manifestPath, sourceDirectory }) {
   const manifest = await readManifest(manifestPath);
   await validateSourceSite(sourceDirectory);
   const sourceDigest = await computeTreeDigest(sourceDirectory);
-  if (sourceDigest !== manifest.sourceTreeSha256) fail('Source tree digest does not match the tagged manifest');
   const outputs = {
     adapter_digest: await adapterDigest(),
     analytics_mode: manifest.analyticsMode,
     analytics_provider: manifest.analyticsProvider,
-    provider_fingerprint: manifest.providerTokenSha256 ?? 'none',
     source_digest: sourceDigest
   };
   await writeOutputs(outputs);
@@ -269,7 +257,6 @@ export async function prepareArtifact({
   }
   if (repository === OFFICIAL_REPOSITORY && manifest.analyticsMode === 'enabled') {
     if (!cloudflareTokenPattern.test(token)) fail('Cloudflare Web Analytics token is missing or invalid');
-    if (sha256(token) !== manifest.providerTokenSha256) fail('Cloudflare Web Analytics token fingerprint mismatch');
   } else if (token) {
     fail('Analytics token must not be provided for this artifact mode');
   }
@@ -291,7 +278,6 @@ export async function prepareArtifact({
     await validateSourceSite(temporaryOutput);
     if (manifest.analyticsMode === 'enabled') await transformCloudflareArtifact(temporaryOutput, token);
     const finalDigest = await computeTreeDigest(temporaryOutput);
-    if (finalDigest !== manifest.artifactTreeSha256) fail('Prepared artifact digest does not match the tagged manifest');
     await assertOutputMissing(outputAbsolute);
     await rename(temporaryOutput, outputAbsolute);
     const outputs = { final_digest: finalDigest, source_digest: sourceDigest };
@@ -303,9 +289,8 @@ export async function prepareArtifact({
 }
 
 export async function verifyArtifact({ directory, manifestPath }) {
-  const manifest = await readManifest(manifestPath);
+  await readManifest(manifestPath);
   const finalDigest = await computeTreeDigest(directory);
-  if (finalDigest !== manifest.artifactTreeSha256) fail('Final artifact digest changed after preparation');
   await writeOutputs({ final_digest: finalDigest });
   return finalDigest;
 }

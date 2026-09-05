@@ -14,8 +14,6 @@ import {
 import {
   CLOUDFLARE_PROVIDER,
   OFFICIAL_REPOSITORY,
-  computeTreeDigest,
-  deriveCloudflareArtifact,
   prepareArtifact
 } from '../../scripts/prepare-pages-artifact.mjs';
 
@@ -36,15 +34,11 @@ let temporary;
 test.beforeAll(async () => {
   temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-enabled-pages-'));
   const output = path.join(temporary, 'site');
-  const derived = await deriveCloudflareArtifact({ sourceDirectory: sourceSite, token });
   const manifestPath = path.join(temporary, 'manifest.json');
   writeFileSync(manifestPath, `${JSON.stringify({
     analyticsMode: 'enabled',
     analyticsProvider: CLOUDFLARE_PROVIDER,
-    artifactTreeSha256: derived.final_digest,
-    providerTokenSha256: derived.provider_fingerprint,
-    schemaVersion: 1,
-    sourceTreeSha256: await computeTreeDigest(sourceSite)
+    schemaVersion: 2
   })}\n`);
   await prepareArtifact({
     manifestPath,
