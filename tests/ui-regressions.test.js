@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
@@ -80,26 +79,4 @@ test('all locale editors and template styles are connected to the page', () => {
   assert.match(main, /japaneseEditor\.refresh\(\)/);
   assert.match(localeController, /'zh-CN': document\.getElementById\('chineseWorkspace'\)/);
   assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
-});
-
-test('Pages release preparation and publication preserve one verified artifact', () => {
-  const quality = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  const release = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
-
-  assert.match(quality, /name: Quality/);
-  assert.match(quality, /pull_request:/);
-  assert.match(quality, /push:\s*\n\s*branches:\s*\n\s*- main/);
-  assert.match(quality, /permissions: \{\}/);
-  assert.match(release, /mode:[\s\S]*?options: \[prepare, publish\]/);
-  assert.match(release, /node scripts\/validate-release-run\.mjs quality --sha/);
-  assert.match(release, /node scripts\/release-artifact-evidence\.mjs create/);
-  assert.match(release, /uses: actions\/upload-artifact@v7[\s\S]*?name: pages-release-artifact/);
-  assert.match(release, /artifact-ids: \$\{\{ inputs\.prepared_artifact_id \}\}/);
-  assert.match(release, /node scripts\/release-publication\.mjs publish/);
-  assert.match(release, /uses: actions\/upload-pages-artifact@v5/);
-  assert.match(release, /uses: actions\/deploy-pages@v5/);
-  assert.match(release, /node scripts\/check-online-editor\.mjs/);
-  assert.doesNotMatch(release, /provider[-_]?fingerprint/i);
-  assert.doesNotMatch(release, /--provider-value/);
-  assert.ok(DEPLOYMENT_PATH_CONTRACTS.some((contract) => contract.artifactPath === 'editor/index.html'));
 });

@@ -71,9 +71,9 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 
 新経路で作った版は、その版の未失効の prepare run / artifact ID と既存 tag を指定して publish を再実行します。保存済み artifact が失効していれば、元の merged PR から再度 prepare し、結果を確認してから公開します。
 
-旧形式は受入済み `v0.2.0` / `v0.2.2` に限定し、`mode=prepare`、`release_tag` を指定、`pr_number` は空欄にします。小さな互換 adapter が当時の mode / provider を読み、現在の公開 site 設定で配布物を準備します。古い公開 bytes の完全再現とは区別し、承認前に再検証します。旧版の Quality には確認用画像・PDF artifact がない場合があります。必要な目視証拠は別途用意し、未確認のまま公開しません。
+旧形式で current adapter に適合する受入済み tag は `v0.2.2` だけです。`mode=prepare` と `release_tag` を指定し、`pr_number` は空欄にします。小さな互換 adapter が当時の mode / provider を読み、現在の公開 site 設定で配布物を準備します。古い公開 bytes の完全再現とは区別し、承認前に再検証します。旧版の Quality には確認用画像・PDF artifact がない場合があります。必要な目視証拠は別途用意し、未確認のまま公開しません。
 
-放棄済み `v0.2.1` と互換 adapter 未対応の `v0.1.0` はこの復旧入口の対象外です。どの経路でも既存 tag を移動せず、所有者の指示・承認の範囲で再配布し、smoke の成功を確認します。
+放棄済み `v0.2.1`、source の hreflang contract が current adapter と異なる `v0.2.0`、互換 adapter 未対応の `v0.1.0` はこの復旧入口の対象外です。どの経路でも既存 tag を移動せず、所有者の指示・承認の範囲で再配布し、smoke の成功を確認します。
 
 ## 初回設定・設定変更時だけ行うこと
 
