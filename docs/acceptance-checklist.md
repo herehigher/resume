@@ -4,13 +4,12 @@
 
 ## 自動ゲート
 
+公開の自動検証・再開・旧 tag の対応範囲は [リリース手順](release-playbook.md) を参照する。
+
 - `npm ci`、`npm test`、`npm run lint`、`npx playwright install chromium`、`npm run test:e2e` が成功する。
-- 安定版 Tag（`vMAJOR.MINOR.PATCH`）の Pages release は、tag が `v${package.json version}` と一致し、再利用可能な `Quality` workflow が成功し、対象 commit が `main` の履歴に含まれる場合だけ deploy job へ進む。Leading zero、prerelease、build metadata、不正な ref 形式は拒否する。
-- Pinned release SHA の `Pre-tag artifact gate` は default branch から manual dispatch され、#77 の online path contract、version、main ancestry、manifest、artifact semantic smoke を read-only で検証する。provider raw value は必要な場合でも GitHub runner 内だけに留め、summary には tag、SHA、fingerprint、artifact digest、run URL だけが出る。
 - `main` の通常 push は `.github/workflows/ci.yml` の Quality だけを実行し、Pages を deploy しない。`Quality / quality` を main の必須 status check とし、失敗した Pull Request の merge を禁止する。
 - Pages artifact は検証済み full commit SHA の `site/` だけを含み、deploy は artifact と Quality の両方に依存する。GitHub Actions の `github-pages` environment に結果と URL が表示される。
 - `pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` なので実行中の production deployment を自動 cancel しない。release host の local pre-check は競合を race-free にする保証ではない。
-- Manual rollback / redeploy は default branch の `Deploy Pages` workflow へ既存 tag を入力し、自動 release と同じ exact tag、version、main ancestry、Quality gate を通す。
 - Playwright の失敗時は GitHub Actions の `playwright-results` artifact で trace と screenshot を確認する。
 - PDF ゲートは short（英語1ページ）、standard（日本語2ページ）、long（英語複数ページ）について、ページ数、用紙寸法、先頭・末尾の抽出テキストを確認する。
 - `tests/public-entry.test.js` が root、`/zh-cn/`、`/en/` の public entry と `/ja/` 互換入口の metadata、canonical / hreflang、`sitemap.xml`、`resume-studio-web-v1.schema.json` と import example の代表的な正常・異常 case を検証する。

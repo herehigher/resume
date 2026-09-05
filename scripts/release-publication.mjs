@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { verifyArtifactEvidence } from './release-artifact-evidence.mjs';
 
 const stableTagPattern = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
-const rollbackTags = new Set(['v0.2.0', 'v0.2.2']);
+const rollbackTags = new Set(['v0.2.2']);
 
 function fail(message) {
   throw new Error(`Release publication failed: ${message}`);
@@ -27,6 +27,7 @@ function tagExists(cwd, tag) {
 
 export function validateRollbackTag(tag) {
   if (tag === 'v0.2.1') fail('v0.2.1 is not an accepted rollback target');
+  if (tag === 'v0.2.0') fail('v0.2.0 requires an incompatible legacy path and cannot be prepared by the current adapter');
   if (!rollbackTags.has(tag)) fail('rollback tag is not an accepted historical release');
   return tag;
 }

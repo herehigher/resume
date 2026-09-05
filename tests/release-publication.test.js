@@ -11,6 +11,7 @@ import { ensureImmutableReleaseTag, validateRollbackTag } from '../scripts/relea
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const command = path.join(root, 'scripts/release-publication.mjs');
+const analytics = { analyticsMode: 'enabled', analyticsProvider: 'cloudflare-web-analytics' };
 
 function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -34,7 +35,7 @@ function fixture(t) {
 
 test('publication creates an immutable tag and safely resumes the same tag', async (t) => {
   const { artifact, cwd, evidence, sha } = fixture(t);
-  await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
+  await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
   const created = await ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' });
   assert.equal(created.resumed, false);
   const resumed = await ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' });
@@ -43,7 +44,7 @@ test('publication creates an immutable tag and safely resumes the same tag', asy
 
 test('publication rejects tag and artifact mismatches', async (t) => {
   const { artifact, cwd, evidence, sha } = fixture(t);
-  await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
+  await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
   await assert.rejects(ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v9.9.9' }), /does not match/);
   writeFileSync(path.join(cwd, 'different.txt'), 'different commit\n');
   git(cwd, 'add', 'different.txt');
@@ -56,6 +57,7 @@ test('publication rejects tag and artifact mismatches', async (t) => {
 test('publication CLI accepts only historical rollback targets and excludes v0.2.1', () => {
   assert.equal(validateRollbackTag('v0.2.2'), 'v0.2.2');
   assert.throws(() => validateRollbackTag('v0.2.1'), /not an accepted/);
+  assert.throws(() => validateRollbackTag('v0.2.0'), /incompatible legacy/);
   const rejected = spawnSync(process.execPath, [command, 'rollback', '--tag', 'v0.2.1'], { encoding: 'utf8' });
   assert.notEqual(rejected.status, 0);
   assert.match(rejected.stderr, /not an accepted/);
@@ -63,7 +65,7 @@ test('publication CLI accepts only historical rollback targets and excludes v0.2
 
 test('publication CLI creates and resumes a real annotated tag from a temporary artifact', async (t) => {
   const { artifact, cwd, evidence, sha } = fixture(t);
-  await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
+  await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
   const invoke = () => spawnSync(process.execPath, [command, 'publish',
     '--artifact-dir', artifact, '--cwd', cwd, '--evidence', evidence,
     '--source-dir', cwd, '--source-sha', sha, '--tag', 'v0.2.2'

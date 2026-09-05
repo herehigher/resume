@@ -14,6 +14,7 @@ import {
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const command = path.join(root, 'scripts/release-artifact-evidence.mjs');
+const analytics = { analyticsMode: 'enabled', analyticsProvider: 'cloudflare-web-analytics' };
 
 function fixture(t) {
   const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-artifact-evidence-'));
@@ -29,26 +30,26 @@ function fixture(t) {
 test('artifact evidence binds immutable bytes, package version, and source SHA', async (t) => {
   const { artifact, evidence, source } = fixture(t);
   const sha = 'a'.repeat(40);
-  const created = await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
-  const verified = await verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha });
+  const created = await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
+  const verified = await verifyArtifactEvidence({ ...analytics, artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha });
   assert.deepEqual(verified, created);
 });
 
 test('artifact evidence rejects mismatched source, artifact, and resume attempts', async (t) => {
   const { artifact, evidence, source } = fixture(t);
   const sha = 'b'.repeat(40);
-  await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
-  await assert.rejects(verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: 'c'.repeat(40) }), /different source SHA/);
+  await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
+  await assert.rejects(verifyArtifactEvidence({ ...analytics, artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: 'c'.repeat(40) }), /different source SHA/);
   writeFileSync(path.join(artifact, 'index.html'), `${readFileSync(path.join(artifact, 'index.html'), 'utf8')}\n`);
-  await assert.rejects(verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha }), /artifact bytes/);
+  await assert.rejects(verifyArtifactEvidence({ ...analytics, artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha }), /artifact bytes/);
 });
 
 test('artifact evidence refuses to overwrite a prepared record', async (t) => {
   const { artifact, evidence, source } = fixture(t);
   const sha = 'd'.repeat(40);
-  await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
-  await assert.rejects(writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha }), /EEXIST/);
-  const derived = await createArtifactEvidence({ artifactDirectory: artifact, sourceDirectory: source, sourceSha: sha });
+  await writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
+  await assert.rejects(writeArtifactEvidence({ ...analytics, artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha }), /EEXIST/);
+  const derived = await createArtifactEvidence({ ...analytics, artifactDirectory: artifact, sourceDirectory: source, sourceSha: sha });
   assert.equal(derived.sourceSha, sha);
 });
 
@@ -56,6 +57,7 @@ test('artifact evidence CLI succeeds, resumes, and rejects an artifact mismatch'
   const { artifact, evidence, source } = fixture(t);
   const sha = 'e'.repeat(40);
   const invoke = (verb, inputSha = sha) => spawnSync(process.execPath, [command, verb,
+    '--analytics-mode', analytics.analyticsMode, '--analytics-provider', analytics.analyticsProvider,
     '--artifact-dir', artifact, '--evidence', evidence, '--source-dir', source, '--source-sha', inputSha
   ], { encoding: 'utf8' });
   const created = invoke('create');
