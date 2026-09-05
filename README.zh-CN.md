@@ -67,7 +67,7 @@ npx --yes http-server site --port 8000
 - [简体中文 A4 PDF 示例](output/pdf/zh-CN-a4.pdf)
 - [English US Letter PDF 示例](output/pdf/en-letter.pdf)
 
-所有文件均使用虚构的示例数据。生成来源和 Chromium version 记录在 [asset manifest](docs/assets-manifest.json) 中。
+这些历史展示示例均使用虚构数据。生成时的 source 和 Chromium version 记录在 [asset manifest](docs/assets-manifest.json) 中。
 
 ## 数据和隐私
 

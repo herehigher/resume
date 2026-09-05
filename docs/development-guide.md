@@ -65,13 +65,11 @@ resume/
 Dependency を導入し、`site/` を static server から配信します。
 
 ```bash
-git lfs install --local
-git lfs pull
 npm ci
 python3 -m http.server 8000 --directory site
 ```
 
-Git LFS client が未導入の場合は先にインストールします。`git lfs pull` により release screenshot と PDF sample の実体を取得します。
+通常の開発・test・CI は Git LFS client や過去の screenshot / PDF sample の実体を必要としません。
 
 Chrome で editor の `http://localhost:8000/editor/`、public entry の `http://localhost:8000/`、`http://localhost:8000/zh-cn/`、`http://localhost:8000/en/` を開けます。既存外部リンクの互換確認には `http://localhost:8000/ja/` も利用できます。Production code に build step はありません。
 
@@ -89,8 +87,8 @@ Chrome で editor の `http://localhost:8000/editor/`、public entry の `http:/
 | `npm run lint` | `site/assets/js/`、`scripts/`、`tests/` の Biome lint |
 | `npm run test:e2e` | Desktop / mobile workflow、public entry の no-JavaScript 表示、UI semantic state、source の外部通信拒否、disabled / enabled / configuration error の privacy status、合成 token で作る enabled artifact の固定 Cloudflare request、PDF page size・pagination・抽出 text の Playwright acceptance。Live provider には依存しない |
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
-| `npm run release:assets -- --source-sha <SHA>` | 指定 commit の Git archive から一時候補として三言語 screenshot、PDF sample、provenance manifest を生成・検査し、source SHA・site hash・対象7ファイルと SHA-256 を表示する |
-| `npm run test:release-assets` | Release asset が最終 RC の `site/` と一致し、既存の文書・画像・PDF 検査を通ることを確認 |
+| `npm run generate:doc-assets -- --output-dir <DIR> --source-sha <SHA>` | source checkout と独立した空の一時 directory に、三言語 screenshot、PDF、provenance manifest を生成する。SHA が checkout の HEAD と一致しない場合は fail する |
+| `npm run verify:doc-assets -- --asset-root <DIR> --source-root <DIR> --source-sha <SHA>` | 一時 output の source SHA、site hash、PNG size、PDF page size と marker text、output hash を検証する |
 | GitHub `Prepare release manifest` | Enabled Analytics の versioned `site/` から、provider raw value を runner 内だけで使用して manifest 用の非機密 source / adapter / artifact digest を導出 |
 | GitHub `Pre-tag artifact gate` | Tag 作成前に immutable release SHA の version、main ancestry、#77 の online path contract、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証。raw provider value は GitHub runner 外へ出さない |
 
@@ -104,34 +102,28 @@ Chrome で editor の `http://localhost:8000/editor/`、public entry の `http:/
 | CSS、responsive、print、PDF | 関連する Node / E2E test、`npm run test:acceptance`、[受入チェックリスト](acceptance-checklist.md) の対象 page |
 | Script、dependency、workflow、release gate | 変更対象の focused check、`npm run test:acceptance`、実際の CI / release dependency の review |
 | `site/` または公開 sample data | 上記の test を実行する。日常開発と通常の Pull Request では screenshot / PDF sample を更新しない |
-| 新 version の最終 release candidate | Tag 作成前の release Pull Request で公開文書 asset を再生成し、次節の provenance / visual check を実行 |
+| 新 version の最終 release candidate | CI の一時 documentation artifact と対象 page の目視確認を実行 |
 
 CI の `Quality` workflow も `npm test`、lint、Playwright E2E を実行します。Public entry と machine-readable contract、locale resolution、locale data isolation、invalid import protection、escape / URL protocol、mobile operation、network guard、PDF の詳細な release 判定は [受入チェックリスト](acceptance-checklist.md) に集約します。
 
 ## 公開文書 asset の更新
 
-Screenshot と PDF sample は release の snapshot として扱い、日常開発、通常の feature Pull Request、`main` push では更新しません。新 version の `site/`、public sample、version 表示を確定して最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ screenshot、PDF、manifest を同じ commit に更新します。Tag workflow は immutable な tag から deploy するだけで、生成物を repository へ書き戻しません。
+Screenshot と PDF sample は過去の公開 snapshot として扱い、日常開発、通常の feature Pull Request、`main` push、version / release date / workflow だけの変更では更新しません。UI、layout、template、font、公開 sample data を変更した場合だけ、同じ架空 data の provenance を更新して展示 sample を更新します。Tag workflow は immutable な tag から deploy するだけで、生成物を repository へ書き戻しません。
 
-Release asset は working tree から直接順次上書きしません。Pinned RC の clean export を一時 staging にして全 output を検査し、source SHA、site hash、対象 file list を表示します。Approval A の後だけ screenshot 3件、PDF 3件、manifest 1件をまとめて promote します。途中の生成・検査・promotion が失敗した場合は既存 tracked output を維持または復元し、partial update を残しません。実装済み interface の具体的な invocation 以外をこの文書から推測して実行しません。
+CI は checkout と独立した空の temporary directory で三言語 screenshot、PDF、manifest を生成して検証し、Actions artifact に保存します。生成先が source checkout または既存の展示物を上書きする path、空でない directory、source SHA が checkout と一致しない場合は fail します。失敗しても source や展示 sample は変更しません。
 
 ```bash
-npm run release:assets -- --source-sha '<RELEASE_SHA>'
-# 表示された bundle path、source SHA、site hash、7つの対象ファイルと SHA-256 を owner が目視確認する。
-# 明示承認後は同じ bundle だけを再検証して promote する。
-npm run release:assets -- --bundle '<BUNDLE_PATH>' --owner-approval
-git add docs/assets-manifest.json docs/screenshots/*.png output/pdf/*.pdf
-npm run test:release-assets
-git lfs ls-files
+npm run generate:doc-assets -- --output-dir '<TEMPORARY_DIRECTORY>' --source-sha '<RELEASE_SHA>'
+npm run verify:doc-assets -- --asset-root '<TEMPORARY_DIRECTORY>' --source-root '<CHECKOUT_DIRECTORY>' --source-sha '<RELEASE_SHA>'
 ```
 
-`docs/screenshots/*.png` と `output/pdf/*.pdf` は `.gitattributes` により Git LFS で管理します。Clone 後に実体を取得するには Git LFS client が必要です。過去 commit の binary blob は履歴を書き換えず、LFS 設定を導入する commit 以降を LFS object とします。
+既存の `docs/screenshots/*.png` と `output/pdf/*.pdf` は過去の公開 sample として保持します。過去 commit の binary blob や LFS 履歴は書き換えません。通常の clone、test、CI はこれらの実体を必要としません。
 
 生成後は次を確認します。
 
-- `docs/screenshots/` の三言語 screenshot が同一 release candidate 由来であること。
-- `output/pdf/` の日本語 A4、中国語 A4、English Letter を全 page render し、文字切れ、重なり、空白・重複 page、壊れた glyph がないこと。
-- Git archive は tracked commit だけを入力にするため、ignored / untracked file は候補生成に入らない。stage は permission-restricted owner temporary bundle を保持して候補を目視可能にし、promote は同じ bundle の source commit・site hash・対象7ファイルの SHA-256 を再表示・再検証する。owner approval がない限り tracked output は変えないこと。
-- `docs/assets-manifest.json` の source commit・site hash、Chromium version、output hash が生成物と一致すること。promote 中の copy failure では対象7ファイルを backup から復元すること。成功後の backup / bundle cleanup failure は復元 failure ではないため、保持された path を記録して cleanup 状態を確認すること。
+- 一時 artifact の三言語 screenshot と、日本語 A4、中国語 A4、English Letter PDF を対象 commit から生成し、全 page の size と marker text を検証すること。
+- manifest の source commit・site hash、Chromium version、output hash が一時生成物と一致すること。
+- UI、layout、template、font、公開 sample data を変更して展示 sample を更新する場合は、三言語 screenshot と PDF を目視確認し、過去 sample と誤認しない provenance を記録すること。
 - Fixture、sample、生成 asset に、実在する個人・organization・account と誤認される data を含めないこと。
 
 ## Release と責任範囲
@@ -142,7 +134,7 @@ git lfs ls-files
 - `.github/workflows/deploy-pages.yml` は tag の exact ref を commit まで解決し、同じ full commit SHA を reusable `Quality` workflow と Pages artifact checkout に渡します。Quality が失敗した場合は artifact 作成と deploy を実行しません。Artifact は `site/` だけを含みます。
 - Release の実行層は local sandbox、owner-approved trusted release host、GitHub runner、Pages deployment job の四つです。release host は認証済み `gh` session と GitHub API で identity / permission を確認し、OS credential API を直接呼びません。macOS Keychain は一例であり、Windows Credential Manager、Linux Secret Service 等も同じ安全な provider contract を満たします。Pages OIDC は release host の credential provider と独立します。
 - AI agent environment に raw `GH_TOKEN` / `GITHUB_TOKEN` が直接ある場合、agent-assisted sensitive step は owner 管理の隔離 session へ deferred とします。これは human または CI の認証方法全体を禁止する規則ではありません。
-- Approval A（clean staged release assets の promotion）と Approval B（repository / exact tag / full SHA / version の再照合後の remote push）は別です。Pages settings、redeploy、rollback、final acceptance も個別の owner decision を要します。
+- Repository、exact tag、full SHA、version の再照合、Pages settings、redeploy、rollback、final acceptance はそれぞれ個別の owner decision を要します。
 - `.github/workflows/deploy-pages.yml` の `pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` で実行中 deployment を自動 cancel しません。release host の local pre-check は race-free guarantee ではありません。
 - Public release、tag、Pages settings、repository visibility を変更するには、owner の明示承認が必要です。Release tag は移動または削除せず、修正が必要な場合は新しい version を発行します。
 - Release workflow の smoke は production URL、公開 path、version marker を bounded retry で確認します。Smoke failure は「deploy 済み・未受入」であり、自動 rollback を意味しません。

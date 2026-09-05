@@ -5,8 +5,6 @@
 ## 開発環境
 
 ```bash
-git lfs install --local
-git lfs pull
 npm ci
 python3 -m http.server 8000 --directory site
 ```
@@ -39,7 +37,7 @@ npm run test:acceptance
 
 PDF や responsive layout を変更した場合は [release acceptance checklist](docs/acceptance-checklist.md) に従い、全対象 page を目視確認します。
 
-README の screenshot と PDF sample は通常の feature Pull Request では更新しません。新 version の最終 release candidate を freeze した後、tag 作成前の release Pull Request でだけ `npm run release:assets -- --source-sha <SHA>` で clean Git archive の temporary bundle を確認します。表示された bundle path、source commit、site hash、対象7ファイルと SHA-256 を owner が明示承認した場合だけ、同じ bundle を `npm run release:assets -- --bundle <BUNDLE_PATH> --owner-approval` で再検証して promote し、`npm run test:release-assets` を通して Git LFS object として commit します。
+README の screenshot と PDF sample は provenance を記録した過去の展示物です。通常の feature Pull Request、version、release date、workflow だけの変更では更新しません。UI、layout、template、font、公開 sample data を変更する Pull Request では、架空 data のみを使い provenance とともに更新します。PDF correctness は CI が対象 commit から一時生成した artifact を検証します。
 
 ## Issue と Pull Request
 
