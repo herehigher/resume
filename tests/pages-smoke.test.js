@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,8 +9,6 @@ import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.m
 import {
   CLOUDFLARE_PROVIDER,
   OFFICIAL_REPOSITORY,
-  computeTreeDigest,
-  deriveCloudflareArtifact,
   prepareArtifact
 } from '../scripts/prepare-pages-artifact.mjs';
 import { validateDeploymentArtifact, validatePublishedDeployment } from '../scripts/validate-pages-smoke.mjs';
@@ -19,7 +16,6 @@ import { validateDeploymentArtifact, validatePublishedDeployment } from '../scri
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = path.join(root, 'site');
 const token = 'a'.repeat(32);
-const fingerprint = createHash('sha256').update(token).digest('hex');
 const packageVersion = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 
 function temporaryDirectory(t) {
@@ -34,20 +30,15 @@ async function validate(directory, overrides = {}) {
     analyticsMode: 'disabled',
     analyticsProvider: 'none',
     packageVersion,
-    providerFingerprint: 'none',
     ...overrides
   });
 }
 
 async function enabledArtifact(directory) {
-  const derived = await deriveCloudflareArtifact({ sourceDirectory: directory, token });
   const manifest = {
     analyticsMode: 'enabled',
     analyticsProvider: CLOUDFLARE_PROVIDER,
-    artifactTreeSha256: derived.final_digest,
-    providerTokenSha256: fingerprint,
-    schemaVersion: 1,
-    sourceTreeSha256: await computeTreeDigest(directory)
+    schemaVersion: 2,
   };
   const manifestPath = path.join(path.dirname(directory), `${path.basename(directory)}.manifest.json`);
   writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
@@ -59,19 +50,15 @@ async function enabledArtifact(directory) {
     sourceDirectory: directory,
     token
   });
-  return { directory: output, fingerprint: derived.provider_fingerprint };
+  return { directory: output };
 }
 
 async function disabledArtifact(directory) {
-  const sourceDigest = await computeTreeDigest(directory);
   const manifestPath = path.join(path.dirname(directory), `${path.basename(directory)}.manifest.json`);
   writeFileSync(manifestPath, `${JSON.stringify({
     analyticsMode: 'disabled',
     analyticsProvider: 'none',
-    artifactTreeSha256: sourceDigest,
-    providerTokenSha256: null,
-    schemaVersion: 1,
-    sourceTreeSha256: sourceDigest
+    schemaVersion: 2,
   })}\n`);
   const output = `${directory}-prepared`;
   await prepareArtifact({
@@ -102,11 +89,10 @@ test('semantic smoke accepts disabled and enabled prepared artifacts with legal 
   await validate(prepared.directory, {
     analyticsMode: 'enabled',
     analyticsProvider: CLOUDFLARE_PROVIDER,
-    providerFingerprint: prepared.fingerprint
   });
 });
 
-test('semantic smoke detects language, analytics tuple, beacon duplication, and token mismatch', async (t) => {
+test('semantic smoke detects language, analytics tuple, beacon duplication, and invalid beacon configuration', async (t) => {
   const temporary = temporaryDirectory(t);
   const cases = [
     ['language', 'en/index.html', (html) => html.replace('lang="en"', 'lang="ja"'), /language is invalid/],
@@ -135,12 +121,11 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
   cpSync(source, enabled, { recursive: true });
   const prepared = await enabledArtifact(enabled);
   const target = path.join(prepared.directory, 'en/index.html');
-  writeFileSync(target, readFileSync(target, 'utf8').replace(token, 'b'.repeat(32)));
+  writeFileSync(target, readFileSync(target, 'utf8').replace(token, 'invalid-site-setting'));
   await assert.rejects(validate(prepared.directory, {
     analyticsMode: 'enabled',
     analyticsProvider: CLOUDFLARE_PROVIDER,
-    providerFingerprint: fingerprint
-  }), /fingerprint/);
+  }), /beacon contract/);
 
   for (const [name, mutate, expected] of [
     ['missing-beacon', (html) => html.replace(/\s*<script[^>]*data-cf-beacon[^>]*><\/script>/, ''), /must contain one analytics beacon/],
@@ -157,7 +142,6 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
     await assert.rejects(validate(artifact.directory, {
       analyticsMode: 'enabled',
       analyticsProvider: CLOUDFLARE_PROVIDER,
-      providerFingerprint: fingerprint
     }), expected);
   }
 });
@@ -187,7 +171,6 @@ test('published smoke fetches every authoritative path and reports editor respon
     baseUrl: 'https://example.test/resume/',
     fetchImpl,
     packageVersion,
-    providerFingerprint: 'none',
     releaseSha: 'a'.repeat(40)
   });
   assert.deepEqual(requests, DEPLOYMENT_PATH_CONTRACTS.map((contract) => contract.urlPath));
@@ -209,7 +192,6 @@ test('published smoke fetches every authoritative path and reports editor respon
     baseUrl: 'https://example.test/resume/',
     fetchImpl: missingEditor,
     packageVersion,
-    providerFingerprint: 'none'
   }), /editor\/ \[artifact=editor\/index\.html; status=404; content-type=text\/html; charset=utf-8\]/);
 });
 
@@ -229,7 +211,6 @@ test('published smoke bounds every request with an injectable timeout signal', a
       throw signal.reason;
     },
     packageVersion,
-    providerFingerprint: 'none',
     requestTimeoutMs: 25,
     timeoutSignal
   }), /\/ \[artifact=index\.html; status=timeout; content-type=unknown\]/);
