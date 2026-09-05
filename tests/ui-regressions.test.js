@@ -82,50 +82,24 @@ test('all locale editors and template styles are connected to the page', () => {
   assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
 });
 
-test('Pages releases use the validated commit and cannot bypass the reusable quality workflow', () => {
+test('Pages release preparation and publication preserve one verified artifact', () => {
   const quality = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  const deploy = readFileSync(new URL('../.github/workflows/deploy-pages.yml', import.meta.url), 'utf8');
+  const release = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 
   assert.match(quality, /name: Quality/);
   assert.match(quality, /pull_request:/);
   assert.match(quality, /push:\s*\n\s*branches:\s*\n\s*- main/);
-  assert.match(quality, /workflow_call:/);
-  assert.match(quality, /checkout_ref:\s*\n\s*description:[^\n]+\n\s*required: true\s*\n\s*type: string/);
-  assert.match(quality, /ref: \$\{\{ inputs\.checkout_ref \|\| github\.sha \}\}/);
   assert.match(quality, /permissions: \{\}/);
-  assert.match(quality, /quality:\s*\n\s*runs-on:[\s\S]*?permissions:\s*\n\s*contents: read/);
-
-  assert.match(deploy, /tags:\s*\n\s*- 'v\*\.\*\.\*'/);
-  assert.match(deploy, /workflow_dispatch:\s*\n\s*inputs:\s*\n\s*release_tag:/);
-  assert.doesNotMatch(deploy, /^\s+branches:/m);
-  assert.match(deploy, /permissions: \{\}/);
-  assert.match(deploy, /group: pages-production\s*\n\s*cancel-in-progress: false/);
-  assert.match(deploy, /run: node scripts\/validate-release-ref\.mjs/);
-  assert.match(deploy, /quality:\s*\n\s*needs: validate\s*\n\s*uses: \.\/\.github\/workflows\/ci\.yml/);
-  assert.match(deploy, /checkout_ref: \$\{\{ needs\.validate\.outputs\.release_sha \}\}/);
-  assert.match(deploy, /artifact:\s*\n\s*needs: \[validate, quality\]/);
-  assert.match(deploy, /ref: \$\{\{ needs\.validate\.outputs\.release_sha \}\}/);
-  assert.match(deploy, /Validate tagged Pages manifest without provider token[\s\S]*?id: manifest[\s\S]*?prepare-pages-artifact\.mjs validate/);
-  assert.match(deploy, /github\.repository != 'herehigher\/resume'.*analytics_mode == 'enabled'[\s\S]*?exit 1/);
-  assert.match(deploy, /artifact:\s*\n\s*needs: \[validate, quality\][\s\S]*?permissions:\s*\n\s*contents: read/);
-  assert.match(deploy, /github\.repository == 'herehigher\/resume'.*analytics_mode == 'enabled'.*cloudflare-web-analytics[\s\S]*?CLOUDFLARE_WEB_ANALYTICS_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WEB_ANALYTICS_TOKEN \}\}[\s\S]*?import \{ prepareArtifact \} from '\.\/scripts\/prepare-pages-artifact\.mjs';[\s\S]*?token: process\.env\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
-  assert.doesNotMatch(deploy, /--provider-value/);
-  assert.doesNotMatch(deploy, /vars\.CLOUDFLARE_WEB_ANALYTICS_TOKEN/);
-  assert.doesNotMatch(deploy, /RELEASE_GITHUB_TOKEN|github\.token/);
-  assert.match(deploy, /Prepare analytics-disabled artifact[\s\S]*?analytics_mode == 'disabled'.*analytics_provider == 'none'/);
-  assert.match(deploy, /git diff --exit-code -- site[\s\S]*?status --porcelain=v1 --untracked-files=all -- site/);
-  assert.match(deploy, /Verify final artifact digest[\s\S]*?prepare-pages-artifact\.mjs verify[\s\S]*?uses: actions\/upload-pages-artifact@v5\s*\n\s*with:\s*\n\s*path: \$\{\{ runner\.temp \}\}\/resume-pages-site/);
-  assert.match(deploy, /deploy:\s*\n\s*needs: \[validate, artifact\]/);
-  assert.match(deploy, /name: github-pages\s*\n\s*url: \$\{\{ steps\.deployment\.outputs\.page_url \}\}/);
-  assert.match(deploy, /id-token: write\s*\n\s*pages: write/);
-  assert.match(deploy, /uses: actions\/configure-pages@v6/);
-  assert.match(deploy, /uses: actions\/deploy-pages@v5/);
-  assert.match(deploy, /smoke:\s*\n\s*needs: \[validate, artifact, deploy\][\s\S]*?permissions: \{\}/);
-  assert.match(deploy, /REPOSITORY: \$\{\{ github\.repository \}\}/);
-  assert.match(deploy, /base_url.*!= https:\/\/\*[\s\S]*?page_authority.*== \*'@'\*[\s\S]*?unsafe deployment URL/);
-  assert.match(deploy, /if \[\[ "\$REPOSITORY" == 'herehigher\/resume' \]\]; then\s*\n\s*test "\$base_url" = "\$EXPECTED_PAGE_URL"/);
-  assert.match(deploy, /node scripts\/validate-pages-smoke\.mjs[\s\S]*?--base-url "\$base_url"[\s\S]*?--release-sha "\$RELEASE_SHA"[\s\S]*?--analytics-mode "\$ANALYTICS_MODE"[\s\S]*?--provider-fingerprint "\$PROVIDER_FINGERPRINT"/);
-  assert.doesNotMatch(deploy, /check_analytics\(/);
-  assert.doesNotMatch(deploy, /fetch_and_check|smoke_dir|curl --fail/);
+  assert.match(release, /mode:[\s\S]*?options: \[prepare, publish\]/);
+  assert.match(release, /node scripts\/validate-release-run\.mjs quality --sha/);
+  assert.match(release, /node scripts\/release-artifact-evidence\.mjs create/);
+  assert.match(release, /uses: actions\/upload-artifact@v7[\s\S]*?name: pages-release-artifact/);
+  assert.match(release, /artifact-ids: \$\{\{ inputs\.prepared_artifact_id \}\}/);
+  assert.match(release, /node scripts\/release-publication\.mjs publish/);
+  assert.match(release, /uses: actions\/upload-pages-artifact@v5/);
+  assert.match(release, /uses: actions\/deploy-pages@v5/);
+  assert.match(release, /node scripts\/check-online-editor\.mjs/);
+  assert.doesNotMatch(release, /provider[-_]?fingerprint/i);
+  assert.doesNotMatch(release, /--provider-value/);
   assert.ok(DEPLOYMENT_PATH_CONTRACTS.some((contract) => contract.artifactPath === 'editor/index.html'));
 });

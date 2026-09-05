@@ -7,8 +7,8 @@
 - Production は browser 標準の HTML、CSS、ES Modules で動作し、build や runtime framework を必要としません。
 - 正式な配布先は GitHub Pages です。Local development でも `file://` ではなく static server を使用します。
 - 公開用 application file は `site/` に集約し、履歴書の入力 data は browser 内で扱います。
-- `site/` source の runtime 通信は同一 origin の static asset と利用者が選択した profile link に限定し、Analytics は無効です。`herehigher/resume` の検証済み stable tag だけは、`.github/pages-release-manifest.json` が有効な場合に deployment-only adapter が staging artifact へ固定 Cloudflare beacon を追加します。Clone / fork は注入せず、未対応 configuration は失敗させます。
-- Analytics provider、固定 injection template、endpoint、privacy / network policy を変える場合は、独立した Pull Request、version、immutable stable tag が必要です。Manifest structure または provider fingerprint の意味を変える場合は `schemaVersion` を増やします。既存 tag の manual redeploy は、その tag 自身に含まれる adapter と schema の契約を使用して互換性を保ちます。Enabled tag が固定した旧 token を利用できない場合は再構築を hard failure とし、同じ tag を新しい token へ移行しません。
+- `site/` source の runtime 通信は同一 origin の static asset と利用者が選択した profile link に限定し、Analytics は無効です。`herehigher/resume` の検証済み commit だけは、`.github/pages-release-manifest.json` が有効な場合に deployment-only adapter が staging artifact へ固定 Cloudflare beacon を追加します。Clone / fork は注入せず、未対応 configuration は失敗させます。
+- Analytics の設定、注入と復旧の契約は [リリース手順](release-playbook.md#analytics-の扱い) を参照します。
 - `site/index.html` は redirect を行わない既定言語（日本語）の公開紹介ページで、`/editor/?lang=ja` へ直接案内します。`/zh-cn/` と `/en/` は JavaScript が無効でも読める各言語の公開 entry で、それぞれ対応する editor へ案内します。`/ja/` は既存外部リンク用の互換入口で、canonical を root へ統合し、sitemap・hreflang・通常の内部導線から除外します。editor は `/editor/` にあり、`noindex,follow` として公開 hreflang cluster・sitemap から除外します。
 - Root、`/zh-cn/`、`/en/` の3 public entry は canonical / reciprocal hreflang で関係を宣言し、`site/sitemap.xml` はこの3 canonical URL だけを列挙します。
 - 表示 locale は非機密の versioned localStorage key `resume-studio-locale-v1` に draft と分離して保存します。決定順は URL query、保存 preference、`navigator.languages`、`ja` です。import 内の `settings.locale` は document data として保持しますが、表示 preference は変更しません。`zh-TW` と `zh-Hant` は简体中文へ自動 mapping しません。
@@ -89,8 +89,7 @@ Chrome で editor の `http://localhost:8000/editor/`、public entry の `http:/
 | `npm run test:acceptance` | `npm test`、lint、E2E を順に実行する full gate |
 | `npm run generate:doc-assets -- --output-dir <DIR> --source-sha <SHA>` | source checkout と独立した空の一時 directory に、三言語 screenshot、PDF、provenance manifest を生成する。SHA が checkout の HEAD と一致しない場合は fail する |
 | `npm run verify:doc-assets -- --asset-root <DIR> --source-root <DIR> --source-sha <SHA>` | 一時 output の source SHA、site hash、PNG size、PDF page size と marker text、output hash を検証する |
-| GitHub `Prepare release manifest` | Enabled Analytics の versioned `site/` から、provider raw value を runner 内だけで使用して manifest 用の非機密 source / adapter / artifact digest を導出 |
-| GitHub `Pre-tag artifact gate` | Tag 作成前に immutable release SHA の version、main ancestry、#77 の online path contract、provider fingerprint、source / adapter / final artifact digest と prepared artifact semantic smoke を read-only・fail-closed で検証。raw provider value は GitHub runner 外へ出さない |
+| GitHub `Release Pages` | Merged PR の検証済み commit から配布物を準備し、summary の公開入口で同じ artifact を tag / deploy / smoke する |
 
 ### 変更種別ごとの route
 
@@ -128,14 +127,4 @@ npm run verify:doc-assets -- --asset-root '<TEMPORARY_DIRECTORY>' --source-root 
 
 ## Release と責任範囲
 
-- Version 公開の実行順、placeholder、command、証拠 template、失敗時の判断は [Version release playbook](release-playbook.md) を canonical とします。この節は仕組みの概要だけを示します。
-- Pull Request と `main` の quality check は `.github/workflows/ci.yml` で実行します。通常の `main` push は application を deploy しません。
-- Production release tag は leading zero、prerelease、build metadata を含まない安定版 `vMAJOR.MINOR.PATCH` だけを使用します。Tag と `package.json` の version は一致させ、tag の commit は `main` の履歴に含めます。
-- `.github/workflows/deploy-pages.yml` は tag の exact ref を commit まで解決し、同じ full commit SHA を reusable `Quality` workflow と Pages artifact checkout に渡します。Quality が失敗した場合は artifact 作成と deploy を実行しません。Artifact は `site/` だけを含みます。
-- Release の実行層は local sandbox、owner-approved trusted release host、GitHub runner、Pages deployment job の四つです。release host は認証済み `gh` session と GitHub API で identity / permission を確認し、OS credential API を直接呼びません。macOS Keychain は一例であり、Windows Credential Manager、Linux Secret Service 等も同じ安全な provider contract を満たします。Pages OIDC は release host の credential provider と独立します。
-- AI agent environment に raw `GH_TOKEN` / `GITHUB_TOKEN` が直接ある場合、agent-assisted sensitive step は owner 管理の隔離 session へ deferred とします。これは human または CI の認証方法全体を禁止する規則ではありません。
-- Repository、exact tag、full SHA、version の再照合、Pages settings、redeploy、rollback、final acceptance はそれぞれ個別の owner decision を要します。
-- `.github/workflows/deploy-pages.yml` の `pages-production` concurrency group は deployment を直列化し、`cancel-in-progress: false` で実行中 deployment を自動 cancel しません。release host の local pre-check は race-free guarantee ではありません。
-- Public release、tag、Pages settings、repository visibility を変更するには、owner の明示承認が必要です。Release tag は移動または削除せず、修正が必要な場合は新しい version を発行します。
-- Release workflow の smoke は production URL、公開 path、version marker を bounded retry で確認します。Smoke failure は「deploy 済み・未受入」であり、自動 rollback を意味しません。
-- 初回 Pages / HTTPS、RC screenshot の時点、annotated tag、manual existing-tag redeploy / rollback、README follow-up は playbook の順序に従います。
+準備、承認、公開、再開と復旧は [リリース手順](release-playbook.md) に集約します。通常の main push は Quality のみで Pages を deploy しません。既存 tag は変更せず、確認済みの配布物と対象 commit を対応付けて公開します。

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +14,6 @@ import {
 } from './cloudflare-analytics.mjs';
 import { CLOUDFLARE_PROVIDER } from './prepare-pages-artifact.mjs';
 
-const digestPattern = /^[0-9a-f]{64}$/;
 const tokenPattern = /^[0-9a-f]{32}$/;
 const publicHreflangAlternates = Object.freeze([
   Object.freeze({ hreflang: 'ja', href: DEPLOYMENT_ORIGIN }),
@@ -78,7 +76,7 @@ function cloudflareTokens(html) {
     });
 }
 
-function assertAnalytics(html, contract, metadata, { analyticsMode, analyticsProvider, providerFingerprint }) {
+function assertAnalytics(html, contract, metadata, { analyticsMode, analyticsProvider }) {
   const htmlAttributes = openingHtml(html, contract, metadata);
   for (const attribute of ['data-analytics-mode', 'data-analytics-provider']) {
     if ((html.match(new RegExp(`\\b${attribute}\\s*=`, 'gi')) || []).length !== 1) {
@@ -103,8 +101,6 @@ function assertAnalytics(html, contract, metadata, { analyticsMode, analyticsPro
   if (tokens.length !== 1 || !tokens[0] || cloudflareAnalyticsScriptTags(html, tokens[0]).length !== 1) {
     failure(contract, metadata, 'analytics beacon contract is invalid');
   }
-  const fingerprint = createHash('sha256').update(tokens[0]).digest('hex');
-  if (fingerprint !== providerFingerprint) failure(contract, metadata, 'analytics token fingerprint does not match');
 }
 
 function expectedContentType(kind) {
@@ -194,12 +190,10 @@ function assertSemanticContract(contract, content, metadata, options) {
   }
 }
 
-function validateOptions({ analyticsMode, analyticsProvider, packageVersion, providerFingerprint }) {
+function validateOptions({ analyticsMode, analyticsProvider, packageVersion }) {
   if (!['disabled', 'enabled'].includes(analyticsMode)) fail('unsupported analytics mode');
   const expectedProvider = analyticsMode === 'enabled' ? CLOUDFLARE_PROVIDER : 'none';
   if (analyticsProvider !== expectedProvider) fail('unsupported analytics provider');
-  if (analyticsMode === 'enabled' && !digestPattern.test(providerFingerprint || '')) fail('invalid provider fingerprint');
-  if (analyticsMode === 'disabled' && providerFingerprint !== 'none') fail('disabled analytics requires no provider fingerprint');
   if (!/^\d+\.\d+\.\d+$/.test(packageVersion || '')) fail('invalid package version');
 }
 
@@ -213,7 +207,6 @@ async function validateWithReader(options, readArtifact) {
     analyticsMode: options.analyticsMode,
     analyticsProvider: options.analyticsProvider,
     packageVersion: options.packageVersion,
-    providerFingerprint: options.providerFingerprint
   });
 }
 
@@ -285,7 +278,7 @@ function parseArguments(args) {
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('invalid command arguments');
     const key = name.slice(2);
-    if (!['directory', 'base-url', 'release-sha', 'analytics-mode', 'analytics-provider', 'package-version', 'provider-fingerprint'].includes(key)
+    if (!['directory', 'base-url', 'release-sha', 'analytics-mode', 'analytics-provider', 'package-version'].includes(key)
       || key in options) fail('unknown or duplicate command argument');
     options[key] = value;
   }
@@ -298,13 +291,12 @@ async function main() {
     analyticsMode: options['analytics-mode'],
     analyticsProvider: options['analytics-provider'],
     packageVersion: options['package-version'],
-    providerFingerprint: options['provider-fingerprint']
   };
-  if (options.directory && Object.keys(options).length === 5) {
+  if (options.directory && Object.keys(options).length === 4) {
     await validateDeploymentArtifact({ directory: options.directory, ...shared });
     return;
   }
-  if (options['base-url'] && options['release-sha'] && Object.keys(options).length === 6) {
+  if (options['base-url'] && options['release-sha'] && Object.keys(options).length === 5) {
     await validatePublishedDeployment({ baseUrl: options['base-url'], releaseSha: options['release-sha'], ...shared });
     return;
   }

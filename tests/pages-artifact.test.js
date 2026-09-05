@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   cpSync,
   mkdtempSync,
@@ -21,7 +20,6 @@ import {
   CLOUDFLARE_PROVIDER,
   OFFICIAL_REPOSITORY,
   computeTreeDigest,
-  deriveCloudflareArtifact,
   prepareArtifact,
   validateManifest
 } from '../scripts/prepare-pages-artifact.mjs';
@@ -30,7 +28,6 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const sourceSite = path.join(root, 'site');
 const adapterPath = path.join(root, 'scripts/prepare-pages-artifact.mjs');
 const token = 'a'.repeat(32);
-const tokenFingerprint = createHash('sha256').update(token).digest('hex');
 
 function temporaryDirectory(t) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'resume-pages-test-'));
@@ -38,14 +35,11 @@ function temporaryDirectory(t) {
   return directory;
 }
 
-function manifestValue({ artifactDigest, mode = 'disabled', sourceDigest }) {
+function manifestValue({ mode = 'disabled' } = {}) {
   return {
     analyticsMode: mode,
     analyticsProvider: mode === 'enabled' ? CLOUDFLARE_PROVIDER : 'none',
-    artifactTreeSha256: artifactDigest,
-    providerTokenSha256: mode === 'enabled' ? tokenFingerprint : null,
-    schemaVersion: 1,
-    sourceTreeSha256: sourceDigest
+    schemaVersion: 2
   };
 }
 
@@ -66,44 +60,30 @@ function collectFiles(directory, rootDirectory = directory) {
 }
 
 test('manifest accepts only the two closed analytics tuples', () => {
-  const digest = '0'.repeat(64);
   const values = ['disabled', 'enabled', 'unknown'];
   const providers = ['none', CLOUDFLARE_PROVIDER, 'unknown'];
-  const fingerprints = [null, digest, 'invalid'];
   for (const analyticsMode of values) {
     for (const analyticsProvider of providers) {
-      for (const providerTokenSha256 of fingerprints) {
-        const value = {
-          analyticsMode,
-          analyticsProvider,
-          artifactTreeSha256: digest,
-          providerTokenSha256,
-          schemaVersion: 1,
-          sourceTreeSha256: digest
-        };
-        const valid = (analyticsMode === 'disabled' && analyticsProvider === 'none' && providerTokenSha256 === null)
-          || (analyticsMode === 'enabled'
-            && analyticsProvider === CLOUDFLARE_PROVIDER
-            && providerTokenSha256 === digest);
-        if (valid) assert.deepEqual(validateManifest(value), value);
-        else assert.throws(() => validateManifest(value), /Unsupported analytics mode\/provider\/fingerprint tuple/);
-      }
+      const value = { analyticsMode, analyticsProvider, schemaVersion: 2 };
+      const valid = (analyticsMode === 'disabled' && analyticsProvider === 'none')
+        || (analyticsMode === 'enabled' && analyticsProvider === CLOUDFLARE_PROVIDER);
+      if (valid) assert.deepEqual(validateManifest(value), value);
+      else assert.throws(() => validateManifest(value), /Unsupported analytics mode\/provider tuple/);
     }
   }
   assert.throws(() => validateManifest({
-    ...manifestValue({ artifactDigest: digest, sourceDigest: digest }),
+    ...manifestValue(),
     endpoint: 'https://example.test'
   }), /unknown or missing fields/);
   assert.throws(() => validateManifest({
-    ...manifestValue({ artifactDigest: digest, sourceDigest: digest }),
+    ...manifestValue(),
     schemaVersion: 0
   }), /Unsupported Pages release manifest schemaVersion/);
 });
 
 test('final gate validate CLI fails closed for malformed manifest contracts', async (t) => {
   const temporary = temporaryDirectory(t);
-  const digest = await computeTreeDigest(sourceSite);
-  const valid = manifestValue({ artifactDigest: digest, sourceDigest: digest });
+  const valid = manifestValue();
   const cases = [
     ['invalid tuple', { ...valid, analyticsMode: 'unknown' }],
     ['unknown field', { ...valid, providerConfig: 'forbidden' }],
@@ -131,10 +111,7 @@ printf 'FINAL_GATE_SUCCESS\\n'
 test('disabled artifacts and non-official repositories remain byte-identical to source', async (t) => {
   const temporary = temporaryDirectory(t);
   const sourceDigest = await computeTreeDigest(sourceSite);
-  const manifestPath = writeManifest(temporary, manifestValue({
-    artifactDigest: sourceDigest,
-    sourceDigest
-  }));
+  const manifestPath = writeManifest(temporary, manifestValue());
   const output = path.join(temporary, 'output');
   const before = await computeTreeDigest(sourceSite);
 
@@ -154,12 +131,7 @@ test('disabled artifacts and non-official repositories remain byte-identical to 
 test('enabled official artifact changes only the five allowlisted HTML documents', async (t) => {
   const temporary = temporaryDirectory(t);
   const sourceDigest = await computeTreeDigest(sourceSite);
-  const derived = await deriveCloudflareArtifact({ sourceDirectory: sourceSite, token });
-  const manifestPath = writeManifest(temporary, manifestValue({
-    artifactDigest: derived.final_digest,
-    mode: 'enabled',
-    sourceDigest
-  }));
+  const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
   const output = path.join(temporary, 'output');
 
   await prepareArtifact({
@@ -186,15 +158,9 @@ test('enabled official artifact changes only the five allowlisted HTML documents
   assert.equal(await computeTreeDigest(sourceSite), sourceDigest);
 });
 
-test('enabled preparation rejects token and repository failures without leaking token', async (t) => {
+test('enabled preparation rejects token and repository failures with invalid public configuration', async (t) => {
   const temporary = temporaryDirectory(t);
-  const sourceDigest = await computeTreeDigest(sourceSite);
-  const derived = await deriveCloudflareArtifact({ sourceDirectory: sourceSite, token });
-  const manifestPath = writeManifest(temporary, manifestValue({
-    artifactDigest: derived.final_digest,
-    mode: 'enabled',
-    sourceDigest
-  }));
+  const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
   const run = (candidate, repository = OFFICIAL_REPOSITORY) => prepareArtifact({
     manifestPath,
     outputDirectory: path.join(temporary, `output-${Math.random()}`),
@@ -204,10 +170,7 @@ test('enabled preparation rejects token and repository failures without leaking 
   });
 
   for (const candidate of ['', 'a'.repeat(31), 'g'.repeat(32), `${token} `]) {
-    await assert.rejects(run(candidate), (error) => {
-      assert.doesNotMatch(error.message, new RegExp(token));
-      return /missing or invalid|fingerprint mismatch/.test(error.message);
-    });
+    await assert.rejects(run(candidate), /missing or invalid/);
   }
   await assert.rejects(run('', 'fork/example'), /restricted to the official repository/);
 });
@@ -240,11 +203,7 @@ test('source validation rejects beacon, body, HTML path, symlink, and non-canoni
     const site = path.join(temporary, name.replaceAll(' ', '-'));
     cpSync(sourceSite, site, { recursive: true });
     mutate(site);
-    const sourceDigest = await computeTreeDigest(sourceSite);
-    const manifestPath = writeManifest(path.dirname(site), manifestValue({
-      artifactDigest: sourceDigest,
-      sourceDigest
-    }));
+    const manifestPath = writeManifest(path.dirname(site), manifestValue());
     await assert.rejects(prepareArtifact({
       manifestPath,
       outputDirectory: `${site}-output`,
@@ -258,8 +217,7 @@ test('artifact output cannot overlap the source tree', async (t) => {
   const temporary = temporaryDirectory(t);
   const source = path.join(temporary, 'site');
   cpSync(sourceSite, source, { recursive: true });
-  const sourceDigest = await computeTreeDigest(source);
-  const manifestPath = writeManifest(temporary, manifestValue({ artifactDigest: sourceDigest, sourceDigest }));
+  const manifestPath = writeManifest(temporary, manifestValue());
   mkdirSync(path.join(source, 'nested'));
   await assert.rejects(prepareArtifact({
     manifestPath,
@@ -271,8 +229,7 @@ test('artifact output cannot overlap the source tree', async (t) => {
 
 test('prepare CLI refuses an existing output without changing its sentinel', async (t) => {
   const temporary = temporaryDirectory(t);
-  const sourceDigest = await computeTreeDigest(sourceSite);
-  const manifestPath = writeManifest(temporary, manifestValue({ artifactDigest: sourceDigest, sourceDigest }));
+  const manifestPath = writeManifest(temporary, manifestValue());
   const output = path.join(temporary, 'existing-output');
   const sentinel = path.join(output, 'sentinel.txt');
   mkdirSync(output);
@@ -292,43 +249,22 @@ test('prepare CLI refuses an existing output without changing its sentinel', asy
   assert.equal(readFileSync(sentinel, 'utf8'), 'preserve me');
 });
 
-test('derive and prepare CLI boundaries never expose the provider token', async (t) => {
+test('prepare CLI builds the enabled artifact and emits its byte digest', async (t) => {
   const temporary = temporaryDirectory(t);
-  const derived = await deriveCloudflareArtifact({ sourceDirectory: sourceSite, token });
-  const manifestPath = writeManifest(temporary, manifestValue({
-    artifactDigest: derived.final_digest,
-    mode: 'enabled',
-    sourceDigest: derived.source_digest
-  }));
-  const commands = [
-    {
-      args: ['derive-cloudflare', '--source', sourceSite],
-      output: path.join(temporary, 'derive-output.txt')
-    },
-    {
-      args: [
-        'prepare', '--source', sourceSite,
-        '--output', path.join(temporary, 'prepared-site'),
-        '--manifest', manifestPath,
-        '--repository', OFFICIAL_REPOSITORY
-      ],
-      output: path.join(temporary, 'prepare-output.txt')
-    }
-  ];
-
-  for (const command of commands) {
-    writeFileSync(command.output, '');
-    const result = spawnSync(process.execPath, [adapterPath, ...command.args], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        CLOUDFLARE_WEB_ANALYTICS_TOKEN: token,
-        GITHUB_OUTPUT: command.output
-      }
-    });
-    assert.equal(result.status, 0, result.stderr);
-    for (const boundary of [result.stdout, result.stderr, readFileSync(command.output, 'utf8')]) {
-      assert.doesNotMatch(boundary, new RegExp(token));
-    }
-  }
+  const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
+  const output = path.join(temporary, 'prepared-site');
+  const actionsOutput = path.join(temporary, 'actions-output');
+  const result = spawnSync(process.execPath, [adapterPath,
+    'prepare', '--source', sourceSite, '--output', output,
+    '--manifest', manifestPath, '--repository', OFFICIAL_REPOSITORY
+  ], {
+    encoding: 'utf8',
+    env: { ...process.env, CLOUDFLARE_WEB_ANALYTICS_TOKEN: token, GITHUB_OUTPUT: actionsOutput }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const digest = await computeTreeDigest(output);
+  assert.ok(readFileSync(actionsOutput, 'utf8').includes(`final_digest=${digest}\n`));
+  const html = readFileSync(path.join(output, 'editor/index.html'), 'utf8');
+  assert.ok(html.includes(CLOUDFLARE_BEACON_URL));
+  assert.ok(html.includes(`&quot;token&quot;:&quot;${token}&quot;`));
 });
