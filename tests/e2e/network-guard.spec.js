@@ -54,7 +54,7 @@ for (const forbidden of forbiddenCases) {
       const request = route.request();
       const url = new URL(request.url());
       if (url.origin !== new URL(baseURL).origin) return route.abort();
-      if (request.method !== 'GET') return route.abort();
+      if (request.method() !== 'GET') return route.abort();
       return route.continue();
     });
     await page.evaluate(forbidden.action);
