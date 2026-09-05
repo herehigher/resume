@@ -94,7 +94,7 @@ npm ci
 npm run test:acceptance
 ```
 
-`site/` source に外部 API、CDN、外部 font、analytics を追加しないでください。唯一の例外は、公式 repository の検証済み stable tag から作る artifact に、tagged manifest と一致する標準 Cloudflare Web Analytics を deployment-only adapter が追加する経路です。詳しくは [開発ガイド](docs/development-guide.md)、[Contributing](CONTRIBUTING.md)、[release acceptance checklist](docs/acceptance-checklist.md) を参照してください。
+`site/` source に外部 API、CDN、外部 font、analytics を追加しないでください。唯一の例外は、公式 repository の検証済み stable tag から作る artifact に、tagged manifest と一致する標準 Cloudflare Web Analytics を deployment-only adapter が追加する経路です。詳しくは [開発ガイド](docs/development-guide.md)、[Contributing](CONTRIBUTING.md)、[release playbook](docs/release-playbook.md) を参照してください。
 
 ## Repository information
 

@@ -94,7 +94,7 @@ npm ci
 npm run test:acceptance
 ```
 
-Do not add external APIs, CDNs, external fonts, or analytics to the `site/` source. The sole exception is the deployment-only adapter adding standard Cloudflare Web Analytics to a validated stable-tag artifact in the official repository when its tagged manifest matches. See [Contributing](CONTRIBUTING.md) and the [release acceptance checklist](docs/acceptance-checklist.md).
+Do not add external APIs, CDNs, external fonts, or analytics to the `site/` source. The sole exception is the deployment-only adapter adding standard Cloudflare Web Analytics to a validated stable-tag artifact in the official repository when its tagged manifest matches. See [Contributing](CONTRIBUTING.md) and the [release playbook](docs/release-playbook.md).
 
 ## Repository information
 

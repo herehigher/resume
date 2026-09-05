@@ -94,7 +94,7 @@ npm ci
 npm run test:acceptance
 ```
 
-请勿向 `site/` source 加入外部 API、CDN、外部 font 或 analytics。唯一例外是 deployment-only adapter 根据 tagged manifest，为官方 repository 的已验证 stable tag artifact 加入标准 Cloudflare Web Analytics。详情参见 [Contributing](CONTRIBUTING.md) 和 [release acceptance checklist](docs/acceptance-checklist.md)。
+请勿向 `site/` source 加入外部 API、CDN、外部 font 或 analytics。唯一例外是 deployment-only adapter 根据 tagged manifest，为官方 repository 的已验证 stable tag artifact 加入标准 Cloudflare Web Analytics。详情参见 [Contributing](CONTRIBUTING.md) 和 [release playbook](docs/release-playbook.md)。
 
 ## 仓库资料
 

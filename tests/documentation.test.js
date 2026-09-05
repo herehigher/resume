@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { APP_VERSION } from '../site/assets/js/config.js';
 import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -15,6 +16,7 @@ const markdownFiles = [
   'PRIVACY.md',
   'CHANGELOG.md',
   'CONTRIBUTING.md',
+  '.github/pull_request_template.md',
   'docs/development-guide.md',
   'docs/release-playbook.md'
 ];
@@ -70,13 +72,17 @@ test('release version has one source of truth and a dated changelog entry', () =
   const packageVersion = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
   assert.match(packageVersion, /^\d+\.\d+\.\d+$/);
 
-  const config = readFileSync(path.join(root, 'site/assets/js/config.js'), 'utf8');
-  assert.match(config, new RegExp(`export const APP_VERSION = '${packageVersion.replaceAll('.', '\\.')}';`));
+  assert.equal(APP_VERSION, packageVersion);
+  const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.version, packageVersion);
+  assert.equal(lock.packages[''].version, packageVersion);
 
   const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   const release = new RegExp(`^## \\[${packageVersion.replaceAll('.', '\\.')}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm');
   assert.match(changelog, release);
-  assert.ok(changelog.indexOf('## [Unreleased]') < changelog.search(release));
+  const unreleasedIndex = changelog.indexOf('## [Unreleased]');
+  assert.ok(unreleasedIndex >= 0);
+  assert.ok(unreleasedIndex < changelog.search(release));
 });
 
 test('the public v1 JSON example remains importable under the runtime data contract', () => {
