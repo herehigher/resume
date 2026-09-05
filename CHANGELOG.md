@@ -6,7 +6,7 @@ English: This file records notable changes. Release dates are added only when th
 
 ## [Unreleased]
 
-## [0.2.2] - 2026-09-04
+## [0.2.2] - 2026-09-05
 
 ### Fixed / 修正
 
