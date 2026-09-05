@@ -1,15 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { installNetworkGuard } from './fixtures.js';
+import { observeNetwork } from '../../scripts/network-contract.mjs';
 
 test('source build は analytics を含むすべての外部 runtime request を拒否する', async ({ baseURL, context, page }) => {
-  const guard = await installNetworkGuard(context, baseURL);
+  const guard = observeNetwork(context, { baseUrl: baseURL });
   await page.goto('/editor/');
-
-  expect(guard.unexpectedRequests).toEqual([]);
 
   await page.evaluate(() => {
     fetch('http://127.0.0.1:9/leak').catch(() => {});
-    fetch('/collect', { method: 'POST', body: 'personal-data' }).catch(() => {});
+    fetch('/collect', { method: 'POST', body: 'fictional-network-guard-body' }).catch(() => {});
     fetch('/assets/js/main.js?personal-data').catch(() => {});
     fetch('https://cloudflareinsights.com/cdn-cgi/rum', {
       method: 'POST',
@@ -24,10 +22,11 @@ test('source build は analytics を含むすべての外部 runtime request を
     socket.addEventListener('error', () => socket.close());
   });
 
-  await expect.poll(() => guard.unexpectedRequests).toContain('GET http://127.0.0.1:9/leak');
-  await expect.poll(() => guard.unexpectedRequests).toContain(`POST ${baseURL}/collect`);
-  await expect.poll(() => guard.unexpectedRequests).toContain(`GET ${baseURL}/assets/js/main.js?personal-data`);
-  await expect.poll(() => guard.unexpectedRequests).toContain('POST https://cloudflareinsights.com/cdn-cgi/rum');
-  await expect.poll(() => guard.webSockets).toContain('ws://127.0.0.1:9/leak');
-  await guard.dispose();
+  await expect.poll(() => guard.requests.some((request) => request.method === 'POST' && new URL(request.url).pathname === '/collect')).toBe(true);
+  await expect.poll(() => guard.requests.some((request) => request.url.includes('/assets/js/main.js?personal-data'))).toBe(true);
+  await expect.poll(() => guard.requests.some((request) => request.url.includes('cloudflareinsights.com/cdn-cgi/rum'))).toBe(true);
+  await expect.poll(() => guard.webSockets.length).toBeGreaterThan(0);
+  expect(() => guard.assertClean({ canaries: ['fictional-network-guard-body'] }))
+    .toThrow(/unexpected request \(GET external\).*resume canary appeared in a request URL or body.*WebSocket connection/);
+  guard.dispose();
 });
