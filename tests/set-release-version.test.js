@@ -31,4 +31,6 @@ test('version operation rejects prereleases and malformed dates', async (t) => {
   const directory = fixture(t);
   await assert.rejects(setReleaseVersion({ date: '2026/09/05', rootDirectory: directory, version: '0.2.3' }), /date/);
   await assert.rejects(setReleaseVersion({ date: '2026-09-05', rootDirectory: directory, version: '0.2.3-rc.1' }), /SemVer/);
+  await assert.rejects(setReleaseVersion({ date: '2026-02-30', rootDirectory: directory, version: '0.2.3' }), /real/);
+  await assert.rejects(setReleaseVersion({ date: '2026-09-05', rootDirectory: 'relative', version: '0.2.3' }), /absolute/);
 });

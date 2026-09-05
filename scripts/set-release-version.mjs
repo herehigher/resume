@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 function fail(message) {
   throw new Error(`Set release version failed: ${message}`);
@@ -13,9 +14,16 @@ function replaceOnce(contents, pattern, replacement, label) {
   return contents.replace(pattern, replacement);
 }
 
+function validDate(value) {
+  if (!datePattern.test(value || '')) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 export async function setReleaseVersion({ date, rootDirectory, version }) {
   if (!versionPattern.test(version || '')) fail('version must be a stable SemVer value');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) fail('date must use YYYY-MM-DD');
+  if (!validDate(date)) fail('date must use a real YYYY-MM-DD date');
+  if (!rootDirectory || !path.isAbsolute(rootDirectory)) fail('root directory must be an absolute path');
   const packagePath = path.join(rootDirectory, 'package.json');
   const lockPath = path.join(rootDirectory, 'package-lock.json');
   const configPath = path.join(rootDirectory, 'site/assets/js/config.js');
@@ -28,7 +36,10 @@ export async function setReleaseVersion({ date, rootDirectory, version }) {
   if (packageJson.name !== lockJson.name || !packageJson.name) fail('package and lock names do not match');
   packageJson.version = version;
   lockJson.version = version;
-  if (lockJson.packages?.['']) lockJson.packages[''].version = version;
+  if (!lockJson.packages?.[''] || lockJson.packages[''].name !== packageJson.name) {
+    fail('lock root package metadata does not match package.json');
+  }
+  lockJson.packages[''].version = version;
   const nextConfig = replaceOnce(configText, /APP_VERSION = '[^']+'/, `APP_VERSION = '${version}'`, 'APP_VERSION');
   const unreleased = '## [Unreleased]\n';
   if (!changelogText.includes(unreleased)) fail('CHANGELOG must contain an Unreleased section');

@@ -15,6 +15,16 @@ function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
+function tagExists(cwd, tag) {
+  try {
+    execFileSync('git', ['show-ref', '--verify', '--quiet', `refs/tags/${tag}`], { cwd, stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    if (error.status === 1) return false;
+    fail(`unable to inspect existing release tag: ${error.message}`);
+  }
+}
+
 export function validateRollbackTag(tag) {
   if (tag === 'v0.2.1') fail('v0.2.1 is not an accepted rollback target');
   if (!rollbackTags.has(tag)) fail('rollback tag is not an accepted historical release');
@@ -25,13 +35,13 @@ export async function ensureImmutableReleaseTag({ artifactDirectory, cwd, eviden
   if (!stableTagPattern.test(tag || '')) fail('release tag must be a stable SemVer tag');
   const evidence = await verifyArtifactEvidence({ artifactDirectory, evidencePath, sourceDirectory, sourceSha });
   if (tag !== `v${evidence.packageVersion}`) fail('release tag does not match prepared package version');
-  let existing = '';
-  try {
-    existing = git(cwd, 'rev-parse', `${tag}^{commit}`);
-  } catch {
-    existing = '';
-  }
-  if (existing) {
+  if (tagExists(cwd, tag)) {
+    let existing;
+    try {
+      existing = git(cwd, 'rev-parse', '--verify', '--end-of-options', `${tag}^{commit}`);
+    } catch (error) {
+      fail(`unable to resolve existing release tag: ${error.message}`);
+    }
     if (existing !== sourceSha) fail('existing release tag points to a different commit');
     return Object.freeze({ evidence, resumed: true, tag });
   }

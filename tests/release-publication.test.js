@@ -45,9 +45,12 @@ test('publication rejects tag and artifact mismatches', async (t) => {
   const { artifact, cwd, evidence, sha } = fixture(t);
   await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
   await assert.rejects(ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v9.9.9' }), /does not match/);
-  git(cwd, '-c', 'tag.gpgSign=false', 'tag', '-a', 'v0.2.2', '-m', 'wrong', 'HEAD');
-  writeFileSync(path.join(cwd, 'site', 'index.html'), `${readFileSync(path.join(cwd, 'site', 'index.html'), 'utf8')}\n`);
-  await assert.rejects(ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' }), /source bytes/);
+  writeFileSync(path.join(cwd, 'different.txt'), 'different commit\n');
+  git(cwd, 'add', 'different.txt');
+  git(cwd, 'commit', '--no-gpg-sign', '-m', 'different commit');
+  const differentSha = git(cwd, 'rev-parse', 'HEAD');
+  git(cwd, '-c', 'tag.gpgSign=false', 'tag', '-a', 'v0.2.2', '-m', 'wrong', differentSha);
+  await assert.rejects(ensureImmutableReleaseTag({ artifactDirectory: artifact, cwd, evidencePath: evidence, sourceDirectory: cwd, sourceSha: sha, tag: 'v0.2.2' }), /different commit/);
 });
 
 test('publication CLI accepts only historical rollback targets and excludes v0.2.1', () => {
@@ -56,4 +59,20 @@ test('publication CLI accepts only historical rollback targets and excludes v0.2
   const rejected = spawnSync(process.execPath, [command, 'rollback', '--tag', 'v0.2.1'], { encoding: 'utf8' });
   assert.notEqual(rejected.status, 0);
   assert.match(rejected.stderr, /not an accepted/);
+});
+
+test('publication CLI creates and resumes a real annotated tag from a temporary artifact', async (t) => {
+  const { artifact, cwd, evidence, sha } = fixture(t);
+  await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: cwd, sourceSha: sha });
+  const invoke = () => spawnSync(process.execPath, [command, 'publish',
+    '--artifact-dir', artifact, '--cwd', cwd, '--evidence', evidence,
+    '--source-dir', cwd, '--source-sha', sha, '--tag', 'v0.2.2'
+  ], { encoding: 'utf8' });
+  const created = invoke();
+  assert.equal(created.status, 0, created.stderr);
+  assert.match(created.stdout, /Created immutable v0\.2\.2/);
+  assert.equal(git(cwd, 'rev-parse', 'v0.2.2^{commit}'), sha);
+  const resumed = invoke();
+  assert.equal(resumed.status, 0, resumed.stderr);
+  assert.match(resumed.stdout, /Resumed immutable v0\.2\.2/);
 });

@@ -15,7 +15,30 @@ on:
 permissions: {}
 
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify pull request scope
+        id: scope
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/quality-scope.mjs "$BASE_SHA" "$HEAD_SHA"
+
   quality:
+    needs: scope
+    if: ${{ github.event_name != 'pull_request' || needs.scope.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,3 +105,23 @@ jobs:
           path: node_modules/.cache/resume-studio/playwright-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  documentation:
+    needs: scope
+    if: ${{ github.event_name == 'pull_request' && needs.scope.outputs.docs_only == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Verify documentation links and release version contract
+        run: node --test tests/documentation.test.js tests/quality-scope.test.js
