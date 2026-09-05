@@ -68,4 +68,4 @@ README の screenshot / PDF は長期参照する展示物です。[Manifest](as
 
 画面、layout、template、font、公開 sample data が変わり展示物を更新する場合だけ、対象画像・PDF と provenance を一緒に review します。`docs/screenshots/*.png` と `output/pdf/*.pdf` は Git LFS を維持します。取得・更新時だけ `git lfs install --local` と `git lfs pull` が必要で、通常の Node test / CI に展示 binary は不要です。既存リンクや LFS 履歴は維持し、期限付き Actions URL を README の長期リンクに使いません。
 
-CI の確認用出力は一時 directory から Actions artifact に保存し、source / 展示物へ promote しません。生成 command の実際の入力は[リリース手順](release-playbook.md)の準備入口に集約します。PDF correctness は対象 source の E2E と一時出力で検証し、展示物の更新頻度と分けて扱います。
+CI の確認用出力は一時 directory から Actions artifact に保存し、source / 展示物へ promote しません。手元で必要な場合は `npm run generate:doc-assets -- --output-dir EMPTY_DIRECTORY --source-sha HEAD_SHA` で source 外の空 directory に生成し、`npm run verify:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root CHECKOUT --source-sha HEAD_SHA` で検証します。SHA はその checkout の HEAD 全40桁を指定し、`site/` に未 commit の変更を残しません。PDF correctness は対象 source の E2E と一時出力で検証し、展示物の更新頻度と分けて扱います。

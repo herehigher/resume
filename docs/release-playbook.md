@@ -14,7 +14,7 @@ Public release、tag、Pages 設定、repository visibility の変更には owne
 | 2 | 担当者 | Version 更新機能で関連 file を同期し、CHANGELOG をまとめ、公開 PR を1件作る | Version と変更内容が一致する |
 | 3 | 担当者 | 必要な PR check と review を完了して main へ merge する | 対象の merge commit が確定する |
 | 4 | 担当者 | 下記の公開入口で、その merged PR の準備を開始する | 対象 commit と version が表示される |
-| 5 | CI | 同じ commit の有効な full gate を再利用し、不足時だけ検証する。配布物と確認用画像・PDF を生成・検査する | 検証結果と配布物が承認前に揃う |
+| 5 | CI | 同じ commit の成功済み main Quality を確認し、配布物を生成・検査する。確認用画像・PDF は Quality の出力を参照する | 検証結果と配布物が承認前に揃う |
 | 6 | 担当者・所有者 | Version・変更内容・commit と必要な目視結果を確認し、本番公開を承認する | 必須確認の失敗・未確認がない |
 | 7 | CI | 同じ commit の immutable tag を作成し、検証した配布物をそのまま deploy する | Tag、commit、配布物が一致する |
 | 8 | CI・担当者 | 公開 URL の自動検査と summary を確認する | Deploy と smoke が成功する |
@@ -23,7 +23,13 @@ Version の基準は `package.json`。CHANGELOG の日付は RC を確定した�
 
 ## 公開入口
 
-実装との照合中。この段落は #109 統合後、workflow 名と入力に置き換えます。
+Version 更新は repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。
+
+[Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を main から実行します。通常の準備は `mode=prepare` と merged `pr_number` を指定し、他の入力は空欄にします。対象 SHA の main Quality が実行中・失敗・未存在なら準備を停止するので、その Quality を完了・再実行してから準備を再開します。
+
+準備 summary の version / SHA、配布物、必要な画像・PDF を確認します。公開承認後は、summary が生成した公開 command を担当者がそのまま実行します。Command には `mode=publish`、`release_tag`、`prepared_run_id`、`prepared_artifact_id` が設定済みで、所有者による ID / digest の転記は不要です。GitHub の画面から実行する場合も同じ4項目を使います。
+
+準備 artifact は30日間保持します。同じ run を再実行しても artifact ID は変わるため、新しい準備結果を確認してください。公開時は指定した run / artifact ID の保存済み bytes を再検証して配布し、失効した artifact の代わりを自動生成しません。確認用画像・PDF は Quality run の7日間保持 artifact です。必要な目視の前に失効した場合は、対象 Quality を再実行してから確認します。
 
 ## 変更内容に応じた確認
 
@@ -63,7 +69,11 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 
 ### 前のバージョンへ戻す
 
-成功した公開記録から受入済み tag を選び、同じ公開入口で準備・検証して、所有者の指示・承認の範囲で再配布します。放棄済み `v0.2.1` は対象外です。旧形式 tag の対応方法・利用可能な artifact の条件は上記入口の説明に従います。再配布後も smoke の成功を確認します。
+新経路で作った版は、その版の未失効の prepare run / artifact ID と既存 tag を指定して publish を再実行します。保存済み artifact が失効していれば、元の merged PR から再度 prepare し、結果を確認してから公開します。
+
+旧形式は受入済み `v0.2.0` / `v0.2.2` に限定し、`mode=prepare`、`release_tag` を指定、`pr_number` は空欄にします。小さな互換 adapter が当時の mode / provider を読み、現在の公開 site 設定で配布物を準備します。古い公開 bytes の完全再現とは区別し、承認前に再検証します。旧版の Quality には確認用画像・PDF artifact がない場合があります。必要な目視証拠は別途用意し、未確認のまま公開しません。
+
+放棄済み `v0.2.1` と互換 adapter 未対応の `v0.1.0` はこの復旧入口の対象外です。どの経路でも既存 tag を移動せず、所有者の指示・承認の範囲で再配布し、smoke の成功を確認します。
 
 ## 初回設定・設定変更時だけ行うこと
 
