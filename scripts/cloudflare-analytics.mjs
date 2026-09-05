@@ -10,10 +10,21 @@ const DOCUMENT_PATHS = new Set([
 ]);
 const LOCALES = new Set(['ja', 'zh-CN', 'en']);
 const RUM_KEYS = new Set([
-  'cls', 'deliveryType', 'eventType', 'fid', 'firstContentfulPaint', 'firstPaint', 'inp', 'lcp',
-  'location', 'memory', 'navigationType', 'nt', 'pageloadId', 'referrer', 'resources',
-  'serverTimings', 'siteToken', 'startTime', 'st', 'timingsV2', 'ttfb', 'versions'
+  'cls', 'deliveryType', 'eventType', 'fcp', 'fid', 'firstContentfulPaint', 'firstPaint', 'inp', 'lcp',
+  'bi', 'location', 'memory', 'navigationType', 'nt', 'pageloadId', 'referrer',
+  'siteToken', 'startTime', 'st', 'timingsV2', 'ttfb', 'versions'
 ]);
+const BROWSER_INFO_KEYS = new Set(['be', 'bev', 'bv', 'ov']);
+const BROWSER_ENGINES = new Set(['Blink', 'Gecko', 'WebKit']);
+const VERSION_PATTERN = /^\d+(?:\.\d+)*$/;
+const TIMING_KEYS = new Set([
+  'connectEnd', 'connectStart', 'decodedBodySize', 'domainLookupEnd', 'domainLookupStart',
+  'domComplete', 'domInteractive', 'finalResponseHeadersStart', 'firstInterimResponseStart',
+  'loadEventEnd', 'loadEventStart', 'navigationStart', 'nextHopProtocol', 'redirectEnd',
+  'redirectStart', 'requestStart', 'responseEnd', 'responseStart', 'secureConnectionStart',
+  'transferSize'
+]);
+const NEXT_HOP_PROTOCOLS = new Set(['h2', 'h3', 'http/1.0', 'http/1.1', 'quic']);
 
 function attributesIn(tag) {
   const attributes = new Map();
@@ -77,6 +88,32 @@ function hasBoundedValues(value) {
   return Object.entries(value).every(([key, child]) => key.length <= 64 && hasBoundedValues(child));
 }
 
+function hasAllowedBrowserInfo(value) {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  if (!entries.length || entries.some(([key]) => !BROWSER_INFO_KEYS.has(key))) return false;
+  if (!BROWSER_ENGINES.has(value.be)) return false;
+  return ['bev', 'bv', 'ov'].every((key) => value[key] === undefined
+    || (typeof value[key] === 'string' && VERSION_PATTERN.test(value[key])));
+}
+
+function hasAllowedTimings(value) {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(([key, child]) => TIMING_KEYS.has(key)
+    && (typeof child === 'number' || (key === 'nextHopProtocol' && NEXT_HOP_PROTOCOLS.has(child))));
+}
+
+function hasAllowedVersions(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(([key, child]) => (
+    (key === 'fl' && (child === '' || (typeof child === 'string' && VERSION_PATTERN.test(child))))
+    || (key === 'js' && typeof child === 'string' && VERSION_PATTERN.test(child))
+    || (key === 'timings' && (child === 1 || child === 2))
+  ));
+}
+
 export function isAllowedCloudflareAnalyticsRequest({
   expectedOrigin,
   expectedToken,
@@ -101,10 +138,14 @@ export function isAllowedCloudflareAnalyticsRequest({
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
     if (Object.keys(payload).some((key) => !RUM_KEYS.has(key))) return false;
     if (payload.siteToken !== expectedToken) return false;
+    if (![1, 3].includes(payload.eventType)) return false;
     if (payload.st !== (resourceType === 'xhr' ? 2 : 1)) return false;
     if (!isAllowedDocumentUrl(payload.location, expectedOrigin)) return false;
     if (!isAllowedReferrer(payload.referrer ?? '', expectedOrigin)) return false;
-    return hasBoundedValues(payload);
+    return hasAllowedBrowserInfo(payload.bi)
+      && hasAllowedTimings(payload.timingsV2)
+      && hasAllowedVersions(payload.versions)
+      && hasBoundedValues(payload);
   } catch {
     return false;
   }
@@ -116,6 +157,7 @@ export function cloudflareAnalyticsMockScript(expectedToken) {
     eventType: 1,
     firstContentfulPaint: 0,
     firstPaint: 0,
+    bi: { be: 'Blink', bev: '0', bv: '0', ov: '0' },
     location: '__LOCATION__',
     memory: { jsHeapSizeLimit: 0, totalJSHeapSize: 0, usedJSHeapSize: 0 },
     nt: 'navigate',
@@ -124,7 +166,7 @@ export function cloudflareAnalyticsMockScript(expectedToken) {
     st: 2,
     startTime: 0,
     timingsV2: {},
-    versions: { fl: 'playwright', js: 'playwright', timings: 2 }
+    versions: { fl: '', js: '0.0.0', timings: 2 }
   };
   return `const payload=${JSON.stringify(payload)};payload.location=window.location.href;const request=new XMLHttpRequest();request.open('POST',${JSON.stringify(CLOUDFLARE_RUM_URL)});request.setRequestHeader('content-type','application/json');request.send(JSON.stringify(payload));`;
 }
