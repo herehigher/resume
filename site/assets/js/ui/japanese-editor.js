@@ -29,7 +29,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   const completionBar = document.getElementById('completionBar');
   const completionLabel = document.getElementById('completionLabel');
   const confirmDialog = document.getElementById('confirmDialog');
-  const clearButton = document.getElementById('clearButton');
   const workspace = document.getElementById('japaneseWorkspace');
   let zoom = 1;
   let saveTimer;
@@ -49,10 +48,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     saveStatus.classList.toggle('is-success', tone === 'success');
     saveStatus.classList.toggle('is-saving', tone === 'saving');
     saveStatus.classList.toggle('is-error', tone === 'error');
+    document.querySelector('.draft-controls').classList.toggle('is-error', tone === 'error');
   }
 
   function showDraftMessage(message, {
-    fallback = '入力内容は自動保存されます',
+    fallback = '入力すると暗号化してこの端末に保存されます',
     fallbackTone = '',
     tone = 'success'
   } = {}) {
@@ -66,11 +66,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     window.clearTimeout(saveTimer);
     if (sampleMode) return;
     shouldPersistDraft = true;
-    setDraftStatus('保存中…', 'saving');
+    setDraftStatus('暗号化して保存中…', 'saving');
     saveTimer = window.setTimeout(async () => {
       try {
         await store.save();
-        setDraftStatus('この端末に保存済み', 'success');
+        setDraftStatus('暗号化してこの端末に保存済み', 'success');
       } catch (error) {
         setDraftStatus(messageForDraftStorageError(error, 'ja', '暗号化した下書きを保存できませんでした'), 'error');
       }
@@ -86,7 +86,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     document.querySelector('.draft-controls').classList.toggle('is-sample-mode', active);
     document.getElementById('draftNormalActions').hidden = active;
     document.getElementById('sampleModeActions').hidden = !active;
-    clearButton.hidden = active;
   }
 
   async function enterSampleMode() {
@@ -103,7 +102,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     sampleMode = true;
     store.replace(createJapaneseSampleState(store.getState()), { type: 'sample' });
     setSampleModeUI(true);
-    setDraftStatus('入力例を一時表示しています');
+    setDraftStatus('入力例を表示しています。保存済みの下書きは変更されません。');
   }
 
   function restoreDraftFromSample({ announce = true } = {}) {
@@ -113,7 +112,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     sampleMode = false;
     draftBeforeSample = null;
     setSampleModeUI(false);
-    const fallback = shouldPersistDraft ? 'この端末に保存済み' : '下書きは保存されていません';
+    const fallback = shouldPersistDraft ? '暗号化してこの端末に保存済み' : '入力すると暗号化してこの端末に保存されます';
     const fallbackTone = shouldPersistDraft ? 'success' : '';
     if (announce) {
       showDraftMessage('元の下書きに戻りました', { fallback, fallbackTone });
@@ -140,7 +139,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       draftBeforeSampleWasStored = false;
       setSampleModeUI(false);
       showDraftMessage('入力例を下書きとして保存しました', {
-        fallback: 'この端末に保存済み',
+        fallback: '暗号化してこの端末に保存済み',
         fallbackTone: 'success'
       });
     } catch (error) {
@@ -482,7 +481,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   document.getElementById('loadSampleButton').addEventListener('click', enterSampleMode);
   document.getElementById('restoreDraftButton').addEventListener('click', () => restoreDraftFromSample());
   document.getElementById('adoptSampleButton').addEventListener('click', adoptSampleAsDraft);
-  clearButton.addEventListener('click', () => confirmDialog.showModal());
+  function clearDraft() {
+    if (!confirmDialog.open) confirmDialog.showModal();
+  }
   document.getElementById('confirmClearButton').addEventListener('click', async () => {
     window.clearTimeout(saveTimer);
     try {
@@ -492,9 +493,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       sampleMode = false;
       setSampleModeUI(false);
       showDraftMessage('下書きデータを削除しました', {
-        fallback: '下書きは保存されていません'
+        fallback: '入力すると暗号化してこの端末に保存されます'
       });
-      window.setTimeout(() => document.getElementById('loadSampleButton').focus());
     } catch {
       setDraftStatus('下書きデータを削除できませんでした', 'error');
     }
@@ -532,8 +532,12 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   });
 
   hydrateForm();
+  setDraftStatus(shouldPersistDraft
+    ? '暗号化してこの端末に保存済み'
+    : '入力すると暗号化してこの端末に保存されます', shouldPersistDraft ? 'success' : '');
   return {
     refresh: hydrateForm,
+    clearDraft,
     restoreDraftBeforePersistence() {
       window.clearTimeout(saveTimer);
       return restoreDraftFromSample({ announce: false });

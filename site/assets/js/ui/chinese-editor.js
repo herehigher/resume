@@ -58,19 +58,14 @@ export function renderChineseEditorShell() {
       <div class="completion-track" aria-hidden="true"><span data-zh-completion-bar></span></div>
       <section class="draft-controls" data-zh-draft-controls aria-label="草稿状态与操作">
         <div class="draft-primary-row">
-          <span class="draft-message is-success" data-zh-draft-message role="status" aria-live="polite">${zhCN.savedStatus}</span>
+          <span class="draft-message" data-zh-draft-message role="status" aria-live="polite">${zhCN.saveStatus}</span>
           <div class="draft-normal-actions" data-zh-normal-actions>
             <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
           </div>
           <div class="draft-sample-actions" data-zh-sample-actions hidden>
-            <span class="sample-mode-copy"><strong>${zhCN.sampleNotice}</strong></span>
             <button class="secondary-button" type="button" data-zh-action="restore">${zhCN.restoreDraft}</button>
             <button class="primary-button" type="button" data-zh-action="adopt">${zhCN.adoptSample}</button>
           </div>
-        </div>
-        <div class="draft-clear-row">
-          <button class="draft-clear-button" type="button" data-zh-action="clear">清除此设备上的草稿</button>
-          <span class="draft-clear-notice">输入内容会加密后仅保存在此设备上。</span>
         </div>
       </section>
       <form class="zh-resume-form" autocomplete="on">
@@ -240,6 +235,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     saveStatus.classList.toggle('is-success', tone === 'success');
     saveStatus.classList.toggle('is-saving', tone === 'saving');
     saveStatus.classList.toggle('is-error', tone === 'error');
+    rootElement.querySelector('[data-zh-draft-controls]').classList.toggle('is-error', tone === 'error');
   }
 
   function scheduleSave() {
@@ -361,7 +357,6 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     rootElement.querySelector('[data-zh-draft-controls]').classList.toggle('is-sample-mode', active);
     rootElement.querySelector('[data-zh-normal-actions]').hidden = active;
     rootElement.querySelector('[data-zh-sample-actions]').hidden = !active;
-    rootElement.querySelector('[data-zh-action="clear"]').hidden = active;
   }
 
   async function enterSampleMode() {
@@ -376,7 +371,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     sampleMode = true;
     store.replace(createChineseSampleState(store.getState()), { type: 'zh-sample' });
     setSampleMode(true);
-    setStatus('正在查看填写示例。');
+    setStatus('正在查看填写示例，已保存的草稿不会被更改。');
   }
 
   function restoreDraftFromSample() {
@@ -542,7 +537,6 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     if (action.dataset.zhAction === 'sample') enterSampleMode();
     if (action.dataset.zhAction === 'restore') restoreDraftFromSample();
     if (action.dataset.zhAction === 'adopt') adoptSample();
-    if (action.dataset.zhAction === 'clear') clearDraft();
     if (action.dataset.zhAction === 'print') window.print();
     if (action.dataset.zhAction === 'zoom-out') {
       zoom = Math.max(.4, zoom - .1);
@@ -588,9 +582,11 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     if (['import', 'reload', 'reset', 'zh-sample', 'zh-restore'].includes(event.type)) hydrate();
   });
   hydrate();
+  setStatus(shouldPersistDraft ? zhCN.savedStatus : zhCN.saveStatus, shouldPersistDraft ? 'success' : '');
 
   return {
     refresh: hydrate,
+    clearDraft,
     restoreDraftBeforePersistence: restoreDraftFromSample,
     destroy() {
       window.clearTimeout(saveTimer);

@@ -20,8 +20,9 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await expect(page.locator('.header-actions #saveStatus')).toHaveCount(0);
   await expect(page.locator('#japaneseWorkspace .draft-controls #saveStatus')).toBeVisible();
   await expect(page.locator('#draftControlsTitle, #saveDraftButton, #reloadDraftButton')).toHaveCount(0);
-  await expect(page.locator('#clearButton')).toHaveText('この端末の下書きを消去');
-  await expect(page.locator('#japaneseWorkspace .draft-clear-notice')).toHaveText('入力内容は暗号化してこの端末だけに保存されます。');
+  await expect(page.locator('#clearDraftButton')).toHaveText('この端末の下書きを消去');
+  await expect(page.locator('#japaneseWorkspace .draft-clear-notice')).toHaveCount(0);
+  await expect(page.locator('#saveStatus')).toHaveText('入力すると暗号化してこの端末に保存されます');
   await expect(page.locator('#saveStatus')).toHaveAttribute('role', 'status');
 
   const name = page.locator('[name="fullName"]');
@@ -34,7 +35,6 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
 
   const maliciousName = '<img data-e2e-malicious src=x onerror=alert(1)> 山田';
   await name.fill(maliciousName);
-  await expect.poll(() => page.locator('#clearButton').evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await motivation.fill('顧客課題を整理し、改善を最後まで推進します。');
   await github.fill('https://github.com/resume-studio-test');
   await addLink.click();
@@ -71,7 +71,8 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
 
   await page.locator('#loadSampleButton').click();
   await expect(preview).toContainText('山田 太郎');
-  await expect(page.locator('#sampleModeActions')).toContainText('入力例を一時表示しています');
+  await expect(page.locator('#saveStatus')).toHaveText('入力例を表示しています。保存済みの下書きは変更されません。');
+  await expect(page.locator('#sampleModeActions .sample-mode-copy')).toHaveCount(0);
   await expect(page.locator('.header-actions')).not.toContainText('入力例は一時表示です');
   await page.locator('#adoptSampleButton').click();
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
@@ -85,14 +86,15 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await education.locator('.remove-row-button').click();
   await expect(preview).not.toContainText('E2E大学 入学');
 
-  await page.locator('#clearButton').click();
+  await page.locator('#dataMenuSummary').click();
+  await page.locator('#clearDraftButton').click();
   await expect(page.locator('#confirmDialog')).toBeVisible();
   await expect(page.locator('#cancelClearButton')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('#confirmDialog')).not.toBeVisible();
-  await expect(page.locator('#clearButton')).toBeFocused();
+  await expect(page.locator('#clearDraftButton')).toBeFocused();
 
-  await page.locator('#clearButton').click();
+  await page.locator('#clearDraftButton').click();
   await page.locator('#confirmClearButton').click();
   await expect(name).toHaveValue('');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
@@ -110,21 +112,72 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
     database.close();
     return key ?? null;
   })).toBeNull();
-  await expect(page.locator('#clearButton')).toBeVisible();
-  await expect(page.locator('#loadSampleButton')).toBeFocused();
+  await expect(page.locator('#clearDraftButton')).toBeVisible();
+  await expect(page.locator('#clearDraftButton')).toBeFocused();
 });
 
-test('[mobile] 日本語の下書き操作は375pxと401pxで折り返し、44px以上の押下領域を保つ', async ({ page }) => {
-  for (const width of [375, 401]) {
-    await page.setViewportSize({ width, height: 844 });
-    await openLocale(page, 'ja');
-    await page.locator('[name="fullName"]').fill(`モバイル ${width}`);
-    const buttons = page.locator('#japaneseWorkspace .draft-primary-row .secondary-button:visible, #clearButton:visible');
-    for (const button of await buttons.all()) {
-      await expect.poll(() => button.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+test('[mobile] 三言語の通常下書き状態は320–401pxで1行、操作は44px以上で横にはみ出さない', async ({ page }) => {
+  const cases = [
+    ['ja', '#japaneseWorkspace', '[name="fullName"]', '#saveStatus', '#loadSampleButton', '暗号化してこの端末に保存済み'],
+    ['zh-CN', '#chineseWorkspace', '[data-profile="fullName"]', '[data-zh-draft-message]', '[data-zh-action="sample"]', '已加密并保存到此设备'],
+    ['en', '[data-english-editor]', '[data-profile-field="fullName"]', '[data-en-save-status]', '[data-en-load-sample]', 'Encrypted and saved on this device.']
+  ];
+
+  for (const width of [320, 360, 375, 393, 401]) {
+    for (const [locale, workspaceSelector, fieldSelector, statusSelector, sampleSelector, savedStatus] of cases) {
+      await page.setViewportSize({ width, height: 844 });
+      await openLocale(page, locale);
+      const workspace = page.locator(workspaceSelector);
+      await workspace.locator(fieldSelector).fill(`Mobile ${locale} ${width}`);
+      await expect(workspace.locator(statusSelector)).toHaveText(savedStatus);
+      const layout = await workspace.locator('.draft-controls').evaluate((controls, sample) => {
+        const row = controls.querySelector('.draft-primary-row').getBoundingClientRect();
+        const status = controls.querySelector('.draft-message').getBoundingClientRect();
+        const action = controls.querySelector(sample).getBoundingClientRect();
+        return { controls: controls.getBoundingClientRect(), row, status, action };
+      }, sampleSelector);
+      expect(layout.controls.height).toBeLessThanOrEqual(64);
+      expect(layout.action.height).toBeGreaterThanOrEqual(44);
+      expect(Math.abs(
+        (layout.status.top + (layout.status.height / 2)) - (layout.action.top + (layout.action.height / 2))
+      )).toBeLessThanOrEqual(1);
+      await page.locator('#dataMenuSummary').click();
+      await expect.poll(() => page.locator('#clearDraftButton').evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+      await page.locator('#dataMenuSummary').click();
+      await expectNoPageOverflow(page);
     }
-    await expect(page.locator('#japaneseWorkspace .draft-clear-row')).toHaveCSS('flex-direction', 'column');
+  }
+});
+
+test('[mobile] 三言語の保存エラーは省略せず展開して表示する', async ({ page }) => {
+  const cases = [
+    ['ja', '#japaneseWorkspace', '[name="fullName"]', '#saveStatus'],
+    ['zh-CN', '#chineseWorkspace', '[data-profile="fullName"]', '[data-zh-draft-message]'],
+    ['en', '[data-english-editor]', '[data-profile-field="fullName"]', '[data-en-save-status]']
+  ];
+
+  await page.setViewportSize({ width: 320, height: 844 });
+  for (const [locale, workspaceSelector, fieldSelector, statusSelector] of cases) {
+    await openLocale(page, locale);
+    await page.evaluate((key) => localStorage.setItem(key, '{"invalid":"draft"}'), STORAGE_KEY);
+    const workspace = page.locator(workspaceSelector);
+    await workspace.locator(fieldSelector).fill(`Save error ${locale}`);
+    const controls = workspace.locator('.draft-controls');
+    const status = workspace.locator(statusSelector);
+    await expect(controls).toHaveClass(/is-error/);
+    await expect.poll(() => status.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      height: element.getBoundingClientRect().height
+    }))).toEqual(expect.objectContaining({
+      clientWidth: expect.any(Number),
+      scrollWidth: expect.any(Number),
+      height: expect.any(Number)
+    }));
+    await expect.poll(() => status.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(64);
     await expectNoPageOverflow(page);
+    await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
   }
 });
 
@@ -137,6 +190,31 @@ test('[mobile] 入力例モードの復元と採用は44px以上の押下領域�
     await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   }
   await expectNoPageOverflow(page);
+});
+
+test('[mobile] 三言語の入力例は唯一のlive statusで説明し、320–401pxで横にはみ出さない', async ({ page }) => {
+  const cases = [
+    ['ja', '#japaneseWorkspace', '#loadSampleButton', '#saveStatus', '#sampleModeActions', '#restoreDraftButton', '入力例を表示しています。保存済みの下書きは変更されません。'],
+    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '[data-zh-draft-message]', '[data-zh-sample-actions]', '[data-zh-action="restore"]', '正在查看填写示例，已保存的草稿不会被更改。'],
+    ['en', '[data-english-editor]', '[data-en-load-sample]', '[data-en-save-status]', '[data-en-sample-actions]', '[data-en-restore-sample]', 'Viewing an example. Your saved draft will not be changed.']
+  ];
+
+  for (const width of [320, 360, 375, 393, 401]) {
+    for (const [locale, workspaceSelector, sampleSelector, statusSelector, actionsSelector, restoreSelector, sampleStatus] of cases) {
+      await page.setViewportSize({ width, height: 852 });
+      await openLocale(page, locale);
+      const workspace = page.locator(workspaceSelector);
+      await workspace.locator(sampleSelector).click();
+      await expect(workspace.locator(statusSelector)).toHaveText(sampleStatus);
+      await expect(workspace.locator('.draft-message[role="status"]')).toHaveCount(1);
+      await expect(workspace.locator('.sample-mode-copy')).toHaveCount(0);
+      for (const action of await workspace.locator(`${actionsSelector} .secondary-button, ${actionsSelector} .primary-button`).all()) {
+        await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+      }
+      await expectNoPageOverflow(page);
+      await workspace.locator(restoreSelector).click();
+    }
+  }
 });
 
 test('821pxの編集欄で入力例操作が折り返され、横にはみ出さない', async ({ page }) => {
@@ -213,15 +291,15 @@ test('三言語の入力例モードはstickyな下書きコンポーネント�
   const cases = [
     {
       locale: 'ja', workspace: '#japaneseWorkspace', field: '[name="fullName"]', original: '日本語の元下書き', sample: '山田 太郎',
-      normal: '#draftNormalActions', sampleActions: '#sampleModeActions', sampleButton: '#loadSampleButton', restore: '#restoreDraftButton', adopt: '#adoptSampleButton', clear: '#clearButton'
+      normal: '#draftNormalActions', sampleActions: '#sampleModeActions', sampleButton: '#loadSampleButton', restore: '#restoreDraftButton', adopt: '#adoptSampleButton'
     },
     {
       locale: 'zh-CN', workspace: '#chineseWorkspace', field: '[data-profile="fullName"]', original: '中文原草稿', sample: '简立',
-      normal: '[data-zh-normal-actions]', sampleActions: '[data-zh-sample-actions]', sampleButton: '[data-zh-action="sample"]', restore: '[data-zh-action="restore"]', adopt: '[data-zh-action="adopt"]', clear: '[data-zh-action="clear"]'
+      normal: '[data-zh-normal-actions]', sampleActions: '[data-zh-sample-actions]', sampleButton: '[data-zh-action="sample"]', restore: '[data-zh-action="restore"]', adopt: '[data-zh-action="adopt"]'
     },
     {
       locale: 'en', workspace: '[data-english-editor]', field: '[data-profile-field="fullName"]', original: 'Original English draft', sample: 'Alex Morgan',
-      normal: '[data-en-normal-actions]', sampleActions: '[data-en-sample-actions]', sampleButton: '[data-en-load-sample]', restore: '[data-en-restore-sample]', adopt: '[data-en-adopt-sample]', clear: '[data-en-clear]'
+      normal: '[data-en-normal-actions]', sampleActions: '[data-en-sample-actions]', sampleButton: '[data-en-load-sample]', restore: '[data-en-restore-sample]', adopt: '[data-en-adopt-sample]'
     }
   ];
 
@@ -235,10 +313,12 @@ test('三言語の入力例モードはstickyな下書きコンポーネント�
     await workspace.locator(scenario.sampleButton).click();
     await expect(workspace.locator('.draft-controls')).toBeVisible();
     await expect(workspace.locator('.draft-controls')).toHaveCSS('position', 'sticky');
-    await expect(workspace.locator('.draft-clear-notice')).toBeVisible();
+    await expect(workspace.locator('.draft-clear-notice')).toHaveCount(0);
     await expect(workspace.locator(scenario.sampleActions)).toBeVisible();
     await expect(workspace.locator(scenario.normal)).toBeHidden();
-    await expect(workspace.locator(scenario.clear)).toBeHidden();
+    await page.locator('#dataMenuSummary').click();
+    await expect(page.locator('#clearDraftButton')).toBeVisible();
+    await page.locator('#dataMenuSummary').click();
 
     await workspace.locator(scenario.adopt).click();
     await page.locator('#cancelSampleAdoptButton').click();
@@ -265,7 +345,7 @@ test('三言語エディターは Analytics 表示の下に著作権、MIT Licen
     const license = legal.locator('a[href="https://github.com/herehigher/resume/blob/main/LICENSE"]');
     const xContact = legal.locator('.x-contact-link');
     await expect(page.locator(`${workspace} .editor-footer .editor-legal`)).toHaveCount(1);
-    await expect(page.locator(`${workspace} .editor-footer #clearButton`)).toHaveCount(0);
+    await expect(page.locator(`${workspace} .editor-footer #clearDraftButton`)).toHaveCount(0);
     await expect(legal.locator('[data-analytics-disclosure="status"], [data-editor-analytics-disclosure="status"]')).toBeVisible();
     await expect(license).toHaveText('MIT License');
     await expect(license).toHaveAttribute('href', 'https://github.com/herehigher/resume/blob/main/LICENSE');
@@ -497,14 +577,14 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   }, STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
 });
 
-test('三言語で統一した下書きステータスを表示し、入力例を草稿操作にまとめる', async ({ page }) => {
+test('三言語で暗号化保存の状態を表示し、削除をバックアップメニューへまとめる', async ({ page }) => {
   const cases = [
-    ['ja', '#japaneseWorkspace', '#loadSampleButton', '入力例を表示', 'バックアップと復元', 'この端末の下書きを消去', '入力内容は暗号化してこの端末だけに保存されます。'],
-    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '查看填写示例', '备份与恢复', '清除此设备上的草稿', '输入内容会加密后仅保存在此设备上。'],
-    ['en', '[data-english-editor]', '[data-en-load-sample]', 'View example', 'Backup & restore', 'Clear draft from this device', 'Your input is encrypted and saved only on this device.']
+    ['ja', '#japaneseWorkspace', '#loadSampleButton', '入力例を表示', 'バックアップと復元', 'この端末の下書きを消去', '入力すると暗号化してこの端末に保存されます'],
+    ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '查看填写示例', '备份与恢复', '清除此设备上的草稿', '输入后将加密保存到此设备'],
+    ['en', '[data-english-editor]', '[data-en-load-sample]', 'View example', 'Backup & restore', 'Clear draft from this device', 'Your input will be encrypted and saved on this device.']
   ];
 
-  for (const [locale, workspaceSelector, sampleSelector, sampleLabel, backupLabel, clearLabel, encryptionNotice] of cases) {
+  for (const [locale, workspaceSelector, sampleSelector, sampleLabel, backupLabel, clearLabel, unsavedStatus] of cases) {
     await openLocale(page, locale);
     const workspace = page.locator(workspaceSelector);
     const sampleButton = workspace.locator(sampleSelector);
@@ -513,14 +593,18 @@ test('三言語で統一した下書きステータスを表示し、入力例�
     await expect(sampleButton).toHaveText(sampleLabel);
     await expect(sampleButton.locator('xpath=ancestor::*[contains(@class, "draft-controls")]')).toHaveCount(1);
     await expect(workspace.locator('.draft-primary-row .draft-message')).toHaveAttribute('role', 'status');
-    await expect(workspace.locator('.draft-clear-button')).toHaveText(clearLabel);
-    await expect(workspace.locator('.draft-clear-notice')).toHaveText(encryptionNotice);
+    await expect(workspace.locator('.draft-primary-row .draft-message')).toHaveText(unsavedStatus);
+    await expect(workspace.locator('.draft-clear-button, .draft-clear-notice')).toHaveCount(0);
     await expect(workspace.locator('.draft-controls')).toHaveCSS('position', 'sticky');
     await expect(page.locator('.header-actions').locator(sampleSelector)).toHaveCount(0);
     await expect(backupMenu).toHaveAttribute('aria-label', backupLabel);
     await expect(backupMenu.locator('#dataMenuLabel')).toHaveText(backupLabel);
     await expect(backupMenu.locator('#dataMenuLabel')).toBeVisible();
     await expect(backupMenu.locator('#dataMenuShortLabel')).toBeHidden();
+    await backupMenu.click();
+    await expect(page.locator('#clearDraftButton')).toHaveText(clearLabel);
+    await expect(page.locator('#clearDraftButton')).toBeVisible();
+    await backupMenu.click();
 
     const layout = await page.locator('.header-actions').evaluate((header) => {
       const headerBox = header.getBoundingClientRect();

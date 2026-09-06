@@ -9,6 +9,7 @@ export default {
   brandEntry: 'Resume Studio の紹介ページを開く',
   exportData: 'データを書き出す',
   importData: 'データを読み込む',
+  clearDraft: 'この端末の下書きを消去',
   printDocument: 'PDF出力',
   exportSuccess: 'データを書き出しました。',
   exportError: 'データを書き出せませんでした。',

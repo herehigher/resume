@@ -39,19 +39,14 @@ export function renderEnglishWorkspace() {
 
       <section class="draft-controls" aria-label="Draft status and actions">
         <div class="draft-primary-row">
-          <span class="draft-message is-success" data-en-save-status role="status" aria-live="polite">Saved on this device.</span>
+          <span class="draft-message" data-en-save-status role="status" aria-live="polite">Your input will be encrypted and saved on this device.</span>
           <div class="draft-normal-actions" data-en-normal-actions>
             <button class="secondary-button" data-en-load-sample type="button">View example</button>
           </div>
           <div class="draft-sample-actions" data-en-sample-actions hidden>
-            <span class="sample-mode-copy"><strong>Viewing an example resume</strong><small>Your saved draft has not been changed.</small></span>
             <button class="secondary-button" data-en-restore-sample type="button">Return to my draft</button>
             <button class="primary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
           </div>
-        </div>
-        <div class="draft-clear-row">
-          <button class="draft-clear-button" data-en-clear type="button">Clear draft from this device</button>
-          <span class="draft-clear-notice">Your input is encrypted and saved only on this device.</span>
         </div>
       </section>
 
@@ -234,6 +229,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     saveStatus.classList.toggle('is-success', normalizedTone === 'success');
     saveStatus.classList.toggle('is-saving', normalizedTone === 'saving');
     saveStatus.classList.toggle('is-error', normalizedTone === 'error');
+    root.querySelector('.draft-controls').classList.toggle('is-error', normalizedTone === 'error');
   }
 
   function scheduleSave() {
@@ -243,11 +239,11 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       return;
     }
     shouldPersistDraft = true;
-    setStatus('Saving…', 'saving');
+    setStatus('Encrypting and saving…', 'saving');
     saveTimer = window.setTimeout(async () => {
       try {
         await store.save();
-        setStatus('Saved on this device.', 'success');
+        setStatus('Encrypted and saved on this device.', 'success');
       } catch (error) {
         setStatus(messageForDraftStorageError(error, 'en', 'Your changes could not be saved on this device.'), true);
       }
@@ -347,7 +343,6 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     root.querySelector('.draft-controls').classList.toggle('is-sample-mode', active);
     root.querySelector('[data-en-normal-actions]').hidden = active;
     root.querySelector('[data-en-sample-actions]').hidden = !active;
-    root.querySelector('[data-en-clear]').hidden = active;
   }
 
   async function enterSampleMode() {
@@ -364,7 +359,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     sampleMode = true;
     store.replace(createEnglishSampleState(store.getState()), { type: 'en-sample' });
     setSampleUI(true);
-    setStatus('Viewing an example. Your draft is protected.');
+    setStatus('Viewing an example. Your saved draft will not be changed.');
   }
 
   function restoreDraftFromSample({ announce = true } = {}) {
@@ -511,8 +506,6 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       restoreDraftFromSample();
     } else if (event.target.closest('[data-en-adopt-sample]')) {
       adoptSample();
-    } else if (event.target.closest('[data-en-clear]')) {
-      clearDraft();
     }
   }
 
@@ -538,10 +531,14 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   window.addEventListener('resize', fitPreview);
   window.addEventListener('pagehide', onPageHide);
   hydrate();
+  setStatus(shouldPersistDraft
+    ? 'Encrypted and saved on this device.'
+    : 'Your input will be encrypted and saved on this device.', shouldPersistDraft ? 'success' : '');
 
   return {
     available: true,
     render: hydrate,
+    clearDraft,
     restoreDraftBeforePersistence() {
       return restoreDraftFromSample({ announce: false });
     },

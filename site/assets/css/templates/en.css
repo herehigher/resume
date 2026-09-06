@@ -179,8 +179,6 @@
   justify-content: start;
 }
 
-.english-workspace .sample-mode-copy { grid-column: 1 / -1; }
-
 .english-editor-page-size select {
   border: 1px solid var(--line);
   border-radius: 6px;
