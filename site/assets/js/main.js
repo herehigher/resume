@@ -84,5 +84,9 @@ initLocaleController(store, {
     if (locale === 'ja') japaneseEditor.refresh();
     if (locale === 'zh-CN') chineseEditor.refresh();
     if (locale === 'en') englishEditor.render();
+  },
+  onClearDraft(locale) {
+    const editor = { ja: japaneseEditor, 'zh-CN': chineseEditor, en: englishEditor }[locale];
+    editor?.clearDraft();
   }
 });

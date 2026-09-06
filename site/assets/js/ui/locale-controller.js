@@ -40,7 +40,8 @@ export function persistLocaleChange(store, storage, locale) {
 export function initLocaleController(store, {
   locale: initialLocale,
   preferenceStorage = window.localStorage,
-  onLocaleApplied = () => {}
+  onLocaleApplied = () => {},
+  onClearDraft = () => {}
 } = {}) {
   const select = document.getElementById('localeSelect');
   const workspaces = {
@@ -58,6 +59,7 @@ export function initLocaleController(store, {
   const dataMenuShortLabel = document.getElementById('dataMenuShortLabel');
   const exportButton = document.getElementById('exportDataButton');
   const importButton = document.getElementById('importDataButton');
+  const clearDraftButton = document.getElementById('clearDraftButton');
   const importInput = document.getElementById('importDataInput');
   const brand = document.querySelector('.brand');
   let locale = initialLocale || store.getState().settings.locale;
@@ -80,6 +82,7 @@ export function initLocaleController(store, {
     dataMenuShortLabel.textContent = copy.backupMenuShortLabel;
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
+    clearDraftButton.textContent = copy.clearDraft;
     document.getElementById('printButtonLabel').textContent = copy.printDocument;
     document.getElementById('pendingTitle').textContent = copy.pendingTitle;
     document.getElementById('pendingBody').textContent = copy.pendingBody;
@@ -125,6 +128,7 @@ export function initLocaleController(store, {
   });
 
   importButton.addEventListener('click', () => importInput.click());
+  clearDraftButton.addEventListener('click', () => onClearDraft(locale));
   importInput.addEventListener('change', async () => {
     const file = importInput.files?.[0];
     if (!file) return;

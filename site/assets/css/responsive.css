@@ -29,6 +29,8 @@
   .preview-scroll { padding: 20px 14px 50px; }
   .document-preview { transform-origin: top left; }
   .document-page { min-height: 842px; padding: 34px 37px; width: 595px; }
+  .data-menu-panel .secondary-button,
+  .data-menu-panel .danger-button { min-height: 44px; }
 }
 
 @media (max-width: 520px) {
@@ -49,13 +51,23 @@
   .editor-footer { gap: 20px; }
   .editor-footer-actions { align-items: flex-start; }
   .editor-legal { padding-bottom: 62px; }
-  .draft-primary-row { align-items: flex-start; grid-template-columns: 1fr; }
-  .draft-normal-actions,
+  .draft-controls { gap: 0; padding: 8px; }
+  .draft-primary-row { align-items: center; gap: 4px; grid-template-columns: minmax(0, 1fr) auto; }
+  .draft-controls.is-sample-mode .draft-primary-row,
+  .draft-controls.is-error .draft-primary-row { align-items: flex-start; grid-template-columns: 1fr; }
+  .draft-normal-actions { justify-content: flex-end; }
   .draft-sample-actions { justify-content: flex-start; }
   .draft-controls .secondary-button { min-height: 44px; }
+  .draft-normal-actions .secondary-button {
+    background: transparent;
+    border-color: transparent;
+    color: var(--blue);
+    padding: 0 8px;
+  }
   .draft-sample-actions .primary-button { min-height: 44px; }
-  .draft-clear-row { align-items: flex-start; flex-direction: column; gap: 2px; }
-  .draft-clear-button { margin-left: -10px; }
+  .draft-message { font-size: 9px; gap: 5px; overflow: hidden; white-space: nowrap; }
+  .draft-controls.is-sample-mode .draft-message,
+  .draft-controls.is-error .draft-message { overflow: visible; white-space: normal; }
   .trust-capsule {
     bottom: calc(9px + env(safe-area-inset-bottom));
     right: calc(9px + env(safe-area-inset-right));

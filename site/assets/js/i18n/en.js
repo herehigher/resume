@@ -9,6 +9,7 @@ export default {
   brandEntry: 'Open the Resume Studio introduction',
   exportData: 'Export data',
   importData: 'Import data',
+  clearDraft: 'Clear draft from this device',
   printDocument: 'Save PDF',
   exportSuccess: 'Your data was exported.',
   exportError: 'Your data could not be exported.',
@@ -35,7 +36,7 @@ export default {
     pageSize: 'Paper size',
     preview: 'Live preview',
     emptyList: 'No entries yet. Select Add to create one.',
-    saveStatus: 'Saved on this device',
+    saveStatus: 'Encrypted and saved on this device.',
     saveError: 'Your changes could not be saved on this device.'
   },
   privacySecurity: {

@@ -10,7 +10,8 @@ import {
 } from './fixtures.js';
 
 async function clearDraftWithUi(page) {
-  await page.locator('#clearButton').click();
+  await page.locator('#dataMenuSummary').click();
+  await page.locator('#clearDraftButton').click();
   await page.locator('#confirmClearButton').click();
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY)).toBeNull();
 }
