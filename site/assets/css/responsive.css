@@ -15,13 +15,42 @@
   .brand small, .desktop-only { display: none; }
   .brand-mark { border-radius: 9px; height: 34px; width: 34px; }
   .document-switcher { display: none; }
+  html[lang="ja"] .app-header {
+    grid-template-areas:
+      "brand actions"
+      "documents documents";
+    grid-template-columns: auto 1fr;
+    grid-template-rows: 62px 52px;
+    height: 120px;
+    padding: 0 14px 5px;
+  }
+  html[lang="ja"] .brand { grid-area: brand; }
+  html[lang="ja"] .header-actions { grid-area: actions; }
+  html[lang="ja"] .document-switcher {
+    align-self: start;
+    display: grid;
+    grid-area: documents;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    justify-self: stretch;
+    width: 100%;
+  }
+  html[lang="ja"] .document-tab {
+    min-height: 44px;
+    min-width: 0;
+    padding: 0 13px;
+    white-space: nowrap;
+  }
   .data-menu-label { display: none; }
   .data-menu-short-label { display: inline; }
   .primary-button { padding: 0 11px; }
   .mobile-view-switch { background: #fff; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; height: 44px; padding: 5px 14px; }
-  .mobile-view-switch button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 11px; font-weight: 700; }
+  .mobile-view-switch button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
   .mobile-view-switch button.is-active { border-color: var(--blue); color: var(--blue); }
   .workspace { display: block; height: calc(100vh - 106px); }
+  #japaneseWorkspace {
+    height: calc(100vh - 164px);
+    height: calc(100dvh - 164px);
+  }
   .workspace[data-mobile-mode="editor"] .preview-panel { display: none; }
   .workspace[data-mobile-mode="preview"] .editor-panel { display: none; }
   .editor-panel { border: 0; height: 100%; padding: 26px 18px 48px; }

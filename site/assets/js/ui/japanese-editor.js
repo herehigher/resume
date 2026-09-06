@@ -312,13 +312,23 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     renderPreview();
   }
 
+  function resetVisibleMobileScroll() {
+    if (!window.matchMedia('(max-width: 820px)').matches) return;
+    const scroller = workspace.dataset.mobileMode === 'preview'
+      ? document.getElementById('previewScroll')
+      : workspace.querySelector('.editor-panel');
+    scroller?.scrollTo({ top: 0 });
+  }
+
   function switchDocument(documentType) {
     if (!['resume', 'career'].includes(documentType)) return;
+    if (japaneseDocument().activeDocument === documentType) return;
     mutate((state) => {
       state.documents.ja.activeDocument = documentType;
     });
     renderDocumentControls();
     renderPreview();
+    resetVisibleMobileScroll();
   }
 
   function onFormInput(event) {

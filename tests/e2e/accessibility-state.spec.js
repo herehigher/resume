@@ -38,6 +38,79 @@ test('[mobile] mobile view controls expose synchronized selection state', async 
   await expect(page.locator('[data-en-mobile-view="preview"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('[mobile] Japanese document and view controls remain independent and reachable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await openLocale(page, 'ja');
+
+  const resumeTab = page.locator('#resumeDocumentTab');
+  const careerTab = page.locator('#careerDocumentTab');
+  const editorPanel = page.locator('#japaneseWorkspace .editor-panel');
+  const previewScroll = page.locator('#previewScroll');
+
+  await expect(page.locator('.document-switcher')).toBeVisible();
+  await expect(resumeTab).toHaveAttribute('aria-selected', 'true');
+  await expect(careerTab).toHaveAttribute('aria-selected', 'false');
+
+  await editorPanel.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await careerTab.click();
+  await expect(careerTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#careerFields')).toBeVisible();
+  await expect(editorPanel).toHaveJSProperty('scrollTop', 0);
+
+  await editorPanel.evaluate((element) => {
+    element.scrollTop = 120;
+  });
+  const editorScrollTop = await editorPanel.evaluate((element) => element.scrollTop);
+  expect(editorScrollTop).toBeGreaterThan(0);
+  await page.locator('[data-mobile-view="preview"]').click();
+  await expect(page.locator('#japaneseWorkspace')).toHaveAttribute('data-mobile-mode', 'preview');
+  await expect(page.locator('#previewDocumentName')).toHaveText('職務経歴書');
+  await expect(careerTab).toHaveAttribute('aria-selected', 'true');
+
+  await previewScroll.evaluate((element) => {
+    element.scrollTop = 120;
+  });
+  expect(await previewScroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await resumeTab.click();
+  await expect(resumeTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#previewDocumentName')).toHaveText('履歴書');
+  await expect(previewScroll).toHaveJSProperty('scrollTop', 0);
+  await expect(page.locator('#japaneseWorkspace')).toHaveAttribute('data-mobile-mode', 'preview');
+  await page.locator('[data-mobile-view="editor"]').click();
+  await expect(editorPanel).toHaveJSProperty('scrollTop', editorScrollTop);
+  await expectNoPageOverflow(page);
+});
+
+test('[mobile] Japanese document controls fit the supported mobile breakpoint range', async ({ page }) => {
+  for (const width of [320, 390, 820]) {
+    await page.setViewportSize({ width, height: 844 });
+    await openLocale(page, 'ja');
+
+    const layout = await page.locator('.document-switcher').evaluate((switcher) => ({
+      buttons: Array.from(switcher.querySelectorAll('.document-tab'), (button) => ({
+        height: button.getBoundingClientRect().height,
+        right: button.getBoundingClientRect().right,
+        scrollWidth: button.scrollWidth,
+        width: button.clientWidth
+      })),
+      left: switcher.getBoundingClientRect().left,
+      right: switcher.getBoundingClientRect().right
+    }));
+
+    expect(layout.buttons).toHaveLength(2);
+    for (const button of layout.buttons) {
+      expect(button.height).toBeGreaterThanOrEqual(44);
+      expect(button.scrollWidth).toBeLessThanOrEqual(button.width);
+      expect(button.right).toBeLessThanOrEqual(layout.right);
+    }
+    expect(layout.left).toBeGreaterThanOrEqual(0);
+    expect(layout.right).toBeLessThanOrEqual(width);
+    await expectNoPageOverflow(page);
+  }
+});
+
 test('[mobile] 320px header keeps readable locale choices and separate controls in every locale', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
 
@@ -62,6 +135,22 @@ test('[mobile] 320px header keeps readable locale choices and separate controls 
     expect(layout.menu.right).toBeLessThanOrEqual(layout.print.left);
     await expect(page.locator('#localeSelect')).toHaveCSS('font-size', '11px');
     await expect(page.locator('#printButton')).toBeVisible();
+    if (locale === 'ja') {
+      const documentTabs = page.locator('.document-tab');
+      await expect(documentTabs).toHaveCount(2);
+      for (const tab of await documentTabs.all()) {
+        await expect(tab).toBeVisible();
+        const size = await tab.evaluate((element) => ({
+          clientWidth: element.clientWidth,
+          height: element.getBoundingClientRect().height,
+          scrollWidth: element.scrollWidth
+        }));
+        expect(size.height).toBeGreaterThanOrEqual(44);
+        expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
+      }
+    } else {
+      await expect(page.locator('.document-switcher')).toBeHidden();
+    }
     await expectNoPageOverflow(page);
   }
 });
