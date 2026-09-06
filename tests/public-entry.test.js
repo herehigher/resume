@@ -119,10 +119,18 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
     assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
     assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
-    assert.match(html, /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-links">[\s\S]*?<\/p>\s*<p class="entry-legal">/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
+  }
+
+  for (const file of [...routes.map((route) => route.file), 'site/ja/index.html']) {
+    const html = source(file);
+    assert.match(
+      html,
+      /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-links">[\s\S]*?<\/p>\s*<p class="entry-legal">/,
+      `${file} must place language links between the primary action and legal notice`
+    );
   }
 });
 
