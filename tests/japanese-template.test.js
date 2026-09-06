@@ -116,11 +116,17 @@ test('Japanese resume prints local link icons and repeated semantic history head
 });
 
 test('Japanese resume uses unified personal-information borders and a fixed photo frame', () => {
+  const state = createDefaultState('ja');
+  const html = renderJapaneseDocument(state);
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
 
   assert.match(japaneseCss, /--ja-key-column:\s*88px/);
-  assert.match(japaneseCss, /\.resume-profile\s*\{[^}]*border:\s*\.75pt solid var\(--ja-line-strong\);[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 30mm/s);
-  assert.match(japaneseCss, /\.profile-photo\s*\{[^}]*height:\s*40mm;[^}]*width:\s*30mm;/s);
+  assert.match(japaneseCss, /\.resume-profile\s*\{[^}]*border:\s*\.75pt solid var\(--ja-line-strong\);[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto/s);
+  assert.match(japaneseCss, /\.profile-text\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(38px, auto\) minmax\(68px, auto\) minmax\(38px, auto\);[^}]*min-height:\s*40mm/s);
+  assert.match(japaneseCss, /\.profile-text \.paper-label\s*\{[^}]*align-self:\s*stretch;[^}]*border-right:\s*\.5pt solid var\(--ja-line-default\)/s);
+  assert.match(japaneseCss, /\.profile-photo-column\s*\{[^}]*align-self:\s*stretch;[^}]*border-left:\s*\.5pt solid var\(--ja-line-default\);[^}]*display:\s*flex/s);
+  assert.match(japaneseCss, /\.profile-photo\s*\{[^}]*flex:\s*0 0 auto;[^}]*height:\s*40mm;[^}]*width:\s*30mm;/s);
+  assert.match(html, /<div class="profile-photo-column"><div class="profile-photo">/);
   assert.match(japaneseCss, /\.resume-contact > div\s*\{[^}]*grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\)/s);
   assert.match(japaneseCss, /\.resume-contact \.paper-value\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s);
   assert.match(japaneseCss, /\.paper-history-table\s*\{[^}]*table-layout:\s*fixed;/s);
