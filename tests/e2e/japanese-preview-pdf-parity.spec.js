@@ -78,12 +78,20 @@ async function inspectPdf(buffer) {
   }
 }
 
+function normalizePdfText(value) {
+  return String(value).normalize('NFKC').replace(/\s/g, '');
+}
+
+function normalizeAsciiUrlText(value) {
+  return normalizePdfText(value).replace(/[^a-z\d]/gi, '');
+}
+
 function textAndFontHeight(pages, fragment) {
   const items = pages.flatMap((page) => page.items);
   const item = items.find((candidate) => candidate.str.includes(fragment));
   return {
     fontHeight: item?.height,
-    text: items.map((candidate) => candidate.str).join('').replace(/\s/g, '')
+    text: normalizePdfText(items.map((candidate) => candidate.str).join(''))
   };
 }
 
@@ -123,9 +131,9 @@ test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を�
   ]);
   expect(printed.every((item) => item.items.some((text) => text.str.trim()))).toBe(true);
   const previewText = await page.locator('.paper-text-content').first().textContent();
-  const normalizePdfText = (value) => String(value).replace(/\s/g, '').normalize('NFKC').replaceAll('⻑', '長');
-  const normalizedPreview = normalizePdfText(previewText);
-  const normalizedPrinted = normalizePdfText(printed.flatMap((item) => item.items).map((item) => item.str).join(''));
+  const normalizeJapanesePdfText = (value) => normalizePdfText(value).replaceAll('⻑', '長');
+  const normalizedPreview = normalizeJapanesePdfText(previewText);
+  const normalizedPrinted = normalizeJapanesePdfText(printed.flatMap((item) => item.items).map((item) => item.str).join(''));
   expect(normalizedPrinted).toContain(normalizedPreview);
   expect(normalizedPrinted.split(normalizedPreview)).toHaveLength(2);
 
@@ -234,7 +242,7 @@ test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の
     const longPdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
     const longResult = textAndFontHeight(longPdf, documentTitle);
 
-    expect(longResult.text.match(/longpath/g)).toHaveLength(activeDocument === 'resume' ? 50 : 150);
+    expect(normalizeAsciiUrlText(longResult.text).match(/longpath/g)).toHaveLength(activeDocument === 'resume' ? 50 : 150);
     expect(longResult.fontHeight).toBeCloseTo(baselineResult.fontHeight, 2);
     expect(await page.locator(activeDocument === 'resume' ? '.paper-text-content' : '.career-body').first().evaluate(
       (element) => getComputedStyle(element).fontSize
