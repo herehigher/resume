@@ -29,17 +29,20 @@
 .resume-document-header { align-items: end; border-bottom: 2px solid var(--ja-accent); display: grid; gap: 28px; grid-template-columns: 1fr auto; padding-bottom: 13px; }
 .resume-document-title { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 28px; font-weight: 500; letter-spacing: .28em; margin: 0; }
 .resume-current-date { color: var(--ja-muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.resume-profile { border: .75pt solid var(--ja-line-strong); display: grid; grid-template-columns: minmax(0, 1fr) 30mm; margin-top: 18px; }
-.profile-text > div { align-items: center; border-top: .5pt solid var(--ja-line-default); display: grid; min-height: 38px; }
-.profile-text > div:first-child { border-top: 0; }
+.resume-profile { border: .75pt solid var(--ja-line-strong); display: grid; grid-template-columns: minmax(0, 1fr) auto; margin-top: 18px; }
+.profile-text { align-content: stretch; display: grid; grid-template-rows: minmax(38px, auto) minmax(68px, auto) minmax(38px, auto); min-height: 40mm; }
+.profile-text > div { align-items: stretch; display: grid; min-height: 0; }
+.profile-text > div + div > * { border-top: .5pt solid var(--ja-line-default); }
 .profile-kana { grid-template-columns: var(--ja-key-column) minmax(0, 1fr); }
-.profile-name { grid-template-columns: var(--ja-key-column) minmax(0, 1fr); min-height: 68px !important; }
+.profile-name { grid-template-columns: var(--ja-key-column) minmax(0, 1fr); }
 .profile-birth { grid-template-columns: var(--ja-key-column) minmax(0, 1fr) auto; }
 .paper-label { color: var(--ja-muted); font-size: 12px; padding: 0 12px; }
 .paper-value { font-size: 14px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; padding: 8px 14px; white-space: pre-wrap; }
 .profile-text .paper-label { align-items: center; align-self: stretch; background: var(--ja-fill-label); border-right: .5pt solid var(--ja-line-default); display: flex; }
+.profile-text .paper-value { align-items: center; display: flex; }
 .profile-name .paper-value { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 22px; letter-spacing: .1em; }
-.profile-photo { align-items: center; align-self: start; background: var(--ja-fill-label); border-left: .5pt solid var(--ja-line-default); box-sizing: border-box; color: var(--ja-muted); display: flex; font-family: sans-serif; font-size: 12px; height: 40mm; justify-content: center; margin: 0; overflow: hidden; width: 30mm; }
+.profile-photo-column { align-items: flex-start; align-self: stretch; background: var(--ja-fill-label); border-left: .5pt solid var(--ja-line-default); display: flex; justify-content: center; }
+.profile-photo { align-items: center; background: var(--ja-fill-label); color: var(--ja-muted); display: flex; flex: 0 0 auto; font-family: sans-serif; font-size: 12px; height: 40mm; justify-content: center; margin: 0; overflow: hidden; width: 30mm; }
 .profile-photo img { height: 100%; object-fit: cover; width: 100%; }
 .resume-contact { border: .75pt solid var(--ja-line-strong); border-top: 0; }
 .resume-contact > div { align-items: stretch; border-top: .5pt solid var(--ja-line-default); display: grid; grid-template-columns: var(--ja-key-column) minmax(0, 1fr); min-height: 40px; }

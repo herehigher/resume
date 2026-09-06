@@ -121,7 +121,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
           <div class="profile-name"><span class="paper-label">氏名</span><span class="paper-value">${displayText(fields.fullName, '氏名未入力')}</span></div>
           <div class="profile-birth"><span class="paper-label">生年月日</span><span class="paper-value">${displayText(japaneseDate(fields.birthDate))} ${age ? `（${escapeHTML(age)}）` : ''}</span><span class="paper-value">${escapeHTML(fields.gender)}</span></div>
         </div>
-        <div class="profile-photo">${photo}</div>
+        <div class="profile-photo-column"><div class="profile-photo">${photo}</div></div>
       </section>
       <section class="resume-contact">
         <div><span class="paper-label">ふりがな</span><span class="paper-value full-contact">${displayText(fields.addressKana)}</span></div>

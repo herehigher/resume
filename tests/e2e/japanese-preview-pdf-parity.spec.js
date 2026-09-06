@@ -156,41 +156,83 @@ test('[mobile] 日本語: smartphone 幅でも A4 の内部版面を reflow し�
   expect(mobile).toEqual(desktop);
 });
 
-test('日本語: 印刷時の写真枠は氏名・写真の有無にかかわらず30×40mmを保つ', async ({ page }) => {
+test('日本語: 印刷時のプロフィールgridは罫線を連続させ、写真frameを固定する', async ({ page }) => {
   await openLocale(page, 'ja');
-  const shortName = createDefaultState('ja');
-  shortName.profile.fields.fullName = '架空 太郎';
-  await importJapaneseState(page, shortName);
-  await page.emulateMedia({ media: 'print' });
-  const withoutPhoto = await page.locator('.profile-photo').evaluate((element) => {
-    const box = element.getBoundingClientRect();
-    const style = getComputedStyle(element);
-    return { cssHeight: style.height, cssWidth: style.width, height: box.height, width: box.width };
-  });
+  const photoData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  const scenarios = [
+    { hasPhoto: false, isLong: false },
+    { hasPhoto: true, isLong: false },
+    { hasPhoto: false, isLong: true },
+    { hasPhoto: true, isLong: true }
+  ];
+  const measurements = [];
 
-  const longName = structuredClone(shortName);
-  longName.profile.fields.fullName = '見本 サンプル アレクサンドラ マリア テスト';
-  longName.profile.fields.nameKana = 'みほん さんぷる あれくさんどら まりあ てすと';
-  longName.profile.fields.address = '架空都架空区架空町一丁目二番地三号 長い住所のレイアウト検証';
-  longName.profile.photo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-  await page.emulateMedia({ media: 'screen' });
-  await importJapaneseState(page, longName);
-  await expect(page.locator('.profile-photo img')).toHaveAttribute('src', /^blob:/);
-  await page.emulateMedia({ media: 'print' });
-  const withPhoto = await page.locator('.profile-photo').evaluate((element) => {
-    const box = element.getBoundingClientRect();
-    const image = element.querySelector('img');
-    const style = getComputedStyle(element);
-    return { cssHeight: style.height, cssWidth: style.width, height: box.height, objectFit: image ? getComputedStyle(image).objectFit : '', width: box.width };
-  });
+  for (const scenario of scenarios) {
+    const state = createDefaultState('ja');
+    state.profile.fields.fullName = scenario.isLong
+      ? Array.from({ length: 8 }, (_, index) => `架空氏名の印刷検証 ${index + 1}`).join('\n')
+      : '架空 太郎';
+    state.profile.fields.nameKana = scenario.isLong ? 'かくう しめい の いんさつ けんしょう' : 'かくう たろう';
+    if (scenario.hasPhoto) state.profile.photo = photoData;
 
-  expect(Math.abs(Number.parseFloat(withoutPhoto.cssWidth) - (30 * 96 / 25.4))).toBeLessThan(0.5);
-  expect(Math.abs(Number.parseFloat(withoutPhoto.cssHeight) - (40 * 96 / 25.4))).toBeLessThan(0.5);
-  expect(withPhoto).toMatchObject({
-    cssHeight: withoutPhoto.cssHeight,
-    cssWidth: withoutPhoto.cssWidth,
-    objectFit: 'cover'
-  });
+    await page.emulateMedia({ media: 'screen' });
+    await importJapaneseState(page, state);
+    if (scenario.hasPhoto) await expect(page.locator('.profile-photo img')).toHaveAttribute('src', /^blob:/);
+    await page.emulateMedia({ media: 'print' });
+    const geometry = await page.locator('.resume-profile').evaluate((profile) => {
+      const box = (element) => {
+        const rect = element.getBoundingClientRect();
+        return { bottom: rect.bottom, height: rect.height, left: rect.left, right: rect.right, top: rect.top, width: rect.width };
+      };
+      const text = profile.querySelector('.profile-text');
+      const photoColumn = profile.querySelector('.profile-photo-column');
+      const photo = profile.querySelector('.profile-photo');
+      const photoImage = photo?.querySelector('img');
+      const labels = [...profile.querySelectorAll('.profile-text .paper-label')];
+      const rows = [...profile.querySelectorAll('.profile-text > div')];
+      const photoStyle = getComputedStyle(photo);
+      const columnStyle = getComputedStyle(photoColumn);
+      return {
+        labels: labels.map((label) => ({ ...box(label), borderRightStyle: getComputedStyle(label).borderRightStyle })),
+        photo: { ...box(photo), cssHeight: photoStyle.height, cssWidth: photoStyle.width, objectFit: photoImage ? getComputedStyle(photoImage).objectFit : '' },
+        photoColumn: { ...box(photoColumn), borderLeftStyle: columnStyle.borderLeftStyle },
+        rows: rows.map(box),
+        text: box(text)
+      };
+    });
+    measurements.push({ ...scenario, geometry });
+  }
+
+  const close = (left, right) => expect(Math.abs(left - right)).toBeLessThanOrEqual(0.5);
+  for (const { geometry, hasPhoto, isLong } of measurements) {
+    const { labels, photo, photoColumn, rows, text } = geometry;
+    expect(labels).toHaveLength(3);
+    expect(rows).toHaveLength(3);
+    expect(photoColumn.borderLeftStyle).toBe('solid');
+    close(photoColumn.top, text.top);
+    close(photoColumn.bottom, text.bottom);
+    close(photoColumn.left, text.right);
+    close(labels[0].top, text.top);
+    close(labels.at(-1).bottom, text.bottom);
+    for (let index = 0; index < labels.length; index += 1) {
+      expect(labels[index].borderRightStyle).toBe('solid');
+      close(labels[index].top, rows[index].top);
+      close(labels[index].bottom, rows[index].bottom);
+      close(labels[index].right, labels[0].right);
+      if (index) close(labels[index - 1].bottom, labels[index].top);
+    }
+    expect(Math.abs(Number.parseFloat(photo.cssWidth) - (30 * 96 / 25.4))).toBeLessThan(0.5);
+    expect(Math.abs(Number.parseFloat(photo.cssHeight) - (40 * 96 / 25.4))).toBeLessThan(0.5);
+    expect(photo.objectFit).toBe(hasPhoto ? 'cover' : '');
+    if (isLong) expect(text.height).toBeGreaterThan(photo.height + 0.5);
+    else close(text.height, photo.height);
+  }
+
+  const frame = measurements[0].geometry.photo;
+  for (const { geometry } of measurements.slice(1)) {
+    expect(geometry.photo.cssWidth).toBe(frame.cssWidth);
+    expect(geometry.photo.cssHeight).toBe(frame.cssHeight);
+  }
 });
 
 test('日本語: visible print lifecycle は screen の予約版面を引き継がない', async ({ page }) => {
