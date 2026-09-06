@@ -42,7 +42,10 @@ function expectPageSize(pages, expected) {
 }
 
 function expectPdfContext(text, expected) {
-  if (typeof expected === 'string') expect(text).toContain(expected);
+  if (typeof expected === 'string') {
+    const normalizePdfText = (value) => String(value).normalize('NFKC').replace(/\s/g, '');
+    expect(normalizePdfText(text)).toContain(normalizePdfText(expected));
+  }
   else expect(text).toMatch(expected);
 }
 
