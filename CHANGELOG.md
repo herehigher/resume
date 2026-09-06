@@ -6,16 +6,23 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-06
+
 ### Changed / 変更
 
 - 公開準備・承認・配布・smoke を一つの Actions 入口へ統合し、同じ main commit の Quality と準備済み artifact を再利用するよう整理。
 - 毎 version の展示 screenshot / PDF 更新、独立 asset 承認、手動 digest 転記と未使用の旧 release helper を廃止し、検証出力を一時 Actions artifact に分離。
 - 開発・公開文書を統合し、文言や現在 version を固定する test と docs-only の一律 browser gate を削減。
+- Mobile の下書き状態 UI を圧縮し、保存状態と入力例 action を一行へまとめ、下書き削除を backup menu へ移動。
+- 日本語・简体中文・English の公開入口で、言語切替 link を編集開始 button の直下へ移動。
+- 入力例表示中は元の下書きへ戻る操作を主 button とし、例を下書きとして使用する操作との優先度を三言語で統一。
 
 ### Fixed / 修正
 
 - Cloudflare RUM の browser / engine / OS 情報 `bi` を提供者の根拠に基づいて検証し、実 provider script の互換性確認を公開準備へ接続。
 - 履歴書の入力・写真・JSON・暗号化草稿から再読込・離脱までの通信検査と、同一 origin の不正 request / WebSocket を検出する回帰 test を補完。
+- 日本語履歴書の長文と長い URL を欠落なく自然に改 page し、プロフィール欄の罫線、写真枠、文字配置を安定化。三言語の長大 record も継続 page で文脈を維持。
+- Mobile の日本語 editor で履歴書と職務経歴書を切り替えられない問題を修正し、文書切替と入力・preview 表示を独立して保持。
 
 ## [0.2.2] - 2026-09-05
 
