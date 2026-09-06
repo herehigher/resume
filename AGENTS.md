@@ -13,6 +13,7 @@ Repository 全体に適用し、作業場所に近い `AGENTS.override.md` / `AG
 - Desktop / smartphone の主要操作を維持し、PDF は対象言語・用紙で文字切れ、重なり、不要な空白・重複 page を防ぐ。
 - 依頼と無関係な design、input data、dependency を変更しない。Test dependency は目的と更新方法が明確な場合だけ追加する。
 - UI は対象言語で簡潔に記載する。Issue / PR / review comment は日本語を主とし、必要な code comment は英語を主とする。
+- GitHub 向け Markdown では意図した相手以外を mention しない。Command / test output は要約を基本とし、掲載が必要な場合は fenced code block に入れる。
 
 ## 作業の参照先
 

@@ -64,7 +64,7 @@ async function printFixturePdf(page, fixtureCase) {
   return { endMarker, pages: await inspectPdf(await printPdf(page)) };
 }
 
-test('PDF pagination: 三言語のページ境界データは末尾内容を保持し空白ページを作らない @pdf', async ({ page }) => {
+test('PDF pagination: 三言語のページ境界データは末尾内容を保持し空白ページを作らない', async ({ page }) => {
   const cases = [
     { fixtureCase: { locale: 'ja', length: 'standard', documentType: 'resume', pageSize: 'A4' }, pages: 3, pageSize: A4 },
     { fixtureCase: { locale: 'ja', length: 'extra-long', documentType: 'resume', pageSize: 'A4' }, pages: 11, pageSize: A4 },
@@ -82,7 +82,7 @@ test('PDF pagination: 三言語のページ境界データは末尾内容を保�
   }
 });
 
-test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、空白末尾ページを作らない @pdf', async ({ page }) => {
+test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、空白末尾ページを作らない', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await expect(page.locator('[data-zh-preview]')).toContainText('数据分析专业证书');
@@ -105,7 +105,7 @@ test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、
   expect(pages.at(-1)?.text).toContain('数据分析专业证书');
 });
 
-test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と末尾を保つ @pdf', async ({ page }) => {
+test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と末尾を保つ', async ({ page }) => {
   for (const [pageSize, expectedPageSize] of [
     ['A4', A4],
     ['LETTER', LETTER]
@@ -147,7 +147,7 @@ test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と
   }
 });
 
-test('PDF short: English の短いデータは 1 ページの Letter でテキスト抽出できる @pdf', async ({ page }) => {
+test('PDF short: English の短いデータは 1 ページの Letter でテキスト抽出できる', async ({ page }) => {
   await openLocale(page, 'en');
   await page.locator('[data-profile-field="fullName"]').fill('SHORT PDF MARKER');
 
@@ -157,7 +157,7 @@ test('PDF short: English の短いデータは 1 ページの Letter でテキ�
   expectPageSize(pages, LETTER);
 });
 
-test('PDF standard: 日本語の標準例は 2 ページの A4 で主要テキストを抽出できる @pdf', async ({ page }) => {
+test('PDF standard: 日本語の標準例は 2 ページの A4 で主要テキストを抽出できる', async ({ page }) => {
   await openLocale(page, 'ja');
   await page.locator('#loadSampleButton').click();
 
@@ -169,7 +169,7 @@ test('PDF standard: 日本語の標準例は 2 ページの A4 で主要テキ�
   expect(text).toContain('志望動機');
 });
 
-test('PDF long: English の超長文は複数 Letter ページになり末尾まで抽出できる @pdf', async ({ page }) => {
+test('PDF long: English の超長文は複数 Letter ページになり末尾まで抽出できる', async ({ page }) => {
   await openLocale(page, 'en');
   const state = createDefaultState('en');
   state.profile.fields.fullName = 'LONG PDF START MARKER';
@@ -209,7 +209,7 @@ for (const [locale, addSelector, previewSelector, pageSize] of [
   ['zh-CN', '[data-zh-add-profile-link]', '[data-zh-preview]', A4],
   ['en', '[data-en-add-profile-link]', '[data-en-preview]', LETTER]
 ]) {
-  test(`PDF ${locale}: Links はサイト名と protocol を除いた長い URL を印刷する @pdf`, async ({ page }) => {
+  test(`PDF ${locale}: Links はサイト名と protocol を除いた長い URL を印刷する`, async ({ page }) => {
     const longUrl = `https://example.test/${'long-profile-path-'.repeat(12)}details`;
     await openLocale(page, locale);
     const add = page.locator(addSelector);

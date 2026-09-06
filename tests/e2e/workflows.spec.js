@@ -114,7 +114,7 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await expect(page.locator('#loadSampleButton')).toBeFocused();
 });
 
-test('@mobile 日本語の下書き操作は375pxと401pxで折り返し、44px以上の押下領域を保つ', async ({ page }) => {
+test('[mobile] 日本語の下書き操作は375pxと401pxで折り返し、44px以上の押下領域を保つ', async ({ page }) => {
   for (const width of [375, 401]) {
     await page.setViewportSize({ width, height: 844 });
     await openLocale(page, 'ja');
@@ -128,7 +128,7 @@ test('@mobile 日本語の下書き操作は375pxと401pxで折り返し、44px�
   }
 });
 
-test('@mobile 入力例モードの復元と採用は44px以上の押下領域を保つ', async ({ page }) => {
+test('[mobile] 入力例モードの復元と採用は44px以上の押下領域を保つ', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 844 });
   await openLocale(page, 'ja');
   await page.locator('#loadSampleButton').click();
@@ -171,7 +171,7 @@ test('1280pxの入力例モードでは状態文言を1行で表示する', asyn
   await expectNoPageOverflow(page);
 });
 
-test('@mobile Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
+test('[mobile] Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
   await openLocale(page, 'ja');
   const add = page.locator('#addProfileLinkButton');
   await revealField(add);
@@ -285,7 +285,7 @@ test('三言語エディターは Analytics 表示の下に著作権、MIT Licen
   await expect(page.locator('#japaneseWorkspace .editor-legal')).toBeHidden();
 });
 
-test('@mobile 著作権表示は固定の trust capsule に隠れない', async ({ page }) => {
+test('[mobile] 著作権表示は固定の trust capsule に隠れない', async ({ page }) => {
   await openLocale(page, 'ja');
   const legal = page.locator('#japaneseWorkspace .editor-legal');
   await legal.scrollIntoViewIfNeeded();
@@ -563,7 +563,7 @@ test('三言語のプロフィールURLはHTTP(S)だけがリンクになる', a
   }
 });
 
-test('@mobile 日本語: 編集・保存復元・書き出し・プレビューが操作できる', async ({ page }) => {
+test('[mobile] 日本語: 編集・保存復元・書き出し・プレビューが操作できる', async ({ page }) => {
   await openLocale(page, 'ja');
   expect(page.viewportSize()).toEqual({ width: 390, height: 844 });
   await expect(page.locator('#dataMenuSummary')).toHaveAttribute('aria-label', 'バックアップと復元');
@@ -590,7 +590,7 @@ test('@mobile 日本語: 編集・保存復元・書き出し・プレビュー�
   await expectNoPageOverflow(page);
 });
 
-test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async ({ page }) => {
+test('[mobile] 简体中文: 编辑、保存恢复和预览均可操作', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   const workspace = page.locator('#chineseWorkspace');
   const name = workspace.locator('[data-profile="fullName"]');
@@ -612,7 +612,7 @@ test('@mobile 简体中文: 编辑、保存恢复和预览均可操作', async (
   await expectNoPageOverflow(page);
 });
 
-test('@mobile English: editing, save/restore, and preview remain operable', async ({ page }) => {
+test('[mobile] English: editing, save/restore, and preview remain operable', async ({ page }) => {
   await openLocale(page, 'en');
   const workspace = page.locator('[data-english-editor]');
   const name = workspace.locator('[data-profile-field="fullName"]');

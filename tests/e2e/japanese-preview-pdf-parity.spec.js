@@ -141,7 +141,7 @@ test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を�
   expect(careerAt1024).toEqual(careerAt1440);
 });
 
-test('@mobile 日本語: smartphone 幅でも A4 の内部版面を reflow しない', async ({ page }) => {
+test('[mobile] 日本語: smartphone 幅でも A4 の内部版面を reflow しない', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loadJapaneseSample(page);
   await page.locator('[data-mobile-view="preview"]').click();
@@ -166,7 +166,7 @@ test('日本語: visible print lifecycle は screen の予約版面を引き継�
   });
 });
 
-test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の本文を縮小しない @pdf', async ({ page }) => {
+test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の本文を縮小しない', async ({ page }) => {
   await openLocale(page, 'ja');
   const longUrl = `https://example.invalid/${'longpath'.repeat(50)}`;
 

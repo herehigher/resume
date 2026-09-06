@@ -18,7 +18,7 @@ test('document tabs expose synchronized selection state and keyboard navigation'
   await expect(page.locator('#resumeDocumentTab')).toHaveAttribute('tabindex', '0');
 });
 
-test('@mobile mobile view controls expose synchronized selection state', async ({ page }) => {
+test('[mobile] mobile view controls expose synchronized selection state', async ({ page }) => {
   await openLocale(page, 'ja');
   await expect(page.locator('[data-mobile-view="editor"]')).toHaveAttribute('aria-pressed', 'true');
   await page.locator('[data-mobile-view="preview"]').click();
@@ -38,7 +38,7 @@ test('@mobile mobile view controls expose synchronized selection state', async (
   await expect(page.locator('[data-en-mobile-view="preview"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('@mobile 320px header keeps readable locale choices and separate controls in every locale', async ({ page }) => {
+test('[mobile] 320px header keeps readable locale choices and separate controls in every locale', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
 
   for (const locale of ['ja', 'zh-CN', 'en']) {
@@ -142,7 +142,7 @@ test('homepage and locale CTAs lead to the matching editor locale', async ({ pag
   }
 });
 
-test('@mobile 320px localized public entries keep the centered brand, heading, and primary button separate', async ({ page }) => {
+test('[mobile] 320px localized public entries keep the centered brand, heading, and primary button separate', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   for (const path of ['/', '/zh-cn/', '/en/']) {
     await page.goto(path);
