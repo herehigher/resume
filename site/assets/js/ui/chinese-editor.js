@@ -63,8 +63,8 @@ export function renderChineseEditorShell() {
             <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
           </div>
           <div class="draft-sample-actions" data-zh-sample-actions hidden>
-            <button class="secondary-button" type="button" data-zh-action="restore">${zhCN.restoreDraft}</button>
-            <button class="primary-button" type="button" data-zh-action="adopt">${zhCN.adoptSample}</button>
+            <button class="primary-button" type="button" data-zh-action="restore">${zhCN.restoreDraft}</button>
+            <button class="secondary-button" type="button" data-zh-action="adopt">${zhCN.adoptSample}</button>
           </div>
         </div>
       </section>

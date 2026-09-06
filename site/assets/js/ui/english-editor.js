@@ -44,8 +44,8 @@ export function renderEnglishWorkspace() {
             <button class="secondary-button" data-en-load-sample type="button">View example</button>
           </div>
           <div class="draft-sample-actions" data-en-sample-actions hidden>
-            <button class="secondary-button" data-en-restore-sample type="button">Return to my draft</button>
-            <button class="primary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
+            <button class="primary-button" data-en-restore-sample type="button">Return to my draft</button>
+            <button class="secondary-button" data-en-adopt-sample type="button">Use this example as my draft</button>
           </div>
         </div>
       </section>
