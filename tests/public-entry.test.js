@@ -119,7 +119,7 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
     assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
     assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
-    assert.match(html, /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-legal">/);
+    assert.match(html, /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-links">[\s\S]*?<\/p>\s*<p class="entry-legal">/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
@@ -172,11 +172,11 @@ test('editor brand opens the active locale entry and public entries use the shar
   assert.match(publicEntryCss, /\.entry-lede\s*\{[\s\S]*?color: #354250;[\s\S]*?font-size: 16px;[\s\S]*?line-height: 1\.7;[\s\S]*?margin: 14px 0 0;/);
   assert.match(publicEntryCss, /\.entry-trust-list\s*\{[\s\S]*?gap: 9px;[\s\S]*?margin: 21px 0 0;/);
   assert.match(publicEntryCss, /\.entry-trust-dot\s*\{[\s\S]*?background: #eef5fc;[\s\S]*?border: 1px solid #cadeef;[\s\S]*?height: 19px;[\s\S]*?line-height: 17px;[\s\S]*?width: 19px;/);
-  assert.match(publicEntryCss, /\.entry-actions\s*\{[\s\S]*?justify-content: center;[\s\S]*?margin: 28px 0 22px;/);
+  assert.match(publicEntryCss, /\.entry-actions\s*\{[\s\S]*?justify-content: center;[\s\S]*?margin: 28px 0 0;/);
   assert.match(publicEntryCss, /\.entry-button\s*\{[\s\S]*?display: inline-flex;[\s\S]*?font-size: 14px;[\s\S]*?gap: 8px;[\s\S]*?min-height: 44px;[\s\S]*?padding: 0 19px;/);
   assert.match(publicEntryCss, /\.entry-button:hover\s*\{[^}]*background: #194f86;/);
   assert.match(publicEntryCss, /\.entry-legal\s*\{[\s\S]*?font-size: 12px;[\s\S]*?margin: 0;[\s\S]*?text-align: center;/);
-  assert.match(publicEntryCss, /\.entry-links\s*\{[^}]*text-align: center;/);
+  assert.match(publicEntryCss, /\.entry-links\s*\{[^}]*font-size: 13px;[^}]*margin: 10px 0 14px;[^}]*text-align: center;/);
   assert.match(publicEntryCss, /@media \(max-width: 620px\)[\s\S]*?\.entry-main h1\s*\{[^}]*font-size: 23px;/);
   assert.deepEqual(
     [ja.brandEntry, zhCN.brandEntry, en.brandEntry],
