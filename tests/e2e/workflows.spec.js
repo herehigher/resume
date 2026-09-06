@@ -316,6 +316,8 @@ test('三言語の入力例モードはstickyな下書きコンポーネント�
     await expect(workspace.locator('.draft-clear-notice')).toHaveCount(0);
     await expect(workspace.locator(scenario.sampleActions)).toBeVisible();
     await expect(workspace.locator(scenario.normal)).toBeHidden();
+    await expect(workspace.locator(scenario.restore)).toHaveClass(/primary-button/);
+    await expect(workspace.locator(scenario.adopt)).toHaveClass(/secondary-button/);
     await page.locator('#dataMenuSummary').click();
     await expect(page.locator('#clearDraftButton')).toBeVisible();
     await page.locator('#dataMenuSummary').click();

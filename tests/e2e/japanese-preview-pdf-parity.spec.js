@@ -96,11 +96,14 @@ function textAndFontHeight(pages, fragment) {
 }
 
 async function importJapaneseState(page, state) {
-  await page.locator('#importDataInput').setInputFiles({
+  const importInput = page.locator('#importDataInput');
+  await importInput.setInputFiles({
     name: 'japanese-pdf-layout-fixture.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(state))
   });
+  await expect(importInput).toHaveValue('');
+  await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
 }
 
 test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を保つ', async ({ page }) => {
