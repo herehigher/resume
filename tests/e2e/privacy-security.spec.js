@@ -112,7 +112,7 @@ test('source, badge, and open privacy dialog are excluded from print', async ({ 
   await expect(page.locator('#privacySecurityDialog')).toBeHidden();
 });
 
-test('@mobile privacy UI hides its label and stays reachable without overflow', async ({ page }) => {
+test('[mobile] privacy UI hides its label and stays reachable without overflow', async ({ page }) => {
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     for (const locale of ['ja', 'zh-CN', 'en']) {

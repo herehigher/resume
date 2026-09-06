@@ -125,6 +125,28 @@ test('Japanese resume grid shares one track and keeps long contact values inside
   assert.match(japaneseCss, /\.paper-table-row\s*\{[^}]*grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\)/s);
 });
 
+test('Japanese resume flows every section in one printable document and wraps unbroken input', () => {
+  const state = createDefaultState('ja');
+  const longUrl = `https://example.invalid/${'longpath'.repeat(50)}`;
+  state.documents.ja.fields.motivation = longUrl;
+  const html = renderJapaneseDocument(state);
+  const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
+
+  assert.equal((html.match(/<article class="document-page resume-document">/g) || []).length, 1);
+  assert.equal((html.match(/longpath/g) || []).length, 50);
+  for (const [before, after] of [
+    ['学歴・職歴', '免許・資格'],
+    ['免許・資格', '志望動機・自己PRなど'],
+    ['志望動機・自己PRなど', '本人希望記入欄']
+  ]) {
+    assert.ok(html.indexOf(before) < html.indexOf(after), `${before} should precede ${after}`);
+  }
+  assert.match(japaneseCss, /\.paper-text-content\s*\{[^}]*overflow-wrap:\s*anywhere;/s);
+  assert.match(japaneseCss, /\.career-body\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s);
+  assert.match(japaneseCss, /\.career-company-grid\s*\{[^}]*grid-template-columns:\s*105px minmax\(0, 1fr\)/s);
+  assert.match(japaneseCss, /\.career-company-grid > div\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s);
+});
+
 test('Japanese sample data is isolated from the current draft', () => {
   const draft = createDefaultState('ja');
   draft.profile.fields.fullName = '保存中の氏名';

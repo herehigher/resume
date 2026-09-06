@@ -115,9 +115,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         ${renderHistoryRows(document.education, '学歴')}
         ${renderHistoryRows(document.employment, '職歴')}
       </section>
-    </article>
-    <article class="document-page resume-document">
-      <section class="paper-section paper-section-first">
+      <section class="paper-section">
         <h3 class="resume-section-title">免許・資格</h3>
         <div class="paper-table-header"><div>年月</div><div>内容</div></div>
         ${renderQualificationRows(document.qualification)}

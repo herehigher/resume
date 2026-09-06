@@ -74,7 +74,7 @@
 .paper-text-section { border-bottom: 1px solid var(--ja-line-strong); margin-top: 22px; min-height: 130px; }
 .paper-text-title { align-items: center; border-bottom: 1px solid var(--ja-line-default); color: var(--ja-text); display: flex; font-size: 12px; font-weight: 700; gap: 9px; padding: 0 0 7px; }
 .paper-text-title::before { background: var(--ja-accent-blue); content: ""; height: 17px; width: 4px; }
-.paper-text-content { font-size: 10.5px; line-height: 1.9; padding: 12px 5px; white-space: pre-wrap; }
+.paper-text-content { font-size: 10.5px; line-height: 1.9; overflow-wrap: anywhere; padding: 12px 5px; white-space: pre-wrap; }
 
 .career-document { font-family: "Yu Gothic", "Hiragino Sans", sans-serif; }
 .career-doc-header { border-bottom: 3px solid #1f3f70; padding-bottom: 14px; }
@@ -85,14 +85,15 @@
 .career-section { margin-top: 26px; }
 .career-section-title { align-items: center; border-bottom: 1px solid #9ba9bb; display: flex; font-size: 14px; gap: 9px; margin: 0 0 11px; padding-bottom: 7px; }
 .career-section-title::before { background: #2457a2; content: ""; display: block; height: 18px; width: 4px; }
-.career-body { font-size: 10px; line-height: 1.9; padding: 0 5px; white-space: pre-wrap; }
+.career-body { font-size: 10px; line-height: 1.9; min-width: 0; overflow-wrap: anywhere; padding: 0 5px; white-space: pre-wrap; }
 .career-company { border: 1px solid #9aa6b5; margin-top: 15px; }
-.career-company-heading { background: #eff4f9; border-bottom: 1px solid #9aa6b5; display: flex; justify-content: space-between; padding: 9px 11px; }
+.career-company-heading { background: #eff4f9; border-bottom: 1px solid #9aa6b5; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 9px 11px; }
+.career-company-heading strong { min-width: 0; overflow-wrap: anywhere; }
 .career-company-heading strong { font-size: 11px; }
 .career-company-heading span { font-size: 9px; }
 .career-company-info { border-bottom: 1px solid #c3cad3; font-size: 9px; padding: 7px 11px; }
-.career-company-grid { display: grid; grid-template-columns: 105px 1fr; }
-.career-company-grid > div { border-bottom: 1px solid #cbd2da; font-size: 9px; line-height: 1.75; padding: 9px 11px; white-space: pre-wrap; }
+.career-company-grid { display: grid; grid-template-columns: 105px minmax(0, 1fr); }
+.career-company-grid > div { border-bottom: 1px solid #cbd2da; font-size: 9px; line-height: 1.75; min-width: 0; overflow-wrap: anywhere; padding: 9px 11px; white-space: pre-wrap; }
 .career-company-grid > div:nth-child(odd) { background: #f8fafc; border-right: 1px solid #cbd2da; font-weight: 700; }
 .career-company-grid > div:nth-last-child(-n+2) { border-bottom: 0; }
 .empty-preview { color: #8a95a4; font-family: sans-serif; font-size: 10px; font-style: italic; }
