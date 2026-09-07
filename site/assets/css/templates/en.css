@@ -222,16 +222,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@page english-a4 {
-  margin: 14mm 15mm;
-  size: A4 portrait;
-}
-
-@page english-letter {
-  margin: .55in .62in;
-  size: Letter portrait;
-}
-
 @media print {
   .en-mobile-view-switch { display: none !important; }
 
@@ -245,14 +235,12 @@
 
   .document-page.english-document.en-page-size-a4 {
     min-height: 0;
-    page: english-a4;
     padding: 0;
     width: auto;
   }
 
   .document-page.english-document.en-page-size-letter {
     min-height: 0;
-    page: english-letter;
     padding: 0;
     width: auto;
   }

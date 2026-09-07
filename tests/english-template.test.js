@@ -129,10 +129,9 @@ test('English responsibilities render as semantic achievement bullets', () => {
   assert.doesNotMatch(html, /<li>[•-]/);
 });
 
-test('English print CSS defines both paper sizes and wraps long content', () => {
+test('English print CSS leaves paper selection to the active anonymous page rule and wraps long content', () => {
   const css = readFileSync(new URL('../site/assets/css/templates/en.css', import.meta.url), 'utf8');
-  assert.match(css, /@page english-a4[\s\S]*size:\s*A4 portrait/);
-  assert.match(css, /@page english-letter[\s\S]*size:\s*Letter portrait/);
+  assert.doesNotMatch(css, /@page|[;{]\s*page\s*:/);
   assert.match(css, /overflow-wrap:\s*anywhere/);
   assert.match(css, /\.document-page\.english-document\.en-page-size-letter/);
 });

@@ -10,6 +10,7 @@ import { initJapaneseEditor } from './ui/japanese-editor.js';
 import { initChineseEditor } from './ui/chinese-editor.js';
 import { initLocaleController } from './ui/locale-controller.js';
 import { initPrivacySecurity } from './ui/privacy-security.js';
+import { setActivePrintPage } from './ui/active-print-page.js';
 import { createEmbeddedPhotoUrl } from './utils/embedded-photo-url.js';
 
 const persistence = createDraftStorage(window.localStorage);
@@ -50,6 +51,14 @@ const store = createStore({
   persistence,
   hasStoredState: hasStoredDraft
 });
+
+function syncActivePrintPage(state) {
+  const activeLocale = state.settings.locale;
+  setActivePrintPage(document, activeLocale, state.settings.pageSizeByLocale[activeLocale]);
+}
+
+syncActivePrintPage(store.getState());
+store.subscribe((state) => syncActivePrintPage(state));
 
 document.getElementById('chineseWorkspace').insertAdjacentHTML('afterend', renderEnglishWorkspace());
 
