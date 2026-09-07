@@ -73,6 +73,59 @@ async function printFixturePdf(page, fixtureCase) {
   return { endMarker, pages: await inspectPdf(await printPdf(page)) };
 }
 
+async function activePrintPageText(page) {
+  return page.locator('#activePrintPageStyle').textContent();
+}
+
+test('print page: locale and English paper changes keep exactly one active anonymous page rule', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await expect(page.locator('#activePrintPageStyle')).toHaveCount(1);
+  await expect.poll(() => activePrintPageText(page)).toBe('@page { margin: 14mm 15mm; size: A4 portrait; }');
+
+  await page.locator('#localeSelect').selectOption('en');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await page.locator('[data-en-page-size]').selectOption('A4');
+  await expect.poll(() => activePrintPageText(page)).toBe('@page { margin: 14mm 15mm; size: A4 portrait; }');
+
+  await page.locator('[data-en-page-size]').selectOption('LETTER');
+  await expect.poll(() => activePrintPageText(page)).toBe('@page { margin: .55in .62in; size: Letter portrait; }');
+
+  await page.locator('#localeSelect').selectOption('zh-CN');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+  await expect.poll(() => activePrintPageText(page)).toBe('@page { margin: 13mm 15mm 14mm; size: A4 portrait; }');
+  await expect(page.locator('#activePrintPageStyle')).toHaveCount(1);
+});
+
+test('diagnostic matrix: legacy named pages and common breaks do not reproduce the visible-Chrome blank page through CDP', async ({ page }) => {
+  const cases = [
+    { locale: 'ja', sampleButton: '#loadSampleButton', documentSelector: '#japaneseWorkspace .document-page', lastText: '貴社規定に従います。' },
+    { locale: 'zh-CN', sampleButton: '[data-zh-action="sample"]', documentSelector: '#chineseWorkspace .document-page', lastText: '数据分析专业证书' }
+  ];
+
+  for (const item of cases) {
+    await page.emulateMedia({ media: 'screen' });
+    await openLocale(page, item.locale);
+    await page.locator(item.sampleButton).click();
+    for (const namedPage of [true, false]) {
+      for (const commonBreakAfter of [true, false]) {
+        const name = `issue130-${item.locale.replace(/[^a-z]/gi, '').toLowerCase()}-${namedPage ? 'named' : 'anonymous'}-${commonBreakAfter ? 'break' : 'auto'}`;
+        const diagnosticStyle = await page.addStyleTag({
+          content: `@page ${name} { margin: ${item.locale === 'zh-CN' ? '13mm 15mm 14mm' : '14mm 15mm'}; size: A4 portrait; }
+            @media print {
+              ${item.documentSelector} { ${namedPage ? `page: ${name} !important;` : ''} break-after: ${commonBreakAfter ? 'page' : 'auto'} !important; }
+              ${item.documentSelector}:last-child { break-after: auto !important; }
+            }`,
+        });
+        const pages = await inspectPdf(await printPdf(page));
+        expect(pages).toHaveLength(2);
+        expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+        expect(pages.at(-1)?.text).toContain(item.lastText);
+        await diagnosticStyle.evaluate((element) => element.remove());
+      }
+    }
+  }
+});
+
 test('PDF pagination: 三言語のページ境界データは末尾内容を保持し空白ページを作らない', async ({ page }) => {
   const cases = [
     { fixtureCase: { locale: 'ja', length: 'standard', documentType: 'resume', pageSize: 'A4' }, pageSize: A4 },

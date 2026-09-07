@@ -1,5 +1,4 @@
 @media print {
-  @page { margin: 14mm 15mm; }
   html, body { background: white; height: auto; overflow: visible; }
   .app-header, .mobile-view-switch, .editor-panel, .preview-toolbar, .trust-capsule, .editor-legal, #privacySecurityDialog { display: none !important; }
   .locale-pending, .workspace[hidden] { display: none !important; }

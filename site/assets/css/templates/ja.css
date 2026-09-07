@@ -112,16 +112,10 @@
 #japaneseWorkspace.is-printing .paper-text-section,
 #japaneseWorkspace.is-printing .requests-section { min-height: 0 !important; }
 
-@page japanese-a4 {
-  margin: 14mm 15mm;
-  size: A4 portrait;
-}
-
 @media print {
   #japaneseWorkspace .document-page {
     height: auto;
     overflow: visible;
-    page: japanese-a4;
   }
   #japaneseWorkspace .empty-preview { display: none; }
   #japaneseWorkspace .paper-table-header,

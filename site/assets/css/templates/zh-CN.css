@@ -307,11 +307,6 @@
   .zh-skills .zh-section-body { columns: auto; }
 }
 
-@page chinese-a4 {
-  margin: 13mm 15mm 14mm;
-  size: A4 portrait;
-}
-
 @media print {
   .zh-mobile-view-switch,
   .zh-workspace > .editor-panel,
@@ -335,7 +330,6 @@
     height: auto;
     min-height: 0;
     overflow: visible;
-    page: chinese-a4;
     padding: 0;
     width: auto;
   }
