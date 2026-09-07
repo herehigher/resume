@@ -37,6 +37,19 @@ const alternateLinks = Object.freeze({
 });
 const licenseUrl = 'https://github.com/herehigher/resume/blob/main/LICENSE';
 const xProfileUrl = 'https://x.com/kanhigher';
+const keywordMetadata = Object.freeze({
+  'site/index.html': '無料オンライン履歴書作成, オープンソース履歴書作成, ローカル処理, プライバシー重視, PDF履歴書作成, 履歴書テンプレート, 職務経歴書テンプレート',
+  'site/ja/index.html': '無料オンライン履歴書作成, オープンソース履歴書作成, ローカル処理, プライバシー重視, PDF履歴書作成, 履歴書テンプレート, 職務経歴書テンプレート',
+  'site/zh-cn/index.html': '免费在线简历制作, 开源简历生成器, 本地处理, 隐私安全, PDF简历生成, 简历模板, 中文简历模板',
+  'site/en/index.html': 'free online resume builder, open source resume builder, local processing, privacy-first resume editor, PDF resume generator, resume templates, English CV template',
+  'site/editor/index.html': '無料オンライン履歴書作成, オープンソース履歴書作成, ローカル処理, プライバシー重視, PDF履歴書作成, 免费在线简历制作, 开源简历生成器, 本地处理, 隐私安全, PDF简历生成, free online resume builder, open source resume builder, local processing, privacy-first resume editor, PDF resume generator'
+});
+const descriptionTerms = Object.freeze({
+  'site/index.html': ['無料', 'オープンソース', 'オンライン', '端末内', 'テンプレート', 'PDF'],
+  'site/ja/index.html': ['無料', 'オープンソース', 'オンライン', '端末内', 'テンプレート', 'PDF'],
+  'site/zh-cn/index.html': ['免费', '开源', '在线', '本地设备', '模板', 'PDF'],
+  'site/en/index.html': ['free', 'open-source', 'online', 'locally', 'template', 'PDF']
+});
 
 function source(file) {
   return readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -136,6 +149,21 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
       `${file} must place language links between the primary action and legal notice`
     );
   }
+});
+
+test('entry and editor metadata describes the free, local, private PDF resume experience in every locale', () => {
+  for (const [file, keywords] of Object.entries(keywordMetadata)) {
+    const html = source(file);
+    assert.match(html, new RegExp(`<meta name="keywords" content="${keywords.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`));
+  }
+  for (const [file, terms] of Object.entries(descriptionTerms)) {
+    const description = source(file).match(/<meta name="description" content="([^"]+)">/)?.[1] || '';
+    for (const term of terms) assert.match(description, new RegExp(term, 'i'), `${file} description must include ${term}`);
+  }
+  const editor = source('site/editor/index.html');
+  assert.match(editor, /無料オンライン履歴書作成/);
+  assert.match(editor, /free online resume builder/);
+  assert.match(editor, /<meta name="robots" content="noindex,follow">/);
 });
 
 test('public routes show the X contact link beside the copyright notice', () => {

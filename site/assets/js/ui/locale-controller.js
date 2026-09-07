@@ -62,8 +62,10 @@ export function initLocaleController(store, {
   const clearDraftButton = document.getElementById('clearDraftButton');
   const importInput = document.getElementById('importDataInput');
   const brand = document.querySelector('.brand');
+  const dataMenu = dataMenuSummary.closest('.data-menu');
   let locale = initialLocale || store.getState().settings.locale;
   let renderedLocale = '';
+  let dataMenuPointerDownInside = false;
 
   function applyLocale(force = false) {
     if (!force && renderedLocale === locale) return;
@@ -142,6 +144,31 @@ export function initLocaleController(store, {
     } finally {
       importInput.value = '';
     }
+  });
+
+  dataMenu.addEventListener('focusout', () => {
+    window.queueMicrotask(() => {
+      if (dataMenu.open && !dataMenuPointerDownInside && !dataMenu.contains(document.activeElement)) dataMenu.open = false;
+    });
+  });
+  dataMenu.addEventListener('pointerdown', () => {
+    dataMenuPointerDownInside = true;
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!dataMenu.contains(event.target)) dataMenuPointerDownInside = false;
+    if (dataMenu.open && !dataMenu.contains(event.target)) dataMenu.open = false;
+  });
+  document.addEventListener('pointerup', () => {
+    dataMenuPointerDownInside = false;
+  });
+  document.addEventListener('pointercancel', () => {
+    dataMenuPointerDownInside = false;
+  });
+  dataMenu.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !dataMenu.open) return;
+    event.preventDefault();
+    dataMenu.open = false;
+    dataMenuSummary.focus();
   });
 
   store.subscribe((_state, event) => {

@@ -1,0 +1,25 @@
+import { expect, openLocale, test } from './fixtures.js';
+
+test('backup and restore menu stays open for internal actions, then closes outside or on focus loss', async ({ page }) => {
+  await openLocale(page, 'en');
+  const menu = page.locator('.data-menu');
+  const trigger = page.locator('#dataMenuSummary');
+  await trigger.click();
+  await expect(menu).toHaveAttribute('open', '');
+  await page.locator('#exportDataButton').click();
+  await expect(menu).toHaveAttribute('open', '');
+  await trigger.click();
+  await expect(menu).not.toHaveAttribute('open', '');
+  await trigger.click();
+  await expect(menu).toHaveAttribute('open', '');
+  await page.locator('#localeSelect').focus();
+  await expect(menu).not.toHaveAttribute('open', '');
+  await trigger.click();
+  await expect(menu).toHaveAttribute('open', '');
+  await page.locator('.editor-heading:visible').click();
+  await expect(menu).not.toHaveAttribute('open', '');
+  await trigger.click();
+  await page.keyboard.press('Escape');
+  await expect(menu).not.toHaveAttribute('open', '');
+  await expect(trigger).toBeFocused();
+});
