@@ -51,6 +51,17 @@ test('default state contains independent locale documents', () => {
   assert.notEqual(state.documents['zh-CN'], state.documents.en);
 });
 
+test('page break settings are isolated and reject unsupported keys and duplicates', () => {
+  const state = createDefaultState('en');
+  state.settings.pageBreaks.en.A4.resume = ['projects'];
+  state.settings.pageBreaks.en.LETTER.resume = ['skills'];
+  assert.equal(validateState(state).valid, true);
+  state.settings.pageBreaks.en.A4.resume = ['projects', 'projects'];
+  assert.equal(validateState(state).valid, false);
+  state.settings.pageBreaks.en.A4.resume = ['not-a-section'];
+  assert.equal(validateState(state).valid, false);
+});
+
 test('locale resolution follows URL, saved setting, browser, default order', () => {
   assert.equal(resolveLocale({
     search: '?lang=en',
@@ -120,6 +131,23 @@ test('export and import round trip preserves all locale data', async () => {
 
   assert.deepEqual(target.getState(), source.getState());
   assert.equal(JSON.parse(targetStorage.getItem(STORAGE_KEY)).profile.fields.fullName, 'Sample Person');
+});
+
+test('page breaks survive export, import, reload, and locale, document, and paper switching', async () => {
+  const storage = createMemoryStorage();
+  const source = createTestStore(storage, createDefaultState('en'));
+  source.update((state) => {
+    state.settings.pageBreaks.ja.A4.resume = ['qualifications'];
+    state.settings.pageBreaks.ja.A4.career = ['career-history'];
+    state.settings.pageBreaks.en.A4.resume = ['projects'];
+    state.settings.pageBreaks.en.LETTER.resume = ['skills'];
+  });
+  await source.save();
+  const targetStorage = createMemoryStorage();
+  const target = createTestStore(targetStorage, createDefaultState());
+  await target.importJson(source.exportJson());
+  await target.reload();
+  assert.deepEqual(target.getState().settings.pageBreaks, source.getState().settings.pageBreaks);
 });
 
 test('invalid import does not change current or persisted data', async () => {

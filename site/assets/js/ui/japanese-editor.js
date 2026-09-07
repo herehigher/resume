@@ -4,6 +4,7 @@ import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
 import { confirmSampleAdoption } from './confirmation-dialog.js';
+import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 
 const PROFILE_FIELD_NAMES = new Set([
   'fullName',
@@ -37,6 +38,10 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   let sampleMode = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
+  const pageBreakControls = initPageBreakControls({
+    store, locale: 'ja', preview, toolbar: document.querySelector('#japaneseWorkspace .preview-toolbar'),
+    getDocumentType: () => japaneseDocument().activeDocument, scheduleSave
+  });
 
   function japaneseDocument() {
     return store.getState().documents.ja;
@@ -285,7 +290,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     const fallbackWidth = wide ? 760 : 595;
     const availableWidth = document.getElementById('previewScroll').clientWidth - padding;
     const paperWidth = preview.querySelector('.document-page')?.offsetWidth || fallbackWidth;
-    zoom = Math.min(1, Math.max(wide ? .55 : .45, availableWidth / paperWidth));
+    zoom = Math.min(1, Math.max(wide ? .55 : .45, availableWidth / (paperWidth + (wide ? PAGE_BREAK_PREVIEW_GUTTER : 0))));
     applyZoom();
   }
 
@@ -294,6 +299,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     preview.innerHTML = renderJapaneseDocument(state, {
       photoUrl: embeddedPhotoUrl.resolve(state.profile.photo)
     });
+    pageBreakControls.render();
     updateCompletion();
     window.requestAnimationFrame(fitPreviewForViewport);
   }

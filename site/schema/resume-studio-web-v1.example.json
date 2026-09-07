@@ -1,6 +1,14 @@
 {
   "version": 1,
-  "settings": { "locale": "en", "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" } },
+  "settings": {
+    "locale": "en",
+    "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" },
+    "pageBreaks": {
+      "ja": { "A4": { "resume": [], "career": [] }, "LETTER": { "resume": [], "career": [] } },
+      "zh-CN": { "A4": { "resume": [] }, "LETTER": { "resume": [] } },
+      "en": { "A4": { "resume": ["projects"] }, "LETTER": { "resume": ["skills"] } }
+    }
+  },
   "profile": {
     "photo": "",
     "fields": { "fullName": "Avery Example", "birthDate": "1994-05-20", "gender": "", "postalCode": "100-0000", "address": "Example District, Example City", "phone": "+81-00-0000-0000", "email": "avery@example.test", "links": ["https://example.test/avery", "https://example.test/avery-linkedin", "https://example.test/avery-portfolio"] }

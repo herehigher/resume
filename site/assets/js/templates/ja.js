@@ -115,7 +115,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <h2 class="resume-document-title">履 歴 書</h2>
         <div class="resume-current-date">${displayText(japaneseDate(fields.createdDate), '作成日')} 現在</div>
       </header>
-      <section class="resume-profile">
+      <section class="resume-profile" data-section-key="identity">
         <div class="profile-text">
           <div class="profile-kana"><span class="paper-label">ふりがな</span><span class="paper-value">${displayText(fields.nameKana)}</span></div>
           <div class="profile-name"><span class="paper-label">氏名</span><span class="paper-value">${displayText(fields.fullName, '氏名未入力')}</span></div>
@@ -130,17 +130,17 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <div><span class="paper-label">E-mail</span><span class="paper-value full-contact">${displayText(fields.email)}</span></div>
       </section>
       ${renderResumeProfiles(fields)}
-      <section class="paper-section">
+      <section class="paper-section" data-section-key="history">
         <h3 class="resume-section-title">学歴・職歴</h3>
         ${renderHistoryRows(document.education, '学歴', fields)}
         ${renderHistoryRows(document.employment, '職歴', fields)}
       </section>
-      <section class="paper-section">
+      <section class="paper-section" data-section-key="qualifications">
         <h3 class="resume-section-title">免許・資格</h3>
         ${renderQualificationRows(document.qualification, fields)}
       </section>
-      <section class="paper-text-section"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
-      <section class="paper-text-section requests-section"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(hasContent(fields.requests) ? fields.requests : '貴社規定に従います。')}</div></section>
+      <section class="paper-text-section" data-section-key="motivation"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
+      <section class="paper-text-section requests-section" data-section-key="requests"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(hasContent(fields.requests) ? fields.requests : '貴社規定に従います。')}</div></section>
     </article>`;
 }
 
@@ -173,15 +173,15 @@ export function renderJapaneseCareer(state) {
 
   return `
     <article class="document-page career-document">
-      <header class="career-doc-header">
+      <header class="career-doc-header" data-section-key="identity">
         <h2>職務経歴書</h2>
         <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '作成日')}<br>${displayText(fields.fullName, '氏名未入力')}</div>
         ${renderCareerProfiles(fields)}
       </header>
-      <section class="career-section"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>
-      <section class="career-section"><h3 class="career-section-title">活かせる経験・知識・技術</h3><div class="career-body">${displayText(fields.skills, '経験・知識・技術を入力してください')}</div></section>
-      <section class="career-section"><h3 class="career-section-title">職務経歴</h3>${careers || '<div class="career-body empty-preview">職務経歴を追加してください</div>'}</section>
-      <section class="career-section"><h3 class="career-section-title">自己PR</h3><div class="career-body">${displayText(fields.selfPromotion, '自己PRを入力してください')}</div></section>
+      <section class="career-section" data-section-key="summary"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>
+      <section class="career-section" data-section-key="skills"><h3 class="career-section-title">活かせる経験・知識・技術</h3><div class="career-body">${displayText(fields.skills, '経験・知識・技術を入力してください')}</div></section>
+      <section class="career-section" data-section-key="career-history"><h3 class="career-section-title">職務経歴</h3>${careers || '<div class="career-body empty-preview">職務経歴を追加してください</div>'}</section>
+      <section class="career-section" data-section-key="self-promotion"><h3 class="career-section-title">自己PR</h3><div class="career-body">${displayText(fields.selfPromotion, '自己PRを入力してください')}</div></section>
     </article>`;
 }
 

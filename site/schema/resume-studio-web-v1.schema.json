@@ -9,16 +9,25 @@
     "version": { "const": 1 },
     "settings": {
       "type": "object",
-      "required": ["locale", "pageSizeByLocale"],
+      "required": ["locale", "pageSizeByLocale", "pageBreaks"],
       "properties": {
         "locale": { "enum": ["ja", "zh-CN", "en"] },
         "pageSizeByLocale": {
-          "type": "object",
+          "type": "object", "additionalProperties": false,
           "required": ["ja", "zh-CN", "en"],
           "properties": {
             "ja": { "enum": ["A4", "LETTER"] },
             "zh-CN": { "enum": ["A4", "LETTER"] },
             "en": { "enum": ["A4", "LETTER"] }
+          }
+        },
+        "pageBreaks": {
+          "type": "object", "additionalProperties": false,
+          "required": ["ja", "zh-CN", "en"],
+          "properties": {
+            "ja": { "$ref": "#/$defs/japanesePageBreaks" },
+            "zh-CN": { "$ref": "#/$defs/internationalPageBreaks" },
+            "en": { "$ref": "#/$defs/internationalPageBreaks" }
           }
         }
       }
@@ -45,6 +54,31 @@
     }
   },
   "$defs": {
+    "japaneseResumeBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 4, "items": { "enum": ["history", "qualifications", "motivation", "requests"] } },
+    "japaneseCareerBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 4, "items": { "enum": ["summary", "skills", "career-history", "self-promotion"] } },
+    "internationalBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 6, "items": { "enum": ["summary", "experience", "projects", "education", "skills", "certifications"] } },
+    "japanesePageBreaks": {
+      "type": "object", "additionalProperties": false, "required": ["A4", "LETTER"],
+      "properties": {
+        "A4": { "$ref": "#/$defs/japanesePageBreakDocuments" },
+        "LETTER": { "$ref": "#/$defs/japanesePageBreakDocuments" }
+      }
+    },
+    "japanesePageBreakDocuments": {
+      "type": "object", "additionalProperties": false, "required": ["resume", "career"],
+      "properties": { "resume": { "$ref": "#/$defs/japaneseResumeBreakTargets" }, "career": { "$ref": "#/$defs/japaneseCareerBreakTargets" } }
+    },
+    "internationalPageBreaks": {
+      "type": "object", "additionalProperties": false, "required": ["A4", "LETTER"],
+      "properties": {
+        "A4": { "$ref": "#/$defs/internationalPageBreakDocuments" },
+        "LETTER": { "$ref": "#/$defs/internationalPageBreakDocuments" }
+      }
+    },
+    "internationalPageBreakDocuments": {
+      "type": "object", "additionalProperties": false, "required": ["resume"],
+      "properties": { "resume": { "$ref": "#/$defs/internationalBreakTargets" } }
+    },
     "string": { "type": "string" },
     "profileFields": {
       "type": "object",

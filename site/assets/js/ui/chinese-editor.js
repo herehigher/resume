@@ -6,6 +6,7 @@ import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
 import { confirmAction } from './confirmation-dialog.js';
+import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 
 const PROFILE_FIELDS = new Set([
   'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'
@@ -225,6 +226,10 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   let sampleMode = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
+  const pageBreakControls = initPageBreakControls({
+    store, locale: 'zh-CN', preview, toolbar: rootElement.querySelector('.preview-toolbar'),
+    getDocumentType: () => 'resume', scheduleSave
+  });
 
   function chineseResume() {
     return store.getState().documents['zh-CN'].resume;
@@ -294,7 +299,8 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     const page = preview.querySelector('.zh-resume-document');
     if (!page || rootElement.hidden) return;
     const available = previewScroll.clientWidth - (window.innerWidth > 820 ? 68 : 28);
-    zoom = Math.min(1, Math.max(window.innerWidth > 820 ? .55 : .45, available / (page.offsetWidth || 760)));
+    const gutter = window.innerWidth > 820 ? PAGE_BREAK_PREVIEW_GUTTER : 0;
+    zoom = Math.min(1, Math.max(window.innerWidth > 820 ? .55 : .45, available / ((page.offsetWidth || 760) + gutter)));
     applyZoom();
   }
 
@@ -303,6 +309,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     preview.innerHTML = renderChineseDocument(state, {
       photoUrl: embeddedPhotoUrl.resolve(state.profile.photo)
     });
+    pageBreakControls.render();
     const completion = calculateChineseCompletion(store.getState());
     rootElement.querySelector('[data-zh-completion-bar]').style.width = `${completion}%`;
     rootElement.querySelector('[data-zh-completion-label]').textContent = `${completion}% ${zhCN.completion}`;

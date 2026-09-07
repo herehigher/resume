@@ -4,6 +4,7 @@ import { renderEnglishDocument } from '../templates/en.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
+import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 import { confirmAction } from './confirmation-dialog.js';
 
 const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
@@ -218,6 +219,10 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   let draftBeforeSampleWasStored = false;
   let shouldPersistDraft = store.hasStoredState();
   let zoom = 1;
+  const pageBreakControls = initPageBreakControls({
+    store, locale: 'en', preview, toolbar: root.querySelector('.preview-toolbar'),
+    getDocumentType: () => 'resume', scheduleSave
+  });
 
   function resume() {
     return store.getState().documents.en.resume;
@@ -303,12 +308,13 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     if (!page || root.hidden || !previewScroll.clientWidth) return;
     const padding = window.innerWidth > 820 ? 68 : 28;
     const availableWidth = previewScroll.clientWidth - padding;
-    zoom = Math.min(1, availableWidth / (page.offsetWidth || 816));
+    zoom = Math.min(1, availableWidth / ((page.offsetWidth || 816) + (window.innerWidth > 820 ? PAGE_BREAK_PREVIEW_GUTTER : 0)));
     applyZoom();
   }
 
   function renderPreview() {
     preview.innerHTML = renderEnglishDocument(store.getState());
+    pageBreakControls.render();
     updateCompletion();
     window.requestAnimationFrame(fitPreview);
   }

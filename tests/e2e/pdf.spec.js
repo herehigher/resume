@@ -49,6 +49,11 @@ function expectPdfContext(text, expected) {
   else expect(text).toMatch(expected);
 }
 
+function pdfPageIndex(pages, expected) {
+  const needle = String(expected).normalize('NFKC').replace(/\s/g, '');
+  return pages.findIndex((page) => page.text.normalize('NFKC').replace(/\s/g, '').includes(needle));
+}
+
 async function printPdf(page) {
   await page.emulateMedia({ media: 'print' });
   return page.pdf({
@@ -144,6 +149,71 @@ test('PDF pagination: 三言語のページ境界データは末尾内容を保�
     expect(pages.at(-1)?.text.trim()).not.toBe('');
     expect(pages.at(-1)?.text).toContain(endMarker);
   }
+});
+
+test('manual page breaks start their target sections on new non-empty PDF pages without printing controls', async ({ page }) => {
+  const state = createEnglishSampleState(createDefaultState('en'));
+  state.settings.pageBreaks.en.LETTER.resume = ['summary', 'experience'];
+  await openLocale(page, 'en');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'manual-page-breaks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('.page-break-boundary').first()).toBeHidden();
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages).toHaveLength(3);
+  expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+  expect(pages[1].text).toContain('SUMMARY');
+  expect(pages[2].text).toContain('EXPERIENCE');
+  expect(pages.map((pdfPage) => pdfPage.text).join(' ')).toContain('Certified Scrum Product Owner');
+});
+
+test('manual page break after a naturally near-full section creates no blank PDF page', async ({ page }) => {
+  const { state, endMarker } = createPdfFixture({ locale: 'en', length: 'near-boundary', pageSize: 'LETTER' });
+  state.settings.pageBreaks.en.LETTER.resume = ['experience'];
+  await openLocale(page, 'en');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'manual-near-boundary.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+  const summaryPage = pdfPageIndex(pages, `${endMarker}-SUMMARY`);
+  const experiencePage = pdfPageIndex(pages, 'EXPERIENCE');
+  expect(summaryPage).toBeGreaterThanOrEqual(0);
+  expect(experiencePage).toBeGreaterThan(summaryPage);
+  expect(pdfPageIndex(pages, `Experience test line 12 ${endMarker}`)).toBeGreaterThanOrEqual(experiencePage);
+});
+
+test('manual page-break target may span multiple PDF pages without losing its end marker', async ({ page }) => {
+  const { state, endMarker } = createPdfFixture({ locale: 'en', length: 'extra-long', pageSize: 'LETTER' });
+  state.documents.en.resume.summary = 'Short summary before the manual boundary.';
+  state.settings.pageBreaks.en.LETTER.resume = ['experience'];
+  await openLocale(page, 'en');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'manual-long-target.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+  const targetPages = pages.filter((pdfPage) => pdfPage.text.includes('Experience test line'));
+  expect(targetPages.length).toBeGreaterThan(1);
+  expect(pages.map((pdfPage) => pdfPage.text).join(' ')).toContain(endMarker);
+});
+
+test('Japanese manual page break starts the resume target on a later non-empty A4 page', async ({ page }) => {
+  const { state, endMarker } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'resume', pageSize: 'A4' });
+  state.settings.pageBreaks.ja.A4.resume = ['qualifications'];
+  await openLocale(page, 'ja');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'manual-ja-resume.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await expect(page.locator('[data-section-key="qualifications"]')).toHaveClass(/has-manual-page-break/);
+  const pages = await inspectPdf(await printPdf(page));
+  expectPageSize(pages, A4);
+  expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+  expect(pdfPageIndex(pages, '免許・資格')).toBeGreaterThan(0);
+  expect(pdfPageIndex(pages, endMarker)).toBeGreaterThanOrEqual(0);
 });
 
 test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、空白末尾ページを作らない', async ({ page }) => {

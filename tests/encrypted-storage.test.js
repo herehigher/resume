@@ -54,6 +54,7 @@ test('draft ciphertext contains no fixture name or email and reload restores it'
   const saved = createDefaultState('en');
   saved.profile.fields.fullName = 'Ciphertext Fixture';
   saved.profile.fields.email = 'ciphertext.fixture@example.test';
+  saved.settings.pageBreaks.en.LETTER.resume = ['summary', 'experience'];
   const writer = persistence(storage, keyStore);
 
   await writer.save(saved);
@@ -61,7 +62,9 @@ test('draft ciphertext contains no fixture name or email and reload restores it'
   assert.doesNotMatch(raw, /Ciphertext Fixture|ciphertext\.fixture@example\.test/);
   assert.deepEqual(JSON.parse(raw).format, ENCRYPTED_DRAFT_FORMAT);
   assert.deepEqual(JSON.parse(raw).algorithm, ENCRYPTED_DRAFT_ALGORITHM);
-  assert.equal((await persistence(storage, keyStore).load()).profile.fields.fullName, 'Ciphertext Fixture');
+  const restored = await persistence(storage, keyStore).load();
+  assert.equal(restored.profile.fields.fullName, 'Ciphertext Fixture');
+  assert.deepEqual(restored.settings.pageBreaks.en.LETTER.resume, ['summary', 'experience']);
 });
 
 test('a plaintext v1 draft migrates only after encrypted persistence succeeds', async () => {

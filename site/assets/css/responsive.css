@@ -55,8 +55,12 @@
   .workspace[data-mobile-mode="preview"] .editor-panel { display: none; }
   .editor-panel { border: 0; height: 100%; padding: 26px 18px 48px; }
   .preview-panel { height: 100%; }
+  .preview-toolbar { position: relative; }
+  .page-break-menu { display: inline-flex; align-items: center; }
+  .page-break-boundary { display: none !important; }
   .preview-scroll { padding: 20px 14px 50px; }
   .document-preview { transform-origin: top left; }
+  .document-preview { padding-right: 0; }
   .document-page { min-height: 842px; padding: 34px 37px; width: 595px; }
   .data-menu-panel .secondary-button,
   .data-menu-panel .danger-button { min-height: 44px; }
