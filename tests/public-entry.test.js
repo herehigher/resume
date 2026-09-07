@@ -70,11 +70,15 @@ function validateSchema(schema, value, pointer = '#', root = schema) {
   if (schema.type === 'object') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     if ((schema.required || []).some((key) => !(key in value))) return false;
+    if (schema.additionalProperties === false && Object.keys(value).some((key) => !(key in (schema.properties || {})))) return false;
     return Object.entries(schema.properties || {}).every(([key, child]) => (
       !(key in value) || validateSchema(child, value[key], `${pointer}/properties/${key}`, root)
     ));
   }
-  if (schema.type === 'array') return Array.isArray(value) && value.every((item) => validateSchema(schema.items, item, `${pointer}/items`, root));
+  if (schema.type === 'array') return Array.isArray(value)
+    && (!schema.maxItems || value.length <= schema.maxItems)
+    && (!schema.uniqueItems || new Set(value.map((item) => JSON.stringify(item))).size === value.length)
+    && value.every((item) => validateSchema(schema.items, item, `${pointer}/items`, root));
   if (schema.type === 'string') return typeof value === 'string' && (!schema.pattern || new RegExp(schema.pattern).test(value));
   return true;
 }
@@ -248,4 +252,20 @@ test('published JSON Schema accepts exports and rejects primary invalid values',
   caseInsensitivePhoto.profile.photo = 'DATA:IMAGE/PNG;BASE64,AAAA';
   assert.equal(validateState(caseInsensitivePhoto).valid, true);
   assert.equal(validateSchema(schema, caseInsensitivePhoto), true);
+
+  for (const mutate of [
+    (value) => { value.settings.pageBreaks.en.A4.resume = ['career-history']; },
+    (value) => { value.settings.pageBreaks.ja.A4.resume = ['experience']; },
+    (value) => { value.settings.pageBreaks.extra = {}; },
+    (value) => { value.settings.pageBreaks.en.B5 = { resume: [] }; },
+    (value) => { value.settings.pageBreaks.en.A4.extra = []; },
+    (value) => { value.settings.pageBreaks.en.A4.resume = ['projects', 'projects']; },
+    (value) => { value.settings.pageBreaks.en.A4.resume = Array(7).fill('projects'); },
+    (value) => { value.settings.pageBreaks.en.A4.resume = 'projects'; }
+  ]) {
+    const invalidBreaks = structuredClone(example);
+    mutate(invalidBreaks);
+    assert.equal(validateSchema(schema, invalidBreaks), false);
+    assert.equal(validateState(invalidBreaks).valid, false);
+  }
 });

@@ -146,6 +146,25 @@ test('PDF pagination: 三言語のページ境界データは末尾内容を保�
   }
 });
 
+test('manual page breaks start their target sections on new non-empty PDF pages without printing controls', async ({ page }) => {
+  const state = createEnglishSampleState(createDefaultState('en'));
+  state.settings.pageBreaks.en.LETTER.resume = ['summary', 'experience'];
+  await openLocale(page, 'en');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'manual-page-breaks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('.page-break-boundary').first()).toBeHidden();
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages).toHaveLength(3);
+  expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+  expect(pages[1].text).toContain('SUMMARY');
+  expect(pages[2].text).toContain('EXPERIENCE');
+  expect(pages.map((pdfPage) => pdfPage.text).join(' ')).toContain('Certified Scrum Product Owner');
+});
+
 test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、空白末尾ページを作らない', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();

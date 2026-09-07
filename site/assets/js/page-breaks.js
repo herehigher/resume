@@ -16,12 +16,34 @@ export const PAGE_BREAK_LABELS = Object.freeze({
 
 export const SECTION_REGISTRY = Object.freeze({
   ja: Object.freeze({
-    resume: Object.freeze(['identity', 'history', 'qualifications', 'motivation', 'requests']),
-    career: Object.freeze(['identity', 'summary', 'skills', 'career-history', 'self-promotion'])
+    resume: Object.freeze([
+      { key: 'identity', label: '基本情報', isVisible: () => true }, { key: 'history', label: '学歴・職歴', isVisible: () => true }, { key: 'qualifications', label: '免許・資格', isVisible: () => true }, { key: 'motivation', label: '志望動機・自己PRなど', isVisible: () => true }, { key: 'requests', label: '本人希望記入欄', isVisible: () => true }
+    ]),
+    career: Object.freeze([
+      { key: 'identity', label: '基本情報', isVisible: () => true }, { key: 'summary', label: '職務要約', isVisible: () => true }, { key: 'skills', label: '活かせる経験・知識・技術', isVisible: () => true }, { key: 'career-history', label: '職務経歴', isVisible: () => true }, { key: 'self-promotion', label: '自己PR', isVisible: () => true }
+    ])
   }),
-  'zh-CN': Object.freeze({ resume: Object.freeze(['identity', 'summary', 'experience', 'projects', 'education', 'skills', 'certifications']) }),
-  en: Object.freeze({ resume: Object.freeze(['identity', 'summary', 'experience', 'projects', 'education', 'skills', 'certifications']) })
+  'zh-CN': Object.freeze({ resume: createInternationalRegistry('zh-CN', ['基本信息', '个人概述', '工作经历', '项目经历', '教育经历', '专业技能', '证书与资质']) }),
+  en: Object.freeze({ resume: createInternationalRegistry('en', ['Contact information', 'Summary', 'Experience', 'Projects', 'Education', 'Skills', 'Certifications']) })
 });
+
+function hasText(value) { return Boolean(String(value || '').trim()); }
+function hasEntry(items, fields) { return items.some((item) => fields.some((field) => hasText(item[field]))); }
+function createInternationalRegistry(locale, labels) {
+  const keys = ['identity', 'summary', 'experience', 'projects', 'education', 'skills', 'certifications'];
+  return Object.freeze(keys.map((key, index) => Object.freeze({
+    key, label: labels[index],
+    isVisible: key === 'identity' ? () => true : (state) => {
+      const resume = state.documents[locale].resume;
+      if (key === 'summary' || key === 'skills') return hasText(resume[key]);
+      if (key === 'certifications') return hasEntry(resume.certifications, ['date', 'name', 'url']);
+      return hasEntry(resume[key], key === 'projects' ? ['startDate', 'endDate', 'name', 'role', 'details', 'url'] : key === 'education' ? ['startDate', 'endDate', 'school', 'degree', 'details'] : ['startDate', 'endDate', 'company', 'role', 'details']);
+    }
+  })));
+}
+
+export function getRegisteredSections(locale, documentType) { return SECTION_REGISTRY[locale]?.[documentType] || []; }
+export function getVisibleSectionKeys(state, locale, documentType) { return getRegisteredSections(locale, documentType).filter((section) => section.isVisible(state)).map((section) => section.key); }
 
 export function createEmptyPageBreaks() {
   return {
@@ -36,7 +58,7 @@ export function getPageBreaks(state, locale, paper, documentType) {
 }
 
 export function isValidPageBreakKey(locale, documentType, key) {
-  return SECTION_REGISTRY[locale]?.[documentType]?.slice(1).includes(key) || false;
+  return getRegisteredSections(locale, documentType).slice(1).some((section) => section.key === key);
 }
 
 export function validatePageBreaks(value) {
@@ -52,13 +74,13 @@ export function validatePageBreaks(value) {
         continue;
       }
       if (Object.keys(byDocument).some((documentType) => !(documentType in documents))) errors.push(`settings.pageBreaks.${locale}.${paper} contains an unsupported document type`);
-      for (const [documentType, keys] of Object.entries(documents)) {
+      for (const [documentType, sections] of Object.entries(documents)) {
         const targets = byDocument[documentType];
         const path = `settings.pageBreaks.${locale}.${paper}.${documentType}`;
         if (!Array.isArray(targets)) { errors.push(`${path} must be an array`); continue; }
-        if (targets.length > keys.length - 1) errors.push(`${path} has too many entries`);
+        if (targets.length > sections.length - 1) errors.push(`${path} has too many entries`);
         if (new Set(targets).size !== targets.length) errors.push(`${path} must not contain duplicates`);
-        if (!targets.every((key) => typeof key === 'string' && keys.slice(1).includes(key))) errors.push(`${path} contains an unsupported section key`);
+        if (!targets.every((key) => isValidPageBreakKey(locale, documentType, key))) errors.push(`${path} contains an unsupported section key`);
       }
     }
   }
@@ -93,11 +115,14 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     return { state, type, paper: state.settings.pageSizeByLocale[locale] };
   }
   function visibleSections() {
-    const { type } = activeContext();
-    const allowed = SECTION_REGISTRY[locale][type];
-    return [...preview.querySelectorAll('[data-section-key]')].filter((element) => allowed.includes(element.dataset.sectionKey));
+    const { state, type } = activeContext();
+    const elements = new Map([...preview.querySelectorAll('[data-section-key]')].map((element) => [element.dataset.sectionKey, element]));
+    return getVisibleSectionKeys(state, locale, type).map((key) => ({
+      section: getRegisteredSections(locale, type).find((item) => item.key === key), element: elements.get(key)
+    })).filter((item) => item.element);
   }
   function setOpen(open) {
+    if (menu.hidden) { panel.hidden = true; menu.setAttribute('aria-expanded', 'false'); return; }
     panel.hidden = !open;
     menu.setAttribute('aria-expanded', String(open));
     if (open) panel.querySelector('button')?.focus();
@@ -113,35 +138,44 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     render();
   }
   function description(previous, target, active) {
-    return `${labels[previous]} ${labels.after} ${labels[target]}: ${active ? labels.remove : labels.add}`;
+    if (locale === 'ja') return `${previous.label}の後に${target.label}を${active ? '解除' : '追加'}`;
+    if (locale === 'zh-CN') return `${previous.label}之后为${target.label}${active ? '取消分页' : '添加分页'}`;
+    return `${active ? 'Remove' : 'Add'} page break between ${previous.label} and ${target.label}`;
   }
   function render() {
     const { state, type, paper } = activeContext();
     const targets = getPageBreaks(state, locale, paper, type);
     const sections = visibleSections();
-    const validTargets = sections.slice(1).map((element) => element.dataset.sectionKey);
+    const validTargets = sections.slice(1).map((item) => item.section.key);
     const active = targets.filter((key) => validTargets.includes(key));
+    preview.querySelectorAll('.page-break-boundary').forEach((control) => { control.remove(); });
+    preview.querySelectorAll('[data-section-key]').forEach((section) => { section.classList.remove('has-manual-page-break'); });
+    menu.hidden = validTargets.length === 0;
+    if (menu.hidden) { setOpen(false); panel.replaceChildren(); live.textContent = ''; return; }
     menu.textContent = `${labels.menu} ${active.length}`;
     panel.replaceChildren();
     const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
-    sections.slice(1).forEach((section, index) => {
-      const key = section.dataset.sectionKey;
-      const previous = sections[index].dataset.sectionKey;
+    sections.slice(1).forEach(({ section, element }, index) => {
+      const key = section.key;
+      const previous = sections[index].section;
       const enabled = targets.includes(key);
-      section.classList.toggle('has-manual-page-break', enabled);
+      element.classList.toggle('has-manual-page-break', enabled);
       const control = document.createElement('button');
       control.type = 'button'; control.className = 'page-break-boundary'; control.dataset.pageBreakKey = key;
-      control.setAttribute('aria-pressed', String(enabled)); control.setAttribute('aria-label', description(previous, key, enabled));
+      control.setAttribute('aria-pressed', String(enabled)); control.setAttribute('aria-label', description(previous, section, enabled));
       control.innerHTML = `<span class="page-break-add"><span class="page-break-plus">${icon(enabled)}</span>${enabled ? labels.remove : labels.add}</span>`;
       control.addEventListener('click', () => toggle(key));
-      section.prepend(control);
+      element.prepend(control);
       const row = document.createElement('button');
       row.type = 'button'; row.className = 'page-break-row'; row.dataset.pageBreakKey = key;
-      row.setAttribute('aria-pressed', String(enabled)); row.setAttribute('aria-label', description(previous, key, enabled));
-      row.innerHTML = `<span><b>${labels[key]}</b><small>${enabled ? labels.remove : `${labels[previous]} ${labels.after}`}</small></span><span class="page-break-switch" aria-hidden="true"></span>`;
+      row.setAttribute('aria-pressed', String(enabled)); row.setAttribute('aria-label', description(previous, section, enabled));
+      row.innerHTML = `<span><b>${section.label}</b><small>${enabled ? labels.remove : `${previous.label} ${labels.after}`}</small></span><span class="page-break-switch" aria-hidden="true"></span>`;
       row.addEventListener('click', () => toggle(key)); panel.append(row);
     });
-    live.textContent = lastFocusKey ? `${labels[lastFocusKey]}: ${targets.includes(lastFocusKey) ? labels.remove : labels.add}` : '';
+    if (lastFocusKey) {
+      const target = getRegisteredSections(locale, type).find((section) => section.key === lastFocusKey);
+      live.textContent = locale === 'en' ? `Page break ${targets.includes(lastFocusKey) ? 'added' : 'removed'} before ${target.label}` : `${target.label}${targets.includes(lastFocusKey) ? 'に改ページを追加しました' : 'の改ページを解除しました'}`;
+    }
     if (lastFocusKey) {
       const focusTarget = window.matchMedia('(max-width: 820px)').matches
         ? panel.querySelector(`[data-page-break-key="${lastFocusKey}"]`)

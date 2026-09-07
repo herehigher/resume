@@ -2,20 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
-import { PAGE_BREAK_LABELS, SECTION_REGISTRY, getPageBreaks, validatePageBreaks } from '../site/assets/js/page-breaks.js';
+import { PAGE_BREAK_LABELS, SECTION_REGISTRY, getPageBreaks, getVisibleSectionKeys, validatePageBreaks } from '../site/assets/js/page-breaks.js';
 import { renderEnglishDocument } from '../site/assets/js/templates/en.js';
 import { renderChineseDocument } from '../site/assets/js/templates/zh-CN.js';
 import { renderJapaneseDocument } from '../site/assets/js/templates/ja.js';
 
 test('section registry is the shared bounded source of saved page-break targets', () => {
   const state = createDefaultState();
-  assert.deepEqual(SECTION_REGISTRY.ja.resume, ['identity', 'history', 'qualifications', 'motivation', 'requests']);
-  assert.deepEqual(SECTION_REGISTRY.ja.career, ['identity', 'summary', 'skills', 'career-history', 'self-promotion']);
+  assert.deepEqual(SECTION_REGISTRY.ja.resume.map((section) => section.key), ['identity', 'history', 'qualifications', 'motivation', 'requests']);
+  assert.deepEqual(SECTION_REGISTRY.ja.career.map((section) => section.key), ['identity', 'summary', 'skills', 'career-history', 'self-promotion']);
   assert.deepEqual(getPageBreaks(state, 'en', 'A4', 'resume'), []);
   state.settings.pageBreaks.en.A4.resume = ['projects', 'projects'];
   assert.match(validatePageBreaks(state.settings.pageBreaks).join(' '), /duplicates/);
   state.settings.pageBreaks.en.A4.resume = ['identity'];
   assert.match(validatePageBreaks(state.settings.pageBreaks).join(' '), /unsupported section key/);
+});
+
+test('registry derives visible sections from state before preview controls map to the DOM', () => {
+  const state = createDefaultState('en');
+  assert.deepEqual(getVisibleSectionKeys(state, 'en', 'resume'), ['identity']);
+  state.documents.en.resume.summary = 'Fictional summary';
+  state.documents.en.resume.experience[0].company = 'Fictional company';
+  assert.deepEqual(getVisibleSectionKeys(state, 'en', 'resume'), ['identity', 'summary', 'experience']);
+  assert.equal(getVisibleSectionKeys(state, 'ja', 'resume').length, 5);
 });
 
 test('desktop page-break actions use the compact localized add and remove pairs', () => {
