@@ -148,15 +148,17 @@ export function initLocaleController(store, {
 
   dataMenu.addEventListener('focusout', () => {
     window.queueMicrotask(() => {
-      if (dataMenu.open && !dataMenuPointerDownInside && !dataMenu.contains(document.activeElement)) dataMenu.open = false;
+      const activeModal = document.activeElement?.closest?.('dialog[open]');
+      if (dataMenu.open && !dataMenuPointerDownInside && !activeModal && !dataMenu.contains(document.activeElement)) dataMenu.open = false;
     });
   });
   dataMenu.addEventListener('pointerdown', () => {
     dataMenuPointerDownInside = true;
   });
   document.addEventListener('pointerdown', (event) => {
+    const activeModal = event.target.closest?.('dialog[open]');
     if (!dataMenu.contains(event.target)) dataMenuPointerDownInside = false;
-    if (dataMenu.open && !dataMenu.contains(event.target)) dataMenu.open = false;
+    if (dataMenu.open && !activeModal && !dataMenu.contains(event.target)) dataMenu.open = false;
   });
   document.addEventListener('pointerup', () => {
     dataMenuPointerDownInside = false;

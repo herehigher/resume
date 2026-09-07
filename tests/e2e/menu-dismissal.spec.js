@@ -6,6 +6,12 @@ test('backup and restore menu stays open for internal actions, then closes outsi
   const trigger = page.locator('#dataMenuSummary');
   await trigger.click();
   await expect(menu).toHaveAttribute('open', '');
+  await page.locator('#clearDraftButton').click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(menu).toHaveAttribute('open', '');
+  await expect(page.locator('#clearDraftButton')).toBeFocused();
   await page.locator('#exportDataButton').click();
   await expect(menu).toHaveAttribute('open', '');
   await trigger.click();
