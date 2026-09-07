@@ -184,7 +184,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       const focusTarget = window.matchMedia('(max-width: 820px)').matches
         ? panel.querySelector(`[data-page-break-key="${lastFocusKey}"]`)
         : preview.querySelector(`.page-break-boundary[data-page-break-key="${lastFocusKey}"]`);
-      focusTarget?.focus(); lastFocusKey = null;
+      focusTarget?.focus({ preventScroll: true }); lastFocusKey = null;
     }
   }
   menu.addEventListener('click', () => setOpen(panel.hidden));

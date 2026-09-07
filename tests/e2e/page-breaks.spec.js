@@ -2,6 +2,12 @@ import { expect, openLocale, test } from './fixtures.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createEnglishSampleState } from '../../site/assets/js/data/en-sample.js';
 
+async function clickVisible(page, locator) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box.x + (box.width / 2), box.y + (box.height / 2));
+}
+
 test('desktop: English section boundary is a single button and persists its manual page break', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openLocale(page, 'en');
@@ -10,9 +16,17 @@ test('desktop: English section boundary is a single button and persists its manu
     name: 'page-break-persistence.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
   const boundary = page.locator('.page-break-boundary[data-page-break-key="summary"]');
+  const previewScroll = page.locator('[data-en-preview-scroll]');
   await expect(boundary).toBeVisible();
   await expect(boundary).toHaveAttribute('aria-pressed', 'false');
-  await boundary.click();
+  await expect.poll(() => boundary.evaluate((element) => {
+    const button = element.getBoundingClientRect();
+    const paper = element.closest('.document-page').getBoundingClientRect();
+    const preview = element.closest('.preview-scroll').getBoundingClientRect();
+    return button.left >= paper.right && button.right <= preview.right;
+  })).toBe(true);
+  const scrollLeftBeforeToggle = await previewScroll.evaluate((element) => element.scrollLeft);
+  await clickVisible(page, boundary);
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await expect(boundary).toContainText('Remove');
@@ -25,10 +39,11 @@ test('desktop: English section boundary is a single button and persists its manu
   });
   expect(geometry.buttonLeft).toBeGreaterThanOrEqual(geometry.paperRight);
   expect(geometry.buttonRight).toBeLessThanOrEqual(geometry.previewRight);
+  expect(await previewScroll.evaluate((element) => element.scrollLeft)).toBe(scrollLeftBeforeToggle);
   for (let index = 0; index < 3; index += 1) {
-    await boundary.click();
+    await clickVisible(page, boundary);
     await expect(page.locator('.page-break-boundary[data-page-break-key="summary"]')).toHaveCount(1);
-    await boundary.click();
+    await clickVisible(page, boundary);
     await expect(page.locator('.page-break-boundary[data-page-break-key="summary"]')).toHaveCount(1);
   }
   const summaryInput = page.locator('[data-resume-field="summary"]');
@@ -85,7 +100,7 @@ test('desktop: a saved target stays applied when preceding optional sections bec
   await openLocale(page, 'en');
   await page.locator('[data-en-load-sample]').click();
   const experience = page.locator('.page-break-boundary[data-page-break-key="experience"]');
-  await experience.click();
+  await clickVisible(page, experience);
   await expect(experience).toHaveAttribute('aria-pressed', 'true');
   const summaryInput = page.locator('[data-resume-field="summary"]');
   await summaryInput.fill('');
