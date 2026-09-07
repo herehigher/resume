@@ -5,8 +5,16 @@
   font-size: 13.5px;
   line-height: 1.65;
   overflow-wrap: anywhere;
-  padding: 44px 50px 52px;
   word-break: break-word;
+}
+
+/* Keep the screen page box aligned with the anonymous A4 print page. */
+@media screen {
+  #chineseWorkspace .document-page.zh-resume-document {
+    min-height: 297mm;
+    padding: 13mm 15mm 14mm;
+    width: 210mm;
+  }
 }
 
 .zh-resume-header {

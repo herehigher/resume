@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
-      grepInvert: /\[mobile\]/,
+      grepInvert: /\[mobile\]|\[webkit\]/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 1000 }
@@ -31,6 +31,14 @@ export default defineConfig({
       use: {
         ...devices['Pixel 7'],
         viewport: { width: 390, height: 844 }
+      }
+    },
+    {
+      name: 'webkit',
+      grep: /\[webkit\]/,
+      use: {
+        ...devices['Desktop Safari'],
+        viewport: { width: 1440, height: 1000 }
       }
     }
   ],
