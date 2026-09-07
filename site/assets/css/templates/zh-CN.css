@@ -5,8 +5,16 @@
   font-size: 13.5px;
   line-height: 1.65;
   overflow-wrap: anywhere;
-  padding: 44px 50px 52px;
   word-break: break-word;
+}
+
+@media screen {
+  /* Keep the preview's content box aligned with the active A4 print margin. */
+  #chineseWorkspace .zh-resume-document {
+    min-height: 297mm;
+    padding: 13mm 15mm 14mm;
+    width: 210mm;
+  }
 }
 
 .zh-resume-header {

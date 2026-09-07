@@ -300,10 +300,11 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
 
   function fitPreview() {
     const page = preview.querySelector('.english-document');
-    if (!page || root.hidden) return;
+    if (!page || root.hidden || previewScroll.clientWidth === 0) return;
     const padding = window.innerWidth > 820 ? 68 : 28;
-    const availableWidth = previewScroll.clientWidth - padding;
-    zoom = Math.min(1, Math.max(window.innerWidth > 820 ? .55 : .45, availableWidth / (page.offsetWidth || 816)));
+    const availableWidth = previewScroll.clientWidth - padding - 2;
+    preview.style.width = `${page.offsetWidth}px`;
+    zoom = Math.min(1, availableWidth / page.offsetWidth);
     applyZoom();
   }
 

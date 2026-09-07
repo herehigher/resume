@@ -290,11 +290,17 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     preview.style.marginBottom = `${Math.min(0, preview.offsetHeight * (zoom - 1))}px`;
   }
 
+  function minimumZoom(page) {
+    const available = previewScroll.clientWidth - (window.innerWidth > 820 ? 68 : 28) - 2;
+    return Math.min(.4, available / (page?.offsetWidth || 210 * 96 / 25.4));
+  }
+
   function fitPreview() {
     const page = preview.querySelector('.zh-resume-document');
-    if (!page || rootElement.hidden) return;
-    const available = previewScroll.clientWidth - (window.innerWidth > 820 ? 68 : 28);
-    zoom = Math.min(1, Math.max(window.innerWidth > 820 ? .55 : .45, available / (page.offsetWidth || 760)));
+    if (!page || rootElement.hidden || previewScroll.clientWidth === 0) return;
+    const available = previewScroll.clientWidth - (window.innerWidth > 820 ? 68 : 28) - 2;
+    preview.style.width = `${page.offsetWidth}px`;
+    zoom = Math.min(1, Math.max(minimumZoom(page), available / page.offsetWidth));
     applyZoom();
   }
 
@@ -539,7 +545,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     if (action.dataset.zhAction === 'adopt') adoptSample();
     if (action.dataset.zhAction === 'print') window.print();
     if (action.dataset.zhAction === 'zoom-out') {
-      zoom = Math.max(.4, zoom - .1);
+      zoom = Math.max(minimumZoom(preview.querySelector('.zh-resume-document')), zoom - .1);
       applyZoom();
     }
     if (action.dataset.zhAction === 'zoom-in') {

@@ -148,6 +148,11 @@
 .zoom-controls span { border-left: 1px solid #e2e6eb; border-right: 1px solid #e2e6eb; color: #647084; font-size: 8px; margin: 0 !important; min-width: 44px; text-align: center; }
 .preview-scroll { overflow: auto; padding: 30px 34px 64px; }
 .document-preview { margin: 0 auto; transform-origin: top center; transition: transform .2s ease; width: min(100%, 760px); }
+.zh-workspace .document-preview,
+.english-workspace .document-preview {
+  margin: 0;
+  transform-origin: top left;
+}
 
 dialog { background: transparent; border: 0; padding: 0; }
 dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px); }
