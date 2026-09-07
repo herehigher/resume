@@ -9,7 +9,7 @@ test('desktop: English section boundary is a single button and persists its manu
   await boundary.click();
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
-  await expect(boundary).toContainText('Remove page break');
+  await expect(boundary).toContainText('Remove');
   expect(await boundary.evaluate((element) => getComputedStyle(element, '::before').borderTopStyle)).toBe('dashed');
   await page.reload();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);

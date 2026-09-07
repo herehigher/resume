@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
-import { SECTION_REGISTRY, getPageBreaks, validatePageBreaks } from '../site/assets/js/page-breaks.js';
+import { PAGE_BREAK_LABELS, SECTION_REGISTRY, getPageBreaks, validatePageBreaks } from '../site/assets/js/page-breaks.js';
 import { renderEnglishDocument } from '../site/assets/js/templates/en.js';
 import { renderChineseDocument } from '../site/assets/js/templates/zh-CN.js';
 import { renderJapaneseDocument } from '../site/assets/js/templates/ja.js';
@@ -16,6 +16,12 @@ test('section registry is the shared bounded source of saved page-break targets'
   assert.match(validatePageBreaks(state.settings.pageBreaks).join(' '), /duplicates/);
   state.settings.pageBreaks.en.A4.resume = ['identity'];
   assert.match(validatePageBreaks(state.settings.pageBreaks).join(' '), /unsupported section key/);
+});
+
+test('desktop page-break actions use the compact localized add and remove pairs', () => {
+  assert.deepEqual([PAGE_BREAK_LABELS.ja.add, PAGE_BREAK_LABELS.ja.remove], ['追加', '解除']);
+  assert.deepEqual([PAGE_BREAK_LABELS['zh-CN'].add, PAGE_BREAK_LABELS['zh-CN'].remove], ['分页', '取消']);
+  assert.deepEqual([PAGE_BREAK_LABELS.en.add, PAGE_BREAK_LABELS.en.remove], ['Add', 'Remove']);
 });
 
 test('renderers expose semantic sections for legal visible-boundary controls', () => {

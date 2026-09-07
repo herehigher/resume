@@ -1,16 +1,16 @@
-const PAGE_BREAK_LABELS = Object.freeze({
+export const PAGE_BREAK_LABELS = Object.freeze({
   ja: {
     identity: '基本情報', history: '学歴・職歴', qualifications: '免許・資格', motivation: '志望動機・自己PRなど', requests: '本人希望記入欄',
     summary: '職務要約', skills: '活かせる経験・知識・技術', 'career-history': '職務経歴', 'self-promotion': '自己PR',
-    add: '改ページ', remove: '改ページを解除', menu: '改ページ', positions: '改ページ位置', after: 'の後'
+    add: '追加', remove: '解除', menu: '改ページ', positions: '改ページ位置', after: 'の後'
   },
   'zh-CN': {
     identity: '基本信息', summary: '个人概述', experience: '工作经历', projects: '项目经历', education: '教育经历', skills: '专业技能', certifications: '证书与资质',
-    add: '分页', remove: '取消分页', menu: '分页', positions: '分页位置', after: '之后'
+    add: '分页', remove: '取消', menu: '分页', positions: '分页位置', after: '之后'
   },
   en: {
     identity: 'Contact information', summary: 'Summary', experience: 'Experience', projects: 'Projects', education: 'Education', skills: 'Skills', certifications: 'Certifications',
-    add: 'Page break', remove: 'Remove page break', menu: 'Page breaks', positions: 'Page break positions', after: 'after'
+    add: 'Add', remove: 'Remove', menu: 'Page breaks', positions: 'Page break positions', after: 'after'
   }
 });
 
