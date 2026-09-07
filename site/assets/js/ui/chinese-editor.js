@@ -6,6 +6,7 @@ import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
 import { confirmAction } from './confirmation-dialog.js';
+import { initPageBreakControls } from '../page-breaks.js';
 
 const PROFILE_FIELDS = new Set([
   'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'
@@ -225,6 +226,10 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   let sampleMode = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
+  const pageBreakControls = initPageBreakControls({
+    store, locale: 'zh-CN', preview, toolbar: rootElement.querySelector('.preview-toolbar'),
+    getDocumentType: () => 'resume', scheduleSave
+  });
 
   function chineseResume() {
     return store.getState().documents['zh-CN'].resume;
@@ -303,6 +308,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     preview.innerHTML = renderChineseDocument(state, {
       photoUrl: embeddedPhotoUrl.resolve(state.profile.photo)
     });
+    pageBreakControls.render();
     const completion = calculateChineseCompletion(store.getState());
     rootElement.querySelector('[data-zh-completion-bar]').style.width = `${completion}%`;
     rootElement.querySelector('[data-zh-completion-label]').textContent = `${completion}% ${zhCN.completion}`;

@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
+import { createEmptyPageBreaks } from '../page-breaks.js';
 
 function today() {
   const now = new Date();
@@ -94,7 +95,8 @@ export function createDefaultState(locale = DEFAULT_LOCALE) {
         ja: 'A4',
         'zh-CN': 'A4',
         en: 'LETTER'
-      }
+      },
+      pageBreaks: createEmptyPageBreaks()
     },
     profile: createDefaultProfile(),
     documents: {

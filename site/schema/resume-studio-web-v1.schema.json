@@ -9,7 +9,7 @@
     "version": { "const": 1 },
     "settings": {
       "type": "object",
-      "required": ["locale", "pageSizeByLocale"],
+      "required": ["locale", "pageSizeByLocale", "pageBreaks"],
       "properties": {
         "locale": { "enum": ["ja", "zh-CN", "en"] },
         "pageSizeByLocale": {
@@ -19,6 +19,15 @@
             "ja": { "enum": ["A4", "LETTER"] },
             "zh-CN": { "enum": ["A4", "LETTER"] },
             "en": { "enum": ["A4", "LETTER"] }
+          }
+        },
+        "pageBreaks": {
+          "type": "object",
+          "required": ["ja", "zh-CN", "en"],
+          "properties": {
+            "ja": { "$ref": "#/$defs/japanesePageBreaks" },
+            "zh-CN": { "$ref": "#/$defs/internationalPageBreaks" },
+            "en": { "$ref": "#/$defs/internationalPageBreaks" }
           }
         }
       }
@@ -45,6 +54,30 @@
     }
   },
   "$defs": {
+    "pageBreakTarget": { "enum": ["history", "qualifications", "motivation", "requests", "summary", "skills", "career-history", "self-promotion", "experience", "projects", "education", "certifications"] },
+    "pageBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 6, "items": { "$ref": "#/$defs/pageBreakTarget" } },
+    "japanesePageBreaks": {
+      "type": "object", "additionalProperties": false, "required": ["A4", "LETTER"],
+      "properties": {
+        "A4": { "$ref": "#/$defs/japanesePageBreakDocuments" },
+        "LETTER": { "$ref": "#/$defs/japanesePageBreakDocuments" }
+      }
+    },
+    "japanesePageBreakDocuments": {
+      "type": "object", "additionalProperties": false, "required": ["resume", "career"],
+      "properties": { "resume": { "$ref": "#/$defs/pageBreakTargets" }, "career": { "$ref": "#/$defs/pageBreakTargets" } }
+    },
+    "internationalPageBreaks": {
+      "type": "object", "additionalProperties": false, "required": ["A4", "LETTER"],
+      "properties": {
+        "A4": { "$ref": "#/$defs/internationalPageBreakDocuments" },
+        "LETTER": { "$ref": "#/$defs/internationalPageBreakDocuments" }
+      }
+    },
+    "internationalPageBreakDocuments": {
+      "type": "object", "additionalProperties": false, "required": ["resume"],
+      "properties": { "resume": { "$ref": "#/$defs/pageBreakTargets" } }
+    },
     "string": { "type": "string" },
     "profileFields": {
       "type": "object",

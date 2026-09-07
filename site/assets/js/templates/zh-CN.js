@@ -100,9 +100,9 @@ function renderOptionalDetails(fields) {
   return details.length ? `<div class="zh-optional-details">${details.join('')}</div>` : '';
 }
 
-function renderSection(title, body, className = '') {
+function renderSection(title, body, className = '', sectionKey = '') {
   if (!hasText(body)) return '';
-  return `<section class="zh-section ${className}"><h2>${escapeHTML(title)}</h2><div class="zh-section-body">${displayText(body)}</div></section>`;
+  return `<section class="zh-section ${className}"${sectionKey ? ` data-section-key="${sectionKey}"` : ''}><h2>${escapeHTML(title)}</h2><div class="zh-section-body">${displayText(body)}</div></section>`;
 }
 
 function isEntered(item, keys) {
@@ -127,7 +127,7 @@ function renderTimeline(title, items, { kind, keys }) {
         </div>
       </article>`;
   }).join('');
-  return `<section class="zh-section"><h2>${escapeHTML(title)}</h2><div class="zh-timeline">${rows}</div></section>`;
+  return `<section class="zh-section" data-section-key="${kind}"><h2>${escapeHTML(title)}</h2><div class="zh-timeline">${rows}</div></section>`;
 }
 
 function renderProjects(projects) {
@@ -144,7 +144,7 @@ function renderProjects(projects) {
       ${renderAchievements(project.details, `项目经历（续） · ${[project.name, project.role].filter(hasText).join(' · ') || '未填写'}`)}
       ${renderLink(project.url, '', 'zh-project-link')}
     </article>`).join('');
-  return `<section class="zh-section"><h2>项目经历</h2><div class="zh-project-list">${rows}</div></section>`;
+  return `<section class="zh-section" data-section-key="projects"><h2>项目经历</h2><div class="zh-project-list">${rows}</div></section>`;
 }
 
 function renderCertifications(certifications) {
@@ -158,7 +158,7 @@ function renderCertifications(certifications) {
       <span>${displayText(item.name, '证书名称')}</span>
       ${renderLink(item.url, '查看证书', 'zh-certification-link')}
     </li>`).join('');
-  return `<section class="zh-section zh-certifications"><h2>证书与资质</h2><ul>${rows}</ul></section>`;
+  return `<section class="zh-section zh-certifications" data-section-key="certifications"><h2>证书与资质</h2><ul>${rows}</ul></section>`;
 }
 
 export function renderChineseResume(state, { photoUrl = '' } = {}) {
@@ -166,7 +166,7 @@ export function renderChineseResume(state, { photoUrl = '' } = {}) {
   const headerClass = photoUrl ? 'zh-resume-header has-photo' : 'zh-resume-header';
   return `
     <article class="document-page zh-resume-document" lang="zh-CN">
-      <header class="${headerClass}">
+      <header class="${headerClass}" data-section-key="identity">
         <div class="zh-identity">
           <h1>${displayText(fields.fullName, '姓名')}</h1>
           ${hasText(fields.headline) ? `<p>${escapeHTML(fields.headline)}</p>` : ''}
@@ -177,7 +177,7 @@ export function renderChineseResume(state, { photoUrl = '' } = {}) {
         ${photoUrl ? `<img class="zh-profile-photo" src="${escapeHTML(photoUrl)}" alt="">` : ''}
       </header>
       <div class="zh-resume-content">
-        ${renderSection('个人概述', fields.summary, 'zh-summary')}
+        ${renderSection('个人概述', fields.summary, 'zh-summary', 'summary')}
         ${renderTimeline('工作经历', fields.experience, {
           kind: 'experience',
           keys: ['startDate', 'endDate', 'company', 'role', 'details']
@@ -187,7 +187,7 @@ export function renderChineseResume(state, { photoUrl = '' } = {}) {
           kind: 'education',
           keys: ['startDate', 'endDate', 'school', 'degree', 'details']
         })}
-        ${renderSection('专业技能', fields.skills, 'zh-skills')}
+        ${renderSection('专业技能', fields.skills, 'zh-skills', 'skills')}
         ${renderCertifications(fields.certifications)}
       </div>
     </article>`;

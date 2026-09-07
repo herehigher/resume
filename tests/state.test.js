@@ -51,6 +51,17 @@ test('default state contains independent locale documents', () => {
   assert.notEqual(state.documents['zh-CN'], state.documents.en);
 });
 
+test('page break settings are isolated and reject unsupported keys and duplicates', () => {
+  const state = createDefaultState('en');
+  state.settings.pageBreaks.en.A4.resume = ['projects'];
+  state.settings.pageBreaks.en.LETTER.resume = ['skills'];
+  assert.equal(validateState(state).valid, true);
+  state.settings.pageBreaks.en.A4.resume = ['projects', 'projects'];
+  assert.equal(validateState(state).valid, false);
+  state.settings.pageBreaks.en.A4.resume = ['not-a-section'];
+  assert.equal(validateState(state).valid, false);
+});
+
 test('locale resolution follows URL, saved setting, browser, default order', () => {
   assert.equal(resolveLocale({
     search: '?lang=en',

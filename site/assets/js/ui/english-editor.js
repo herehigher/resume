@@ -4,6 +4,7 @@ import { renderEnglishDocument } from '../templates/en.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
+import { initPageBreakControls } from '../page-breaks.js';
 import { confirmAction } from './confirmation-dialog.js';
 
 const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
@@ -218,6 +219,10 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   let draftBeforeSampleWasStored = false;
   let shouldPersistDraft = store.hasStoredState();
   let zoom = 1;
+  const pageBreakControls = initPageBreakControls({
+    store, locale: 'en', preview, toolbar: root.querySelector('.preview-toolbar'),
+    getDocumentType: () => 'resume', scheduleSave
+  });
 
   function resume() {
     return store.getState().documents.en.resume;
@@ -309,6 +314,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
 
   function renderPreview() {
     preview.innerHTML = renderEnglishDocument(store.getState());
+    pageBreakControls.render();
     updateCompletion();
     window.requestAnimationFrame(fitPreview);
   }

@@ -124,7 +124,7 @@ function renderExperience(entries) {
       ${renderAchievements(entry.details, `Continued · ${[entry.company, entry.role].filter(Boolean).join(' · ') || 'Experience'}`, heading) || heading}
     </article>`;
   }).join('');
-  return items ? `<section class="en-section" aria-labelledby="en-experience-heading"><h2 id="en-experience-heading">Experience</h2>${items}</section>` : '';
+  return items ? `<section class="en-section" data-section-key="experience" aria-labelledby="en-experience-heading"><h2 id="en-experience-heading">Experience</h2>${items}</section>` : '';
 }
 
 function renderProjects(entries) {
@@ -136,7 +136,7 @@ function renderProjects(entries) {
       ${entry.url ? `<p class="en-entry-link"><span>Project:</span> ${renderUrl(entry.url)}</p>` : ''}
     </article>`;
   }).join('');
-  return items ? `<section class="en-section" aria-labelledby="en-projects-heading"><h2 id="en-projects-heading">Projects</h2>${items}</section>` : '';
+  return items ? `<section class="en-section" data-section-key="projects" aria-labelledby="en-projects-heading"><h2 id="en-projects-heading">Projects</h2>${items}</section>` : '';
 }
 
 function renderEducation(entries) {
@@ -151,7 +151,7 @@ function renderEducation(entries) {
       ${entry.details ? `<div class="en-entry-details">${text(entry.details)}</div>` : ''}
     </article>`;
   }).join('');
-  return items ? `<section class="en-section" aria-labelledby="en-education-heading"><h2 id="en-education-heading">Education</h2>${items}</section>` : '';
+  return items ? `<section class="en-section" data-section-key="education" aria-labelledby="en-education-heading"><h2 id="en-education-heading">Education</h2>${items}</section>` : '';
 }
 
 function renderCertifications(entries) {
@@ -163,7 +163,7 @@ function renderCertifications(entries) {
       ${entry.url ? `<span class="en-certification-link">${renderUrl(entry.url)}</span>` : ''}
     </li>`;
   }).join('');
-  return items ? `<section class="en-section" aria-labelledby="en-certifications-heading"><h2 id="en-certifications-heading">Certifications</h2><ul class="en-certification-list">${items}</ul></section>` : '';
+  return items ? `<section class="en-section" data-section-key="certifications" aria-labelledby="en-certifications-heading"><h2 id="en-certifications-heading">Certifications</h2><ul class="en-certification-list">${items}</ul></section>` : '';
 }
 
 export function renderEnglishResume(state) {
@@ -174,16 +174,16 @@ export function renderEnglishResume(state) {
   const summary = String(resume.summary || '').trim();
   const skills = String(resume.skills || '').trim();
   return `<article class="document-page english-document ${pageClass}" data-page-size="${pageSize}" aria-label="English resume">
-    <header class="en-resume-header">
+    <header class="en-resume-header" data-section-key="identity">
       <h1>${text(profile.fullName) || '<span class="empty-preview">Your Name</span>'}</h1>
       ${resume.headline ? `<p class="en-headline">${text(resume.headline)}</p>` : ''}
       ${renderContact(profile, resume.location)}
     </header>
-    ${summary ? `<section class="en-section" aria-labelledby="en-summary-heading"><h2 id="en-summary-heading">Summary</h2><div class="en-section-body">${escapeHTML(summary)}</div></section>` : ''}
+    ${summary ? `<section class="en-section" data-section-key="summary" aria-labelledby="en-summary-heading"><h2 id="en-summary-heading">Summary</h2><div class="en-section-body">${escapeHTML(summary)}</div></section>` : ''}
     ${renderExperience(resume.experience)}
     ${renderProjects(resume.projects)}
     ${renderEducation(resume.education)}
-    ${skills ? `<section class="en-section" aria-labelledby="en-skills-heading"><h2 id="en-skills-heading">Skills</h2><div class="en-section-body">${escapeHTML(skills)}</div></section>` : ''}
+    ${skills ? `<section class="en-section" data-section-key="skills" aria-labelledby="en-skills-heading"><h2 id="en-skills-heading">Skills</h2><div class="en-section-body">${escapeHTML(skills)}</div></section>` : ''}
     ${renderCertifications(resume.certifications)}
   </article>`;
 }

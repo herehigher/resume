@@ -1,5 +1,6 @@
 import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createDefaultState } from './defaults.js';
+import { validatePageBreaks } from '../page-breaks.js';
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -54,6 +55,7 @@ export function validateState(value) {
       errors.push(`settings.pageSizeByLocale.${locale} is not supported`);
     }
   });
+  errors.push(...validatePageBreaks(value.settings?.pageBreaks));
 
   if (!['resume', 'career'].includes(value.documents?.ja?.activeDocument)) {
     errors.push('documents.ja.activeDocument is not supported');
