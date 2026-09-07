@@ -1,18 +1,16 @@
 export const PAGE_BREAK_LABELS = Object.freeze({
   ja: {
-    identity: '基本情報', history: '学歴・職歴', qualifications: '免許・資格', motivation: '志望動機・自己PRなど', requests: '本人希望記入欄',
-    summary: '職務要約', skills: '活かせる経験・知識・技術', 'career-history': '職務経歴', 'self-promotion': '自己PR',
-    add: '追加', remove: '解除', menu: '改ページ', positions: '改ページ位置', after: 'の後'
+    add: '改頁', remove: '解除', menu: '改頁', positions: '改頁位置', after: 'の後'
   },
   'zh-CN': {
-    identity: '基本信息', summary: '个人概述', experience: '工作经历', projects: '项目经历', education: '教育经历', skills: '专业技能', certifications: '证书与资质',
     add: '分页', remove: '取消', menu: '分页', positions: '分页位置', after: '之后'
   },
   en: {
-    identity: 'Contact information', summary: 'Summary', experience: 'Experience', projects: 'Projects', education: 'Education', skills: 'Skills', certifications: 'Certifications',
     add: 'Add', remove: 'Remove', menu: 'Page breaks', positions: 'Page break positions', after: 'after'
   }
 });
+
+export const PAGE_BREAK_PREVIEW_GUTTER = 112;
 
 export const SECTION_REGISTRY = Object.freeze({
   ja: Object.freeze({
@@ -55,6 +53,12 @@ export function createEmptyPageBreaks() {
 
 export function getPageBreaks(state, locale, paper, documentType) {
   return state.settings.pageBreaks[locale][paper][documentType];
+}
+
+export function describePageBreak(locale, previous, target, active) {
+  if (locale === 'ja') return `${previous.label}の後、${target.label}の前に改ページを${active ? '解除' : '追加'}`;
+  if (locale === 'zh-CN') return `${previous.label}之后、${target.label}之前${active ? '取消分页' : '添加分页'}`;
+  return `${active ? 'Remove' : 'Add'} page break between ${previous.label} and ${target.label}`;
 }
 
 export function isValidPageBreakKey(locale, documentType, key) {
@@ -138,9 +142,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     render();
   }
   function description(previous, target, active) {
-    if (locale === 'ja') return `${previous.label}の後に${target.label}を${active ? '解除' : '追加'}`;
-    if (locale === 'zh-CN') return `${previous.label}之后为${target.label}${active ? '取消分页' : '添加分页'}`;
-    return `${active ? 'Remove' : 'Add'} page break between ${previous.label} and ${target.label}`;
+    return describePageBreak(locale, previous, target, active);
   }
   function render() {
     const { state, type, paper } = activeContext();
@@ -174,7 +176,9 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     });
     if (lastFocusKey) {
       const target = getRegisteredSections(locale, type).find((section) => section.key === lastFocusKey);
-      live.textContent = locale === 'en' ? `Page break ${targets.includes(lastFocusKey) ? 'added' : 'removed'} before ${target.label}` : `${target.label}${targets.includes(lastFocusKey) ? 'に改ページを追加しました' : 'の改ページを解除しました'}`;
+      if (locale === 'ja') live.textContent = `${target.label}の前に改ページを${targets.includes(lastFocusKey) ? '追加しました' : '解除しました'}`;
+      else if (locale === 'zh-CN') live.textContent = `${target.label}之前的分页已${targets.includes(lastFocusKey) ? '添加' : '取消'}`;
+      else live.textContent = `Page break ${targets.includes(lastFocusKey) ? 'added' : 'removed'} before ${target.label}`;
     }
     if (lastFocusKey) {
       const focusTarget = window.matchMedia('(max-width: 820px)').matches

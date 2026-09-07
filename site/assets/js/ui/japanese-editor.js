@@ -4,7 +4,7 @@ import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
 import { confirmSampleAdoption } from './confirmation-dialog.js';
-import { initPageBreakControls } from '../page-breaks.js';
+import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 
 const PROFILE_FIELD_NAMES = new Set([
   'fullName',
@@ -290,7 +290,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     const fallbackWidth = wide ? 760 : 595;
     const availableWidth = document.getElementById('previewScroll').clientWidth - padding;
     const paperWidth = preview.querySelector('.document-page')?.offsetWidth || fallbackWidth;
-    zoom = Math.min(1, Math.max(wide ? .55 : .45, availableWidth / paperWidth));
+    zoom = Math.min(1, Math.max(wide ? .55 : .45, availableWidth / (paperWidth + (wide ? PAGE_BREAK_PREVIEW_GUTTER : 0))));
     applyZoom();
   }
 
