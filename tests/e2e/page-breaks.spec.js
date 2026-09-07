@@ -26,7 +26,13 @@ test('desktop: English section boundary is a single button and persists its manu
     const preview = element.closest('.preview-scroll').getBoundingClientRect();
     return icon.left >= paper.right && button.right <= preview.right;
   })).toBe(true);
-  const iconLeftBeforeToggle = await boundary.locator('.page-break-plus').evaluate((element) => element.getBoundingClientRect().left);
+  const iconPaperOffsetBeforeToggle = await boundary.evaluate((element) => {
+    const icon = element.querySelector('.page-break-plus').getBoundingClientRect();
+    const paper = element.closest('.document-page');
+    const paperRect = paper.getBoundingClientRect();
+    const scale = paperRect.width / paper.offsetWidth;
+    return (icon.left - paperRect.right) / scale;
+  });
   const scrollLeftBeforeToggle = await previewScroll.evaluate((element) => element.scrollLeft);
   await clickVisible(page, boundary);
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
@@ -55,7 +61,7 @@ test('desktop: English section boundary is a single button and persists its manu
     };
   });
   expect(geometry.iconLeft - geometry.paperRight).toBeCloseTo(16 * geometry.scale, 0);
-  expect(geometry.iconLeft).toBeCloseTo(iconLeftBeforeToggle, 1);
+  expect((geometry.iconLeft - geometry.paperRight) / geometry.scale).toBeCloseTo(iconPaperOffsetBeforeToggle, 1);
   expect(geometry.buttonRight).toBeLessThanOrEqual(geometry.previewRight);
   expect(geometry.guideBorder).toBe('dashed');
   expect(geometry.guideStart).toBeCloseTo(geometry.paperLeft, 1);
