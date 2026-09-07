@@ -21,24 +21,45 @@ test('desktop: English section boundary is a single button and persists its manu
   await expect(boundary).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => boundary.evaluate((element) => {
     const button = element.getBoundingClientRect();
+    const icon = element.querySelector('.page-break-plus').getBoundingClientRect();
     const paper = element.closest('.document-page').getBoundingClientRect();
     const preview = element.closest('.preview-scroll').getBoundingClientRect();
-    return button.left >= paper.right && button.right <= preview.right;
+    return icon.left >= paper.right && button.right <= preview.right;
   })).toBe(true);
+  const iconLeftBeforeToggle = await boundary.locator('.page-break-plus').evaluate((element) => element.getBoundingClientRect().left);
   const scrollLeftBeforeToggle = await previewScroll.evaluate((element) => element.scrollLeft);
   await clickVisible(page, boundary);
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await expect(boundary).toContainText('Remove');
-  expect(await boundary.evaluate((element) => getComputedStyle(element, '::before').borderTopStyle)).toBe('dashed');
+  expect(await boundary.evaluate((element) => getComputedStyle(element.closest('[data-section-key]'), '::before').borderTopStyle)).toBe('dashed');
   const geometry = await boundary.evaluate((element) => {
     const button = element.getBoundingClientRect();
+    const icon = element.querySelector('.page-break-plus').getBoundingClientRect();
     const paper = element.closest('.document-page').getBoundingClientRect();
     const preview = element.closest('.preview-scroll').getBoundingClientRect();
-    return { buttonLeft: button.left, buttonRight: button.right, paperRight: paper.right, previewRight: preview.right };
+    const section = element.closest('[data-section-key]');
+    const sectionRect = section.getBoundingClientRect();
+    const guide = getComputedStyle(section, '::before');
+    const scale = paper.width / element.closest('.document-page').offsetWidth;
+    return {
+      buttonRight: button.right,
+      guideEnd: sectionRect.right - (Number.parseFloat(guide.right) * scale),
+      guideBorder: guide.borderTopStyle,
+      guideStart: sectionRect.left + (Number.parseFloat(guide.left) * scale),
+      iconLeft: icon.left,
+      paperLeft: paper.left,
+      paperRight: paper.right,
+      previewRight: preview.right,
+      scale
+    };
   });
-  expect(geometry.buttonLeft).toBeGreaterThanOrEqual(geometry.paperRight);
+  expect(geometry.iconLeft - geometry.paperRight).toBeCloseTo(16 * geometry.scale, 0);
+  expect(geometry.iconLeft).toBeCloseTo(iconLeftBeforeToggle, 1);
   expect(geometry.buttonRight).toBeLessThanOrEqual(geometry.previewRight);
+  expect(geometry.guideBorder).toBe('dashed');
+  expect(geometry.guideStart).toBeCloseTo(geometry.paperLeft, 1);
+  expect(geometry.guideEnd).toBeCloseTo(geometry.paperRight, 1);
   expect(await previewScroll.evaluate((element) => element.scrollLeft)).toBe(scrollLeftBeforeToggle);
   for (let index = 0; index < 3; index += 1) {
     await clickVisible(page, boundary);
@@ -81,6 +102,22 @@ test('[mobile] smartphone: page breaks use the toolbar list and Escape returns f
   }
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
+});
+
+test('[mobile] page-break list closes when focus or a click moves outside it', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  await page.locator('[data-zh-action="sample"]').click();
+  await page.locator('[data-zh-mobile-view="preview"]').click();
+  const workspace = page.locator('#chineseWorkspace');
+  const trigger = workspace.locator('.page-break-menu');
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await page.locator('#localeSelect').focus();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await workspace.locator('[data-zh-preview-scroll]').click({ position: { x: 4, y: 4 } });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('[mobile] identity-only documents hide the page-break menu and retain no illegal controls', async ({ page }) => {

@@ -151,7 +151,11 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     const validTargets = sections.slice(1).map((item) => item.section.key);
     const active = targets.filter((key) => validTargets.includes(key));
     preview.querySelectorAll('.page-break-boundary').forEach((control) => { control.remove(); });
-    preview.querySelectorAll('[data-section-key]').forEach((section) => { section.classList.remove('has-manual-page-break'); });
+    preview.querySelectorAll('[data-section-key]').forEach((section) => {
+      section.classList.remove('has-manual-page-break');
+      section.style.removeProperty('--page-break-paper-left-offset');
+      section.style.removeProperty('--page-break-paper-right-offset');
+    });
     menu.hidden = validTargets.length === 0;
     if (menu.hidden) { setOpen(false); panel.replaceChildren(); live.textContent = ''; return; }
     menu.textContent = `${labels.menu} ${active.length}`;
@@ -168,6 +172,14 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       control.innerHTML = `<span class="page-break-add"><span class="page-break-plus">${icon(enabled)}</span>${enabled ? labels.remove : labels.add}</span>`;
       control.addEventListener('click', () => toggle(key));
       element.prepend(control);
+      const documentPage = element.closest('.document-page');
+      const pageRect = documentPage?.getBoundingClientRect();
+      const sectionRect = element.getBoundingClientRect();
+      const scale = pageRect && documentPage.offsetWidth ? pageRect.width / documentPage.offsetWidth : 1;
+      const leftOffset = pageRect && scale ? Math.max(0, (sectionRect.left - pageRect.left) / scale) : 0;
+      const rightOffset = pageRect && scale ? Math.max(0, (pageRect.right - sectionRect.right) / scale) : 0;
+      element.style.setProperty('--page-break-paper-left-offset', `${leftOffset}px`);
+      element.style.setProperty('--page-break-paper-right-offset', `${rightOffset}px`);
       const row = document.createElement('button');
       row.type = 'button'; row.className = 'page-break-row'; row.dataset.pageBreakKey = key;
       row.setAttribute('aria-pressed', String(enabled)); row.setAttribute('aria-label', description(previous, section, enabled));
@@ -189,5 +201,13 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   menu.addEventListener('click', () => setOpen(panel.hidden));
   toolbar.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !panel.hidden) { setOpen(false); menu.focus(); } });
+  toolbar.addEventListener('focusout', () => {
+    window.queueMicrotask(() => {
+      if (!panel.hidden && !toolbar.contains(document.activeElement)) setOpen(false);
+    });
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!panel.hidden && !toolbar.contains(event.target)) setOpen(false);
+  });
   return { render };
 }
