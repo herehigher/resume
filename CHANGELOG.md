@@ -6,6 +6,23 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-07
+
+### Added / 追加
+
+- 表示中の章同士の間に手動改ページを追加・解除できる操作を desktop と smartphone に追加。設定は言語・用紙・書類種別ごとに保存し、JSON の読込・書出しにも含める。
+
+### Changed / 変更
+
+- 简体中文 A4 と English A4 / Letter の画面プレビューを印刷時と同じ版面寸法・余白へ統一し、画面幅や用紙切替による本文の再配置を防止。
+- 手動改ページの境界線と操作位置、mobile の改ページ menu と backup menu の閉じ方、dialog 後の focus 復帰を調整。
+- 三言語の公開入口と editor の説明・検索 metadata に、無料、open source、local processing、privacy、PDF、template の特性を明示。
+
+### Fixed / 修正
+
+- 表示中の言語・用紙に対応する印刷 page rule を一つだけ適用し、locale や用紙の切替後も末尾の空白 page が生じないよう修正。
+- 長い section や連続した手動改ページでも、内容のない重複 page を作らず対象の章を本文付きの新しい page から開始するよう安定化。
+
 ## [0.2.3] - 2026-09-06
 
 ### Changed / 変更
