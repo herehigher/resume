@@ -68,9 +68,9 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
         run: npm run lint
 
-      - name: Install Chromium
+      - name: Install Chromium and WebKit
         if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Browser and PDF acceptance tests
         if: ${{ github.event_name != 'pull_request' || needs.scope.result != 'success' || needs.scope.outputs.docs_only != 'true' }}

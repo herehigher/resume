@@ -39,7 +39,7 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 | --- | --- |
 | `npm test` | Unit / document / 公開契約 / JavaScript syntax / network と storage の static check |
 | `npm run lint` | JavaScript と test / script の Biome lint |
-| `npm run test:e2e` | Desktop / mobile 操作、保存・言語・privacy・PDF の Chromium test |
+| `npm run test:e2e` | Desktop / mobile 操作、保存・言語・privacy・PDF の Chromium test と、画面内 layout parity の WebKit test |
 | `npm run test:acceptance` | Unit / static、lint、E2E をまとめて実行する診断用 full gate |
 
 CI は文書だけの変更でも Quality の結果を返します。確認を実行せず required check を pending のまま残す path filter は使いません。GitHub の branch protection は別設定です。Playwright の失敗証拠は Actions artifact に残します。
