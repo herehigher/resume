@@ -75,6 +75,7 @@ async function validatePdf(file, output) {
 
 export async function verifyDocumentationAssets({
   assetRoot,
+  requireExactSource = true,
   sourceRoot = root,
   sourceSha
 } = {}) {
@@ -85,8 +86,15 @@ export async function verifyDocumentationAssets({
   const manifestFile = path.join(resolvedAssetRoot, 'docs/assets-manifest.json');
   await assertRegularFile(manifestFile);
   const manifest = JSON.parse(await readFile(manifestFile, 'utf8'));
+  const packageVersion = JSON.parse(await readFile(path.join(sourceRoot, 'package.json'), 'utf8')).version;
   const siteHash = await computeSiteHash(path.join(sourceRoot, 'site'));
-  if (manifest.source?.commit !== sourceSha) throw new Error('Documentation asset source SHA does not match the manifest.');
+  if (manifest.schemaVersion !== 2) throw new Error('Documentation asset manifest schema is not current.');
+  if (requireExactSource && manifest.source?.commit !== sourceSha) {
+    throw new Error('Documentation asset source SHA does not match the manifest.');
+  }
+  if (manifest.source?.appVersion !== packageVersion) {
+    throw new Error('Documentation asset app version does not match the source checkout.');
+  }
   if (manifest.source?.siteHash !== siteHash) throw new Error('Documentation asset site hash does not match the source checkout.');
   if (!Array.isArray(manifest.outputs) || manifest.outputs.length !== 3) {
     throw new Error('Documentation asset manifest must describe three locales.');

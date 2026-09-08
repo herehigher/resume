@@ -6,6 +6,10 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+### Fixed / 修正
+
+- 安定版の公開 PR と最終 main Quality で展示 screenshot / PDF の version、site hash、生成 bytes を照合し、古い展示 asset を含む tag の公開を停止するよう修正。Quality の検証済み asset を read-only CI のまま公開 PR へ取り込める手順も追加。
+
 ## [0.2.5] - 2026-09-08
 
 ### Changed / 変更

@@ -40,6 +40,14 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/quality-scope.mjs "$BASE_SHA" "$HEAD_SHA"
 
+      - name: Classify release documentation asset requirement
+        id: release_assets
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/release-doc-assets.mjs required --base "$BASE_SHA" --head "$HEAD_SHA"
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
@@ -95,6 +103,15 @@ jobs:
           path: ${{ runner.temp }}/resume-documentation-assets/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Verify release documentation assets are committed
+        if: ${{ github.event_name == 'pull_request' && steps.release_assets.outputs.required == 'true' }}
+        env:
+          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
+        run: >-
+          node scripts/release-doc-assets.mjs compare
+          --committed-root "${GITHUB_WORKSPACE}"
+          --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
 
       - name: Upload Playwright failure evidence
         if: failure()

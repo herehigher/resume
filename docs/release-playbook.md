@@ -12,18 +12,21 @@ Public release、tag、Pages 設定、repository visibility の変更には owne
 | --- | --- | --- | --- |
 | 1 | 担当者 | 変更範囲と公開 version を決める | 安定版番号が決まっている |
 | 2 | 担当者 | Version 更新機能で関連 file を同期し、CHANGELOG をまとめ、公開 PR を1件作る | Version と変更内容が一致する |
-| 3 | 担当者 | 必要な PR check と review を完了して main へ merge する | 対象の merge commit が確定する |
-| 4 | 担当者 | 下記の公開入口で、その merged PR の準備を開始する | 対象 commit と version が表示される |
-| 5 | CI | 同じ commit の成功済み main Quality を確認し、配布物を生成・検査する。確認用画像・PDF は Quality の出力を参照する | 検証結果と配布物が承認前に揃う |
-| 6 | 担当者・所有者 | Version・変更内容・commit と必要な目視結果を確認し、本番公開を承認する | 必須確認の失敗・未確認がない |
-| 7 | CI | 同じ commit の immutable tag を作成し、検証した配布物をそのまま deploy する | Tag、commit、配布物が一致する |
-| 8 | CI・担当者 | 公開 URL の自動検査と summary を確認する | Deploy と smoke が成功する |
+| 3 | CI・担当者 | Quality が生成した画像・PDFを公開 PR へ取り込み、再実行した check と review を完了する | 展示 asset が候補 version・site bytes・Quality 出力と一致する |
+| 4 | 担当者 | 公開 PR を main へ merge する | 対象の merge commit が確定する |
+| 5 | 担当者 | 下記の公開入口で、その merged PR の準備を開始する | 対象 commit と version が表示される |
+| 6 | CI | 同じ commit の成功済み main Quality と、commit 済み展示 asset の一致を確認し、配布物を生成・検査する | 検証結果と配布物が承認前に揃う |
+| 7 | 担当者・所有者 | Version・変更内容・commit と必要な目視結果を確認し、本番公開を承認する | 必須確認の失敗・未確認がない |
+| 8 | CI | 同じ commit の immutable tag を作成し、検証した配布物をそのまま deploy する | Tag、commit、配布物が一致する |
+| 9 | CI・担当者 | 公開 URL の自動検査と summary を確認する | Deploy と smoke が成功する |
 
 Version の基準は `package.json`。CHANGELOG の日付は RC を確定した日であり、実際の公開時刻は GitHub の実行記録を参照します。日付跨ぎだけで version や test をやり直しません。対象は PR の merge commit であり、その後の main tip や PR head に切り替えません。
 
 ## 公開入口
 
-Version 更新は repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。
+Version 更新は repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。Version 更新を commit・push すると、Quality は候補 code から一時的な展示 asset を生成してから、PR に commit 済みの asset との一致を検査します。古い場合は asset を upload した上で check が失敗します。
+
+その Quality run の `documentation-assets-*` artifact を source 外へ展開し、候補 branch の `site/` が commit 済みであることを確認して、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root "$PWD" --source-sha HEAD_SHA` を実行します。変更された三言語の screenshot、PDF、`docs/assets-manifest.json` を目視・review して同じ公開 PR へ commit します。再実行した Quality は Git LFS object ID、version、site hash、最終生成 bytes の不一致を拒否します。CI 自身に repository 書込権限は与えません。
 
 [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を main から実行します。通常の準備は `mode=prepare` と merged `pr_number` を指定し、他の入力は空欄にします。対象 SHA の main Quality が実行中・失敗・未存在なら準備を停止するので、その Quality を完了・再実行してから準備を再開します。
 
@@ -35,11 +38,12 @@ Version 更新は repository root で `node scripts/set-release-version.mjs VERS
 
 | 変更 | 目視するもの |
 | --- | --- |
-| Version、文書、公開 script のみ | 原則不要。変更内容と CI 結果を確認 |
+| Version の更新 | 三言語の展示 screenshot にある version 表示と manifest。PDF の目視は PDF に影響する変更がなければ不要 |
+| 文書、公開 script のみ | 原則不要。変更内容と CI 結果を確認 |
 | 画面、文言、操作 | 対象言語と desktop / smartphone 相当幅の変更画面 |
 | PDF、template、font、公開 sample | 対象言語・用紙の全 PDF page。文字切れ、重なり、改ページ、末尾欠落 |
 
-詳しい確認条件と展示 sample の扱いは[開発ガイド](development-guide.md#表示pdf-の目視)を参照します。必要な結果と差異だけを PR / run に残し、自動 test、agent の目視、人の受入判断、未確認を分けます。確認用画像・PDF は CI artifact から取得し、展示 sample を毎 version commit し直しません。
+詳しい確認条件と展示 sample の扱いは[開発ガイド](development-guide.md#表示pdf-の目視)を参照します。必要な結果と差異だけを PR / run に残し、自動 test、agent の目視、人の受入判断、未確認を分けます。確認用画像・PDF は CI artifact から取得します。通常の開発 PR では展示 sample を更新せず、安定版の公開 PR では tag 内の version と画面を一致させるため毎回 commit します。
 
 ## 自動で確認・記録すること
 

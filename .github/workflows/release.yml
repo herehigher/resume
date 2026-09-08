@@ -105,6 +105,24 @@ jobs:
           set -euo pipefail
           node scripts/validate-release-run.mjs quality --sha "$RELEASE_SHA"
 
+      - name: Download exact Quality documentation assets
+        if: ${{ inputs.release_tag == '' }}
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          name: documentation-assets-${{ steps.release.outputs.release_sha }}
+          path: ${{ runner.temp }}/quality-documentation-assets
+          run-id: ${{ steps.quality.outputs.run_id }}
+
+      - name: Verify release documentation assets match final Quality output
+        if: ${{ inputs.release_tag == '' }}
+        env:
+          SOURCE_ROOT: ${{ runner.temp }}/release-source
+        run: >-
+          node scripts/release-doc-assets.mjs compare
+          --committed-root "${SOURCE_ROOT}"
+          --generated-root "${{ runner.temp }}/quality-documentation-assets"
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:

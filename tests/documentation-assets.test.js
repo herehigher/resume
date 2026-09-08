@@ -49,7 +49,7 @@ test('documentation assets require a new empty directory independent from source
   );
 });
 
-test('documentation asset provenance rejects a dirty site checkout', async (t) => {
+test('documentation asset provenance rejects dirty site or package inputs', async (t) => {
   const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'resume-doc-assets-source-test-'));
   t.after(() => rm(sourceRoot, { force: true, recursive: true }));
   await mkdir(path.join(sourceRoot, 'site'));
@@ -63,5 +63,9 @@ test('documentation asset provenance rejects a dirty site checkout', async (t) =
   assert.equal(resolveSourceCommit(sourceRoot, sourceSha), sourceSha);
 
   await writeFile(path.join(sourceRoot, 'site', 'index.html'), '<title>changed</title>');
-  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site changes/);
+  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site or package changes/);
+
+  execFileSync('git', ['checkout', '--', 'site/index.html'], { cwd: sourceRoot });
+  await writeFile(path.join(sourceRoot, 'package.json'), '{"version":"0.3.0"}\n');
+  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site or package changes/);
 });
