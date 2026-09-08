@@ -108,10 +108,12 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && steps.release_assets.outputs.required == 'true' }}
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
+          SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
         run: >-
           node scripts/release-doc-assets.mjs compare
           --committed-root "${GITHUB_WORKSPACE}"
           --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
+          --source-sha "${SOURCE_SHA}"
 
       - name: Upload Playwright failure evidence
         if: failure()

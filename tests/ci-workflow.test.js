@@ -26,14 +26,14 @@ test('release documentation assets are uploaded before the pull request freshnes
   assert.match(qualityWorkflow, /release-doc-assets\.mjs required/);
   assert.match(qualityWorkflow, /Upload documentation asset evidence[\s\S]+Verify release documentation assets are committed/);
   assert.match(qualityWorkflow, /steps\.release_assets\.outputs\.required == 'true'/);
-  assert.match(qualityWorkflow, /release-doc-assets\.mjs compare/);
+  assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
 });
 
 test('release preparation compares committed assets with the exact main Quality output', () => {
   assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets match final Quality output[\s\S]+Prepare the single Pages artifact/);
   assert.match(releaseWorkflow, /documentation-assets-\$\{\{ steps\.release\.outputs\.release_sha \}\}/);
   assert.match(releaseWorkflow, /run-id: \$\{\{ steps\.quality\.outputs\.run_id \}\}/);
-  assert.match(releaseWorkflow, /release-doc-assets\.mjs compare/);
+  assert.match(releaseWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
 });
 
 test('CI installs only the browser binaries required by headless execution', () => {

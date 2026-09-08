@@ -101,8 +101,10 @@ async function recordedFileDigest(rootDirectory, relativePath) {
   return createHash('sha256').update(contents).digest('hex');
 }
 
-export async function compareReleaseAssets({ committedRoot = root, generatedRoot }) {
-  if (!generatedRoot) fail('generated asset root is required');
+export async function compareReleaseAssets({ committedRoot = root, generatedRoot, sourceSha }) {
+  if (!generatedRoot || !fullCommitPattern.test(sourceSha || '')) {
+    fail('generated asset root and full source SHA are required');
+  }
   const generatedManifest = await readJson(path.join(generatedRoot, 'docs/assets-manifest.json'), 'generated manifest');
   const committedManifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
   const version = packageVersion(await readFile(path.join(committedRoot, 'package.json'), 'utf8'), 'committed');
@@ -111,6 +113,9 @@ export async function compareReleaseAssets({ committedRoot = root, generatedRoot
 
   if (generatedManifest.source.appVersion !== version || committedManifest.source.appVersion !== version) {
     fail(`asset version does not match package version ${version}`);
+  }
+  if (generatedManifest.source.commit !== sourceSha) {
+    fail('generated asset source commit does not match the expected Quality source');
   }
   if (generatedManifest.source.siteHash !== committedManifest.source.siteHash) {
     fail('committed assets were generated from different site bytes');
@@ -196,10 +201,14 @@ async function main() {
     return;
   }
   if (command === 'compare') {
-    const values = parseOptions(args, ['committed-root', 'generated-root']);
-    if (!values['committed-root'] || !values['generated-root']) fail('compare expects committed and generated roots');
+    const values = parseOptions(args, ['committed-root', 'generated-root', 'source-sha']);
+    if (!values['committed-root'] || !values['generated-root'] || !values['source-sha']) {
+      fail('compare expects committed and generated roots and a source SHA');
+    }
     const result = await compareReleaseAssets({
-      committedRoot: path.resolve(values['committed-root']), generatedRoot: path.resolve(values['generated-root'])
+      committedRoot: path.resolve(values['committed-root']),
+      generatedRoot: path.resolve(values['generated-root']),
+      sourceSha: values['source-sha']
     });
     console.log(`Verified committed documentation assets for v${result.version} and site ${result.siteHash}.`);
     return;

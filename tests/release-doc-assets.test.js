@@ -82,7 +82,7 @@ test('committed LFS assets may come from another commit when version, site, and 
   const committedRoot = path.join(directory, 'committed');
   await writeAssetFixture(generatedRoot, { commit: 'a'.repeat(40) });
   await writeAssetFixture(committedRoot, { commit: 'b'.repeat(40), lfsPointers: true });
-  assert.deepEqual(await compareReleaseAssets({ committedRoot, generatedRoot }), {
+  assert.deepEqual(await compareReleaseAssets({ committedRoot, generatedRoot, sourceSha: 'a'.repeat(40) }), {
     siteHash: 'c'.repeat(64), version: '0.3.0'
   });
 });
@@ -94,14 +94,21 @@ test('release asset comparison rejects stale versions, site bytes, and LFS objec
   const committedRoot = path.join(directory, 'committed');
   await writeAssetFixture(generatedRoot, { commit: 'a'.repeat(40) });
   await writeAssetFixture(committedRoot, { commit: 'b'.repeat(40), lfsPointers: true, version: '0.2.5' });
-  await assert.rejects(compareReleaseAssets({ committedRoot, generatedRoot }), /version does not match/);
+  const compare = () => compareReleaseAssets({ committedRoot, generatedRoot, sourceSha: 'a'.repeat(40) });
+  await assert.rejects(compare(), /version does not match/);
 
   await writeAssetFixture(committedRoot, { commit: 'b'.repeat(40), lfsPointers: true, siteHash: 'd'.repeat(64) });
-  await assert.rejects(compareReleaseAssets({ committedRoot, generatedRoot }), /different site bytes/);
+  await assert.rejects(compare(), /different site bytes/);
 
   await writeAssetFixture(committedRoot, { commit: 'b'.repeat(40), lfsPointers: true });
   await writeFile(path.join(committedRoot, 'docs/screenshots/ja.png'), `version https://git-lfs.github.com/spec/v1\noid sha256:${'e'.repeat(64)}\nsize 10\n`);
-  await assert.rejects(compareReleaseAssets({ committedRoot, generatedRoot }), /committed ja screenshot bytes/);
+  await assert.rejects(compare(), /committed ja screenshot bytes/);
+
+  await writeAssetFixture(committedRoot, { commit: 'b'.repeat(40), lfsPointers: true });
+  await assert.rejects(
+    compareReleaseAssets({ committedRoot, generatedRoot, sourceSha: 'd'.repeat(40) }),
+    /source commit does not match/
+  );
 });
 
 test('promotion refuses overlapping generated and source roots', async (t) => {
