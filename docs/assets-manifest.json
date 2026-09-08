@@ -1,16 +1,25 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "generator": {
-    "command": "npm run release:assets",
+    "command": "node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>",
+    "inputHash": "c8d777b3d61650c448ca5e12d4f2d0db5d02f3afe8b3eb6ad3cff8ed42699330",
+    "inputHashAlgorithm": "sha256(relative-path + NUL + content + NUL)",
+    "inputs": [
+      "package-lock.json",
+      "scripts/generate-doc-assets.mjs",
+      "scripts/verify-doc-assets.mjs"
+    ],
     "path": "scripts/generate-doc-assets.mjs",
-    "version": "1.1.0"
+    "version": "1.4.0"
   },
   "source": {
-    "commit": "8d06fb490f2c0a179b88df0c8e17602b801abdee",
+    "appVersion": "0.2.6",
+    "checkoutCommit": "d0dfdc2af00a84af7c7a925a9345ed59d5e0fda6",
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
-    "siteHash": "981f59c38ceb18985a8c215cd67b76893aece4c095a68b3fca610fe432f85cb8",
+    "qualityRunId": "34221440129",
+    "siteHash": "5d0b036b66b3f37bbef1af5daa81a1c404fe5a7644f6594a42cf84afcd428bf3",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -25,60 +34,60 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-981F59C38CEB",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-5D0B036B66B3",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-981F59C38CEB",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-5D0B036B66B3",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "a616cf6d73dbc5feca03393ae56080c2bc5e6012c8b93992b4720fa0be4a27a0"
+        "sha256": "eb98c57365b6a6bf5655d73e90b81919ee4377901ec3921cb49be94d9cf777b1"
       },
       "screenshot": {
-        "fixture": "built-in-example",
+        "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/ja.png",
-        "sha256": "f7f72199168cd32367d44cc1348fb57eaeac0bb33b92e22df315db73bdb2a140",
+        "sha256": "c7fc438c05452cc54cb0ff70d4440d6fe9f16d318e08dc119b4ba873091f51a5",
         "width": 1440
       }
     },
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-981F59C38CEB",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-5D0B036B66B3",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-981F59C38CEB",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-5D0B036B66B3",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "c2bc5b609d60ddba05c777f9bd54420ea2e45f0b401c30f21b577987238d7529"
+        "sha256": "d5f9535d1830c0515e0d72daf554a5ca67fbda8c7d2916cdcccf1b91834fcf7a"
       },
       "screenshot": {
-        "fixture": "built-in-example",
+        "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/zh-CN.png",
-        "sha256": "335354782feb6f4784a712dbe7f938940a110dbde0ec4e9623e62fead14da2c0",
+        "sha256": "911c58bf0203fa0aa711b1a7a6f487b18b55f56e2eb91522fdc603d68ddc7118",
         "width": 1440
       }
     },
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-981F59C38CEB",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-5D0B036B66B3",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-981F59C38CEB",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-5D0B036B66B3",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "1102c1124267d84ee82b15aaf509d4f0e75b14cae80244afed039d3e73eeda9c"
+        "sha256": "bc33882102b2fc72390353a3a968dc50f91a786ebe0eefbea10147c60f6ea7a5"
       },
       "screenshot": {
-        "fixture": "built-in-example",
+        "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/en.png",
-        "sha256": "621bbe12073a6d5e7a43d06aa1812c7efb406f897d4d7f8c4ff40bb21e3cbf15",
+        "sha256": "6be326b868b97cec8f85d4c9c5a095a5828d290a8e6e3c41c7378c19d5db313c",
         "width": 1440
       }
     }
