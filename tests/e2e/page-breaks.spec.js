@@ -8,6 +8,14 @@ async function clickVisible(page, locator) {
   await page.mouse.click(box.x + (box.width / 2), box.y + (box.height / 2));
 }
 
+async function blurFocusedControlOnNextPointerDown(locator) {
+  await locator.evaluate((element) => {
+    element.addEventListener('pointerdown', () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    }, { once: true });
+  });
+}
+
 test('desktop: English section boundary is a single button and persists its manual page break', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openLocale(page, 'en');
@@ -85,7 +93,7 @@ test('desktop: English section boundary is a single button and persists its manu
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
 });
 
-test('[mobile] smartphone: page breaks use the toolbar list and Escape returns focus to its trigger', async ({ page }) => {
+test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navigation and Escape returns focus to the trigger', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
@@ -100,17 +108,57 @@ test('[mobile] smartphone: page breaks use the toolbar list and Escape returns f
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-pressed', 'true');
   await expect(workspace.locator('.page-break-live')).toHaveText('个人概述之前的分页已添加');
-  for (let index = 0; index < 2; index += 1) {
-    await row.press('Space');
-    await expect(workspace.locator('.page-break-row[data-page-break-key="summary"]')).toHaveCount(1);
-    await row.press('Space');
-    await expect(workspace.locator('.page-break-row[data-page-break-key="summary"]')).toHaveCount(1);
-  }
+  await expect(row).toBeFocused();
+  await page.keyboard.press('Tab');
+  const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
+  await expect(experience).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await experience.press('Enter');
+  await expect(experience).toHaveAttribute('aria-pressed', 'true');
+  await expect(experience).toBeFocused();
+  await expect(experience).toHaveCount(1);
+  await expect(workspace.locator('.page-break-live')).toHaveText('工作经历之前的分页已添加');
   await page.keyboard.press('Escape');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();
 });
 
-test('[mobile] page-break list closes when focus or a click moves outside it', async ({ page }) => {
+test('[mobile][mobile-webkit] later page-break rows survive touch focus loss and rerender in Chromium and WebKit', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  await page.locator('[data-zh-action="sample"]').click();
+  await page.locator('[data-zh-mobile-view="preview"]').click();
+  const workspace = page.locator('#chineseWorkspace');
+  const trigger = workspace.locator('.page-break-menu');
+  const summary = workspace.locator('.page-break-row[data-page-break-key="summary"]');
+  const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
+  const projects = workspace.locator('.page-break-row[data-page-break-key="projects"]');
+
+  await trigger.tap();
+  await expect(summary).toBeFocused();
+  await blurFocusedControlOnNextPointerDown(experience);
+  await experience.tap();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(experience).toHaveCount(1);
+  await expect(experience).toHaveAttribute('aria-pressed', 'true');
+  await expect(experience).toBeFocused();
+  await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
+  await expect(workspace.locator('.page-break-live')).toHaveText('工作经历之前的分页已添加');
+
+  await blurFocusedControlOnNextPointerDown(projects);
+  await projects.tap();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(projects).toHaveCount(1);
+  await expect(projects).toHaveAttribute('aria-pressed', 'true');
+  await expect(projects).toBeFocused();
+  await expect(page.locator('[data-section-key="projects"]')).toHaveClass(/has-manual-page-break/);
+  await expect(workspace.locator('.page-break-live')).toHaveText('项目经历之前的分页已添加');
+
+  await blurFocusedControlOnNextPointerDown(trigger);
+  await trigger.tap();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('[mobile][mobile-webkit] page-break list closes when focus or a click moves outside it', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
@@ -123,6 +171,12 @@ test('[mobile] page-break list closes when focus or a click moves outside it', a
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await workspace.locator('[data-zh-preview-scroll]').click({ position: { x: 4, y: 4 } });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+  const row = workspace.locator('.page-break-row[data-page-break-key="summary"]');
+  await row.dispatchEvent('pointerdown', { isPrimary: true, pointerId: 139, pointerType: 'touch' });
+  await row.dispatchEvent('pointercancel', { isPrimary: true, pointerId: 139, pointerType: 'touch' });
+  await page.locator('#localeSelect').focus();
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 });
 
