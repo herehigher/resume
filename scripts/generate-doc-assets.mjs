@@ -11,8 +11,14 @@ const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const siteRoot = path.join(root, 'site');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
-const generatorVersion = '1.3.0';
+const generatorVersion = '1.4.0';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
+const fixedPdfDate = `D:${fixedDate.replaceAll('-', '')}000000+00'00'`;
+const generatorInputPaths = Object.freeze([
+  'package-lock.json',
+  'scripts/generate-doc-assets.mjs',
+  'scripts/verify-doc-assets.mjs'
+]);
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -79,8 +85,37 @@ export async function computeSiteHash(rootDirectory = siteRoot) {
   return hash.digest('hex');
 }
 
+export async function computeGeneratorInputHash(sourceRoot = root) {
+  const hash = createHash('sha256');
+  for (const relativePath of generatorInputPaths) {
+    hash.update(relativePath);
+    hash.update('\0');
+    hash.update(await readFile(path.join(sourceRoot, relativePath)));
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+}
+
 async function fileHash(file) {
   return createHash('sha256').update(await readFile(file)).digest('hex');
+}
+
+export function normalizePdfMetadata(contents) {
+  const source = Buffer.from(contents);
+  let normalized = source.toString('latin1');
+  for (const field of ['CreationDate', 'ModDate']) {
+    const pattern = new RegExp(`/${field} \\(D:\\d{14}[+-]\\d{2}'\\d{2}'\\)`, 'g');
+    const matches = normalized.match(pattern) || [];
+    if (matches.length !== 1) {
+      throw new Error(`Documentation PDF must contain one ${field}.`);
+    }
+    normalized = normalized.replace(pattern, `/${field} (${fixedPdfDate})`);
+  }
+  const output = Buffer.from(normalized, 'latin1');
+  if (output.length !== source.length) {
+    throw new Error('Documentation PDF metadata normalization must preserve byte offsets.');
+  }
+  return output;
 }
 
 async function appVersion(sourceRoot) {
@@ -110,14 +145,17 @@ export function resolveSourceCommit(sourceRoot, sourceCommit) {
   try {
     siteStatus = execFileSync(
       'git',
-      ['-C', sourceRoot, 'status', '--porcelain=v1', '--untracked-files=all', '--', 'site', 'package.json'],
+      [
+        '-C', sourceRoot, 'status', '--porcelain=v1', '--untracked-files=all', '--',
+        'site', 'package.json', ...generatorInputPaths
+      ],
       { encoding: 'utf8' }
     ).trim();
   } catch {
     throw new Error('Documentation asset source checkout could not be checked for site changes.');
   }
   if (siteStatus) {
-    throw new Error('Documentation asset source checkout has uncommitted site or package changes.');
+    throw new Error('Documentation asset source checkout has uncommitted site, package, or generator changes.');
   }
   return currentCommit;
 }
@@ -213,6 +251,13 @@ function createPdfState(locale, marker, firstText, factories) {
   return state;
 }
 
+async function waitForStableRendering(page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+}
+
 function documentationState(locale, marker, firstText, factories) {
   const state = createPdfState(locale, marker, firstText, factories);
   const labels = {
@@ -276,7 +321,6 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
       ({ previewSelector, markerText }) => document.querySelector(previewSelector)?.textContent.includes(markerText),
       { markerText: marker, previewSelector: variant.previewSelector }
     );
-    await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => {
       document.documentElement.scrollLeft = 0;
       document.body.scrollLeft = 0;
@@ -297,16 +341,24 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
     if (!visiblePageBreaks) throw new Error(`Documentation screenshot must show a page-break control: ${variant.locale}`);
 
     const screenshotAbsolute = path.join(outputRoot, variant.screenshotPath);
+    // Linux shadow rasterization can vary by a few antialiasing pixels across identical runners.
+    const captureStyle = await page.addStyleTag({
+      content: '.document-tab.is-active { box-shadow: none !important; }'
+    });
+    await waitForStableRendering(page);
     await page.screenshot({ animations: 'disabled', fullPage: false, path: screenshotAbsolute });
+    await captureStyle.evaluate((element) => element.remove());
 
     await page.emulateMedia({ media: 'print' });
+    await page.waitForFunction(() => matchMedia('print').matches);
+    await waitForStableRendering(page);
     const pdfAbsolute = path.join(outputRoot, variant.pdfPath);
-    await page.pdf({
+    const pdf = normalizePdfMetadata(await page.pdf({
       displayHeaderFooter: false,
-      path: pdfAbsolute,
       preferCSSPageSize: true,
       printBackground: true
-    });
+    }));
+    await writeFile(pdfAbsolute, pdf);
 
     return {
       browserLocale: variant.browserLocale,
@@ -335,9 +387,13 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
 
 export async function generateDocumentationAssets({
   outputRoot,
+  qualityRunId,
   sourceCommit,
   sourceRoot = root
 } = {}) {
+  if (!/^[1-9][0-9]*$/.test(qualityRunId || '')) {
+    throw new Error('Documentation assets require a positive Quality run ID.');
+  }
   const verifiedSourceCommit = resolveSourceCommit(sourceRoot, sourceCommit);
   const verifiedOutputRoot = await prepareDocumentationOutputDirectory({ outputRoot, sourceRoot });
   await mkdir(path.join(verifiedOutputRoot, 'docs/screenshots'), { recursive: true });
@@ -363,18 +419,22 @@ export async function generateDocumentationAssets({
       outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot: verifiedOutputRoot }));
     }
     const manifest = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       generator: {
-        command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA>',
+        command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>',
+        inputHash: await computeGeneratorInputHash(sourceRoot),
+        inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
+        inputs: generatorInputPaths,
         path: 'scripts/generate-doc-assets.mjs',
         version: generatorVersion
       },
       source: {
         appVersion: await appVersion(sourceRoot),
-        commit: verifiedSourceCommit,
+        checkoutCommit: verifiedSourceCommit,
         fixedDate,
         markerHashLength: 12,
         markerPrefix: 'RESUME-STUDIO-SAMPLE',
+        qualityRunId,
         siteHash,
         siteHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)'
       },
@@ -407,10 +467,15 @@ export function parseArguments(args) {
       index += 1;
       continue;
     }
+    if (argument === '--quality-run-id' && !values.qualityRunId && args[index + 1] && !args[index + 1].startsWith('--')) {
+      values.qualityRunId = args[index + 1];
+      index += 1;
+      continue;
+    }
     throw new Error('Invalid documentation asset arguments.');
   }
-  if (!values.outputRoot || !values.sourceCommit) {
-    throw new Error('Provide --output-dir and --source-sha for temporary documentation assets.');
+  if (!values.outputRoot || !values.sourceCommit || !values.qualityRunId) {
+    throw new Error('Provide --output-dir, --source-sha, and --quality-run-id for temporary documentation assets.');
   }
   return values;
 }

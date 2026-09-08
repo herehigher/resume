@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      release_assets_changed: ${{ steps.release_assets.outputs.changed }}
+      release_assets_required: ${{ steps.release_assets.outputs.required }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -78,10 +81,12 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
+          QUALITY_RUN_ID: ${{ github.run_id }}
           SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
         run: >-
           npm run generate:doc-assets --
           --output-dir "${DOCUMENTATION_ASSET_DIRECTORY}"
+          --quality-run-id "${QUALITY_RUN_ID}"
           --source-sha "${SOURCE_SHA}"
 
       - name: Verify temporary documentation assets
@@ -104,17 +109,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Verify release documentation assets are committed
-        if: ${{ github.event_name == 'pull_request' && steps.release_assets.outputs.required == 'true' }}
-        env:
-          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
-          SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
-        run: >-
-          node scripts/release-doc-assets.mjs compare
-          --committed-root "${GITHUB_WORKSPACE}"
-          --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
-          --source-sha "${SOURCE_SHA}"
-
       - name: Upload Playwright failure evidence
         if: failure()
         uses: actions/upload-artifact@v7
@@ -133,3 +127,75 @@ jobs:
       - name: Reject pull request scope classification failure
         if: ${{ always() && github.event_name == 'pull_request' && steps.scope.outcome == 'failure' }}
         run: exit 1
+
+  release-assets-current:
+    name: Release assets current
+    needs: quality
+    if: ${{ github.event_name == 'pull_request' && needs.quality.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Report release assets are not required
+        if: ${{ needs.quality.outputs.release_assets_required != 'true' && needs.quality.outputs.release_assets_changed != 'true' }}
+        run: echo "This pull request does not change the package version."
+
+      - name: Reject release asset changes outside a version pull request
+        if: ${{ needs.quality.outputs.release_assets_required != 'true' && needs.quality.outputs.release_assets_changed == 'true' }}
+        run: |
+          echo "Release documentation assets may only change together with the package version." >&2
+          exit 1
+
+      - name: Checkout
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+
+      - name: Setup Node.js
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install documentation asset verification dependencies
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        run: npm ci
+
+      - name: Resolve promoted Quality artifact provenance
+        id: provenance
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        run: node scripts/release-doc-assets.mjs provenance --committed-root "${GITHUB_WORKSPACE}"
+
+      - name: Download documentation asset evidence
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: documentation-assets-${{ github.sha }}
+          path: ${{ runner.temp }}/resume-documentation-assets
+
+      - name: Download the originally promoted Quality artifact
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          name: ${{ steps.provenance.outputs.artifact_name }}
+          path: ${{ runner.temp }}/promoted-documentation-assets
+          run-id: ${{ steps.provenance.outputs.quality_run_id }}
+
+      - name: Verify release documentation assets are current
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        env:
+          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
+          PROMOTED_ASSET_DIRECTORY: ${{ runner.temp }}/promoted-documentation-assets
+          SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          node scripts/release-doc-assets.mjs compare
+          --committed-root "${GITHUB_WORKSPACE}"
+          --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
+          --promoted-root "${PROMOTED_ASSET_DIRECTORY}"
+          --source-sha "${SOURCE_SHA}"

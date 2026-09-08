@@ -11,29 +11,39 @@ test('quality cancels superseded pull request runs without grouping main runs', 
   assert.match(qualityWorkflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
 });
 
-test('quality classifies scope after its single checkout', () => {
-  assert.equal(qualityWorkflow.match(/uses: actions\/checkout@/g)?.length, 1);
+test('quality classifies scope after its primary checkout', () => {
+  assert.equal(qualityWorkflow.match(/uses: actions\/checkout@/g)?.length, 2);
   assert.doesNotMatch(qualityWorkflow, /^ {2}scope:\s*$/m);
-  assert.match(qualityWorkflow, /- name: Checkout[\s\S]+- name: Classify pull request scope[\s\S]+- name: Setup Node\.js/);
+  assert.match(qualityWorkflow, /quality:[\s\S]+- name: Checkout[\s\S]+- name: Classify pull request scope[\s\S]+- name: Setup Node\.js/);
   assert.doesNotMatch(qualityWorkflow, /needs\.scope/);
   assert.match(qualityWorkflow, /steps\.scope\.outputs\.docs_only/);
   assert.match(qualityWorkflow, /id: scope\s+if: [^\n]+\s+continue-on-error: true/);
   assert.match(qualityWorkflow, /always\(\) && github\.event_name == 'pull_request' && steps\.scope\.outcome == 'failure'/);
 });
 
-test('release documentation assets are uploaded before the pull request freshness gate', () => {
+test('release asset currentness is a separate check after Quality uploads evidence', () => {
   assert.match(qualityWorkflow, /Classify release documentation asset requirement/);
   assert.match(qualityWorkflow, /release-doc-assets\.mjs required/);
-  assert.match(qualityWorkflow, /Upload documentation asset evidence[\s\S]+Verify release documentation assets are committed/);
-  assert.match(qualityWorkflow, /steps\.release_assets\.outputs\.required == 'true'/);
-  assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+  assert.match(qualityWorkflow, /quality:[\s\S]+outputs:[\s\S]+release_assets_required:[\s\S]+Upload documentation asset evidence/);
+  assert.match(qualityWorkflow, /release_assets_changed: \$\{\{ steps\.release_assets\.outputs\.changed \}\}/);
+  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+name: Release assets current[\s\S]+needs: quality/);
+  assert.match(qualityWorkflow, /github\.event_name == 'pull_request' && needs\.quality\.result == 'success'/);
+  assert.match(qualityWorkflow, /Download documentation asset evidence[\s\S]+Verify release documentation assets are current/);
+  assert.match(qualityWorkflow, /needs\.quality\.outputs\.release_assets_required == 'true'/);
+  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+lfs: true/);
+  assert.match(qualityWorkflow, /--quality-run-id "\$\{QUALITY_RUN_ID\}"/);
+  assert.match(qualityWorkflow, /Resolve promoted Quality artifact provenance[\s\S]+Download the originally promoted Quality artifact/);
+  assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--promoted-root "\$\{PROMOTED_ASSET_DIRECTORY\}"[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+  assert.match(qualityWorkflow, /Reject release asset changes outside a version pull request[\s\S]+release_assets_changed == 'true'[\s\S]+exit 1/);
 });
 
-test('release preparation compares committed assets with the exact main Quality output', () => {
-  assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets match final Quality output[\s\S]+Prepare the single Pages artifact/);
+test('release preparation checks committed assets against the final Quality evidence', () => {
+  assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets are current for final Quality source[\s\S]+Prepare the single Pages artifact/);
   assert.match(releaseWorkflow, /documentation-assets-\$\{\{ needs\.authorize\.outputs\.release_sha \}\}/);
   assert.match(releaseWorkflow, /run-id: \$\{\{ steps\.quality\.outputs\.run_id \}\}/);
-  assert.match(releaseWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+  assert.match(releaseWorkflow, /git -C "\$RUNNER_TEMP\/release-source" lfs pull/);
+  assert.match(releaseWorkflow, /release-doc-assets\.mjs compare-current[\s\S]+--generated-root "\$\{\{ runner\.temp \}\}\/quality-documentation-assets"[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+  assert.doesNotMatch(releaseWorkflow, /Download the originally promoted Quality artifact|promoted-documentation-assets/);
 });
 
 test('a merged version pull request is the standard publication authorization', () => {

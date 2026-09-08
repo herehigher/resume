@@ -67,10 +67,25 @@ export function releaseAssetsRequiredBetween(base, head, cwd = process.cwd()) {
   return versionAt(cwd, base) !== versionAt(cwd, head);
 }
 
+export function releaseAssetPathsChangedBetween(base, head, cwd = process.cwd()) {
+  if (!fullCommitPattern.test(base || '') || !fullCommitPattern.test(head || '')) {
+    fail('release asset classification requires full commit SHAs');
+  }
+  try {
+    const changedPaths = execFileSync('git', ['diff', '--name-only', '--no-renames', `${base}...${head}`], {
+      cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
+    }).split('\n').filter(Boolean);
+    return changedPaths.some((relativePath) => assetPaths.includes(relativePath));
+  } catch {
+    fail(`release asset paths are unavailable between ${base} and ${head}`);
+  }
+}
+
 function outputRecords(manifest, label) {
-  if (manifest.schemaVersion !== 2) fail(`${label} manifest schema is not current`);
+  if (manifest.schemaVersion !== 3) fail(`${label} manifest schema is not current`);
   if (!versionPattern.test(manifest.source?.appVersion || '')) fail(`${label} app version is invalid`);
-  if (!fullCommitPattern.test(manifest.source?.commit || '')) fail(`${label} source commit is invalid`);
+  if (!fullCommitPattern.test(manifest.source?.checkoutCommit || '')) fail(`${label} source commit is invalid`);
+  if (!/^[1-9][0-9]*$/.test(manifest.source?.qualityRunId || '')) fail(`${label} Quality run ID is invalid`);
   if (!/^[0-9a-f]{64}$/.test(manifest.source?.siteHash || '')) fail(`${label} site hash is invalid`);
   if (!Array.isArray(manifest.outputs) || manifest.outputs.length !== 3) fail(`${label} must describe three locales`);
   const records = new Map();
@@ -101,49 +116,134 @@ async function recordedFileDigest(rootDirectory, relativePath) {
   return createHash('sha256').update(contents).digest('hex');
 }
 
-export async function compareReleaseAssets({ committedRoot = root, generatedRoot, sourceSha }) {
+function withoutKeys(value, omittedKeys) {
+  return Object.fromEntries(Object.entries(value || {}).filter(([key]) => !omittedKeys.includes(key)));
+}
+
+function recordMismatch(mismatches, label, generatedValue, committedValue) {
+  if (JSON.stringify(generatedValue) === JSON.stringify(committedValue)) return;
+  mismatches.push(`${label}: generated=${JSON.stringify(generatedValue)}, committed=${JSON.stringify(committedValue)}`);
+}
+
+export async function readReleaseAssetProvenance(committedRoot = root) {
+  const manifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
+  outputRecords(manifest, 'committed');
+  return {
+    artifactName: `documentation-assets-${manifest.source.checkoutCommit}`,
+    checkoutCommit: manifest.source.checkoutCommit,
+    qualityRunId: manifest.source.qualityRunId
+  };
+}
+
+async function compareReleaseAssetEvidence({ committedRoot = root, generatedRoot, promotedRoot, sourceSha }) {
   if (!generatedRoot || !fullCommitPattern.test(sourceSha || '')) {
-    fail('generated asset root and full source SHA are required');
+    fail('a generated asset root and full source SHA are required');
   }
   const generatedManifest = await readJson(path.join(generatedRoot, 'docs/assets-manifest.json'), 'generated manifest');
   const committedManifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
+  const promotedManifest = promotedRoot
+    ? await readJson(path.join(promotedRoot, 'docs/assets-manifest.json'), 'promoted manifest')
+    : null;
   const version = packageVersion(await readFile(path.join(committedRoot, 'package.json'), 'utf8'), 'committed');
+  const { compareDocumentationAssetContent, verifyDocumentationAssets } = await import('./verify-doc-assets.mjs');
+  const validationTargets = [
+    ['generated', generatedRoot, true],
+    ['committed', committedRoot, false]
+  ];
+  if (promotedRoot) validationTargets.push(['promoted', promotedRoot, false]);
+  for (const [label, assetRoot, requireExactSource] of validationTargets) {
+    try {
+      await verifyDocumentationAssets({ assetRoot, requireExactSource, sourceRoot: committedRoot, sourceSha });
+    } catch (error) {
+      fail(`${label} asset validation failed: ${error.message}`);
+    }
+  }
   const generated = outputRecords(generatedManifest, 'generated');
   const committed = outputRecords(committedManifest, 'committed');
+  if (promotedManifest) outputRecords(promotedManifest, 'promoted');
+  const mismatches = [];
 
-  if (generatedManifest.source.appVersion !== version || committedManifest.source.appVersion !== version) {
-    fail(`asset version does not match package version ${version}`);
+  if (promotedRoot) {
+    for (const relativePath of assetPaths) {
+      const committedDigest = await recordedFileDigest(committedRoot, relativePath);
+      const promotedDigest = await recordedFileDigest(promotedRoot, relativePath);
+      if (committedDigest !== promotedDigest) {
+        mismatches.push(`${relativePath} does not match the Quality artifact selected by committed provenance`);
+      }
+    }
   }
-  if (generatedManifest.source.commit !== sourceSha) {
-    fail('generated asset source commit does not match the expected Quality source');
+
+  if (generatedManifest.source.appVersion !== version) {
+    mismatches.push(`generated asset version ${generatedManifest.source.appVersion} does not match package version ${version}`);
+  }
+  if (committedManifest.source.appVersion !== version) {
+    mismatches.push(`committed asset version ${committedManifest.source.appVersion} does not match package version ${version}`);
+  }
+  if (generatedManifest.source.checkoutCommit !== sourceSha) {
+    mismatches.push(`generated source commit ${generatedManifest.source.checkoutCommit} does not match Quality source ${sourceSha}`);
   }
   if (generatedManifest.source.siteHash !== committedManifest.source.siteHash) {
-    fail('committed assets were generated from different site bytes');
+    mismatches.push(`site bytes differ: generated=${generatedManifest.source.siteHash}, committed=${committedManifest.source.siteHash}`);
   }
+  recordMismatch(mismatches, 'generator contract', generatedManifest.generator, committedManifest.generator);
+  recordMismatch(mismatches, 'browser contract', generatedManifest.browser, committedManifest.browser);
+  recordMismatch(
+    mismatches,
+    'source generation contract',
+    withoutKeys(generatedManifest.source, ['appVersion', 'checkoutCommit', 'qualityRunId', 'siteHash']),
+    withoutKeys(committedManifest.source, ['appVersion', 'checkoutCommit', 'qualityRunId', 'siteHash'])
+  );
 
   for (const locale of Object.keys(expectedOutputs)) {
     const generatedOutput = generated.get(locale);
     const committedOutput = committed.get(locale);
     for (const field of ['browserLocale', 'paper', 'firstText', 'lastText', 'marker']) {
-      if (generatedOutput[field] !== committedOutput[field]) fail(`${locale} ${field} does not match`);
+      recordMismatch(mismatches, `${locale} ${field}`, generatedOutput[field], committedOutput[field]);
     }
     for (const kind of ['screenshot', 'pdf']) {
       const generatedRecord = generatedOutput[kind];
       const committedRecord = committedOutput[kind];
-      if (JSON.stringify(generatedRecord) !== JSON.stringify(committedRecord)) {
-        fail(`${locale} ${kind} metadata does not match`);
+      recordMismatch(
+        mismatches,
+        `${locale} ${kind} semantic metadata`,
+        withoutKeys(generatedRecord, ['sha256']),
+        withoutKeys(committedRecord, ['sha256'])
+      );
+      for (const [label, rootDirectory, record] of [
+        ['generated', generatedRoot, generatedRecord],
+        ['committed', committedRoot, committedRecord]
+      ]) {
+        if (!/^[0-9a-f]{64}$/.test(record.sha256 || '')) {
+          mismatches.push(`${label} ${locale} ${kind} manifest digest is invalid: ${JSON.stringify(record.sha256)}`);
+          continue;
+        }
+        const actualDigest = await recordedFileDigest(rootDirectory, record.path);
+        if (actualDigest !== record.sha256) {
+          mismatches.push(`${label} ${locale} ${kind} bytes do not match its manifest: expected=${record.sha256}, actual=${actualDigest}`);
+        }
       }
-      const expectedDigest = generatedRecord.sha256;
-      if (!/^[0-9a-f]{64}$/.test(expectedDigest || '')) fail(`${locale} ${kind} digest is invalid`);
-      if (await recordedFileDigest(generatedRoot, generatedRecord.path) !== expectedDigest) {
-        fail(`generated ${locale} ${kind} bytes do not match the manifest`);
-      }
-      if (await recordedFileDigest(committedRoot, committedRecord.path) !== expectedDigest) {
-        fail(`committed ${locale} ${kind} bytes do not match current Quality output`);
+      try {
+        await compareDocumentationAssetContent({
+          committedFile: safePath(committedRoot, committedRecord.path),
+          generatedFile: safePath(generatedRoot, generatedRecord.path),
+          kind
+        });
+      } catch (error) {
+        mismatches.push(`${locale} ${kind} content differs from Quality evidence: ${error.message}`);
       }
     }
   }
+  if (mismatches.length) fail(`currentness check found ${mismatches.length} mismatch(es):\n- ${mismatches.join('\n- ')}`);
   return { siteHash: generatedManifest.source.siteHash, version };
+}
+
+export async function compareReleaseAssets(options) {
+  if (!options?.promotedRoot) fail('a promoted asset root is required for pull request verification');
+  return compareReleaseAssetEvidence(options);
+}
+
+export async function compareCurrentReleaseAssets(options) {
+  return compareReleaseAssetEvidence(options);
 }
 
 export async function promoteReleaseAssets({ assetRoot, sourceRoot = root, sourceSha }) {
@@ -196,21 +296,48 @@ async function main() {
     const values = parseOptions(args, ['base', 'head']);
     if (Object.keys(values).length !== 2) fail('required expects base and head');
     const required = releaseAssetsRequiredBetween(values.base, values.head);
-    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
+    const changed = releaseAssetPathsChangedBetween(values.base, values.head);
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\nchanged=${changed}\n`);
     console.log(required ? 'Release documentation assets must be refreshed.' : 'Release documentation assets are unchanged.');
     return;
   }
   if (command === 'compare') {
-    const values = parseOptions(args, ['committed-root', 'generated-root', 'source-sha']);
-    if (!values['committed-root'] || !values['generated-root'] || !values['source-sha']) {
-      fail('compare expects committed and generated roots and a source SHA');
+    const values = parseOptions(args, ['committed-root', 'generated-root', 'promoted-root', 'source-sha']);
+    if (!values['committed-root'] || !values['generated-root'] || !values['promoted-root'] || !values['source-sha']) {
+      fail('compare expects committed, generated, and promoted roots and a source SHA');
     }
     const result = await compareReleaseAssets({
       committedRoot: path.resolve(values['committed-root']),
       generatedRoot: path.resolve(values['generated-root']),
+      promotedRoot: path.resolve(values['promoted-root']),
       sourceSha: values['source-sha']
     });
     console.log(`Verified committed documentation assets for v${result.version} and site ${result.siteHash}.`);
+    return;
+  }
+  if (command === 'compare-current') {
+    const values = parseOptions(args, ['committed-root', 'generated-root', 'source-sha']);
+    if (!values['committed-root'] || !values['generated-root'] || !values['source-sha']) {
+      fail('compare-current expects committed and generated roots and a source SHA');
+    }
+    const result = await compareCurrentReleaseAssets({
+      committedRoot: path.resolve(values['committed-root']),
+      generatedRoot: path.resolve(values['generated-root']),
+      sourceSha: values['source-sha']
+    });
+    console.log(`Verified current documentation assets for v${result.version} and site ${result.siteHash}.`);
+    return;
+  }
+  if (command === 'provenance') {
+    const values = parseOptions(args, ['committed-root']);
+    if (!values['committed-root']) fail('provenance expects a committed root');
+    const provenance = await readReleaseAssetProvenance(path.resolve(values['committed-root']));
+    if (process.env.GITHUB_OUTPUT) {
+      appendFileSync(process.env.GITHUB_OUTPUT, `artifact_name=${provenance.artifactName}\n`);
+      appendFileSync(process.env.GITHUB_OUTPUT, `checkout_commit=${provenance.checkoutCommit}\n`);
+      appendFileSync(process.env.GITHUB_OUTPUT, `quality_run_id=${provenance.qualityRunId}\n`);
+    }
+    console.log(`Resolved documentation asset provenance for ${provenance.checkoutCommit}.`);
     return;
   }
   if (command === 'promote') {
@@ -224,7 +351,7 @@ async function main() {
     console.log(`Promoted ${result.files.length} verified documentation asset files.`);
     return;
   }
-  fail('expected required, compare, or promote command');
+  fail('expected required, compare, compare-current, provenance, or promote command');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

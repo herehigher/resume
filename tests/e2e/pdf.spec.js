@@ -196,6 +196,8 @@ test('manual page-break target may span multiple PDF pages without losing its en
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-long-target.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('[data-en-preview]')).toContainText(endMarker);
   const pages = await inspectPdf(await printPdf(page));
   expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
   const targetPages = pages.filter((pdfPage) => pdfPage.text.includes('Experience test line'));
