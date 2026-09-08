@@ -8,6 +8,7 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "generate:doc-assets": "node scripts/generate-doc-assets.mjs",
+    "promote:doc-assets": "node scripts/release-doc-assets.mjs promote",
     "test": "node --test tests/*.test.js && npm run check",
     "verify:doc-assets": "node scripts/verify-doc-assets.mjs",
     "test:e2e": "playwright test",

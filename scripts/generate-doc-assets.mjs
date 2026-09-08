@@ -11,7 +11,7 @@ const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const siteRoot = path.join(root, 'site');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
-const generatorVersion = '1.2.0';
+const generatorVersion = '1.3.0';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -83,6 +83,12 @@ async function fileHash(file) {
   return createHash('sha256').update(await readFile(file)).digest('hex');
 }
 
+async function appVersion(sourceRoot) {
+  const value = JSON.parse(await readFile(path.join(sourceRoot, 'package.json'), 'utf8')).version;
+  if (!/^\d+\.\d+\.\d+$/.test(value || '')) throw new Error('Documentation asset source version is invalid.');
+  return value;
+}
+
 function isWithin(directory, candidate) {
   return candidate === directory || candidate.startsWith(`${directory}${path.sep}`);
 }
@@ -104,14 +110,14 @@ export function resolveSourceCommit(sourceRoot, sourceCommit) {
   try {
     siteStatus = execFileSync(
       'git',
-      ['-C', sourceRoot, 'status', '--porcelain=v1', '--untracked-files=all', '--', 'site'],
+      ['-C', sourceRoot, 'status', '--porcelain=v1', '--untracked-files=all', '--', 'site', 'package.json'],
       { encoding: 'utf8' }
     ).trim();
   } catch {
     throw new Error('Documentation asset source checkout could not be checked for site changes.');
   }
   if (siteStatus) {
-    throw new Error('Documentation asset source checkout has uncommitted site changes.');
+    throw new Error('Documentation asset source checkout has uncommitted site or package changes.');
   }
   return currentCommit;
 }
@@ -278,6 +284,17 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
         element.scrollLeft = 0;
       }
     });
+    const visiblePageBreaks = await page.locator(`${variant.previewSelector} .page-break-boundary`).evaluateAll((controls) => (
+      controls.filter((control) => {
+        const bounds = control.getBoundingClientRect();
+        const style = getComputedStyle(control);
+        return style.display !== 'none' && style.visibility !== 'hidden'
+          && bounds.width > 0 && bounds.height > 0
+          && bounds.bottom > 0 && bounds.right > 0
+          && bounds.top < innerHeight && bounds.left < innerWidth;
+      }).length
+    ));
+    if (!visiblePageBreaks) throw new Error(`Documentation screenshot must show a page-break control: ${variant.locale}`);
 
     const screenshotAbsolute = path.join(outputRoot, variant.screenshotPath);
     await page.screenshot({ animations: 'disabled', fullPage: false, path: screenshotAbsolute });
@@ -346,13 +363,14 @@ export async function generateDocumentationAssets({
       outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot: verifiedOutputRoot }));
     }
     const manifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       generator: {
         command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA>',
         path: 'scripts/generate-doc-assets.mjs',
         version: generatorVersion
       },
       source: {
+        appVersion: await appVersion(sourceRoot),
         commit: verifiedSourceCommit,
         fixedDate,
         markerHashLength: 12,

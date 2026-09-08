@@ -28,16 +28,6 @@ export function validateRunIdentity(run, workflow, { event, sha, runId }) {
   if (sha) requireValue(run.head_sha === sha, 'source SHA mismatch');
 }
 
-export function validateSelectedArtifact(artifact, runId, artifactId) {
-  requireValue(String(artifact.id) === String(artifactId), 'artifact ID mismatch');
-  requireValue(artifact.name === 'pages-release-artifact', 'artifact name mismatch');
-  requireValue(artifact.expired === false, 'artifact expired');
-  requireValue(String(artifact.workflow_run?.id) === String(runId), 'artifact run mismatch');
-  requireValue(artifact.workflow_run?.repository_id === artifact.workflow_run?.head_repository_id,
-    'artifact repository mismatch');
-  requireValue(/^sha256:[0-9a-f]{64}$/.test(artifact.digest || ''), 'artifact digest is unavailable');
-}
-
 function successfulJob(runId, name, requiredStep) {
   const pages = JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp',
     `repos/${repository}/actions/runs/${runId}/jobs?filter=latest&per_page=100`
@@ -51,36 +41,27 @@ function successfulJob(runId, name, requiredStep) {
 
 export function validateReleaseRun(mode, values, environment = process.env) {
   requireValue(environment.GITHUB_REPOSITORY === repository, 'only the official repository may publish');
-  const workflowFile = mode === 'quality' ? 'ci.yml' : 'release.yml';
-  requireValue(['quality', 'prepared'].includes(mode), 'unknown mode');
+  requireValue(mode === 'quality', 'unknown mode');
+  const workflowFile = 'ci.yml';
   const workflow = api(`actions/workflows/${workflowFile}`);
   requireValue(workflow.path === `.github/workflows/${workflowFile}` && Number.isInteger(workflow.id),
     'workflow path mismatch');
-  let runId;
-  if (mode === 'quality') {
-    requireValue(Object.keys(values).length === 1 && /^[0-9a-f]{40}$/.test(values.sha || ''), 'full source SHA required');
+  requireValue(Object.keys(values).every((key) => ['sha', 'run-id'].includes(key))
+    && Object.keys(values).length >= 1 && Object.keys(values).length <= 2
+    && /^[0-9a-f]{40}$/.test(values.sha || '')
+    && (!values['run-id'] || positiveId.test(values['run-id'])), 'full source SHA and optional run ID required');
+  let runId = values['run-id'];
+  if (!runId) {
     const runs = api(`actions/workflows/${workflow.id}/runs?branch=main&event=push&status=success&head_sha=${values.sha}&per_page=100`);
     const run = runs.workflow_runs?.find((item) => item.head_sha === values.sha && item.head_branch === 'main'
       && item.event === 'push' && item.conclusion === 'success');
     requireValue(run, 'no successful main Quality exists for this SHA; wait for or rerun that Quality run');
     runId = String(run.id);
-  } else {
-    requireValue(Object.keys(values).length === 2 && positiveId.test(values['run-id'] || '')
-      && positiveId.test(values['artifact-id'] || ''), 'prepared run and artifact IDs required');
-    runId = values['run-id'];
   }
   const run = api(`actions/runs/${runId}`);
-  validateRunIdentity(run, workflow, { event: mode === 'quality' ? 'push' : 'workflow_dispatch', sha: values.sha, runId });
-  successfulJob(runId, mode === 'quality' ? 'quality' : 'prepare',
-    mode === 'quality' ? 'Browser and PDF acceptance tests' : undefined);
+  validateRunIdentity(run, workflow, { event: 'push', sha: values.sha, runId });
+  successfulJob(runId, 'quality', 'Browser and PDF acceptance tests');
   const result = { run_id: runId, run_url: `https://github.com/${repository}/actions/runs/${runId}` };
-  if (mode === 'prepared') {
-    const artifact = api(`actions/artifacts/${values['artifact-id']}`);
-    validateSelectedArtifact(artifact, runId, values['artifact-id']);
-    requireValue(artifact.workflow_run.repository_id === run.repository.id, 'artifact belongs to another repository');
-    result.artifact_id = String(artifact.id);
-    result.archive_digest = artifact.digest;
-  }
   return result;
 }
 
