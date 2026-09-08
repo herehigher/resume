@@ -11,8 +11,9 @@ const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const siteRoot = path.join(root, 'site');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
-const generatorVersion = '1.3.0';
+const generatorVersion = '1.3.2';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
+const fixedPdfDate = `D:${fixedDate.replaceAll('-', '')}000000+00'00'`;
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -81,6 +82,24 @@ export async function computeSiteHash(rootDirectory = siteRoot) {
 
 async function fileHash(file) {
   return createHash('sha256').update(await readFile(file)).digest('hex');
+}
+
+export function normalizePdfMetadata(contents) {
+  const source = Buffer.from(contents);
+  let normalized = source.toString('latin1');
+  for (const field of ['CreationDate', 'ModDate']) {
+    const pattern = new RegExp(`/${field} \\(D:\\d{14}[+-]\\d{2}'\\d{2}'\\)`, 'g');
+    const matches = normalized.match(pattern) || [];
+    if (matches.length !== 1) {
+      throw new Error(`Documentation PDF must contain one ${field}.`);
+    }
+    normalized = normalized.replace(pattern, `/${field} (${fixedPdfDate})`);
+  }
+  const output = Buffer.from(normalized, 'latin1');
+  if (output.length !== source.length) {
+    throw new Error('Documentation PDF metadata normalization must preserve byte offsets.');
+  }
+  return output;
 }
 
 async function appVersion(sourceRoot) {
@@ -213,6 +232,13 @@ function createPdfState(locale, marker, firstText, factories) {
   return state;
 }
 
+async function waitForStableRendering(page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+}
+
 function documentationState(locale, marker, firstText, factories) {
   const state = createPdfState(locale, marker, firstText, factories);
   const labels = {
@@ -276,7 +302,6 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
       ({ previewSelector, markerText }) => document.querySelector(previewSelector)?.textContent.includes(markerText),
       { markerText: marker, previewSelector: variant.previewSelector }
     );
-    await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => {
       document.documentElement.scrollLeft = 0;
       document.body.scrollLeft = 0;
@@ -297,16 +322,24 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
     if (!visiblePageBreaks) throw new Error(`Documentation screenshot must show a page-break control: ${variant.locale}`);
 
     const screenshotAbsolute = path.join(outputRoot, variant.screenshotPath);
+    // Linux shadow rasterization can vary by a few antialiasing pixels across identical runners.
+    const captureStyle = await page.addStyleTag({
+      content: '.document-tab.is-active { box-shadow: none !important; }'
+    });
+    await waitForStableRendering(page);
     await page.screenshot({ animations: 'disabled', fullPage: false, path: screenshotAbsolute });
+    await captureStyle.evaluate((element) => element.remove());
 
     await page.emulateMedia({ media: 'print' });
+    await page.waitForFunction(() => matchMedia('print').matches);
+    await waitForStableRendering(page);
     const pdfAbsolute = path.join(outputRoot, variant.pdfPath);
-    await page.pdf({
+    const pdf = normalizePdfMetadata(await page.pdf({
       displayHeaderFooter: false,
-      path: pdfAbsolute,
       preferCSSPageSize: true,
       printBackground: true
-    });
+    }));
+    await writeFile(pdfAbsolute, pdf);
 
     return {
       browserLocale: variant.browserLocale,

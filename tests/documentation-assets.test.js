@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  normalizePdfMetadata,
   parseArguments as parseGenerationArguments,
   prepareDocumentationOutputDirectory,
   resolveSourceCommit
@@ -27,6 +28,17 @@ test('documentation asset commands require explicit temporary output and source 
     sourceSha
   });
   assert.throws(() => parseVerificationArguments(['--asset-root', '/private/tmp/doc-assets']), /Provide/);
+});
+
+test('documentation PDF metadata uses fixed-length deterministic dates', () => {
+  const first = Buffer.from("%PDF-1.4\n/CreationDate (D:20260908080051+00'00')\n/ModDate (D:20260908080051+00'00')\n%%EOF", 'latin1');
+  const second = Buffer.from("%PDF-1.4\n/CreationDate (D:20260908080859+00'00')\n/ModDate (D:20260908080859+00'00')\n%%EOF", 'latin1');
+  const normalized = normalizePdfMetadata(first);
+
+  assert.equal(normalized.length, first.length);
+  assert.deepEqual(normalized, normalizePdfMetadata(second));
+  assert.match(normalized.toString('latin1'), /CreationDate \(D:20260901000000\+00'00'\)/);
+  assert.throws(() => normalizePdfMetadata(Buffer.from('/CreationDate (invalid)')), /one CreationDate/);
 });
 
 test('documentation assets require a new empty directory independent from source', async (t) => {
