@@ -118,6 +118,13 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await expect(experience).toBeFocused();
   await expect(experience).toHaveCount(1);
   await expect(workspace.locator('.page-break-live')).toHaveText('工作经历之前的分页已添加');
+  const lastRow = workspace.locator('.page-break-row').last();
+  await lastRow.focus();
+  await page.keyboard.press('Tab');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.focus();
+  await trigger.press('Enter');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();
