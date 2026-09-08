@@ -24,6 +24,24 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 
 表示 locale の決定順は URL query、`resume-studio-locale-v1` の保存 preference、`navigator.languages`、`ja`。Import 内の locale は文書 data で、表示 preference を変更しません。`zh-TW` / `zh-Hant` を简体中文へ自動変換しません。
 
+## Open Graph 共有画像
+
+日本語・简体中文・English の公開入口で使う 1200 × 630 の共有画像は、repository root から次の command で3言語分をまとめて再生成します。
+
+```bash
+node scripts/render-open-graph-cards.mjs --locale all
+```
+
+正式な画像は `site/assets/social/` に出力され、同じ directory の `resume-studio-og.manifest.json` に生成 script、元の brand 画像、各生成画像の SHA-256 が記録されます。正式 asset と manifest の不整合を避けるため、同 directory へは必ず全 locale を一度に生成します。
+
+1言語だけ確認する場合は、正式 asset を変更しない一時 directory を明示します。`--locale` は `ja`、`zh-CN`、`en` を受け付けます。
+
+```bash
+node scripts/render-open-graph-cards.mjs --locale zh-CN --output-dir /tmp/resume-studio-og-preview
+```
+
+生成 script は `site/assets/brand/resume-studio-marmot-logo.png` を直接埋め込みます。土拨鼠を描き直した画像へ置き換えず、生成後は対象言語の文言と contrast に加え、logo の歯・輪郭・三本線が変形、欠落、切断していないことを 1200 × 630 の実寸で確認します。
+
 ## 変更に応じた検証
 
 変更に近い focused test から始め、PR の必要な CI が成功してから merge します。成功済みの同じ内容に local / CI の full gate を反復要求せず、変更・失敗・証拠不足がある場合に追加確認します。
