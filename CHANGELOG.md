@@ -6,6 +6,16 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-09-08
+
+### Changed / 変更
+
+- Quality と公開 workflow の Playwright 準備を、必要な Chromium Headless Shell と WebKit の取得に限定し、pull request の scope 判定を同じ job に統合。更新された pull request の古い Quality run は自動で終了するよう整理。
+
+### Fixed / 修正
+
+- Smartphone の改ページ menu で2件目以降を touch した際、click より先に menu が閉じて操作できない問題を修正。Keyboard focus、外部操作、Escape による既存の閉じ方は維持。
+
 ## [0.2.4] - 2026-09-07
 
 ### Added / 追加
