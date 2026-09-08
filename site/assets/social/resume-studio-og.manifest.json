@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "generator": {
+    "path": "scripts/render-open-graph-cards.mjs",
+    "sha256": "5e32f0e1b66162180c3a3951738bcadec9427ed4a61227d8099ff90571be4e63"
+  },
+  "mascot": {
+    "path": "site/assets/brand/resume-studio-marmot-logo.png",
+    "sha256": "d325bcf403f765be3bb376046acc314184aeb703ada9ae3920e7b045464a0ef9"
+  },
+  "cards": {
+    "en": {
+      "output": "resume-studio-og-en.png",
+      "sha256": "1e4c04121cbbc75bc0e67821939ea66da98f83d16d4462ae146381dc306d3a76"
+    },
+    "ja": {
+      "output": "resume-studio-og-ja.png",
+      "sha256": "0f4a6c8a6bbe8514a9b5c0a0f4010b95f2ab32e618fc8813b33cbc92d8f1ee94"
+    },
+    "zh-CN": {
+      "output": "resume-studio-og-zh-cn.png",
+      "sha256": "c3296a8a855435a01c4c816b7074525452dbe81e3995adfc639a95c892bb1c81"
+    }
+  }
+}
