@@ -137,7 +137,7 @@ jobs:
         if: ${{ steps.release.outputs.analytics_mode == 'enabled' }}
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps --only-shell chromium
 
       - name: Check actual provider compatibility before publication approval
         if: ${{ steps.release.outputs.analytics_mode == 'enabled' }}
@@ -390,7 +390,7 @@ jobs:
       - name: Install online smoke dependencies
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps --only-shell chromium
 
       - name: Smoke test deployed public paths and editor
         id: smoke
