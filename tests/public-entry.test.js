@@ -5,7 +5,11 @@ import test from 'node:test';
 
 import { findExternalRuntimeAssets } from '../scripts/check-site.mjs';
 import { publicDocumentContracts } from '../scripts/deployment-path-contract.mjs';
-import { CARD_PRESENTATIONS, MASCOT_RELATIVE_PATH } from '../scripts/render-open-graph-cards.mjs';
+import {
+  CARD_PRESENTATIONS,
+  MASCOT_RELATIVE_PATH,
+  renderOpenGraphCards
+} from '../scripts/render-open-graph-cards.mjs';
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
@@ -218,6 +222,13 @@ test('Open Graph card manifest binds every committed image to its generator and 
       sha256: fileSha256(`site/assets/social/${presentation.output}`)
     });
   }
+});
+
+test('committed Open Graph cards must be regenerated as a complete locale set', async () => {
+  await assert.rejects(
+    renderOpenGraphCards({ locales: ['ja'] }),
+    /must be rendered together with --locale all/
+  );
 });
 
 test('entry and editor metadata describes the free, local, private PDF resume experience in every locale', () => {

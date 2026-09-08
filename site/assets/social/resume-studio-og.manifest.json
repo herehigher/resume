@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generator": {
     "path": "scripts/render-open-graph-cards.mjs",
-    "sha256": "2708b107a3b0d6c564f53ac5c8d992ffee08ace94cebee77bfda92308733c9ac"
+    "sha256": "5e32f0e1b66162180c3a3951738bcadec9427ed4a61227d8099ff90571be4e63"
   },
   "mascot": {
     "path": "site/assets/brand/resume-studio-marmot-logo.png",

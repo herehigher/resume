@@ -176,6 +176,10 @@ export async function renderOpenGraphCards({
     throw new TypeError('Open Graph locales must be a non-empty unique supported locale list');
   }
   const resolvedOutputDirectory = path.resolve(outputDirectory);
+  if (resolvedOutputDirectory === defaultOutputDirectory
+    && locales.length !== Object.keys(CARD_PRESENTATIONS).length) {
+    throw new Error('Committed Open Graph cards must be rendered together with --locale all; use --output-dir for a single-locale preview');
+  }
   const mascotPath = path.join(repositoryRoot, MASCOT_RELATIVE_PATH);
   const [mascot, generatorSource] = await Promise.all([readFile(mascotPath), readFile(scriptPath)]);
   const mascotDataUrl = `data:image/png;base64,${mascot.toString('base64')}`;
