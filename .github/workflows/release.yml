@@ -199,7 +199,7 @@ jobs:
           path: ${{ runner.temp }}/quality-documentation-assets
           run-id: ${{ steps.quality.outputs.run_id }}
 
-      - name: Verify release documentation assets match final Quality output
+      - name: Verify release documentation assets are current for final Quality source
         if: ${{ needs.authorize.outputs.recovery != 'true' }}
         env:
           SOURCE_ROOT: ${{ runner.temp }}/release-source

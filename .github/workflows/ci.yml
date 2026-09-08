@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      release_assets_required: ${{ steps.release_assets.outputs.required }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -104,17 +106,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Verify release documentation assets are committed
-        if: ${{ github.event_name == 'pull_request' && steps.release_assets.outputs.required == 'true' }}
-        env:
-          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
-          SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
-        run: >-
-          node scripts/release-doc-assets.mjs compare
-          --committed-root "${GITHUB_WORKSPACE}"
-          --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
-          --source-sha "${SOURCE_SHA}"
-
       - name: Upload Playwright failure evidence
         if: failure()
         uses: actions/upload-artifact@v7
@@ -133,3 +124,48 @@ jobs:
       - name: Reject pull request scope classification failure
         if: ${{ always() && github.event_name == 'pull_request' && steps.scope.outcome == 'failure' }}
         run: exit 1
+
+  release-assets-current:
+    name: Release assets current
+    needs: quality
+    if: ${{ github.event_name == 'pull_request' && needs.quality.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Report release assets are not required
+        if: ${{ needs.quality.outputs.release_assets_required != 'true' }}
+        run: echo "This pull request does not change the package version."
+
+      - name: Checkout
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Download documentation asset evidence
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: documentation-assets-${{ github.sha }}
+          path: ${{ runner.temp }}/resume-documentation-assets
+
+      - name: Verify release documentation assets are current
+        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        env:
+          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
+          SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          node scripts/release-doc-assets.mjs compare
+          --committed-root "${GITHUB_WORKSPACE}"
+          --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
+          --source-sha "${SOURCE_SHA}"
