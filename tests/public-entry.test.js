@@ -11,9 +11,21 @@ import { validateState } from '../site/assets/js/state/schema.js';
 import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const routePresentation = Object.freeze({
-  'en/index.html': { h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/' },
-  'index.html': { h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: './assets/favicon/' },
-  'zh-cn/index.html': { h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/' }
+  'en/index.html': {
+    h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/',
+    openGraphLocale: 'en_US', openGraphAlternates: ['ja_JP', 'zh_CN'], openGraphImage: 'resume-studio-og-en.png',
+    openGraphImageAlt: 'Resume Studio — Build your resume. Keep your data local.'
+  },
+  'index.html': {
+    h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: './assets/favicon/',
+    openGraphLocale: 'ja_JP', openGraphAlternates: ['zh_CN', 'en_US'], openGraphImage: 'resume-studio-og-ja.png',
+    openGraphImageAlt: 'Resume Studio — 履歴書をつくる。データは端末の中に。'
+  },
+  'zh-cn/index.html': {
+    h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/',
+    openGraphLocale: 'zh_CN', openGraphAlternates: ['ja_JP', 'en_US'], openGraphImage: 'resume-studio-og-zh-cn.png',
+    openGraphImageAlt: 'Resume Studio — 创建简历，数据留在本地。'
+  }
 });
 const routes = Object.freeze(publicDocumentContracts().map((contract) => ({
   ...routePresentation[contract.artifactPath],
@@ -66,6 +78,15 @@ function linkAttributes(html) {
   ));
 }
 
+function metaValues(html, key) {
+  return [...html.matchAll(/<meta\s+([^>]+)>/gi)]
+    .map((match) => Object.fromEntries(
+      [...match[1].matchAll(/([\w:-]+)="([^"]*)"/g)].map((attribute) => [attribute[1], attribute[2]])
+    ))
+    .filter((attributes) => attributes.property === key || attributes.name === key)
+    .map((attributes) => attributes.content);
+}
+
 function pngDimensions(file) {
   const png = readFileSync(file);
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
@@ -116,6 +137,30 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     for (const [locale, url] of Object.entries(alternateLinks)) {
       assert.equal(linkTarget(html, 'alternate', locale), url, `${route.file} must link to ${locale}`);
     }
+    const title = html.match(/<title>([^<]+)<\/title>/i)?.[1] || '';
+    const description = metaValues(html, 'description')[0] || '';
+    const imageUrl = `${base}assets/social/${route.openGraphImage}`;
+    assert.deepEqual(metaValues(html, 'og:type'), ['website']);
+    assert.deepEqual(metaValues(html, 'og:site_name'), ['Resume Studio']);
+    assert.deepEqual(metaValues(html, 'og:title'), [title]);
+    assert.deepEqual(metaValues(html, 'og:description'), [description]);
+    assert.deepEqual(metaValues(html, 'og:url'), [route.canonical]);
+    assert.deepEqual(metaValues(html, 'og:locale'), [route.openGraphLocale]);
+    assert.deepEqual(metaValues(html, 'og:locale:alternate'), route.openGraphAlternates);
+    assert.deepEqual(metaValues(html, 'og:image'), [imageUrl]);
+    assert.deepEqual(metaValues(html, 'og:image:type'), ['image/png']);
+    assert.deepEqual(metaValues(html, 'og:image:width'), ['1200']);
+    assert.deepEqual(metaValues(html, 'og:image:height'), ['630']);
+    assert.deepEqual(metaValues(html, 'og:image:alt'), [route.openGraphImageAlt]);
+    assert.deepEqual(metaValues(html, 'twitter:card'), ['summary_large_image']);
+    assert.deepEqual(metaValues(html, 'twitter:title'), [title]);
+    assert.deepEqual(metaValues(html, 'twitter:description'), [description]);
+    assert.deepEqual(metaValues(html, 'twitter:image'), [imageUrl]);
+    assert.deepEqual(metaValues(html, 'twitter:image:alt'), [route.openGraphImageAlt]);
+    assert.deepEqual(
+      pngDimensions(new URL(`../site/assets/social/${route.openGraphImage}`, import.meta.url)),
+      { colorType: 2, width: 1200, height: 630 }
+    );
   }
 
   for (const route of routes) {

@@ -102,7 +102,10 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
     ['legacy hreflang', 'ja/index.html', (html) => html.replace('</head>', '<link rel="alternate" hreflang="ja" href="https://herehigher.github.io/resume/">\n</head>'), /must not join the public hreflang cluster/],
     ['ja alternate', 'index.html', (html) => html.replace('hreflang="ja" href="https://herehigher.github.io/resume/"', 'hreflang="ja" href="https://example.invalid/"'), /ja alternate URL/],
     ['unexpected alternate', 'index.html', (html) => html.replace('</head>', '<link rel="alternate" hreflang="fr" href="https://example.invalid/">\n</head>'), /alternate URL set is invalid/],
-    ['canonical', 'zh-cn/index.html', (html) => html.replace('https://herehigher.github.io/resume/zh-cn/', 'https://example.invalid/'), /canonical URL/],
+    ['canonical', 'zh-cn/index.html', (html) => html.replace(
+      '<link rel="canonical" href="https://herehigher.github.io/resume/zh-cn/">',
+      '<link rel="canonical" href="https://example.invalid/">'
+    ), /canonical URL/],
     ['editor', 'editor/index.html', (html) => html.replace('noindex,follow', 'index,follow'), /editor\/ \[artifact=editor\/index\.html; status=local; content-type=text\/html\]: must be noindex,follow/],
     ['schema identity', 'schema/resume-studio-web-v1.schema.json', (schema) => schema.replace('https://herehigher.github.io/resume/schema/', 'https://example.invalid/'), /identity or title is invalid/],
     ['import version', 'schema/resume-studio-web-v1.example.json', (example) => example.replace('"version": 1', '"version": 2'), /version is invalid/],
