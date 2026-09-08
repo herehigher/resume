@@ -31,9 +31,25 @@ test('release documentation assets are uploaded before the pull request freshnes
 
 test('release preparation compares committed assets with the exact main Quality output', () => {
   assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets match final Quality output[\s\S]+Prepare the single Pages artifact/);
-  assert.match(releaseWorkflow, /documentation-assets-\$\{\{ steps\.release\.outputs\.release_sha \}\}/);
+  assert.match(releaseWorkflow, /documentation-assets-\$\{\{ needs\.authorize\.outputs\.release_sha \}\}/);
   assert.match(releaseWorkflow, /run-id: \$\{\{ steps\.quality\.outputs\.run_id \}\}/);
   assert.match(releaseWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+});
+
+test('a merged version pull request is the standard publication authorization', () => {
+  assert.match(releaseWorkflow, /workflow_run:[\s\S]+workflows: \[Quality\][\s\S]+types: \[completed\]/);
+  assert.match(releaseWorkflow, /workflow_run\.conclusion == 'success'[\s\S]+workflow_run\.event == 'push'[\s\S]+workflow_run\.head_branch == github\.event\.repository\.default_branch/);
+  assert.match(releaseWorkflow, /validate-release-run\.mjs quality --sha "\$release_sha" --run-id "\$quality_run_id"/);
+  assert.match(releaseWorkflow, /commits\/\$release_sha\/pulls[\s\S]+base_sha="\$\(jq -r '\.\[0\]\.base\.sha'[\s\S]+release-doc-assets\.mjs required/);
+  assert.match(releaseWorkflow, /\.merged_at != null[\s\S]+\.base\.repo\.full_name == \$repository[\s\S]+\.merge_commit_sha == \$sha/);
+  assert.match(releaseWorkflow, /package_version" != "\$current_version"[\s\S]+release_required=false[\s\S]+Stale release ignored/);
+  assert.doesNotMatch(releaseWorkflow, /mode=publish|prepared_run_id|inputs\.prepared_artifact_id/);
+});
+
+test('prepare, tag, and deploy reuse one exact artifact under the production lock', () => {
+  assert.match(releaseWorkflow, /publish:[\s\S]+needs: \[authorize, prepare\][\s\S]+artifact-ids: \$\{\{ needs\.prepare\.outputs\.prepared_artifact_id \}\}[\s\S]+run-id: \$\{\{ github\.run_id \}\}/);
+  assert.match(releaseWorkflow, /publish:[\s\S]+concurrency:[\s\S]+group: pages-production[\s\S]+Recheck current version under the production lock[\s\S]+prepared_version" = "\$current_version"[\s\S]+Reverify bytes and create or resume the immutable tag[\s\S]+Verify original bytes against the tagged source[\s\S]+Deploy to GitHub Pages/);
+  assert.doesNotMatch(releaseWorkflow, /^concurrency:/m);
 });
 
 test('CI installs only the browser binaries required by headless execution', () => {
