@@ -34,6 +34,14 @@ export default defineConfig({
       }
     },
     {
+      name: 'mobile-webkit',
+      grep: /\[mobile-webkit\]/,
+      use: {
+        ...devices['iPhone 13'],
+        viewport: { width: 390, height: 844 }
+      }
+    },
+    {
       name: 'webkit',
       grep: /\[webkit\]/,
       use: {
