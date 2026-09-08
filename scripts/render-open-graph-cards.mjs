@@ -1,15 +1,17 @@
-import { mkdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
-const root = process.cwd();
-const outputDirectory = path.join(root, 'site/assets/social');
-const mascotPath = path.join(root, 'site/assets/brand/resume-studio-marmot-logo.png');
-const mascot = await readFile(mascotPath);
-const mascotDataUrl = `data:image/png;base64,${mascot.toString('base64')}`;
+const scriptPath = fileURLToPath(import.meta.url);
+const repositoryRoot = path.resolve(path.dirname(scriptPath), '..');
+const defaultOutputDirectory = path.join(repositoryRoot, 'site/assets/social');
+const manifestName = 'resume-studio-og.manifest.json';
 
-const cards = Object.freeze({
+export const MASCOT_RELATIVE_PATH = 'site/assets/brand/resume-studio-marmot-logo.png';
+export const CARD_PRESENTATIONS = Object.freeze({
   en: Object.freeze({
     eyebrow: 'FREE · OPEN SOURCE · LOCAL-FIRST',
     headline: 'Build your resume.<br>Keep your data local.',
@@ -33,18 +35,35 @@ const cards = Object.freeze({
   })
 });
 
-const localeIndex = process.argv.indexOf('--locale');
-const locale = localeIndex === -1 ? '' : process.argv[localeIndex + 1];
-const card = cards[locale];
-if (!card || process.argv.length !== 4) {
-  throw new Error('Usage: node scripts/render-open-graph-cards.mjs --locale ja|zh-CN|en');
+function sha256(content) {
+  return createHash('sha256').update(content).digest('hex');
 }
 
-await mkdir(outputDirectory, { recursive: true });
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
+function parseArguments(args) {
+  const options = {};
+  for (let index = 0; index < args.length; index += 2) {
+    const name = args[index];
+    const value = args[index + 1];
+    if (!['--locale', '--output-dir'].includes(name) || !value || value.startsWith('--') || name in options) {
+      throw new Error('Usage: node scripts/render-open-graph-cards.mjs --locale ja|zh-CN|en|all [--output-dir DIRECTORY]');
+    }
+    options[name] = value;
+  }
+  const requestedLocale = options['--locale'];
+  if (!requestedLocale || (requestedLocale !== 'all' && !CARD_PRESENTATIONS[requestedLocale])) {
+    throw new Error('Usage: node scripts/render-open-graph-cards.mjs --locale ja|zh-CN|en|all [--output-dir DIRECTORY]');
+  }
+  return {
+    locales: requestedLocale === 'all' ? Object.keys(CARD_PRESENTATIONS) : [requestedLocale],
+    outputDirectory: options['--output-dir'] ? path.resolve(options['--output-dir']) : defaultOutputDirectory
+  };
+}
 
-await page.setContent(`<!doctype html>
+async function renderCard(browser, locale, card, mascotDataUrl, outputDirectory) {
+  const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
+  try {
+    await page.setContent(`<!doctype html>
+
   <html lang="${locale}">
     <head>
       <meta charset="utf-8">
@@ -134,7 +153,59 @@ await page.setContent(`<!doctype html>
       </main>
     </body>
   </html>`);
+    await page.evaluate(() => document.fonts.ready);
+    const mascotLoaded = await page.locator('.mascot').evaluate((image) => (
+      image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+    ));
+    if (!mascotLoaded) throw new Error(`Brand mascot failed to load for ${locale}`);
+    const outputPath = path.join(outputDirectory, card.output);
+    await page.screenshot({ path: outputPath, type: 'png' });
+    return { output: card.output, sha256: sha256(await readFile(outputPath)) };
+  } finally {
+    await page.close();
+  }
+}
 
-await page.locator('.mascot').evaluate((image) => image.complete || new Promise((resolve) => image.addEventListener('load', resolve, { once: true })));
-await page.screenshot({ path: path.join(outputDirectory, card.output), type: 'png' });
-await browser.close();
+export async function renderOpenGraphCards({
+  locales = Object.keys(CARD_PRESENTATIONS),
+  outputDirectory = defaultOutputDirectory
+} = {}) {
+  if (!Array.isArray(locales) || locales.length === 0
+    || new Set(locales).size !== locales.length
+    || locales.some((locale) => !CARD_PRESENTATIONS[locale])) {
+    throw new TypeError('Open Graph locales must be a non-empty unique supported locale list');
+  }
+  const resolvedOutputDirectory = path.resolve(outputDirectory);
+  const mascotPath = path.join(repositoryRoot, MASCOT_RELATIVE_PATH);
+  const [mascot, generatorSource] = await Promise.all([readFile(mascotPath), readFile(scriptPath)]);
+  const mascotDataUrl = `data:image/png;base64,${mascot.toString('base64')}`;
+  await mkdir(resolvedOutputDirectory, { recursive: true });
+  let browser;
+  const renderedCards = {};
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const locale of locales) {
+      renderedCards[locale] = await renderCard(
+        browser,
+        locale,
+        CARD_PRESENTATIONS[locale],
+        mascotDataUrl,
+        resolvedOutputDirectory
+      );
+    }
+  } finally {
+    await browser?.close();
+  }
+  const manifest = {
+    schemaVersion: 1,
+    generator: { path: 'scripts/render-open-graph-cards.mjs', sha256: sha256(generatorSource) },
+    mascot: { path: MASCOT_RELATIVE_PATH, sha256: sha256(mascot) },
+    cards: renderedCards
+  };
+  await writeFile(path.join(resolvedOutputDirectory, manifestName), `${JSON.stringify(manifest, null, 2)}\n`);
+  return manifest;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
+  await renderOpenGraphCards(parseArguments(process.argv.slice(2)));
+}

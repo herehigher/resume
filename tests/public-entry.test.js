@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { findExternalRuntimeAssets } from '../scripts/check-site.mjs';
 import { publicDocumentContracts } from '../scripts/deployment-path-contract.mjs';
+import { CARD_PRESENTATIONS, MASCOT_RELATIVE_PATH } from '../scripts/render-open-graph-cards.mjs';
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
@@ -93,6 +95,10 @@ function pngDimensions(file) {
   return { colorType: png[25], width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
 }
 
+function fileSha256(file) {
+  return createHash('sha256').update(readFileSync(new URL(`../${file}`, import.meta.url))).digest('hex');
+}
+
 function resolvePointer(root, reference) {
   return reference.slice(1).split('/').filter(Boolean).reduce((value, part) => value[part], root);
 }
@@ -157,10 +163,8 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.deepEqual(metaValues(html, 'twitter:description'), [description]);
     assert.deepEqual(metaValues(html, 'twitter:image'), [imageUrl]);
     assert.deepEqual(metaValues(html, 'twitter:image:alt'), [route.openGraphImageAlt]);
-    assert.deepEqual(
-      pngDimensions(new URL(`../site/assets/social/${route.openGraphImage}`, import.meta.url)),
-      { colorType: 2, width: 1200, height: 630 }
-    );
+    const { width, height } = pngDimensions(new URL(`../site/assets/social/${route.openGraphImage}`, import.meta.url));
+    assert.deepEqual({ width, height }, { width: 1200, height: 630 });
   }
 
   for (const route of routes) {
@@ -193,6 +197,26 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
       /<div class="entry-actions">[\s\S]*?<\/div>\s*<p class="entry-links">[\s\S]*?<\/p>\s*<p class="entry-legal">/,
       `${file} must place language links between the primary action and legal notice`
     );
+  }
+});
+
+test('Open Graph card manifest binds every committed image to its generator and original mascot', () => {
+  const manifest = JSON.parse(source('site/assets/social/resume-studio-og.manifest.json'));
+  assert.equal(manifest.schemaVersion, 1);
+  assert.deepEqual(manifest.generator, {
+    path: 'scripts/render-open-graph-cards.mjs',
+    sha256: fileSha256('scripts/render-open-graph-cards.mjs')
+  });
+  assert.deepEqual(manifest.mascot, {
+    path: MASCOT_RELATIVE_PATH,
+    sha256: fileSha256(MASCOT_RELATIVE_PATH)
+  });
+  assert.deepEqual(Object.keys(manifest.cards).sort(), Object.keys(CARD_PRESENTATIONS).sort());
+  for (const [locale, presentation] of Object.entries(CARD_PRESENTATIONS)) {
+    assert.deepEqual(manifest.cards[locale], {
+      output: presentation.output,
+      sha256: fileSha256(`site/assets/social/${presentation.output}`)
+    });
   }
 });
 
