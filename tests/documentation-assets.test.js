@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  computeGeneratorInputHash,
   normalizePdfMetadata,
   parseArguments as parseGenerationArguments,
   prepareDocumentationOutputDirectory,
@@ -15,19 +16,38 @@ import { parseArguments as parseVerificationArguments } from '../scripts/verify-
 
 test('documentation asset commands require explicit temporary output and source provenance', () => {
   const sourceSha = 'a'.repeat(40);
-  assert.deepEqual(parseGenerationArguments(['--output-dir', '/private/tmp/doc-assets', '--source-sha', sourceSha]), {
+  assert.deepEqual(parseGenerationArguments([
+    '--output-dir', '/private/tmp/doc-assets', '--source-sha', sourceSha, '--quality-run-id', '12345'
+  ]), {
     outputRoot: '/private/tmp/doc-assets',
+    qualityRunId: '12345',
     sourceCommit: sourceSha
   });
   assert.throws(() => parseGenerationArguments(['--output-dir', '/private/tmp/doc-assets']), /source-sha/);
   assert.throws(() => parseGenerationArguments(['--source-sha', sourceSha]), /output-dir/);
-  assert.throws(() => parseGenerationArguments(['--output-dir', '/private/tmp/doc-assets', '--output-dir', '/private/tmp/other', '--source-sha', sourceSha]), /Invalid/);
+  assert.throws(() => parseGenerationArguments([
+    '--output-dir', '/private/tmp/doc-assets', '--output-dir', '/private/tmp/other',
+    '--source-sha', sourceSha, '--quality-run-id', '12345'
+  ]), /Invalid/);
   assert.deepEqual(parseVerificationArguments(['--asset-root', '/private/tmp/doc-assets', '--source-root', '/source', '--source-sha', sourceSha]), {
     assetRoot: '/private/tmp/doc-assets',
     sourceRoot: '/source',
     sourceSha
   });
   assert.throws(() => parseVerificationArguments(['--asset-root', '/private/tmp/doc-assets']), /Provide/);
+});
+
+test('documentation generator input hash covers code and the dependency lockfile', async (t) => {
+  const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'resume-doc-assets-generator-test-'));
+  t.after(() => rm(sourceRoot, { force: true, recursive: true }));
+  await mkdir(path.join(sourceRoot, 'scripts'));
+  await writeFile(path.join(sourceRoot, 'package-lock.json'), '{"lockfileVersion":3}\n');
+  await writeFile(path.join(sourceRoot, 'scripts/generate-doc-assets.mjs'), '// generator one\n');
+  await writeFile(path.join(sourceRoot, 'scripts/verify-doc-assets.mjs'), '// verifier one\n');
+  const original = await computeGeneratorInputHash(sourceRoot);
+
+  await writeFile(path.join(sourceRoot, 'scripts/verify-doc-assets.mjs'), '// verifier two\n');
+  assert.notEqual(await computeGeneratorInputHash(sourceRoot), original);
 });
 
 test('documentation PDF metadata uses fixed-length deterministic dates', () => {
@@ -61,7 +81,7 @@ test('documentation assets require a new empty directory independent from source
   );
 });
 
-test('documentation asset provenance rejects dirty site or package inputs', async (t) => {
+test('documentation asset provenance rejects dirty site, package, or generator inputs', async (t) => {
   const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'resume-doc-assets-source-test-'));
   t.after(() => rm(sourceRoot, { force: true, recursive: true }));
   await mkdir(path.join(sourceRoot, 'site'));
@@ -75,9 +95,9 @@ test('documentation asset provenance rejects dirty site or package inputs', asyn
   assert.equal(resolveSourceCommit(sourceRoot, sourceSha), sourceSha);
 
   await writeFile(path.join(sourceRoot, 'site', 'index.html'), '<title>changed</title>');
-  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site or package changes/);
+  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site, package, or generator changes/);
 
   execFileSync('git', ['checkout', '--', 'site/index.html'], { cwd: sourceRoot });
   await writeFile(path.join(sourceRoot, 'package.json'), '{"version":"0.3.0"}\n');
-  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site or package changes/);
+  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site, package, or generator changes/);
 });

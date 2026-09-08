@@ -24,9 +24,9 @@ Version の基準は `package.json`。CHANGELOG の日付は RC を確定した�
 
 Version 更新は repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。Version 更新を commit・push すると、Quality は候補 code から一時的な展示 asset を生成して upload します。Product・test の `Quality` と asset 更新状態の `Release assets current` は別 check です。古い asset は後者だけを失敗させ、原因を混同しません。
 
-その Quality run の `documentation-assets-*` artifact を source 外へ展開し、候補 branch の `site/` が commit 済みであることを確認して、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root "$PWD" --source-sha HEAD_SHA` を実行します。変更された三言語の screenshot、PDF、`docs/assets-manifest.json` を目視・review して同じ公開 PR へ commit します。再実行した `Release assets current` は version、site hash、generator・browser・三言語の出力契約を現在の Quality evidence と照合し、commit 済み file の Git LFS object ID がその manifest の digest と一致することを確認します。別 run の Chromium rasterization bytes は完全一致を要求しません。Promotion 時には review 対象 artifact 自体の digest・画像寸法・PDF 用紙と先頭・末尾 marker を検証してから、その exact bytes を commit します。CI 自身に repository 書込権限は与えません。
+その Quality run の `documentation-assets-*` artifact を source 外へ展開し、候補 branch の `site/` が commit 済みであることを確認して、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root "$PWD" --source-sha HEAD_SHA` を実行します。変更された三言語の screenshot、PDF、`docs/assets-manifest.json` を目視・review して同じ公開 PR へ commit します。再実行した `Release assets current` は manifest の Quality run ID から元の artifact を再取得し、commit 済み LFS file と manifest が promotion 元の exact bytes であることを先に確認します。そのうえで version、site hash、generator・browser・三言語の出力契約、PDF 全文・page、screenshot visual を現在の Quality evidence と照合します。別 run の Chromium rasterization bytes は完全一致を要求しません。CI 自身に repository 書込権限は与えません。
 
-Manifest の `source.commit` は asset を生成した Quality checkout の provenance であり、asset を取り込んだ後の最終 tag commit を表しません。公開対象との同一性は candidate version、`siteHash`、生成契約と各 file の digest で判定します。
+Manifest の `source.checkoutCommit` は asset を生成した checkout の情報値であり、asset を取り込んだ後の最終 tag commit を表しません。`source.qualityRunId` と組み合わせ、repository 内の該当 Actions artifact を取得できて exact bytes が一致した場合にだけ promotion provenance として採用します。現在の Quality artifact 側は source SHA と直接照合し、両 run 間は candidate version、`siteHash`、generator input hash、PDF 全文・page contract と screenshot の visual comparison で結び付けます。
 
 通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。公開 PR の merge 結果 commit に対する main Quality が成功すると、workflow がその Quality run ID と SHA を照合し、PR の base から version が変わったこと、対応する merged PR が1件であること、同じ version が現在も main の version であることを確認して自動的に準備・tag・deploy へ進みます。Repository で許可された merge commit・squash・rebase のいずれでも、GitHub が記録する merged PR の base / result SHA を基準にします。Version が変わらない通常の main 更新や、古い release commit の Quality 再実行では公開 job を開始しません。
 
@@ -85,7 +85,7 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 
 ## 初回設定・設定変更時だけ行うこと
 
-Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。通常公開は version を更新した公開 PR の merge、旧版復旧は `recovery_tag` を指定した手動実行を、それぞれ承認の実行とします。
+Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。Main の merge ruleset は `quality` と `Release assets current` の両方を required check にします。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。通常公開は version を更新した公開 PR の merge、旧版復旧は `recovery_tag` を指定した手動実行を、それぞれ承認の実行とします。
 
 Local の GitHub query / PR 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は、許可された sandbox 外の実行へ切り替えます。Token を抽出・export・複製せず、特定 OS の credential backend は要件にしません。
 

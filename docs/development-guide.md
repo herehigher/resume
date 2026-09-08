@@ -82,10 +82,10 @@ Local で複数 worktree の E2E を実行する場合、既定 port 4183 / 4184
 
 ## 展示 sample と検証出力
 
-README の screenshot / PDF は安定版ごとの長期参照用展示物です。[Manifest](assets-manifest.json) に app version、生成時の source commit、site hash、Chromium、架空 data の条件を記録します。通常の開発途中では現在の main と一致することを保証しませんが、安定版 tag ではその version の画面・site bytes・生成結果と一致させます。Screenshot に version が表示されるため、安定版の version 更新では展示 asset も更新します。文書 / workflow だけの変更では更新しません。
+README の screenshot / PDF は安定版ごとの長期参照用展示物です。[Manifest](assets-manifest.json) に app version、生成 checkout の情報値、site hash、generator input hash、Chromium、架空 data の条件を記録します。通常の開発途中では現在の main と一致することを保証しませんが、安定版 tag ではその version の画面・site bytes・生成結果と一致させます。Screenshot に version が表示されるため、安定版の version 更新では展示 asset も更新します。文書 / workflow だけの変更では更新しません。
 
 安定版の version、画面、layout、template、font、公開 sample data が変わり展示物を更新する場合は、対象画像・PDF と provenance を一緒に review します。`docs/screenshots/*.png` と `output/pdf/*.pdf` は Git LFS を維持します。取得・更新時だけ `git lfs install --local` と `git lfs pull` が必要で、通常の Node test / CI に展示 binary は不要です。既存リンクや LFS 履歴は維持し、期限付き Actions URL を README の長期リンクに使いません。
 
-CI の確認用出力は一時 directory から Actions artifact に保存し、通常の開発 PR では source / 展示物へ promote しません。安定版の公開 PR だけは、その PR の Quality artifact を source 外へ展開し、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root CHECKOUT --source-sha HEAD_SHA` で検証済み asset を取り込みます。SHA は候補 branch の HEAD 全40桁を指定し、`site/` に未 commit の変更を残しません。CI は候補 version と最終 main Quality の両方で同じ生成 bytes になることを検査し、自動 commit は行いません。
+CI の確認用出力は一時 directory から Actions artifact に保存し、通常の開発 PR では source / 展示物へ promote しません。安定版の公開 PR だけは、その PR の Quality artifact を source 外へ展開し、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root CHECKOUT --source-sha HEAD_SHA` で検証済み asset を取り込みます。SHA は候補 branch の HEAD 全40桁を指定し、`site/` に未 commit の変更を残しません。CI は commit 済みの LFS object を取得し、各 file と manifest digest の一致を検証したうえで、候補 version と最終 main Quality の site・generator contract、PDF 全文・page、screenshot visual の一致を検査します。別 browser run の raw bytes 完全一致は要求せず、自動 commit も行いません。
 
-手元で一時出力だけが必要な場合は `npm run generate:doc-assets -- --output-dir EMPTY_DIRECTORY --source-sha HEAD_SHA` で source 外の空 directory に生成し、`npm run verify:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root CHECKOUT --source-sha HEAD_SHA` で検証します。PDF correctness は対象 source の E2E と一時出力で検証し、展示 asset の version 同期とは分けて扱います。
+手元で一時出力だけが必要な場合は `npm run generate:doc-assets -- --output-dir EMPTY_DIRECTORY --source-sha HEAD_SHA --quality-run-id LOCAL_POSITIVE_ID` で source 外の空 directory に生成し、`npm run verify:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root CHECKOUT --source-sha HEAD_SHA` で検証します。Local の ID は情報値にすぎず、その出力を公開 PR へ promote しません。公開用 manifest には Quality が実 run ID を設定します。PDF correctness は対象 source の E2E と一時出力で検証し、展示 asset の version 同期とは分けて扱います。

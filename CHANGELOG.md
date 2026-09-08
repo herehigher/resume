@@ -10,7 +10,8 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 - 安定版の公開 PR と最終 main Quality で展示 screenshot / PDF の version、site hash、生成・semantic contract と各 manifest digest を照合し、古い展示 asset を含む tag の公開を停止するよう修正。Quality の検証済み asset を read-only CI のまま公開 PR へ取り込める手順も追加。
 - Version を更新した公開 PR の merge を公開承認として扱い、その結果 commit の main Quality 成功後に準備・tag・deploy を自動継続するよう公開手順を簡略化。
-- Product・test の `Quality` と展示 asset 更新状態の `Release assets current` を分離し、asset promotion が必要な状態と回帰 failure を区別。別 browser run 間の不安定な raw bytes 比較を廃止し、manifest 内部の digest 整合性と表示・PDF の contract を維持。
+- Product・test の `Quality` と展示 asset 更新状態の `Release assets current` を分離し、asset promotion が必要な状態と回帰 failure を区別。Manifest に記録した Quality run から promotion 元 artifact を再取得して commit 済み LFS object との exact bytes を確認し、現在の Quality evidence とは PDF 全文・page と screenshot visual を照合することで、別 browser run 間の不安定な raw bytes 比較だけを廃止。
+- 展示 asset manifest に generator・verifier・dependency lockfile の input hash を追加し、生成 code の更新漏れで古い asset が通る問題を防止。
 - 展示 PDF の時刻 metadata、print layout 待機、screenshot の shadow rasterization を安定化し、長大 PDF test は import 完了後に印刷するよう修正。
 
 ## [0.2.5] - 2026-09-08

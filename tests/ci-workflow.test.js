@@ -29,14 +29,19 @@ test('release asset currentness is a separate check after Quality uploads eviden
   assert.match(qualityWorkflow, /github\.event_name == 'pull_request' && needs\.quality\.result == 'success'/);
   assert.match(qualityWorkflow, /Download documentation asset evidence[\s\S]+Verify release documentation assets are current/);
   assert.match(qualityWorkflow, /needs\.quality\.outputs\.release_assets_required == 'true'/);
-  assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+lfs: true/);
+  assert.match(qualityWorkflow, /--quality-run-id "\$\{QUALITY_RUN_ID\}"/);
+  assert.match(qualityWorkflow, /Resolve promoted Quality artifact provenance[\s\S]+Download the originally promoted Quality artifact/);
+  assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--promoted-root "\$\{PROMOTED_ASSET_DIRECTORY\}"[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
 });
 
 test('release preparation checks committed assets against the final Quality evidence', () => {
   assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets are current for final Quality source[\s\S]+Prepare the single Pages artifact/);
   assert.match(releaseWorkflow, /documentation-assets-\$\{\{ needs\.authorize\.outputs\.release_sha \}\}/);
   assert.match(releaseWorkflow, /run-id: \$\{\{ steps\.quality\.outputs\.run_id \}\}/);
-  assert.match(releaseWorkflow, /release-doc-assets\.mjs compare[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
+  assert.match(releaseWorkflow, /git -C "\$RUNNER_TEMP\/release-source" lfs pull/);
+  assert.match(releaseWorkflow, /Resolve promoted Quality artifact provenance[\s\S]+Download the originally promoted Quality artifact/);
+  assert.match(releaseWorkflow, /release-doc-assets\.mjs compare[\s\S]+--promoted-root "\$\{\{ runner\.temp \}\}\/promoted-documentation-assets"[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
 });
 
 test('a merged version pull request is the standard publication authorization', () => {

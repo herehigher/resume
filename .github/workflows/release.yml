@@ -171,6 +171,8 @@ jobs:
           else
             git fetch --no-tags origin "$RELEASE_SHA"
             git worktree add --detach "$RUNNER_TEMP/release-source" "$RELEASE_SHA"
+            git -C "$RUNNER_TEMP/release-source" lfs pull \
+              --include="docs/screenshots/*.png,output/pdf/*.pdf" --exclude=""
             manifest_path="$RUNNER_TEMP/release-source/.github/pages-release-manifest.json"
           fi
           echo "manifest_path=$manifest_path" >> "$GITHUB_OUTPUT"
@@ -199,6 +201,31 @@ jobs:
           path: ${{ runner.temp }}/quality-documentation-assets
           run-id: ${{ steps.quality.outputs.run_id }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install documentation asset verification dependencies
+        if: ${{ needs.authorize.outputs.recovery != 'true' }}
+        run: npm ci
+
+      - name: Resolve promoted Quality artifact provenance
+        id: provenance
+        if: ${{ needs.authorize.outputs.recovery != 'true' }}
+        env:
+          SOURCE_ROOT: ${{ runner.temp }}/release-source
+        run: node scripts/release-doc-assets.mjs provenance --committed-root "${SOURCE_ROOT}"
+
+      - name: Download the originally promoted Quality artifact
+        if: ${{ needs.authorize.outputs.recovery != 'true' }}
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          name: ${{ steps.provenance.outputs.artifact_name }}
+          path: ${{ runner.temp }}/promoted-documentation-assets
+          run-id: ${{ steps.provenance.outputs.quality_run_id }}
+
       - name: Verify release documentation assets are current for final Quality source
         if: ${{ needs.authorize.outputs.recovery != 'true' }}
         env:
@@ -208,12 +235,8 @@ jobs:
           node scripts/release-doc-assets.mjs compare
           --committed-root "${SOURCE_ROOT}"
           --generated-root "${{ runner.temp }}/quality-documentation-assets"
+          --promoted-root "${{ runner.temp }}/promoted-documentation-assets"
           --source-sha "${SOURCE_SHA}"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
 
       - name: Prepare the single Pages artifact
         env:

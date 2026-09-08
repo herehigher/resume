@@ -68,9 +68,10 @@ export function releaseAssetsRequiredBetween(base, head, cwd = process.cwd()) {
 }
 
 function outputRecords(manifest, label) {
-  if (manifest.schemaVersion !== 2) fail(`${label} manifest schema is not current`);
+  if (manifest.schemaVersion !== 3) fail(`${label} manifest schema is not current`);
   if (!versionPattern.test(manifest.source?.appVersion || '')) fail(`${label} app version is invalid`);
-  if (!fullCommitPattern.test(manifest.source?.commit || '')) fail(`${label} source commit is invalid`);
+  if (!fullCommitPattern.test(manifest.source?.checkoutCommit || '')) fail(`${label} source commit is invalid`);
+  if (!/^[1-9][0-9]*$/.test(manifest.source?.qualityRunId || '')) fail(`${label} Quality run ID is invalid`);
   if (!/^[0-9a-f]{64}$/.test(manifest.source?.siteHash || '')) fail(`${label} site hash is invalid`);
   if (!Array.isArray(manifest.outputs) || manifest.outputs.length !== 3) fail(`${label} must describe three locales`);
   const records = new Map();
@@ -110,16 +111,48 @@ function recordMismatch(mismatches, label, generatedValue, committedValue) {
   mismatches.push(`${label}: generated=${JSON.stringify(generatedValue)}, committed=${JSON.stringify(committedValue)}`);
 }
 
-export async function compareReleaseAssets({ committedRoot = root, generatedRoot, sourceSha }) {
-  if (!generatedRoot || !fullCommitPattern.test(sourceSha || '')) {
-    fail('generated asset root and full source SHA are required');
+export async function readReleaseAssetProvenance(committedRoot = root) {
+  const manifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
+  outputRecords(manifest, 'committed');
+  return {
+    artifactName: `documentation-assets-${manifest.source.checkoutCommit}`,
+    checkoutCommit: manifest.source.checkoutCommit,
+    qualityRunId: manifest.source.qualityRunId
+  };
+}
+
+export async function compareReleaseAssets({ committedRoot = root, generatedRoot, promotedRoot, sourceSha }) {
+  if (!generatedRoot || !promotedRoot || !fullCommitPattern.test(sourceSha || '')) {
+    fail('generated and promoted asset roots and a full source SHA are required');
   }
   const generatedManifest = await readJson(path.join(generatedRoot, 'docs/assets-manifest.json'), 'generated manifest');
   const committedManifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
+  const promotedManifest = await readJson(path.join(promotedRoot, 'docs/assets-manifest.json'), 'promoted manifest');
   const version = packageVersion(await readFile(path.join(committedRoot, 'package.json'), 'utf8'), 'committed');
+  const { compareDocumentationAssetContent, verifyDocumentationAssets } = await import('./verify-doc-assets.mjs');
+  for (const [label, assetRoot, requireExactSource] of [
+    ['generated', generatedRoot, true],
+    ['committed', committedRoot, false],
+    ['promoted', promotedRoot, false]
+  ]) {
+    try {
+      await verifyDocumentationAssets({ assetRoot, requireExactSource, sourceRoot: committedRoot, sourceSha });
+    } catch (error) {
+      fail(`${label} asset validation failed: ${error.message}`);
+    }
+  }
   const generated = outputRecords(generatedManifest, 'generated');
   const committed = outputRecords(committedManifest, 'committed');
+  outputRecords(promotedManifest, 'promoted');
   const mismatches = [];
+
+  for (const relativePath of assetPaths) {
+    const committedDigest = await recordedFileDigest(committedRoot, relativePath);
+    const promotedDigest = await recordedFileDigest(promotedRoot, relativePath);
+    if (committedDigest !== promotedDigest) {
+      mismatches.push(`${relativePath} does not match the Quality artifact selected by committed provenance`);
+    }
+  }
 
   if (generatedManifest.source.appVersion !== version) {
     mismatches.push(`generated asset version ${generatedManifest.source.appVersion} does not match package version ${version}`);
@@ -127,8 +160,8 @@ export async function compareReleaseAssets({ committedRoot = root, generatedRoot
   if (committedManifest.source.appVersion !== version) {
     mismatches.push(`committed asset version ${committedManifest.source.appVersion} does not match package version ${version}`);
   }
-  if (generatedManifest.source.commit !== sourceSha) {
-    mismatches.push(`generated source commit ${generatedManifest.source.commit} does not match Quality source ${sourceSha}`);
+  if (generatedManifest.source.checkoutCommit !== sourceSha) {
+    mismatches.push(`generated source commit ${generatedManifest.source.checkoutCommit} does not match Quality source ${sourceSha}`);
   }
   if (generatedManifest.source.siteHash !== committedManifest.source.siteHash) {
     mismatches.push(`site bytes differ: generated=${generatedManifest.source.siteHash}, committed=${committedManifest.source.siteHash}`);
@@ -138,8 +171,8 @@ export async function compareReleaseAssets({ committedRoot = root, generatedRoot
   recordMismatch(
     mismatches,
     'source generation contract',
-    withoutKeys(generatedManifest.source, ['appVersion', 'commit', 'siteHash']),
-    withoutKeys(committedManifest.source, ['appVersion', 'commit', 'siteHash'])
+    withoutKeys(generatedManifest.source, ['appVersion', 'checkoutCommit', 'qualityRunId', 'siteHash']),
+    withoutKeys(committedManifest.source, ['appVersion', 'checkoutCommit', 'qualityRunId', 'siteHash'])
   );
 
   for (const locale of Object.keys(expectedOutputs)) {
@@ -169,6 +202,15 @@ export async function compareReleaseAssets({ committedRoot = root, generatedRoot
         if (actualDigest !== record.sha256) {
           mismatches.push(`${label} ${locale} ${kind} bytes do not match its manifest: expected=${record.sha256}, actual=${actualDigest}`);
         }
+      }
+      try {
+        await compareDocumentationAssetContent({
+          committedFile: safePath(committedRoot, committedRecord.path),
+          generatedFile: safePath(generatedRoot, generatedRecord.path),
+          kind
+        });
+      } catch (error) {
+        mismatches.push(`${locale} ${kind} content differs from Quality evidence: ${error.message}`);
       }
     }
   }
@@ -231,16 +273,29 @@ async function main() {
     return;
   }
   if (command === 'compare') {
-    const values = parseOptions(args, ['committed-root', 'generated-root', 'source-sha']);
-    if (!values['committed-root'] || !values['generated-root'] || !values['source-sha']) {
-      fail('compare expects committed and generated roots and a source SHA');
+    const values = parseOptions(args, ['committed-root', 'generated-root', 'promoted-root', 'source-sha']);
+    if (!values['committed-root'] || !values['generated-root'] || !values['promoted-root'] || !values['source-sha']) {
+      fail('compare expects committed, generated, and promoted roots and a source SHA');
     }
     const result = await compareReleaseAssets({
       committedRoot: path.resolve(values['committed-root']),
       generatedRoot: path.resolve(values['generated-root']),
+      promotedRoot: path.resolve(values['promoted-root']),
       sourceSha: values['source-sha']
     });
     console.log(`Verified committed documentation assets for v${result.version} and site ${result.siteHash}.`);
+    return;
+  }
+  if (command === 'provenance') {
+    const values = parseOptions(args, ['committed-root']);
+    if (!values['committed-root']) fail('provenance expects a committed root');
+    const provenance = await readReleaseAssetProvenance(path.resolve(values['committed-root']));
+    if (process.env.GITHUB_OUTPUT) {
+      appendFileSync(process.env.GITHUB_OUTPUT, `artifact_name=${provenance.artifactName}\n`);
+      appendFileSync(process.env.GITHUB_OUTPUT, `checkout_commit=${provenance.checkoutCommit}\n`);
+      appendFileSync(process.env.GITHUB_OUTPUT, `quality_run_id=${provenance.qualityRunId}\n`);
+    }
+    console.log(`Resolved documentation asset provenance for ${provenance.checkoutCommit}.`);
     return;
   }
   if (command === 'promote') {
@@ -254,7 +309,7 @@ async function main() {
     console.log(`Promoted ${result.files.length} verified documentation asset files.`);
     return;
   }
-  fail('expected required, compare, or promote command');
+  fail('expected required, compare, provenance, or promote command');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
