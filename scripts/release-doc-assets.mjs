@@ -101,6 +101,15 @@ async function recordedFileDigest(rootDirectory, relativePath) {
   return createHash('sha256').update(contents).digest('hex');
 }
 
+function withoutKeys(value, omittedKeys) {
+  return Object.fromEntries(Object.entries(value || {}).filter(([key]) => !omittedKeys.includes(key)));
+}
+
+function recordMismatch(mismatches, label, generatedValue, committedValue) {
+  if (JSON.stringify(generatedValue) === JSON.stringify(committedValue)) return;
+  mismatches.push(`${label}: generated=${JSON.stringify(generatedValue)}, committed=${JSON.stringify(committedValue)}`);
+}
+
 export async function compareReleaseAssets({ committedRoot = root, generatedRoot, sourceSha }) {
   if (!generatedRoot || !fullCommitPattern.test(sourceSha || '')) {
     fail('generated asset root and full source SHA are required');
@@ -110,39 +119,60 @@ export async function compareReleaseAssets({ committedRoot = root, generatedRoot
   const version = packageVersion(await readFile(path.join(committedRoot, 'package.json'), 'utf8'), 'committed');
   const generated = outputRecords(generatedManifest, 'generated');
   const committed = outputRecords(committedManifest, 'committed');
+  const mismatches = [];
 
-  if (generatedManifest.source.appVersion !== version || committedManifest.source.appVersion !== version) {
-    fail(`asset version does not match package version ${version}`);
+  if (generatedManifest.source.appVersion !== version) {
+    mismatches.push(`generated asset version ${generatedManifest.source.appVersion} does not match package version ${version}`);
+  }
+  if (committedManifest.source.appVersion !== version) {
+    mismatches.push(`committed asset version ${committedManifest.source.appVersion} does not match package version ${version}`);
   }
   if (generatedManifest.source.commit !== sourceSha) {
-    fail('generated asset source commit does not match the expected Quality source');
+    mismatches.push(`generated source commit ${generatedManifest.source.commit} does not match Quality source ${sourceSha}`);
   }
   if (generatedManifest.source.siteHash !== committedManifest.source.siteHash) {
-    fail('committed assets were generated from different site bytes');
+    mismatches.push(`site bytes differ: generated=${generatedManifest.source.siteHash}, committed=${committedManifest.source.siteHash}`);
   }
+  recordMismatch(mismatches, 'generator contract', generatedManifest.generator, committedManifest.generator);
+  recordMismatch(mismatches, 'browser contract', generatedManifest.browser, committedManifest.browser);
+  recordMismatch(
+    mismatches,
+    'source generation contract',
+    withoutKeys(generatedManifest.source, ['appVersion', 'commit', 'siteHash']),
+    withoutKeys(committedManifest.source, ['appVersion', 'commit', 'siteHash'])
+  );
 
   for (const locale of Object.keys(expectedOutputs)) {
     const generatedOutput = generated.get(locale);
     const committedOutput = committed.get(locale);
     for (const field of ['browserLocale', 'paper', 'firstText', 'lastText', 'marker']) {
-      if (generatedOutput[field] !== committedOutput[field]) fail(`${locale} ${field} does not match`);
+      recordMismatch(mismatches, `${locale} ${field}`, generatedOutput[field], committedOutput[field]);
     }
     for (const kind of ['screenshot', 'pdf']) {
       const generatedRecord = generatedOutput[kind];
       const committedRecord = committedOutput[kind];
-      if (JSON.stringify(generatedRecord) !== JSON.stringify(committedRecord)) {
-        fail(`${locale} ${kind} metadata does not match`);
-      }
-      const expectedDigest = generatedRecord.sha256;
-      if (!/^[0-9a-f]{64}$/.test(expectedDigest || '')) fail(`${locale} ${kind} digest is invalid`);
-      if (await recordedFileDigest(generatedRoot, generatedRecord.path) !== expectedDigest) {
-        fail(`generated ${locale} ${kind} bytes do not match the manifest`);
-      }
-      if (await recordedFileDigest(committedRoot, committedRecord.path) !== expectedDigest) {
-        fail(`committed ${locale} ${kind} bytes do not match current Quality output`);
+      recordMismatch(
+        mismatches,
+        `${locale} ${kind} semantic metadata`,
+        withoutKeys(generatedRecord, ['sha256']),
+        withoutKeys(committedRecord, ['sha256'])
+      );
+      for (const [label, rootDirectory, record] of [
+        ['generated', generatedRoot, generatedRecord],
+        ['committed', committedRoot, committedRecord]
+      ]) {
+        if (!/^[0-9a-f]{64}$/.test(record.sha256 || '')) {
+          mismatches.push(`${label} ${locale} ${kind} manifest digest is invalid: ${JSON.stringify(record.sha256)}`);
+          continue;
+        }
+        const actualDigest = await recordedFileDigest(rootDirectory, record.path);
+        if (actualDigest !== record.sha256) {
+          mismatches.push(`${label} ${locale} ${kind} bytes do not match its manifest: expected=${record.sha256}, actual=${actualDigest}`);
+        }
       }
     }
   }
+  if (mismatches.length) fail(`currentness check found ${mismatches.length} mismatch(es):\n- ${mismatches.join('\n- ')}`);
   return { siteHash: generatedManifest.source.siteHash, version };
 }
 
