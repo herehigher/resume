@@ -9,9 +9,11 @@ import { deflateSync } from 'node:zlib';
 
 import { computeGeneratorInputHash, computeSiteHash } from '../scripts/generate-doc-assets.mjs';
 import {
+  compareCurrentReleaseAssets,
   compareReleaseAssets,
   promoteReleaseAssets,
   readReleaseAssetProvenance,
+  releaseAssetPathsChangedBetween,
   releaseAssetsRequiredBetween
 } from '../scripts/release-doc-assets.mjs';
 
@@ -159,7 +161,7 @@ async function writePromotedFixture(committedRoot, promotedRoot, options) {
   return committed;
 }
 
-test('release asset requirement follows the package version instead of unrelated file changes', async (t) => {
+test('release asset classification separates version changes from managed asset changes', async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'resume-release-assets-version-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -167,16 +169,35 @@ test('release asset requirement follows the package version instead of unrelated
   git('config', 'user.name', 'Release Assets Test');
   git('config', 'user.email', 'release-assets@example.invalid');
   git('config', 'commit.gpgSign', 'false');
+  await mkdir(path.join(directory, 'docs'), { recursive: true });
   await writeFile(path.join(directory, 'package.json'), '{"version":"0.2.5"}\n');
-  git('add', 'package.json');
+  await writeFile(path.join(directory, 'docs/assets-manifest.json'), '{}\n');
+  git('add', 'package.json', 'docs/assets-manifest.json');
   git('commit', '-m', 'initial version');
   const base = git('rev-parse', 'HEAD');
   assert.equal(releaseAssetsRequiredBetween(base, base, directory), false);
+  assert.equal(releaseAssetPathsChangedBetween(base, base, directory), false);
+
+  await writeFile(path.join(directory, 'README.md'), 'unrelated\n');
+  git('add', 'README.md');
+  git('commit', '-m', 'unrelated change');
+  const unrelated = git('rev-parse', 'HEAD');
+  assert.equal(releaseAssetsRequiredBetween(base, unrelated, directory), false);
+  assert.equal(releaseAssetPathsChangedBetween(base, unrelated, directory), false);
+
+  await writeFile(path.join(directory, 'docs/assets-manifest.json'), '{"changed":true}\n');
+  git('commit', '-am', 'asset change');
+  const assetHead = git('rev-parse', 'HEAD');
+  assert.equal(releaseAssetsRequiredBetween(base, assetHead, directory), false);
+  assert.equal(releaseAssetPathsChangedBetween(base, assetHead, directory), true);
+
   await writeFile(path.join(directory, 'package.json'), '{"version":"0.2.6"}\n');
   git('commit', '-am', 'next version');
   const head = git('rev-parse', 'HEAD');
   assert.equal(releaseAssetsRequiredBetween(base, head, directory), true);
+  assert.equal(releaseAssetPathsChangedBetween(base, head, directory), true);
   assert.throws(() => releaseAssetsRequiredBetween('main', head, directory), /full commit SHAs/);
+  assert.throws(() => releaseAssetPathsChangedBetween('main', head, directory), /full commit SHAs/);
 });
 
 test('committed assets may differ in bytes across runs when rendered content stays equivalent', async (t) => {
@@ -192,6 +213,13 @@ test('committed assets may differ in bytes across runs when rendered content sta
   assert.deepEqual(await compareReleaseAssets({ committedRoot, generatedRoot, promotedRoot, sourceSha: 'a'.repeat(40) }), {
     siteHash: committedManifest.source.siteHash, version: '0.3.0'
   });
+  assert.deepEqual(await compareCurrentReleaseAssets({ committedRoot, generatedRoot, sourceSha: 'a'.repeat(40) }), {
+    siteHash: committedManifest.source.siteHash, version: '0.3.0'
+  });
+  await assert.rejects(
+    compareReleaseAssets({ committedRoot, generatedRoot, sourceSha: 'a'.repeat(40) }),
+    /promoted asset root is required/
+  );
   assert.deepEqual(await readReleaseAssetProvenance(committedRoot), {
     artifactName: `documentation-assets-${'b'.repeat(40)}`,
     checkoutCommit: 'b'.repeat(40),
@@ -258,6 +286,10 @@ test('release asset comparison rejects self-consistent but different committed c
 
   await assert.rejects(
     compareReleaseAssets({ committedRoot, generatedRoot, promotedRoot, sourceSha: 'a'.repeat(40) }),
+    /content differs from Quality evidence/
+  );
+  await assert.rejects(
+    compareCurrentReleaseAssets({ committedRoot, generatedRoot, sourceSha: 'a'.repeat(40) }),
     /content differs from Quality evidence/
   );
 });

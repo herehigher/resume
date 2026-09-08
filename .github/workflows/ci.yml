@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      release_assets_changed: ${{ steps.release_assets.outputs.changed }}
       release_assets_required: ${{ steps.release_assets.outputs.required }}
     steps:
       - name: Checkout
@@ -137,8 +138,14 @@ jobs:
       contents: read
     steps:
       - name: Report release assets are not required
-        if: ${{ needs.quality.outputs.release_assets_required != 'true' }}
+        if: ${{ needs.quality.outputs.release_assets_required != 'true' && needs.quality.outputs.release_assets_changed != 'true' }}
         run: echo "This pull request does not change the package version."
+
+      - name: Reject release asset changes outside a version pull request
+        if: ${{ needs.quality.outputs.release_assets_required != 'true' && needs.quality.outputs.release_assets_changed == 'true' }}
+        run: |
+          echo "Release documentation assets may only change together with the package version." >&2
+          exit 1
 
       - name: Checkout
         if: ${{ needs.quality.outputs.release_assets_required == 'true' }}

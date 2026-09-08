@@ -210,32 +210,15 @@ jobs:
         if: ${{ needs.authorize.outputs.recovery != 'true' }}
         run: npm ci
 
-      - name: Resolve promoted Quality artifact provenance
-        id: provenance
-        if: ${{ needs.authorize.outputs.recovery != 'true' }}
-        env:
-          SOURCE_ROOT: ${{ runner.temp }}/release-source
-        run: node scripts/release-doc-assets.mjs provenance --committed-root "${SOURCE_ROOT}"
-
-      - name: Download the originally promoted Quality artifact
-        if: ${{ needs.authorize.outputs.recovery != 'true' }}
-        uses: actions/download-artifact@v8
-        with:
-          github-token: ${{ github.token }}
-          name: ${{ steps.provenance.outputs.artifact_name }}
-          path: ${{ runner.temp }}/promoted-documentation-assets
-          run-id: ${{ steps.provenance.outputs.quality_run_id }}
-
       - name: Verify release documentation assets are current for final Quality source
         if: ${{ needs.authorize.outputs.recovery != 'true' }}
         env:
           SOURCE_ROOT: ${{ runner.temp }}/release-source
           SOURCE_SHA: ${{ needs.authorize.outputs.release_sha }}
         run: >-
-          node scripts/release-doc-assets.mjs compare
+          node scripts/release-doc-assets.mjs compare-current
           --committed-root "${SOURCE_ROOT}"
           --generated-root "${{ runner.temp }}/quality-documentation-assets"
-          --promoted-root "${{ runner.temp }}/promoted-documentation-assets"
           --source-sha "${SOURCE_SHA}"
 
       - name: Prepare the single Pages artifact

@@ -24,15 +24,15 @@ Version の基準は `package.json`。CHANGELOG の日付は RC を確定した�
 
 Version 更新は repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。Version 更新を commit・push すると、Quality は候補 code から一時的な展示 asset を生成して upload します。Product・test の `Quality` と asset 更新状態の `Release assets current` は別 check です。古い asset は後者だけを失敗させ、原因を混同しません。
 
-その Quality run の `documentation-assets-*` artifact を source 外へ展開し、候補 branch の `site/` が commit 済みであることを確認して、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root "$PWD" --source-sha HEAD_SHA` を実行します。変更された三言語の screenshot、PDF、`docs/assets-manifest.json` を目視・review して同じ公開 PR へ commit します。再実行した `Release assets current` は manifest の Quality run ID から元の artifact を再取得し、commit 済み LFS file と manifest が promotion 元の exact bytes であることを先に確認します。そのうえで version、site hash、generator・browser・三言語の出力契約、PDF 全文・page、screenshot visual を現在の Quality evidence と照合します。別 run の Chromium rasterization bytes は完全一致を要求しません。CI 自身に repository 書込権限は与えません。
+その Quality run の `documentation-assets-*` artifact を source 外へ展開し、候補 branch の `site/` が commit 済みであることを確認して、`npm run promote:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root "$PWD" --source-sha HEAD_SHA` を実行します。変更された三言語の screenshot、PDF、`docs/assets-manifest.json` を目視・review して同じ公開 PR へ commit します。再実行した `Release assets current` は manifest の Quality run ID から元の artifact を再取得し、commit 済み LFS file と manifest が promotion 元の exact bytes であることを先に確認します。そのうえで version、site hash、generator・browser・三言語の出力契約、PDF 全文・page、screenshot visual を現在の Quality evidence と照合します。Version を変えない PR で展示 asset を変更した場合は拒否します。別 run の Chromium rasterization bytes は完全一致を要求しません。CI 自身に repository 書込権限は与えません。
 
-Manifest の `source.checkoutCommit` は asset を生成した checkout の情報値であり、asset を取り込んだ後の最終 tag commit を表しません。`source.qualityRunId` と組み合わせ、repository 内の該当 Actions artifact を取得できて exact bytes が一致した場合にだけ promotion provenance として採用します。現在の Quality artifact 側は source SHA と直接照合し、両 run 間は candidate version、`siteHash`、generator input hash、PDF 全文・page contract と screenshot の visual comparison で結び付けます。
+Manifest の `source.checkoutCommit` は asset を生成した checkout の情報値であり、asset を取り込んだ後の最終 tag commit を表しません。`source.qualityRunId` と組み合わせ、公開 PR の check が repository 内の該当 Actions artifact を取得できて exact bytes が一致した場合にだけ promotion provenance として採用します。Merge 後の公開準備は失効し得る過去の artifact へ再依存せず、承認済み commit の展示 asset と最終 main Quality を candidate version、`siteHash`、generator input hash、PDF 全文・page contract、screenshot の visual comparison で再検証します。
 
 通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。公開 PR の merge 結果 commit に対する main Quality が成功すると、workflow がその Quality run ID と SHA を照合し、PR の base から version が変わったこと、対応する merged PR が1件であること、同じ version が現在も main の version であることを確認して自動的に準備・tag・deploy へ進みます。Repository で許可された merge commit・squash・rebase のいずれでも、GitHub が記録する merged PR の base / result SHA を基準にします。Version が変わらない通常の main 更新や、古い release commit の Quality 再実行では公開 job を開始しません。
 
 Analytics 有効時は、生成した配布物で実際の provider script を動かす互換性検査も準備に含まれます。未知の payload 契約や予期しない通信は公開を失敗させます。準備後の publish と deploy は、同じ workflow run が出力した exact artifact ID の保存済み bytes をそれぞれ再検証して使い、承認後の再 build や別 artifact への差し替えを行いません。Production lock の取得後にも current main version を再確認し、並行した新 version の後から旧 version を deploy しません。
 
-準備 artifact は30日間保持します。同じ run 全体を再実行した場合は新しい artifact ID になりますが、その再実行内でも prepare・publish・deploy は同じ ID を引き継ぎます。確認用画像・PDF は Quality run の7日間保持 artifact です。必要な目視の前に失効した場合は、公開 PR を merge する前に候補 branch の Quality を再実行して確認します。
+準備 artifact は30日間保持します。同じ run 全体を再実行した場合は新しい artifact ID になりますが、その再実行内でも prepare・publish・deploy は同じ ID を引き継ぎます。確認用画像・PDF は Quality run の7日間保持 artifact です。公開 PR の merge 前に失効した場合は候補 branch の Quality を再実行し、新しい artifact を再度取り込んで `source.qualityRunId` を更新します。Merge 後の公開準備は過去の promotion artifact の保持期間に依存しません。
 
 ## 変更内容に応じた確認
 
@@ -68,7 +68,7 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 | 状態 | 次の操作 |
 | --- | --- |
 | PR の Quality 失敗 | Product・test・generator 自体の失敗として修正 commit を検証。Asset の promotion を先に繰り返さない |
-| PR の Release assets current 失敗 | Quality artifact を目視して promotion する。不一致の一覧が version・site・生成契約・manifest digest のどれかを確認する |
+| PR の Release assets current 失敗 | Version 更新 PR なら Quality artifact を目視して promotion する。Version を変えず展示 asset を変更していた場合はその変更を分離する。不一致の一覧が version・site・生成契約・manifest digest のどれかを確認する |
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
 | 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release Pages を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
 | Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |
