@@ -112,7 +112,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   live.setAttribute('aria-live', 'polite');
   toolbar.append(live);
   let lastFocusKey = null;
-  const toolbarPointerIds = new Set();
 
   function activeContext() {
     const state = store.getState();
@@ -127,7 +126,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     })).filter((item) => item.element);
   }
   function setOpen(open) {
-    if (!open) toolbarPointerIds.clear();
     if (menu.hidden) { panel.hidden = true; menu.setAttribute('aria-expanded', 'false'); return; }
     panel.hidden = !open;
     menu.setAttribute('aria-expanded', String(open));
@@ -204,17 +202,10 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   menu.addEventListener('click', () => setOpen(panel.hidden));
   toolbar.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !panel.hidden) { setOpen(false); menu.focus(); } });
   toolbar.addEventListener('focusout', (event) => {
-    if (toolbar.contains(event.relatedTarget)) return;
-    window.queueMicrotask(() => {
-      if (!panel.hidden && toolbarPointerIds.size === 0 && !toolbar.contains(document.activeElement)) setOpen(false);
-    });
+    if (!panel.hidden && event.relatedTarget instanceof Node && !toolbar.contains(event.relatedTarget)) setOpen(false);
   });
   document.addEventListener('pointerdown', (event) => {
-    if (toolbar.contains(event.target)) toolbarPointerIds.add(event.pointerId);
-    else if (!panel.hidden) setOpen(false);
+    if (!panel.hidden && !toolbar.contains(event.target)) setOpen(false);
   }, true);
-  const clearToolbarPointer = (event) => { toolbarPointerIds.delete(event.pointerId); };
-  document.addEventListener('pointerup', clearToolbarPointer, true);
-  document.addEventListener('pointercancel', clearToolbarPointer, true);
   return { render };
 }
