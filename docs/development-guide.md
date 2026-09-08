@@ -40,7 +40,7 @@ node scripts/render-open-graph-cards.mjs --locale all
 node scripts/render-open-graph-cards.mjs --locale zh-CN --output-dir /tmp/resume-studio-og-preview
 ```
 
-生成 script は `site/assets/brand/resume-studio-marmot-logo.png` を直接埋め込みます。土拨鼠を描き直した画像へ置き換えず、生成後は対象言語の文言と contrast に加え、logo の歯・輪郭・三本線が変形、欠落、切断していないことを 1200 × 630 の実寸で確認します。
+生成 script は `site/assets/brand/resume-studio-marmot-logo.png` を直接埋め込みます。マーモットを描き直した画像へ置き換えず、生成後は対象言語の文言と contrast に加え、logo の歯・輪郭・三本線が変形、欠落、切断していないことを 1200 × 630 の実寸で確認します。
 
 ## 変更に応じた検証
 
