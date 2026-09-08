@@ -127,6 +127,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     })).filter((item) => item.element);
   }
   function setOpen(open) {
+    if (!open) toolbarPointerIds.clear();
     if (menu.hidden) { panel.hidden = true; menu.setAttribute('aria-expanded', 'false'); return; }
     panel.hidden = !open;
     menu.setAttribute('aria-expanded', String(open));
