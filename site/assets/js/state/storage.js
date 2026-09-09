@@ -179,11 +179,17 @@ export function createDraftStorage(storage, {
     if (mutation && !cryptography) throw new DraftStorageError('crypto-unavailable');
     if (!locks?.request) {
       if (mutation) throw new DraftStorageError('web-lock-unavailable');
-      return operation();
+      return operation(false);
     }
+    let callbackStarted = false;
     try {
-      return await locks.request(DRAFT_WEB_LOCK_NAME, { mode: 'exclusive' }, operation);
+      return await locks.request(DRAFT_WEB_LOCK_NAME, { mode: 'exclusive' }, () => {
+        callbackStarted = true;
+        return operation(true);
+      });
     } catch (error) {
+      if (!mutation && !callbackStarted) return operation(false);
+      if (callbackStarted) throw error;
       throw error instanceof DraftStorageError ? error : new DraftStorageError('web-lock-unavailable', error);
     }
   }
@@ -274,7 +280,7 @@ export function createDraftStorage(storage, {
     pendingMutation = null;
     return encrypted;
   }
-  async function loadInternal() {
+  async function loadInternal(canMutate) {
     const raw = readRawDraft();
     const classified = await classifyRaw(raw);
     pendingMutation = null;
@@ -285,7 +291,7 @@ export function createDraftStorage(storage, {
     const { result } = classified;
     if (result.status === 'current') {
       if (classified.plaintext) {
-        if (!locks?.request) {
+        if (!canMutate) {
           lastKnownRaw = raw;
           pendingMutation = 'encrypt-current';
         } else {
@@ -297,7 +303,7 @@ export function createDraftStorage(storage, {
       return result.state;
     }
     if (result.status === 'migrated' || result.status === 'salvaged') {
-      if (!locks?.request) {
+      if (!canMutate) {
         lastKnownRaw = raw;
         pendingMutation = 'migrate-draft';
       } else {
@@ -307,7 +313,7 @@ export function createDraftStorage(storage, {
     }
     if (result.status === 'too-old') {
       const replacement = createDefaultState();
-      if (!locks?.request) {
+      if (!canMutate) {
         lastKnownRaw = raw;
         pendingMutation = 'replace-too-old-draft';
       } else {
@@ -365,17 +371,17 @@ export function createDraftStorage(storage, {
   function remove(options = {}) {
     return enqueue(() => withLock(() => removeInternal(options), { mutation: true }));
   }
-  async function loadAndRecoverInternal() {
+  async function loadAndRecoverInternal(canMutate) {
     const raw = readRawDraft();
     try {
-      return { state: await loadInternal(), recovered: false };
+      return { state: await loadInternal(canMutate), recovered: false };
     } catch (error) {
       if (!isPermanentlyUnreadableDraftError(error)) throw error;
       try {
-        if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
+        if (!canMutate) throw new DraftStorageError('web-lock-unavailable');
         await removeInternal({ expectedRaw: raw, recovery: true });
       } catch (recoveryError) {
-        if (recoveryError.code === 'storage-changed') return { state: await loadInternal(), recovered: false };
+        if (recoveryError.code === 'storage-changed') return { state: await loadInternal(canMutate), recovered: false };
         throw recoveryError;
       }
       return { state: null, recovered: true };

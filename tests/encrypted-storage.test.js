@@ -90,6 +90,14 @@ function sharedLockManager(events = []) {
   };
 }
 
+function rejectingLockManager() {
+  return {
+    async request() {
+      throw new Error('Lock acquisition failed before callback start.');
+    }
+  };
+}
+
 async function encryptUnsupportedState(state, key) {
   const nonce = webcrypto.getRandomValues(new Uint8Array(12));
   const plaintext = new TextEncoder().encode(JSON.stringify(state));
@@ -563,4 +571,34 @@ test('missing Web Locks keep current and B0 drafts readable without committing t
   assert.equal(b0Storage.getItem(STORAGE_KEY), b0Raw);
   assert.equal(keys.current(), key);
   await assert.rejects(() => b0Draft.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');
+});
+
+test('a rejected Web Lock request falls back to read-only current and B0 loads without retrying a callback', async () => {
+  const current = createDefaultState('en');
+  current.profile.fields.fullName = 'Rejected-lock current plaintext';
+  const currentRaw = JSON.stringify(current);
+  const currentKeys = controllableKeyStore();
+  const currentStorage = memoryStorage({ [STORAGE_KEY]: currentRaw });
+  const currentDraft = persistence(currentStorage, currentKeys, { locks: rejectingLockManager() });
+  assert.equal((await currentDraft.load()).profile.fields.fullName, current.profile.fields.fullName);
+  assert.equal(currentDraft.getPendingMutation(), 'encrypt-current');
+  assert.equal(currentStorage.getItem(STORAGE_KEY), currentRaw);
+  assert.equal(currentKeys.current(), null);
+  await assert.rejects(() => currentDraft.save(current), (error) => error.code === 'web-lock-unavailable');
+  await assert.rejects(() => currentDraft.remove(), (error) => error.code === 'web-lock-unavailable');
+
+  const b0 = createDefaultState('en');
+  delete b0.schemaRevision;
+  b0.profile.fields.fullName = 'Rejected-lock B0 ciphertext';
+  const key = await webcrypto.subtle.generateKey({ name: ENCRYPTED_DRAFT_ALGORITHM, length: 256 }, false, ['encrypt', 'decrypt']);
+  const keys = controllableKeyStore(key);
+  const b0Raw = await encryptUnsupportedState(b0, key);
+  const b0Storage = memoryStorage({ [STORAGE_KEY]: b0Raw });
+  const b0Draft = persistence(b0Storage, keys, { locks: rejectingLockManager() });
+  assert.equal((await b0Draft.load()).schemaRevision, 1);
+  assert.equal(b0Draft.getPendingMutation(), 'migrate-draft');
+  assert.equal(b0Storage.getItem(STORAGE_KEY), b0Raw);
+  assert.equal(keys.current(), key);
+  await assert.rejects(() => b0Draft.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');
+  await assert.rejects(() => b0Draft.remove(), (error) => error.code === 'web-lock-unavailable');
 });
