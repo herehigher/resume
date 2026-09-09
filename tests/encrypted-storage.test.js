@@ -6,13 +6,43 @@ import { STORAGE_KEY } from '../site/assets/js/config.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
 import { createDraftStorage, DraftStorageError, ENCRYPTED_DRAFT_ALGORITHM, ENCRYPTED_DRAFT_FORMAT } from '../site/assets/js/state/storage.js';
 
+const UNRELATED_STORAGE_KEY = 'unrelated-storage-sentinel';
+const UNRELATED_STORAGE_VALUE = JSON.stringify({ keep: 'unrelated storage must remain untouched' });
+
 function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
+  const operations = [];
   return {
-    getItem(key) { return values.has(key) ? values.get(key) : null; },
-    setItem(key, value) { values.set(key, String(value)); },
-    removeItem(key) { values.delete(key); }
+    getItem(key) {
+      operations.push({ operation: 'getItem', key });
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      operations.push({ operation: 'setItem', key });
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      operations.push({ operation: 'removeItem', key });
+      values.delete(key);
+    },
+    key(index) {
+      operations.push({ operation: 'key', key: index });
+      return [...values.keys()][index] || null;
+    },
+    get length() {
+      operations.push({ operation: 'length' });
+      return values.size;
+    },
+    snapshot(key) { return values.has(key) ? values.get(key) : null; },
+    operations() { return operations.slice(); }
   };
+}
+
+function assertUnrelatedStorageUntouched(storage) {
+  assert.equal(storage.snapshot(UNRELATED_STORAGE_KEY), UNRELATED_STORAGE_VALUE);
+  assert.deepEqual(storage.operations().filter(({ key, operation }) => (
+    key === UNRELATED_STORAGE_KEY || operation === 'key' || operation === 'length'
+  )), []);
 }
 
 function memoryKeyStore() {
@@ -106,9 +136,7 @@ test('schema-incompatible encrypted and plaintext v1 drafts stay preserved and c
     responsibilities: '以前の担当業務',
     achievements: '以前の実績'
   };
-  const legacy = JSON.stringify({ keep: 'legacy storage must remain untouched' });
-
-  const encryptedStorage = memoryStorage({ 'resume-studio-data-v1': legacy });
+  const encryptedStorage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
   const encryptedKeys = controllableKeyStore();
   const key = await webcrypto.subtle.generateKey({ name: ENCRYPTED_DRAFT_ALGORITHM, length: 256 }, false, ['encrypt', 'decrypt']);
   await encryptedKeys.write(key);
@@ -119,18 +147,18 @@ test('schema-incompatible encrypted and plaintext v1 drafts stay preserved and c
   await assert.rejects(() => encryptedDraft.loadAndRecoverUnreadableDraft(), (error) => error.code === 'unsupported-state');
   await assert.rejects(() => encryptedDraft.save(createDefaultState()), (error) => error.code === 'unsupported-state');
   assert.equal(encryptedStorage.getItem(STORAGE_KEY), encryptedRaw);
-  assert.equal(encryptedStorage.getItem('resume-studio-data-v1'), legacy);
+  assertUnrelatedStorageUntouched(encryptedStorage);
   assert.equal(encryptedKeys.current(), key);
   assert.equal(encryptedKeys.removals(), 0);
 
   const plaintextRaw = JSON.stringify(unsupported);
-  const plaintextStorage = memoryStorage({ [STORAGE_KEY]: plaintextRaw, 'resume-studio-data-v1': legacy });
+  const plaintextStorage = memoryStorage({ [STORAGE_KEY]: plaintextRaw, [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
   const plaintextKeys = controllableKeyStore();
   const plaintextDraft = persistence(plaintextStorage, plaintextKeys);
   await assert.rejects(() => plaintextDraft.loadAndRecoverUnreadableDraft(), (error) => error.code === 'unsupported-state');
   await assert.rejects(() => plaintextDraft.save(createDefaultState()), (error) => error.code === 'unsupported-state');
   assert.equal(plaintextStorage.getItem(STORAGE_KEY), plaintextRaw);
-  assert.equal(plaintextStorage.getItem('resume-studio-data-v1'), legacy);
+  assertUnrelatedStorageUntouched(plaintextStorage);
   assert.equal(plaintextKeys.current(), null);
   assert.equal(plaintextKeys.removals(), 0);
 });
@@ -245,19 +273,18 @@ test('startup recovery does not clear a newer draft that replaces the unreadable
 });
 
 test('startup clears only permanently unreadable drafts and returns a saveable default state', async () => {
-  const legacy = JSON.stringify({ keep: 'legacy' });
   const scenarios = [
     {
       name: 'corrupt envelope',
       setup: async () => ({
-        storage: memoryStorage({ [STORAGE_KEY]: '{not-json', 'resume-studio-data-v1': legacy }),
+        storage: memoryStorage({ [STORAGE_KEY]: '{not-json', [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE }),
         keyStore: memoryKeyStore()
       })
     },
     {
       name: 'missing key',
       setup: async () => {
-        const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+        const storage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
         const originalKeys = memoryKeyStore();
         await persistence(storage, originalKeys).save(createDefaultState());
         return { storage, keyStore: memoryKeyStore() };
@@ -266,7 +293,7 @@ test('startup clears only permanently unreadable drafts and returns a saveable d
     {
       name: 'invalid key',
       setup: async () => {
-        const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+        const storage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
         const keyStore = memoryKeyStore();
         await persistence(storage, keyStore).save(createDefaultState());
         await keyStore.write({ type: 'secret', extractable: true, algorithm: { name: 'AES-GCM' }, usages: ['encrypt', 'decrypt'] });
@@ -276,7 +303,7 @@ test('startup clears only permanently unreadable drafts and returns a saveable d
     {
       name: 'decrypt failure',
       setup: async () => {
-        const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+        const storage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
         const keyStore = memoryKeyStore();
         await persistence(storage, keyStore).save(createDefaultState());
         await keyStore.write(await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
@@ -291,7 +318,7 @@ test('startup clears only permanently unreadable drafts and returns a saveable d
     assert.equal(result.state, null, scenario.name);
     assert.equal(result.recovered, true, scenario.name);
     assert.equal(storage.getItem(STORAGE_KEY), null, scenario.name);
-    assert.equal(storage.getItem('resume-studio-data-v1'), legacy, scenario.name);
+    assertUnrelatedStorageUntouched(storage);
 
     const defaultState = createDefaultState();
     defaultState.profile.fields.fullName = `Recovered ${scenario.name}`;
@@ -334,9 +361,8 @@ test('startup recovery preserves the draft when cleanup or the storage environme
   assert.equal(removeCalled, false);
 });
 
-test('clear keeps the encrypted draft when key deletion fails and never touches legacy storage', async () => {
-  const legacy = JSON.stringify({ keep: 'legacy' });
-  const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+test('clear keeps the encrypted draft when key deletion fails and does not touch unrelated storage', async () => {
+  const storage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
   const keys = memoryKeyStore();
   const draft = persistence(storage, keys);
   await draft.save(createDefaultState());
@@ -345,12 +371,11 @@ test('clear keeps the encrypted draft when key deletion fails and never touches 
 
   await assert.rejects(() => draft.remove(), (error) => error.code === 'indexeddb-unavailable');
   assert.equal(storage.getItem(STORAGE_KEY), original);
-  assert.equal(storage.getItem('resume-studio-data-v1'), legacy);
+  assertUnrelatedStorageUntouched(storage);
 });
 
-test('legacy key remains untouched and shared profile plus locale documents survive encrypted persistence', async () => {
-  const legacy = JSON.stringify({ fields: { fullName: 'Do not read' } });
-  const storage = memoryStorage({ 'resume-studio-data-v1': legacy });
+test('unrelated storage remains untouched and shared profile plus locale documents survive encrypted persistence', async () => {
+  const storage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
   const keyStore = memoryKeyStore();
   const state = createDefaultState('zh-CN');
   state.profile.fields.fullName = 'Shared Profile';
@@ -360,11 +385,33 @@ test('legacy key remains untouched and shared profile plus locale documents surv
 
   await persistence(storage, keyStore).save(state);
   const restored = await persistence(storage, keyStore).load();
-  assert.equal(storage.getItem('resume-studio-data-v1'), legacy);
+  assertUnrelatedStorageUntouched(storage);
   assert.equal(restored.profile.fields.fullName, 'Shared Profile');
   assert.equal(restored.documents.ja.fields.motivation, 'Japanese only');
   assert.equal(restored.documents['zh-CN'].resume.summary, 'Chinese only');
   assert.equal(restored.documents.en.resume.summary, 'English only');
+});
+
+test('draft load, save, clear, and recovery access only the configured draft key', async () => {
+  const loadStorage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
+  assert.equal(await persistence(loadStorage).load(), null);
+  assertUnrelatedStorageUntouched(loadStorage);
+
+  const saveStorage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
+  const saveDraft = persistence(saveStorage);
+  await saveDraft.save(createDefaultState());
+  assertUnrelatedStorageUntouched(saveStorage);
+
+  const clearStorage = memoryStorage({ [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
+  const clearDraft = persistence(clearStorage);
+  await clearDraft.save(createDefaultState());
+  await clearDraft.remove();
+  assertUnrelatedStorageUntouched(clearStorage);
+
+  const recoveryStorage = memoryStorage({ [STORAGE_KEY]: '{not-json', [UNRELATED_STORAGE_KEY]: UNRELATED_STORAGE_VALUE });
+  const recovery = await persistence(recoveryStorage).loadAndRecoverUnreadableDraft();
+  assert.equal(recovery.recovered, true);
+  assertUnrelatedStorageUntouched(recoveryStorage);
 });
 
 test('queued saves preserve the most recent page-lifecycle snapshot', async () => {

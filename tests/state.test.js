@@ -129,9 +129,9 @@ test('locale preference is versioned, unencrypted, and independent from the draf
   assert.equal(loadLocalePreference(storage), 'en');
 });
 
-test('new storage ignores the legacy key', () => {
+test('new storage reads only the configured draft key', () => {
   const storage = createMemoryStorage({
-    'resume-studio-data-v1': JSON.stringify({ fields: { fullName: 'Legacy' } })
+    'unrelated-storage-sentinel': JSON.stringify({ fields: { fullName: 'Unrelated' } })
   });
   assert.equal(readPersisted(storage), null);
 });

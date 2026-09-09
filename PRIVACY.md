@@ -12,7 +12,7 @@ Version 1.1 - Effective 2026-09-01
 
 ### 保存する情報
 
-Resume Studio は、現在の browser origin の `localStorage` に `resume-studio-web-v1` という key で下書きを保存します。下書き本文は Web Crypto の AES-GCM で暗号化し、保存値は format version、algorithm、nonce、ciphertext を含む内部用 envelope です。復号用 AES key は取り出せない `CryptoKey` として同じ origin の IndexedDB に分けて保存し、localStorage には保存しません。一つの v1 state に profile、埋め込み写真、日本語・简体中文・English の文書、言語と用紙設定が含まれます。既存の plaintext v1 下書きは、暗号化保存が成功した場合だけ同じ key で暗号化形式へ移行します。旧形式 `resume-studio-data-v1` は読み込み、移行、削除しません。入力時の自動保存に加え、利用者は手動保存、JSON 書き出し・読込、browser の印刷機能による PDF 保存を実行できます。公開 JSON の format は v1 のままで、暗号 envelope は export されません。
+Resume Studio は、現在の browser origin の `localStorage` に `resume-studio-web-v1` という key で下書きを保存します。下書き本文は Web Crypto の AES-GCM で暗号化し、保存値は format version、algorithm、nonce、ciphertext を含む内部用 envelope です。復号用 AES key は取り出せない `CryptoKey` として同じ origin の IndexedDB に分けて保存し、localStorage には保存しません。一つの v1 state に profile、埋め込み写真、日本語・简体中文・English の文書、言語と用紙設定が含まれます。既存の plaintext v1 下書きは、暗号化保存が成功した場合だけ同じ key で暗号化形式へ移行します。草稿処理は設定された草稿 key だけを操作し、無関係な localStorage 項目を列挙、読み込み、変更しません。入力時の自動保存に加え、利用者は手動保存、JSON 書き出し・読込、browser の印刷機能による PDF 保存を実行できます。公開 JSON の format は v1 のままで、暗号 envelope は export されません。
 
 暗号化保存には secure context が必要です。`https://`、`http://localhost`、または `http://127.0.0.1` 以外の non-secure HTTP origin では草稿の保存・再読込を拒否し、既存の保存データを変更しません。
 
@@ -26,7 +26,7 @@ Repository の `site/`、clone、fork では Analytics は無効で、HTML、CSS
 
 localStorage の下書き本文は AES-GCM で暗号化されますが、export file は暗号化されません。鍵または browser data を消去、private browsing を終了、保存容量超過、または browser による storage eviction が起きると、下書きを復号できない・失う可能性があります。重要な下書きは JSON で安全な場所へ backup してください。この保護は same-origin script/XSS、悪意の browser extension、browser profile または端末の侵害を防ぐものではありません。
 
-アプリ内の削除 UI は日本語画面の最下部にあります。確認して削除すると `resume-studio-web-v1` の三言語下書きと現在の画面入力をまとめて消去します。この操作は取り消せません。旧形式 `resume-studio-data-v1`、download 済み JSON/PDF、browser の download 履歴、別 origin/profile の data は削除しません。
+アプリ内の削除 UI は日本語画面の最下部にあります。確認して削除すると `resume-studio-web-v1` の三言語下書きと現在の画面入力をまとめて消去します。この操作は取り消せません。無関係な storage 項目、download 済み JSON/PDF、browser の download 履歴、別 origin/profile の data は削除しません。
 
 JSON と PDF には氏名、連絡先、経歴、写真などの個人情報が含まれる場合があります。共有と保管は利用者自身で管理してください。
 
@@ -36,7 +36,7 @@ JSON と PDF には氏名、連絡先、経歴、写真などの個人情報が�
 
 ### 保存的信息
 
-Resume Studio 使用 key `resume-studio-web-v1`，把草稿保存在当前 browser origin 的 `localStorage` 中。草稿正文通过 Web Crypto AES-GCM 加密；保存值是仅供内部使用的 envelope，包含 format version、algorithm、nonce 和 ciphertext。用于解密的 AES key 是不可导出的 `CryptoKey`，单独存放在同一 origin 的 IndexedDB，不存入 localStorage。一个 v1 state 包含 profile、嵌入照片、日本語、简体中文和 English 文档，以及语言与纸张设置。已有的 plaintext v1 草稿只有在加密保存成功后才会迁移为加密格式；旧格式 `resume-studio-data-v1` 不会被读取、迁移或删除。除输入时自动保存外，用户还可以手动保存、导出/导入 JSON，并通过 browser 打印功能保存 PDF。公开 JSON format 仍为 v1，导出中不会包含该 envelope。
+Resume Studio 使用 key `resume-studio-web-v1`，把草稿保存在当前 browser origin 的 `localStorage` 中。草稿正文通过 Web Crypto AES-GCM 加密；保存值是仅供内部使用的 envelope，包含 format version、algorithm、nonce 和 ciphertext。用于解密的 AES key 是不可导出的 `CryptoKey`，单独存放在同一 origin 的 IndexedDB，不存入 localStorage。一个 v1 state 包含 profile、嵌入照片、日本語、简体中文和 English 文档，以及语言与纸张设置。已有的 plaintext v1 草稿只有在加密保存成功后才会迁移为加密格式；草稿处理只操作配置的草稿 key，不会枚举、读取或修改无关的 localStorage 项。除输入时自动保存外，用户还可以手动保存、导出/导入 JSON，并通过 browser 打印功能保存 PDF。公开 JSON format 仍为 v1，导出中不会包含该 envelope。
 
 加密保存需要安全上下文。在 `https://`、`http://localhost` 或 `http://127.0.0.1` 以外的非安全 HTTP origin 中，应用会拒绝保存和重新载入草稿，并且不会修改已有的保存数据。
 
@@ -50,7 +50,7 @@ Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics；除加载 HT
 
 localStorage 中的草稿正文使用 AES-GCM 加密，但 export file 不加密。清除密钥或 browser data、结束 private browsing、超出存储容量或 browser storage eviction 都可能使草稿无法解密或丢失。请将重要草稿导出为 JSON 并安全 backup。该保护不能防护同源 script/XSS、恶意 browser extension、browser profile 或设备被入侵。
 
-应用内删除 UI 位于日本語页面最下方。确认删除后，`resume-studio-web-v1` 中三种语言的草稿和当前画面输入会一起被清除，且无法撤销。该操作不会删除旧格式 `resume-studio-data-v1`、已经下载的 JSON/PDF、browser download history，也不会清除其他 origin/profile 的 data。
+应用内删除 UI 位于日本語页面最下方。确认删除后，`resume-studio-web-v1` 中三种语言的草稿和当前画面输入会一起被清除，且无法撤销。该操作不会删除无关的 storage 项、已经下载的 JSON/PDF、browser download history，也不会清除其他 origin/profile 的 data。
 
 JSON 和 PDF 可能包含姓名、联系方式、经历及照片等个人信息。用户需自行负责共享与保管。
 
@@ -60,7 +60,7 @@ JSON 和 PDF 可能包含姓名、联系方式、经历及照片等个人信息�
 
 ### Data stored
 
-Resume Studio stores the draft in `localStorage` for the current browser origin under the key `resume-studio-web-v1`. Draft content is encrypted with Web Crypto AES-GCM; the stored internal envelope contains a format version, algorithm, nonce, and ciphertext. The decryption AES key is a non-extractable `CryptoKey`, kept separately in IndexedDB for the same origin and never in localStorage. One v1 state contains the profile, embedded photo, Japanese, Simplified Chinese, and English documents, plus locale and paper settings. An existing plaintext v1 draft is migrated to encrypted storage only after encrypted persistence succeeds. The legacy `resume-studio-data-v1` key is never read, migrated, or removed. In addition to autosave while editing, the user can save manually, export/import JSON, and save a PDF through the browser's print function. The public JSON format remains v1; the internal envelope is never exported.
+Resume Studio stores the draft in `localStorage` for the current browser origin under the key `resume-studio-web-v1`. Draft content is encrypted with Web Crypto AES-GCM; the stored internal envelope contains a format version, algorithm, nonce, and ciphertext. The decryption AES key is a non-extractable `CryptoKey`, kept separately in IndexedDB for the same origin and never in localStorage. One v1 state contains the profile, embedded photo, Japanese, Simplified Chinese, and English documents, plus locale and paper settings. An existing plaintext v1 draft is migrated to encrypted storage only after encrypted persistence succeeds. Draft handling operates only on its configured draft key and does not enumerate, read, or modify unrelated localStorage entries. In addition to autosave while editing, the user can save manually, export/import JSON, and save a PDF through the browser's print function. The public JSON format remains v1; the internal envelope is never exported.
 
 Encrypted persistence requires a secure context. On non-secure HTTP origins other than `http://localhost` or `http://127.0.0.1`, the app refuses to save or reload drafts and does not change existing saved data.
 
@@ -74,6 +74,6 @@ An enabled official artifact loads the beacon script at a fixed URL from `static
 
 Draft content in localStorage is AES-GCM encrypted, but exported files are not encrypted. Clearing the key or browser data, ending a private-browsing session, exceeding storage quota, or browser storage eviction can make a draft undecryptable or remove it. Export important drafts as JSON and keep the backup secure. This protection does not defend against same-origin scripts/XSS, malicious browser extensions, or browser-profile or device compromise.
 
-The in-app deletion UI is at the bottom of the Japanese screen. After confirmation, it removes all three language drafts in `resume-studio-web-v1` and resets the current on-screen input. This cannot be undone. It does not remove the legacy `resume-studio-data-v1` key, downloaded JSON/PDF files, browser download history, or data belonging to another origin/profile.
+The in-app deletion UI is at the bottom of the Japanese screen. After confirmation, it removes all three language drafts in `resume-studio-web-v1` and resets the current on-screen input. This cannot be undone. It does not remove unrelated storage entries, downloaded JSON/PDF files, browser download history, or data belonging to another origin/profile.
 
 JSON and PDF files may contain personal information such as a name, contact details, employment history, and photo. The user controls their storage and sharing.

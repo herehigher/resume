@@ -33,9 +33,6 @@ javascriptFiles.forEach((file) => {
   if (/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/.test(source)) {
     failures.push(`${file}: network APIs are not allowed`);
   }
-  if (source.includes('resume-studio-data-v1')) {
-    failures.push(`${file}: legacy storage data must not be read or modified`);
-  }
 });
 
 const indexPath = join(root, 'editor/index.html');
