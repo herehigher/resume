@@ -1,10 +1,13 @@
-import { CURRENT_SCHEMA_REVISION, PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
+import { CURRENT_SCHEMA_REVISION, STATE_VERSION } from '../config.js';
 import { validateCurrentState } from './schema.js';
 
 const OWN = Object.prototype.hasOwnProperty;
+const B0_VERSION = 1;
+const B0_LOCALES = Object.freeze(['ja', 'zh-CN', 'en']);
+const B0_PAGE_SIZES = Object.freeze(['A4', 'LETTER']);
 const JAPANESE_FIELDS = ['nameKana', 'addressKana', 'createdDate', 'motivation', 'requests', 'careerSummary', 'skills', 'selfPromotion'];
 const PROFILE_FIELDS = ['fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'];
-const PAGE_BREAK_TARGETS = Object.freeze({
+const B0_PAGE_BREAK_TARGETS = Object.freeze({
   ja: Object.freeze({ resume: ['history', 'qualifications', 'motivation', 'requests'], career: ['summary', 'skills', 'career-history', 'self-promotion'] }),
   'zh-CN': Object.freeze({ resume: ['summary', 'experience', 'projects', 'education', 'skills', 'certifications'] }),
   en: Object.freeze({ resume: ['summary', 'experience', 'projects', 'education', 'skills', 'certifications'] })
@@ -37,11 +40,11 @@ function hasEntries(value, keys) {
 }
 
 function hasPageBreaks(value) {
-  if (!hasExactKeys(value, SUPPORTED_LOCALES)) return false;
-  return SUPPORTED_LOCALES.every((locale) => {
-    const documentTargets = PAGE_BREAK_TARGETS[locale];
-    if (!hasExactKeys(value[locale], PAGE_SIZES)) return false;
-    return PAGE_SIZES.every((paper) => {
+  if (!hasExactKeys(value, B0_LOCALES)) return false;
+  return B0_LOCALES.every((locale) => {
+    const documentTargets = B0_PAGE_BREAK_TARGETS[locale];
+    if (!hasExactKeys(value[locale], B0_PAGE_SIZES)) return false;
+    return B0_PAGE_SIZES.every((paper) => {
       const byDocument = value[locale][paper];
       if (!hasExactKeys(byDocument, Object.keys(documentTargets))) return false;
       return Object.entries(documentTargets).every(([documentType, allowed]) => {
@@ -97,15 +100,15 @@ function hasInternationalDocument(value, locale) {
 // It expires once R4 is introduced; see isBootstrapSupported below.
 export function isBootstrapState(value) {
   return hasExactKeys(value, ['version', 'settings', 'profile', 'documents'])
-    && value.version === STATE_VERSION
+    && value.version === B0_VERSION
     && !('schemaRevision' in value)
     && hasExactKeys(value.settings, ['locale', 'pageSizeByLocale', 'pageBreaks'])
-    && SUPPORTED_LOCALES.includes(value.settings.locale)
-    && hasExactKeys(value.settings.pageSizeByLocale, SUPPORTED_LOCALES)
-    && SUPPORTED_LOCALES.every((locale) => PAGE_SIZES.includes(value.settings.pageSizeByLocale[locale]))
+    && B0_LOCALES.includes(value.settings.locale)
+    && hasExactKeys(value.settings.pageSizeByLocale, B0_LOCALES)
+    && B0_LOCALES.every((locale) => B0_PAGE_SIZES.includes(value.settings.pageSizeByLocale[locale]))
     && hasPageBreaks(value.settings.pageBreaks)
     && hasProfile(value.profile)
-    && hasExactKeys(value.documents, SUPPORTED_LOCALES)
+    && hasExactKeys(value.documents, B0_LOCALES)
     && hasJapaneseDocument(value.documents.ja)
     && hasInternationalDocument(value.documents['zh-CN'], 'zh-CN')
     && hasInternationalDocument(value.documents.en, 'en');
@@ -171,26 +174,31 @@ export function createMigrationRunner({
   return function migrate(value) {
     if (!isObject(value) || value.version !== STATE_VERSION) return rejected('unsupported', 'unknown-version');
     const hasRevision = OWN.call(value, 'schemaRevision');
+    let state;
+    let revision;
+    let bootstrap = false;
     if (!hasRevision) {
       if (!isBootstrapSupported(currentRevision) || !isBootstrap(value)) return rejected('unsupported', 'unknown-revision');
       try {
-        const state = bootstrapMigration.migrate(value);
-        const validation = validateCurrent(state);
-        return validation.valid ? { status: 'migrated', reason: 'bootstrap', state } : rejected('unsupported', 'final-validation-failed');
+        state = bootstrapMigration.migrate(value);
+        if (!isObject(state) || state.schemaRevision !== bootstrapMigration.to) return rejected('unsupported', 'migration-step-invalid');
+        revision = state.schemaRevision;
+        bootstrap = true;
       } catch {
         return rejected('unsupported', 'migration-failed');
       }
-    }
-    if (!validRevision(value.schemaRevision)) return rejected('unsupported', 'invalid-revision');
-    if (value.schemaRevision > currentRevision) return rejected('future', 'future-revision');
-    if (value.schemaRevision < minimumRevision) return rejected('too-old', 'revision-window-expired');
-    if (value.schemaRevision === currentRevision) {
-      const validation = validateCurrent(value);
-      return validation.valid ? { status: 'current', state: value } : rejected('unsupported', 'current-validation-failed');
+    } else {
+      if (!validRevision(value.schemaRevision)) return rejected('unsupported', 'invalid-revision');
+      if (value.schemaRevision > currentRevision) return rejected('future', 'future-revision');
+      if (value.schemaRevision < minimumRevision) return rejected('too-old', 'revision-window-expired');
+      if (value.schemaRevision === currentRevision) {
+        const validation = validateCurrent(value);
+        return validation.valid ? { status: 'current', state: value } : rejected('unsupported', 'current-validation-failed');
+      }
+      state = copy(value);
+      revision = state.schemaRevision;
     }
 
-    let state = copy(value);
-    let revision = state.schemaRevision;
     let salvaged = false;
     while (revision < currentRevision) {
       const step = numberedSteps.find((candidate) => candidate.from === revision && candidate.to === revision + 1);
@@ -207,7 +215,7 @@ export function createMigrationRunner({
     }
     const validation = validateCurrent(state);
     return validation.valid
-      ? { status: salvaged ? 'salvaged' : 'migrated', state }
+      ? { status: salvaged ? 'salvaged' : 'migrated', ...(bootstrap ? { reason: 'bootstrap' } : {}), state }
       : rejected('unsupported', 'final-validation-failed');
   };
 }

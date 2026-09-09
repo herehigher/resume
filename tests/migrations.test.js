@@ -6,6 +6,7 @@ import {
   createMigrationRunner,
   isBootstrapState,
   mapValidArray,
+  MIGRATION_REGISTRY,
   migrateState,
   preferValidValue
 } from '../site/assets/js/state/migrations.js';
@@ -104,6 +105,54 @@ test('B0 is a fixed, strict bootstrap shape and migrates to the fixed R1 fixture
   priorJapaneseCareer.documents.ja.careers[0].responsibilities = 'Do not infer an older career shape.';
   assert.equal(isBootstrapState(priorJapaneseCareer), false);
   assert.deepEqual(migrateState(priorJapaneseCareer), { status: 'unsupported', reason: 'unknown-revision' });
+});
+
+test('B0 classification is isolated from future locale and paper-size constants', () => {
+  const b0 = fixture('bootstrap-b0');
+  const source = readFileSync(new URL('../site/assets/js/state/migrations.js', import.meta.url), 'utf8');
+
+  assert.equal(isBootstrapState(b0), true);
+  assert.doesNotMatch(source, /\bSUPPORTED_LOCALES\b/);
+  assert.doesNotMatch(source, /\bPAGE_SIZES\b/);
+
+  const futureShape = structuredClone(b0);
+  futureShape.settings.pageSizeByLocale.fr = 'B5';
+  futureShape.settings.pageBreaks.fr = { B5: { resume: [] } };
+  futureShape.documents.fr = { activeDocument: 'resume', resume: {} };
+  assert.equal(isBootstrapState(futureShape), false, 'B0 remains the fixed #151 locale and paper set');
+});
+
+test('B0 joins injected R2 and R3 numbered chains before final validation', () => {
+  const b0 = fixture('bootstrap-b0');
+  const registry = [
+    {
+      from: 1,
+      to: 2,
+      summary: 'Fixture-only R1 to R2 step.',
+      migrate(source) { return { state: { ...source, schemaRevision: 2, migrationTrace: [2] } }; }
+    },
+    {
+      from: 2,
+      to: 3,
+      summary: 'Fixture-only R2 to R3 step.',
+      migrate(source) { return { state: { ...source, schemaRevision: 3, migrationTrace: [...source.migrationTrace, 3] } }; }
+    }
+  ];
+
+  for (const [currentRevision, trace] of [[2, [2]], [3, [2, 3]]]) {
+    const runner = createMigrationRunner({
+      currentRevision,
+      registry,
+      validateCurrent: (value) => ({ valid: value?.schemaRevision === currentRevision && value.migrationTrace?.join(',') === trace.join(',') })
+    });
+    const result = runner(b0);
+    const expected = structuredClone(b0);
+    expected.schemaRevision = currentRevision;
+    expected.migrationTrace = trace;
+    assert.deepEqual(result, { status: 'migrated', reason: 'bootstrap', state: expected });
+  }
+
+  assert.deepEqual(MIGRATION_REGISTRY.map(({ from, to }) => ({ from, to })), [{ from: 'B0', to: 1 }]);
 });
 
 test('revision classification is exclusive for malformed, future, old, and unknown payloads', () => {
