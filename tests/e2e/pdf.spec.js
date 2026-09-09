@@ -395,6 +395,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
       buffer: Buffer.from(JSON.stringify(state))
     });
     await page.locator('#confirmSampleAdoptButton').click();
+    await expect(page.locator('#importDataInput')).toHaveValue('');
     await expect(page.locator(previewSelector)).toContainText('SYNTHETIC-ENTRY-095');
     const pages = await inspectPdf(await printPdf(page));
     const text = pages.map((item) => item.text).join(' ');
