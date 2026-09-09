@@ -1,9 +1,11 @@
 import { STORAGE_KEY } from '../config.js';
-import { cloneData } from './defaults.js';
-import { assertValidState, validateState } from './schema.js';
+import { cloneData, createDefaultState } from './defaults.js';
+import { assertValidState, validateCurrentState } from './schema.js';
+import { migrateState } from './migrations.js';
 
 export const ENCRYPTED_DRAFT_FORMAT = 'resume-studio-local-encrypted-v1';
 export const ENCRYPTED_DRAFT_ALGORITHM = 'AES-GCM';
+export const DRAFT_WEB_LOCK_NAME = 'resume-studio-web-v1:draft';
 const KEY_DATABASE = 'resume-studio-web-v1-keys';
 const KEY_STORE = 'keys';
 const KEY_ID = 'draft-encryption-key';
@@ -144,19 +146,25 @@ function validateEnvelope(value) {
   return { nonce, ciphertext };
 }
 
-function isPlaintextState(value) {
-  return value && typeof value === 'object' && validateState(value).valid;
-}
-
 function isPlaintextStateCandidate(value) {
   return value && typeof value === 'object' && !Array.isArray(value) && value.version !== undefined;
 }
 
-export function createDraftStorage(storage, { crypto = globalThis.crypto, indexedDB = globalThis.indexedDB, keyStore = null } = {}) {
+function nodeTestLockManager() {
+  return { request: async (_name, _options, callback) => callback() };
+}
+
+export function createDraftStorage(storage, {
+  crypto = globalThis.crypto,
+  indexedDB = globalThis.indexedDB,
+  keyStore = null,
+  locks = globalThis.navigator?.locks ?? (typeof window === 'undefined' ? nodeTestLockManager() : null)
+} = {}) {
   if (!storage) throw new TypeError('localStorage is required');
   const cryptography = crypto?.subtle ? crypto : null;
   let keyStoreInstance;
   let persistenceTail = Promise.resolve();
+  let lastKnownRaw;
   function keys() {
     if (!keyStoreInstance) keyStoreInstance = keyStore || createKeyStore(indexedDB);
     return keyStoreInstance;
@@ -165,6 +173,17 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     const task = persistenceTail.then(operation, operation);
     persistenceTail = task.catch(() => {});
     return task;
+  }
+  async function withLock(operation, { mutation = false } = {}) {
+    if (!locks?.request) {
+      if (mutation) throw new DraftStorageError('web-lock-unavailable');
+      return operation();
+    }
+    try {
+      return await locks.request(DRAFT_WEB_LOCK_NAME, { mode: 'exclusive' }, operation);
+    } catch (error) {
+      throw error instanceof DraftStorageError ? error : new DraftStorageError('web-lock-unavailable', error);
+    }
   }
   async function encryptionKey({ create = false } = {}) {
     if (!cryptography) throw new DraftStorageError('crypto-unavailable');
@@ -185,7 +204,7 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     return key;
   }
   async function encrypt(state, allowKeyCreation) {
-    assertValidState(state);
+    if (!validateCurrentState(state).valid) throw new DraftStorageError('unsupported-state');
     const key = await encryptionKey({ create: allowKeyCreation });
     const plaintext = new TextEncoder().encode(JSON.stringify(state));
     // AES-GCM appends a 128-bit authentication tag, so reject before allocating an oversized envelope.
@@ -212,7 +231,7 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     }
     try {
       const state = JSON.parse(new TextDecoder().decode(plaintext));
-      if (!isPlaintextState(state)) throw new DraftStorageError('unsupported-state');
+      if (!state || typeof state !== 'object' || Array.isArray(state)) throw new DraftStorageError('unsupported-state');
       return state;
     } catch (error) {
       throw error instanceof DraftStorageError ? error : new DraftStorageError('corrupt-envelope', error);
@@ -223,56 +242,94 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     try { raw = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
     return raw;
   }
-  async function loadRawDraft(raw) {
-    if (!raw) return null;
+  async function decodeRawDraft(raw) {
+    if (!raw) return { state: null, plaintext: false };
     if (raw.length > MAX_ENVELOPE_CHARACTERS) throw new DraftStorageError('corrupt-envelope');
     let parsed;
     try { parsed = JSON.parse(raw); } catch (error) { throw new DraftStorageError('corrupt-envelope', error); }
-    if (isPlaintextState(parsed)) {
-      await save(parsed);
-      return parsed;
-    }
-    if (isPlaintextStateCandidate(parsed)) throw new DraftStorageError('unsupported-state');
-    return decrypt(parsed);
+    if (isPlaintextStateCandidate(parsed)) return { state: parsed, plaintext: true };
+    return { state: await decrypt(parsed), plaintext: false };
   }
-  async function load() {
-    return loadRawDraft(readRawDraft());
+  function migrationError(result) {
+    return new DraftStorageError(result.status === 'future' ? 'future-state' : result.status === 'too-old' ? 'too-old-state' : 'unsupported-state');
+  }
+  async function classifyRaw(raw) {
+    const decoded = await decodeRawDraft(raw);
+    if (!decoded.state) return { ...decoded, result: null };
+    return { ...decoded, result: migrateState(decoded.state) };
+  }
+  function assertExpectedRaw(expectedRaw) {
+    const actual = readRawDraft();
+    if (actual !== expectedRaw) throw new DraftStorageError('storage-changed');
+    return actual;
+  }
+  async function replaceIfUnchanged(expectedRaw, state, { allowKeyCreation = false } = {}) {
+    assertExpectedRaw(expectedRaw);
+    const encrypted = await encrypt(state, allowKeyCreation);
+    assertExpectedRaw(expectedRaw);
+    try { storage.setItem(STORAGE_KEY, encrypted); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+    lastKnownRaw = encrypted;
+    return encrypted;
+  }
+  async function loadInternal() {
+    const raw = readRawDraft();
+    const classified = await classifyRaw(raw);
+    if (!classified.result) {
+      lastKnownRaw = raw;
+      return null;
+    }
+    const { result } = classified;
+    if (result.status === 'current') {
+      if (classified.plaintext) {
+        if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
+        await replaceIfUnchanged(raw, result.state, { allowKeyCreation: true });
+      } else {
+        lastKnownRaw = raw;
+      }
+      return result.state;
+    }
+    if (result.status === 'migrated' || result.status === 'salvaged') {
+      if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
+      await replaceIfUnchanged(raw, result.state, { allowKeyCreation: classified.plaintext });
+      return result.state;
+    }
+    if (result.status === 'too-old') {
+      if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
+      const replacement = createDefaultState();
+      await replaceIfUnchanged(raw, replacement, { allowKeyCreation: classified.plaintext });
+      return replacement;
+    }
+    throw migrationError(result);
+  }
+  function load() {
+    return withLock(loadInternal);
+  }
+  async function saveInternal(snapshot) {
+    const existing = readRawDraft();
+    const classified = await classifyRaw(existing);
+    if (classified.result && !['current', 'migrated', 'salvaged'].includes(classified.result.status)) throw migrationError(classified.result);
+    if (existing !== null && lastKnownRaw === undefined) throw new DraftStorageError('storage-changed');
+    if (lastKnownRaw !== undefined && existing !== lastKnownRaw) throw new DraftStorageError('storage-changed');
+    if (classified.result?.status === 'migrated' || classified.result?.status === 'salvaged') {
+      throw new DraftStorageError('storage-changed');
+    }
+    await replaceIfUnchanged(existing, snapshot, { allowKeyCreation: !existing || classified.plaintext });
   }
   function save(state) {
     const snapshot = cloneData(assertValidState(state));
-    return enqueue(async () => {
-      let existing;
-      try { existing = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
-      let allowKeyCreation = !existing;
-      if (existing) {
-        if (existing.length > MAX_ENVELOPE_CHARACTERS) throw new DraftStorageError('corrupt-envelope');
-        try {
-          const parsed = JSON.parse(existing);
-          if (isPlaintextState(parsed)) allowKeyCreation = true;
-          else if (isPlaintextStateCandidate(parsed)) throw new DraftStorageError('unsupported-state');
-          else {
-            validateEnvelope(parsed);
-            // Do not replace a ciphertext unless the current key proves it can decrypt it.
-            await decrypt(parsed);
-          }
-        } catch (error) {
-          throw error instanceof DraftStorageError ? error : new DraftStorageError('corrupt-envelope', error);
-        }
-      }
-      const encrypted = await encrypt(snapshot, allowKeyCreation);
-      try {
-        if (storage.getItem(STORAGE_KEY) !== existing) throw new DraftStorageError('storage-changed');
-        storage.setItem(STORAGE_KEY, encrypted);
-      } catch (error) {
-        throw error instanceof DraftStorageError ? error : new DraftStorageError('storage-unavailable', error);
-      }
-    });
+    if (!validateCurrentState(snapshot).valid) return Promise.reject(new DraftStorageError('unsupported-state'));
+    return enqueue(() => withLock(() => saveInternal(snapshot), { mutation: true }));
   }
-  function remove({ expectedRaw } = {}) {
-    return enqueue(async () => {
-      let existing;
-      try { existing = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+  async function removeInternal({ expectedRaw, recovery = false } = {}) {
+      const existing = readRawDraft();
       if (expectedRaw !== undefined && existing !== expectedRaw) throw new DraftStorageError('storage-changed');
+      if (existing && !recovery) {
+        const { result } = await classifyRaw(existing);
+        if (!result || !['current', 'migrated', 'salvaged'].includes(result.status)) throw migrationError(result || { status: 'unsupported' });
+      }
+      if (!recovery && expectedRaw === undefined && existing !== null && lastKnownRaw === undefined) {
+        throw new DraftStorageError('storage-changed');
+      }
       try { storage.removeItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
       try {
         await keys().remove();
@@ -284,22 +341,29 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
         }
         throw error instanceof DraftStorageError ? error : new DraftStorageError('indexeddb-unavailable', error);
       }
-    });
+      lastKnownRaw = null;
   }
-  async function loadAndRecoverUnreadableDraft() {
+  function remove(options = {}) {
+    return enqueue(() => withLock(() => removeInternal(options), { mutation: true }));
+  }
+  async function loadAndRecoverInternal() {
     const raw = readRawDraft();
     try {
-      return { state: await loadRawDraft(raw), recovered: false };
+      return { state: await loadInternal(), recovered: false };
     } catch (error) {
       if (!isPermanentlyUnreadableDraftError(error)) throw error;
       try {
-        await remove({ expectedRaw: raw });
+        if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
+        await removeInternal({ expectedRaw: raw, recovery: true });
       } catch (recoveryError) {
-        if (recoveryError.code === 'storage-changed') return { state: await load(), recovered: false };
+        if (recoveryError.code === 'storage-changed') return { state: await loadInternal(), recovered: false };
         throw recoveryError;
       }
       return { state: null, recovered: true };
     }
+  }
+  function loadAndRecoverUnreadableDraft() {
+    return withLock(loadAndRecoverInternal);
   }
   return { load, loadAndRecoverUnreadableDraft, save, remove, flush: () => persistenceTail };
 }
@@ -320,6 +384,9 @@ export function parseImportedState(text) {
   } catch {
     throw new TypeError('JSONの形式が正しくありません。');
   }
-  assertValidState(parsed);
-  return cloneData(parsed);
+  const result = migrateState(parsed);
+  if (!['current', 'migrated', 'salvaged'].includes(result.status)) {
+    throw new TypeError('このバックアップは現在の Resume Studio では安全に読み込めません。');
+  }
+  return cloneData(result.state);
 }
