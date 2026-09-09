@@ -165,6 +165,7 @@ export function createDraftStorage(storage, {
   let keyStoreInstance;
   let persistenceTail = Promise.resolve();
   let lastKnownRaw;
+  let pendingMutation = null;
   function keys() {
     if (!keyStoreInstance) keyStoreInstance = keyStore || createKeyStore(indexedDB);
     return keyStoreInstance;
@@ -270,11 +271,13 @@ export function createDraftStorage(storage, {
     assertExpectedRaw(expectedRaw);
     try { storage.setItem(STORAGE_KEY, encrypted); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
     lastKnownRaw = encrypted;
+    pendingMutation = null;
     return encrypted;
   }
   async function loadInternal() {
     const raw = readRawDraft();
     const classified = await classifyRaw(raw);
+    pendingMutation = null;
     if (!classified.result) {
       lastKnownRaw = raw;
       return null;
@@ -282,22 +285,34 @@ export function createDraftStorage(storage, {
     const { result } = classified;
     if (result.status === 'current') {
       if (classified.plaintext) {
-        if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
-        await replaceIfUnchanged(raw, result.state, { allowKeyCreation: true });
+        if (!locks?.request) {
+          lastKnownRaw = raw;
+          pendingMutation = 'encrypt-current';
+        } else {
+          await replaceIfUnchanged(raw, result.state, { allowKeyCreation: true });
+        }
       } else {
         lastKnownRaw = raw;
       }
       return result.state;
     }
     if (result.status === 'migrated' || result.status === 'salvaged') {
-      if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
-      await replaceIfUnchanged(raw, result.state, { allowKeyCreation: classified.plaintext });
+      if (!locks?.request) {
+        lastKnownRaw = raw;
+        pendingMutation = 'migrate-draft';
+      } else {
+        await replaceIfUnchanged(raw, result.state, { allowKeyCreation: classified.plaintext });
+      }
       return result.state;
     }
     if (result.status === 'too-old') {
-      if (!locks?.request) throw new DraftStorageError('web-lock-unavailable');
       const replacement = createDefaultState();
-      await replaceIfUnchanged(raw, replacement, { allowKeyCreation: classified.plaintext });
+      if (!locks?.request) {
+        lastKnownRaw = raw;
+        pendingMutation = 'replace-too-old-draft';
+      } else {
+        await replaceIfUnchanged(raw, replacement, { allowKeyCreation: classified.plaintext });
+      }
       return replacement;
     }
     throw migrationError(result);
@@ -328,8 +343,10 @@ export function createDraftStorage(storage, {
         const { result } = await classifyRaw(existing);
         if (!result || !['current', 'migrated', 'salvaged'].includes(result.status)) throw migrationError(result || { status: 'unsupported' });
       }
-      if (!recovery && expectedRaw === undefined && existing !== null && lastKnownRaw === undefined) {
-        throw new DraftStorageError('storage-changed');
+      if (!recovery && expectedRaw === undefined) {
+        if (lastKnownRaw === undefined ? existing !== null : existing !== lastKnownRaw) {
+          throw new DraftStorageError('storage-changed');
+        }
       }
       try { storage.removeItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
       try {
@@ -343,6 +360,7 @@ export function createDraftStorage(storage, {
         throw error instanceof DraftStorageError ? error : new DraftStorageError('indexeddb-unavailable', error);
       }
       lastKnownRaw = null;
+      pendingMutation = null;
   }
   function remove(options = {}) {
     return enqueue(() => withLock(() => removeInternal(options), { mutation: true }));
@@ -366,7 +384,14 @@ export function createDraftStorage(storage, {
   function loadAndRecoverUnreadableDraft() {
     return withLock(loadAndRecoverInternal);
   }
-  return { load, loadAndRecoverUnreadableDraft, save, remove, flush: () => persistenceTail };
+  return {
+    load,
+    loadAndRecoverUnreadableDraft,
+    save,
+    remove,
+    getPendingMutation: () => pendingMutation,
+    flush: () => persistenceTail
+  };
 }
 
 export async function loadStoredState(storage, options) {
