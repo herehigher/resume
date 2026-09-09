@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "settings": {
+    "locale": "zh-CN",
+    "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" },
+    "pageBreaks": {
+      "ja": { "A4": { "resume": [], "career": [] }, "LETTER": { "resume": [], "career": [] } },
+      "zh-CN": { "A4": { "resume": [] }, "LETTER": { "resume": [] } },
+      "en": { "A4": { "resume": [] }, "LETTER": { "resume": [] } }
+    }
+  },
+  "profile": {
+    "photo": "data:image/png;base64,AA==",
+    "fields": {
+      "fullName": "Fictional Shared Profile",
+      "birthDate": "2000-01-02",
+      "gender": "",
+      "postalCode": "000-0000",
+      "address": "Fictional District",
+      "phone": "000-0000-0000",
+      "email": "fictional@example.test",
+      "links": []
+    }
+  },
+  "documents": {
+    "ja": {
+      "activeDocument": "career",
+      "fields": { "nameKana": "ふぃくしょなる", "addressKana": "ふぃくしょなるく", "createdDate": "", "motivation": "", "requests": "", "careerSummary": "", "skills": "", "selfPromotion": "" },
+      "education": [],
+      "employment": [],
+      "qualification": [],
+      "careers": [{ "company": "Fictional Works", "role": "", "startDate": "", "endDate": "", "companyInfo": "", "detailSections": [] }]
+    },
+    "zh-CN": {
+      "activeDocument": "resume",
+      "resume": { "headline": "虚构职位", "summary": "", "education": [], "experience": [], "projects": [], "skills": "", "certifications": [] }
+    },
+    "en": {
+      "activeDocument": "resume",
+      "resume": { "headline": "Fictional Role", "location": "", "summary": "", "education": [], "experience": [], "projects": [], "skills": "", "certifications": [] }
+    }
+  }
+}

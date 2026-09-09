@@ -91,6 +91,7 @@ test('the public v1 JSON example remains importable under the runtime data contr
 
   assert.equal(schema.$id, 'https://herehigher.github.io/resume/schema/resume-studio-web-v1.schema.json');
   assert.equal(schema.properties.version.const, 1);
+  assert.equal(schema.properties.schemaRevision.const, 1);
   assert.deepEqual(schema.properties.settings.properties.locale.enum, ['ja', 'zh-CN', 'en']);
   assert.deepEqual(Object.keys(example.documents).sort(), ['en', 'ja', 'zh-CN']);
   assert.equal(parseImportedState(JSON.stringify(example)).version, 1);

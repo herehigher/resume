@@ -4,9 +4,10 @@
   "title": "Resume Studio web v1 export",
   "description": "The JSON backup format exported by Resume Studio. Resume data must not be uploaded, transmitted, or shared without the user's explicit authorization.",
   "type": "object",
-  "required": ["version", "settings", "profile", "documents"],
+  "required": ["version", "schemaRevision", "settings", "profile", "documents"],
   "properties": {
     "version": { "const": 1 },
+    "schemaRevision": { "const": 1 },
     "settings": {
       "type": "object",
       "required": ["locale", "pageSizeByLocale", "pageBreaks"],
