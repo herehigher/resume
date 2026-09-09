@@ -4,7 +4,7 @@ import { webcrypto } from 'node:crypto';
 
 import { STORAGE_KEY } from '../site/assets/js/config.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
-import { createDraftStorage, DraftStorageError, ENCRYPTED_DRAFT_ALGORITHM, ENCRYPTED_DRAFT_FORMAT } from '../site/assets/js/state/storage.js';
+import { createDraftStorage, DRAFT_WEB_LOCK_NAME, DraftStorageError, ENCRYPTED_DRAFT_ALGORITHM, ENCRYPTED_DRAFT_FORMAT } from '../site/assets/js/state/storage.js';
 
 const UNRELATED_STORAGE_KEY = 'unrelated-storage-sentinel';
 const UNRELATED_STORAGE_VALUE = JSON.stringify({ keep: 'unrelated storage must remain untouched' });
@@ -76,6 +76,26 @@ function controllableKeyStore(initialKey = null) {
 
 function persistence(storage, keyStore = memoryKeyStore(), options = {}) {
   return createDraftStorage(storage, { crypto: webcrypto, keyStore, ...options });
+}
+
+function sharedLockManager(events = []) {
+  let tail = Promise.resolve();
+  return {
+    request(name, _options, callback) {
+      events.push(name);
+      const task = tail.then(callback, callback);
+      tail = task.catch(() => {});
+      return task;
+    }
+  };
+}
+
+function rejectingLockManager() {
+  return {
+    async request() {
+      throw new Error('Lock acquisition failed before callback start.');
+    }
+  };
 }
 
 async function encryptUnsupportedState(state, key) {
@@ -196,7 +216,7 @@ test('envelope allowlist and bounds reject attacker-controlled storage without r
 
 test('save rejects an oversized schema-valid state before it can create an unloadable envelope', async () => {
   const storage = memoryStorage();
-  const keys = memoryKeyStore();
+  const keys = controllableKeyStore();
   const writer = persistence(storage, keys);
   const originalState = createDefaultState();
   originalState.profile.fields.fullName = 'Keep existing draft';
@@ -426,4 +446,159 @@ test('queued saves preserve the most recent page-lifecycle snapshot', async () =
   const finalWrite = draftStorage.save(last);
   await Promise.all([firstWrite, finalWrite]);
   assert.equal((await draftStorage.load()).profile.fields.fullName, 'At pagehide');
+});
+
+test('all cooperating instances share the fixed Web Lock and reject an old memory snapshot', async () => {
+  const storage = memoryStorage();
+  const keyStore = memoryKeyStore();
+  const lockEvents = [];
+  const locks = sharedLockManager(lockEvents);
+  const first = persistence(storage, keyStore, { locks });
+  const second = persistence(storage, keyStore, { locks });
+  const initial = createDefaultState();
+  await first.save(initial);
+  await second.load();
+
+  const newest = createDefaultState();
+  newest.profile.fields.fullName = 'Newest cooperating draft';
+  await first.save(newest);
+  const stale = createDefaultState();
+  stale.profile.fields.fullName = 'Stale cooperating draft';
+  await assert.rejects(() => second.save(stale), (error) => error.code === 'storage-changed');
+
+  assert.equal((await first.load()).profile.fields.fullName, 'Newest cooperating draft');
+  assert.ok(lockEvents.length >= 5);
+  assert.ok(lockEvents.every((name) => name === DRAFT_WEB_LOCK_NAME));
+});
+
+test('a fresh instance cannot overwrite an existing draft before it has established a raw baseline', async () => {
+  const storage = memoryStorage();
+  const keyStore = memoryKeyStore();
+  const locks = sharedLockManager();
+  const writer = persistence(storage, keyStore, { locks });
+  await writer.save(createDefaultState());
+
+  const uninitialized = persistence(storage, keyStore, { locks });
+  await assert.rejects(() => uninitialized.save(createDefaultState()), (error) => error.code === 'storage-changed');
+  await assert.rejects(() => uninitialized.remove(), (error) => error.code === 'storage-changed');
+  assert.notEqual(storage.getItem(STORAGE_KEY), null);
+});
+
+test('a stale clear preserves the newest raw draft and its key after another instance commits', async () => {
+  const storage = memoryStorage();
+  const keys = controllableKeyStore();
+  const locks = sharedLockManager();
+  const writer = persistence(storage, keys, { locks });
+  const clearer = persistence(storage, keys, { locks });
+  await writer.save(createDefaultState());
+  await clearer.load();
+
+  const newest = createDefaultState();
+  newest.profile.fields.fullName = 'Newest draft before stale clear';
+  await writer.save(newest);
+  const raw = storage.getItem(STORAGE_KEY);
+  const key = keys.current();
+
+  await assert.rejects(() => clearer.remove(), (error) => error.code === 'storage-changed');
+  assert.equal(storage.getItem(STORAGE_KEY), raw);
+  assert.equal(keys.current(), key);
+});
+
+test('B0 plaintext and encrypted drafts migrate under the lock without replacing an existing key', async () => {
+  const makeBootstrap = () => {
+    const state = createDefaultState('en');
+    delete state.schemaRevision;
+    state.profile.fields.fullName = 'Bootstrap draft';
+    return state;
+  };
+  const plaintextStorage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(makeBootstrap()) });
+  const plaintext = persistence(plaintextStorage, memoryKeyStore(), { locks: sharedLockManager() });
+  assert.equal((await plaintext.load()).schemaRevision, 1);
+  assert.equal(JSON.parse(plaintextStorage.getItem(STORAGE_KEY)).format, ENCRYPTED_DRAFT_FORMAT);
+
+  const key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const keys = controllableKeyStore(key);
+  const encryptedStorage = memoryStorage({ [STORAGE_KEY]: await encryptUnsupportedState(makeBootstrap(), key) });
+  const encrypted = persistence(encryptedStorage, keys, { locks: sharedLockManager() });
+  assert.equal((await encrypted.load()).schemaRevision, 1);
+  assert.equal(keys.current(), key);
+  assert.equal(keys.removals(), 0);
+});
+
+test('future drafts remain protected from save and clear, and missing Web Locks stop mutation', async () => {
+  const storage = memoryStorage();
+  const keys = controllableKeyStore();
+  const writer = persistence(storage, keys, { locks: sharedLockManager() });
+  await writer.save(createDefaultState());
+  const key = keys.current();
+  const future = createDefaultState();
+  future.schemaRevision = 2;
+  const raw = await encryptUnsupportedState(future, key);
+  storage.setItem(STORAGE_KEY, raw);
+
+  const protectedDraft = persistence(storage, keys, { locks: sharedLockManager() });
+  await assert.rejects(() => protectedDraft.load(), (error) => error.code === 'future-state');
+  await assert.rejects(() => protectedDraft.save(createDefaultState()), (error) => error.code === 'future-state');
+  await assert.rejects(() => protectedDraft.remove(), (error) => error.code === 'future-state');
+  assert.equal(storage.getItem(STORAGE_KEY), raw);
+  assert.equal(keys.current(), key);
+
+  const unlocked = persistence(memoryStorage(), memoryKeyStore(), { locks: null });
+  await assert.rejects(() => unlocked.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');
+  await assert.rejects(() => unlocked.remove(), (error) => error.code === 'web-lock-unavailable');
+});
+
+test('missing Web Locks keep current and B0 drafts readable without committing their required writes', async () => {
+  const current = createDefaultState('en');
+  current.profile.fields.fullName = 'Read-only current plaintext';
+  const currentRaw = JSON.stringify(current);
+  const currentStorage = memoryStorage({ [STORAGE_KEY]: currentRaw });
+  const currentDraft = persistence(currentStorage, memoryKeyStore(), { locks: null });
+  assert.equal((await currentDraft.load()).profile.fields.fullName, current.profile.fields.fullName);
+  assert.equal(currentDraft.getPendingMutation(), 'encrypt-current');
+  assert.equal(currentStorage.getItem(STORAGE_KEY), currentRaw);
+
+  const b0 = createDefaultState('en');
+  delete b0.schemaRevision;
+  b0.profile.fields.fullName = 'Read-only B0 ciphertext';
+  const key = await webcrypto.subtle.generateKey({ name: ENCRYPTED_DRAFT_ALGORITHM, length: 256 }, false, ['encrypt', 'decrypt']);
+  const keys = controllableKeyStore(key);
+  const b0Raw = await encryptUnsupportedState(b0, key);
+  const b0Storage = memoryStorage({ [STORAGE_KEY]: b0Raw });
+  const b0Draft = persistence(b0Storage, keys, { locks: null });
+  assert.equal((await b0Draft.load()).schemaRevision, 1);
+  assert.equal(b0Draft.getPendingMutation(), 'migrate-draft');
+  assert.equal(b0Storage.getItem(STORAGE_KEY), b0Raw);
+  assert.equal(keys.current(), key);
+  await assert.rejects(() => b0Draft.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');
+});
+
+test('a rejected Web Lock request falls back to read-only current and B0 loads without retrying a callback', async () => {
+  const current = createDefaultState('en');
+  current.profile.fields.fullName = 'Rejected-lock current plaintext';
+  const currentRaw = JSON.stringify(current);
+  const currentKeys = controllableKeyStore();
+  const currentStorage = memoryStorage({ [STORAGE_KEY]: currentRaw });
+  const currentDraft = persistence(currentStorage, currentKeys, { locks: rejectingLockManager() });
+  assert.equal((await currentDraft.load()).profile.fields.fullName, current.profile.fields.fullName);
+  assert.equal(currentDraft.getPendingMutation(), 'encrypt-current');
+  assert.equal(currentStorage.getItem(STORAGE_KEY), currentRaw);
+  assert.equal(currentKeys.current(), null);
+  await assert.rejects(() => currentDraft.save(current), (error) => error.code === 'web-lock-unavailable');
+  await assert.rejects(() => currentDraft.remove(), (error) => error.code === 'web-lock-unavailable');
+
+  const b0 = createDefaultState('en');
+  delete b0.schemaRevision;
+  b0.profile.fields.fullName = 'Rejected-lock B0 ciphertext';
+  const key = await webcrypto.subtle.generateKey({ name: ENCRYPTED_DRAFT_ALGORITHM, length: 256 }, false, ['encrypt', 'decrypt']);
+  const keys = controllableKeyStore(key);
+  const b0Raw = await encryptUnsupportedState(b0, key);
+  const b0Storage = memoryStorage({ [STORAGE_KEY]: b0Raw });
+  const b0Draft = persistence(b0Storage, keys, { locks: rejectingLockManager() });
+  assert.equal((await b0Draft.load()).schemaRevision, 1);
+  assert.equal(b0Draft.getPendingMutation(), 'migrate-draft');
+  assert.equal(b0Storage.getItem(STORAGE_KEY), b0Raw);
+  assert.equal(keys.current(), key);
+  await assert.rejects(() => b0Draft.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');
+  await assert.rejects(() => b0Draft.remove(), (error) => error.code === 'web-lock-unavailable');
 });
