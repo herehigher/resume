@@ -29,6 +29,13 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
 
   await expect(firstTitle).toHaveValue('担当業務');
   await expect(secondTitle).toHaveValue('実績・成果');
+  await expect(firstContent).toHaveAttribute('placeholder', '担当した業務、役割、プロジェクト内容');
+  await expect(secondContent).toHaveAttribute('placeholder', '数値や具体例を交えて記載');
+  await firstTitle.fill('プロジェクト概要');
+  await expect(firstCareer.locator('.career-detail-editor-item').first().locator('[data-detail-heading]')).toHaveText('プロジェクト概要');
+  await expect(firstContent).toHaveAttribute('placeholder', '担当した業務、役割、成果など');
+  await firstTitle.fill('担当業務');
+  await expect(firstContent).toHaveAttribute('placeholder', '担当した業務、役割、プロジェクト内容');
   await firstTitle.fill('プロジェクト概要');
   await expect(firstTitle).toBeFocused();
   await firstContent.fill('架空のプロジェクト内容');
@@ -71,6 +78,69 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   await page.locator('#careerDocumentTab').click();
   await expect(page.locator('.career-editor-item').first().getByRole('textbox', { name: '勤務先 1 の詳細項目 2 の項目名' })).toHaveValue('使用技術');
   await expect(page.locator('#documentPreview')).toContainText('HTML, CSS, JavaScript');
+});
+
+test('日本語の勤務先は確認後にだけ削除される', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#careerDocumentTab').click();
+  const careerList = page.locator('#careerList');
+  const firstCareer = careerList.locator('.career-editor-item').first();
+  await firstCareer.locator('[data-key="company"]').fill('架空株式会社');
+
+  await firstCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await expect(page.locator('#sampleAdoptDialogTitle')).toHaveText('「架空株式会社」を削除しますか？');
+  await page.keyboard.press('Escape');
+  await expect(careerList.locator('.career-editor-item')).toHaveCount(1);
+  await expect(firstCareer.locator('[data-key="company"]')).toHaveValue('架空株式会社');
+
+  await firstCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(careerList.locator('.career-editor-item')).toHaveCount(0);
+  await expect(page.locator('[data-add="career"]')).toBeFocused();
+  await expect(page.locator('#careerDetailStatus')).toHaveText('勤務先 1 を削除しました。');
+});
+
+test('日本語の空の勤務先と既定の空詳細項目は確認なしで削除できる', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#careerDocumentTab').click();
+  const firstCareer = page.locator('#careerList .career-editor-item').first();
+
+  await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' }).click();
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toHaveValue('実績・成果');
+
+  await firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' }).click();
+  const customTitle = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 2 の項目名' });
+  await customTitle.fill('本文なしのカスタム見出し');
+  await expect(page.locator('#documentPreview')).not.toContainText('本文なしのカスタム見出し');
+  await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 2 を削除' }).click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(customTitle).toHaveValue('本文なしのカスタム見出し');
+  await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 2 を削除' }).click();
+  await page.locator('#confirmSampleAdoptButton').click();
+
+  await firstCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(page.locator('#careerList .career-editor-item')).toHaveCount(0);
+});
+
+test('[mobile] 日本語の勤務先詳細操作は十分なタッチ領域を持つ', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLocale(page, 'ja');
+  await page.locator('#careerDocumentTab').click();
+  const firstCareer = page.locator('#careerList .career-editor-item').first();
+  const controls = [
+    firstCareer.getByRole('button', { name: '勤務先 1 を削除' }),
+    firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' }),
+    firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' })
+  ];
+
+  for (const control of controls) {
+    const box = await control.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
 });
 
 test('[mobile] mobile view controls expose synchronized selection state', async ({ page }) => {

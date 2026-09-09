@@ -157,16 +157,15 @@ export function renderJapaneseCareer(state) {
       'startDate',
       'endDate',
       'companyInfo'
-    ]) || career.detailSections.some((section) => hasContent(section.title) || hasContent(section.content)))
+    ]) || career.detailSections.some((section) => hasContent(section.content)))
     .map((career) => {
       const period = renderCareerPeriod(career);
       const context = [career.company, career.role].map((value) => String(value ?? '').trim()).filter(Boolean).join(' · ') || '未入力';
       const detailSections = career.detailSections
-        .filter((section) => hasContent(section.title) || hasContent(section.content))
+        .filter((section) => hasContent(section.content))
         .map((section) => {
           const title = hasContent(section.title) ? String(section.title).trim() : '項目名未入力';
-          const content = hasContent(section.content) ? section.content : '未入力';
-          return `<div>${escapeHTML(title)}</div><div>${renderCareerDetail(content, '未入力', `職務経歴（続き） · ${context} · ${title}`)}</div>`;
+          return `<div>${escapeHTML(title)}</div><div>${renderCareerDetail(section.content, '未入力', `職務経歴（続き） · ${context} · ${title}`)}</div>`;
         })
         .join('');
       return `

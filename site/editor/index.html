@@ -420,15 +420,15 @@
       </div>
       <label class="input-field"><span>事業内容・会社概要</span><textarea data-key="companyInfo" rows="2" placeholder="事業内容、従業員数など"></textarea></label>
       <div class="career-detail-list" data-career-detail-list></div>
-      <button class="small-add-button career-detail-add-button" type="button" data-add-detail-section>＋ 項目を追加</button>
+      <button class="small-add-button career-detail-add-button" type="button" data-add-detail-section>＋ 詳細項目を追加</button>
     </article>
   </template>
 
   <template id="careerDetailSectionTemplate">
     <section class="career-detail-editor-item">
-      <div class="career-detail-item-header"><strong>詳細項目 <span data-detail-number></span></strong><button class="remove-career-detail-button" type="button">削除</button></div>
-      <label class="input-field"><span>項目名</span><input type="text" data-detail-key="title" placeholder="例：プロジェクト概要"></label>
-      <label class="input-field"><span>内容</span><textarea data-detail-key="content" rows="4" placeholder="担当した業務、役割、成果など"></textarea></label>
+      <div class="career-detail-item-header"><strong><span class="career-detail-number">項目 <span data-detail-number></span></span><span data-detail-heading></span></strong><button class="remove-career-detail-button" type="button">削除</button></div>
+      <label class="input-field"><span>見出し</span><input type="text" data-detail-key="title" placeholder="例：プロジェクト概要"></label>
+      <label class="input-field"><span>記載内容</span><textarea data-detail-key="content" rows="4"></textarea></label>
     </section>
   </template>
 

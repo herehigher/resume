@@ -76,6 +76,20 @@ test('Japanese career detail sections are validated and survive JSON export/impo
   assert.ok(result.errors.includes('state.documents.ja.careers[0].detailSections[0] has an unsupported shape'));
 });
 
+test('Japanese sample keeps the original responsibilities and achievements examples', () => {
+  const state = createJapaneseSampleState(createDefaultState('ja'));
+  assert.deepEqual(state.documents.ja.careers[0].detailSections, [
+    {
+      title: '担当業務',
+      content: '・法人向けSaaSプロダクトの企画、要件定義\n・利用データおよび顧客インタビューに基づく改善施策の立案\n・エンジニア、デザイナー、営業とのプロジェクト推進\n・5名の企画チームのマネジメント'
+    },
+    {
+      title: '実績・成果',
+      content: '・オンボーディング改善により継続率を18ポイント向上\n・新機能の企画・提供により主要指標を前年比125%へ改善\n・開発プロセスの見直しによりリードタイムを30%短縮'
+    }
+  ]);
+});
+
 test('page break settings are isolated and reject unsupported keys and duplicates', () => {
   const state = createDefaultState('en');
   state.settings.pageBreaks.en.A4.resume = ['projects'];

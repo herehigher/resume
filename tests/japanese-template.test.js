@@ -83,7 +83,7 @@ test('Japanese PDF output omits blank rows and empty career entries', () => {
   assert.doesNotMatch(html, /class="career-company"/);
 });
 
-test('Japanese career detail sections render in order, preserve incomplete values, and escape input', () => {
+test('Japanese career detail sections render non-empty content in order, preserve body-only values, and escape input', () => {
   const state = createDefaultState('ja');
   state.documents.ja.activeDocument = 'career';
   state.documents.ja.careers = [{
@@ -104,13 +104,22 @@ test('Japanese career detail sections render in order, preserve incomplete value
 
   const html = renderJapaneseDocument(state);
   assert.ok(html.indexOf('プロジェクト概要') < html.indexOf('項目名未入力'));
-  assert.ok(html.indexOf('項目名未入力') < html.indexOf('成果'));
   assert.match(html, /<div>項目名未入力<\/div><div>本文だけ<\/div>/);
-  assert.match(html, /<div>成果<\/div><div>未入力<\/div>/);
+  assert.doesNotMatch(html, /<div>成果<\/div>|空項目/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>|<img src=x/);
   assert.match(html, /職務経歴（続き） · 架空株式会社 · 検証担当 · 長文タイトル&lt;script&gt;/);
+});
+
+test('Japanese career preview and PDF markup omit default detail sections without body content', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.careers[0].company = '架空株式会社';
+
+  const html = renderJapaneseDocument(state);
+  assert.match(html, /架空株式会社/);
+  assert.doesNotMatch(html, /担当業務|実績・成果|項目名未入力/);
 });
 
 test('Japanese profile and credential links only activate HTTP URLs', () => {
