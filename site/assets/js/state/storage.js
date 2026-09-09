@@ -175,6 +175,7 @@ export function createDraftStorage(storage, {
     return task;
   }
   async function withLock(operation, { mutation = false } = {}) {
+    if (mutation && !cryptography) throw new DraftStorageError('crypto-unavailable');
     if (!locks?.request) {
       if (mutation) throw new DraftStorageError('web-lock-unavailable');
       return operation();
