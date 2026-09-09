@@ -148,6 +148,32 @@ test('日本語: 1440px と 1024px のプレビューは A4 の内部版面を�
   expect(careerAt1024).toEqual(careerAt1440);
 });
 
+test('日本語PDF: 学歴・職歴・資格の年月は左揃えで、表見出しに氏名を含めない', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const state = createDefaultState('ja');
+  state.profile.fields.fullName = '架空 太郎';
+  state.documents.ja.education = [
+    { date: '2011-04', detail: '架空大学 入学' },
+    { date: '2015-11', detail: '架空大学 卒業' }
+  ];
+  state.documents.ja.employment = [{ date: '2026-03', detail: '架空株式会社 入社' }];
+  state.documents.ja.qualification = [{ date: '2026-09', detail: '架空資格 取得', url: '' }];
+  await importJapaneseState(page, state);
+
+  const tableLayout = await page.evaluate(() => ({
+    dates: [...document.querySelectorAll('.paper-table-date')].map((cell) => getComputedStyle(cell).textAlign),
+    headings: [...document.querySelectorAll('.paper-table-header th:nth-child(2)')].map((cell) => cell.textContent.trim())
+  }));
+  expect(tableLayout.dates).toEqual(['left', 'left', 'left', 'left']);
+  expect(tableLayout.headings).toEqual(['学歴', '職歴', '免許・資格']);
+
+  const pages = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+  const text = normalizePdfText(pages.flatMap((item) => item.items).map((item) => item.str).join(''));
+  expect(text).toContain(normalizePdfText('2011年 4月'));
+  expect(text).toContain(normalizePdfText('2026年 9月'));
+  expect(text).not.toContain(normalizePdfText('履歴書 · 架空 太郎'));
+});
+
 test('[mobile] 日本語: smartphone 幅でも A4 の内部版面を reflow しない', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loadJapaneseSample(page);

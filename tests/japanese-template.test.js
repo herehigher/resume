@@ -101,7 +101,7 @@ test('Japanese profile and credential links only activate HTTP URLs', () => {
   assert.match(html, /Website · javascript:alert\(1\)/);
 });
 
-test('Japanese resume prints local link icons and repeated semantic history headings', () => {
+test('Japanese resume prints local link icons and concise semantic history headings', () => {
   const state = createJapaneseSampleState(createDefaultState('ja'));
   const html = renderJapaneseDocument(state);
 
@@ -110,8 +110,10 @@ test('Japanese resume prints local link icons and repeated semantic history head
   assert.match(html, /Website · example\.com/);
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
   assert.match(japaneseCss, /\.resume-links \{[^}]*margin:\s*0 0 16px/s);
-  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>履歴書 · 山田 太郎 · 学歴<\/th>/);
-  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>履歴書 · 山田 太郎 · 職歴<\/th>/);
+  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>学歴<\/th>/);
+  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>職歴<\/th>/);
+  assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>免許・資格<\/th>/);
+  assert.doesNotMatch(html, /履歴書 · 山田 太郎/);
   assert.match(html, /<tr class="paper-table-row"><td class="paper-table-date">/);
 });
 
@@ -130,7 +132,28 @@ test('Japanese resume uses unified personal-information borders and a fixed phot
   assert.match(japaneseCss, /\.resume-contact > div\s*\{[^}]*grid-template-columns:\s*var\(--ja-key-column\) minmax\(0, 1fr\)/s);
   assert.match(japaneseCss, /\.resume-contact \.paper-value\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s);
   assert.match(japaneseCss, /\.paper-history-table\s*\{[^}]*table-layout:\s*fixed;/s);
-  assert.match(japaneseCss, /\.paper-table-date\s*\{[^}]*vertical-align:\s*top;/s);
+  assert.match(japaneseCss, /\.paper-table-date\s*\{[^}]*text-align:\s*left;[^}]*vertical-align:\s*top;/s);
+});
+
+test('Japanese career company information preserves escaped line breaks', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.careers = [{
+    company: '株式会社テスト',
+    role: '開発部',
+    startDate: '2024-04',
+    endDate: '',
+    companyInfo: 'SaaS の企画・開発\n資本金: 1 億円\n<script>alert(1)</script>',
+    responsibilities: '',
+    achievements: ''
+  }];
+
+  const html = renderJapaneseDocument(state);
+  const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
+  assert.match(html, /SaaS の企画・開発\n資本金: 1 億円/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
+  assert.match(japaneseCss, /\.career-company-info\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*white-space:\s*pre-wrap;/s);
 });
 
 test('Japanese resume flows every section in one printable document and wraps unbroken input', () => {
