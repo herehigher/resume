@@ -49,6 +49,31 @@ test('default state contains independent locale documents', () => {
   assert.equal(state.settings.locale, 'zh-CN');
   assert.notEqual(state.documents.ja, state.documents['zh-CN']);
   assert.notEqual(state.documents['zh-CN'], state.documents.en);
+  assert.deepEqual(state.documents.ja.careers[0].detailSections, [
+    { title: '担当業務', content: '' },
+    { title: '実績・成果', content: '' }
+  ]);
+});
+
+test('Japanese career detail sections are validated and survive JSON export/import in order', async () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.careers[0].detailSections = [
+    { title: 'プロジェクト概要', content: '架空のプロジェクトです。' },
+    { title: '使用技術', content: 'HTML, CSS, JavaScript' },
+    { title: 'チーム規模', content: '5名' }
+  ];
+  assert.equal(validateState(state).valid, true);
+
+  const storage = createMemoryStorage();
+  const source = createTestStore(storage, state);
+  const target = createTestStore(createMemoryStorage(), createDefaultState());
+  await target.importJson(source.exportJson());
+  assert.deepEqual(target.getState().documents.ja.careers[0].detailSections, state.documents.ja.careers[0].detailSections);
+
+  state.documents.ja.careers[0].detailSections[0].unexpected = 'unsupported';
+  const result = validateState(state);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes('state.documents.ja.careers[0].detailSections[0] has an unsupported shape'));
 });
 
 test('page break settings are isolated and reject unsupported keys and duplicates', () => {

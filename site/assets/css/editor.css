@@ -124,6 +124,12 @@
 .career-item-header { align-items: center; border-bottom: 1px solid #e6eaef; display: flex; justify-content: space-between; padding-bottom: 11px; }
 .career-item-header strong { font-size: 11px; }
 .remove-career-button { background: none; border: 0; color: var(--danger); font-size: 9px; }
+.career-detail-list { display: grid; gap: 10px; }
+.career-detail-editor-item { background: #fff; border: 1px solid #e2e7ed; border-radius: 7px; display: grid; gap: 10px; padding: 12px; }
+.career-detail-item-header { align-items: center; display: flex; justify-content: space-between; }
+.career-detail-item-header strong { font-size: 10px; }
+.remove-career-detail-button { background: none; border: 0; color: var(--danger); font-size: 9px; }
+.career-detail-add-button { justify-self: start; }
 
 .editor-footer { display: grid; gap: 24px; padding-top: 32px; }
 .editor-footer-actions { align-items: center; border-bottom: 1px solid var(--soft-line); display: flex; min-height: 44px; padding-bottom: 24px; }

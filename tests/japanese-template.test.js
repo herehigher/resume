@@ -41,8 +41,7 @@ test('Japanese dates, age, and current employment use conventional labels', () =
     startDate: '2024-04',
     endDate: '',
     companyInfo: '',
-    responsibilities: '',
-    achievements: ''
+    detailSections: []
   }];
 
   assert.match(renderJapaneseDocument(state), /2024年 4月 〜 現在/);
@@ -78,11 +77,40 @@ test('Japanese PDF output omits blank rows and empty career entries', () => {
     startDate: '',
     endDate: '',
     companyInfo: '',
-    responsibilities: '\n',
-    achievements: ''
+    detailSections: [{ title: ' \n', content: '' }]
   }];
   html = renderJapaneseDocument(state);
   assert.doesNotMatch(html, /class="career-company"/);
+});
+
+test('Japanese career detail sections render in order, preserve incomplete values, and escape input', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.careers = [{
+    company: '架空株式会社',
+    role: '検証担当',
+    startDate: '',
+    endDate: '',
+    companyInfo: '',
+    detailSections: [
+      { title: 'プロジェクト概要', content: '最初の内容' },
+      { title: '  ', content: '本文だけ' },
+      { title: '成果', content: '   ' },
+      { title: '空項目', content: '' },
+      { title: '<img src=x onerror=alert(1)>', content: '<script>alert(1)</script>' },
+      { title: '長文タイトル<script>', content: Array.from({ length: 13 }, (_, index) => `行 ${index + 1}`).join('\n') }
+    ]
+  }];
+
+  const html = renderJapaneseDocument(state);
+  assert.ok(html.indexOf('プロジェクト概要') < html.indexOf('項目名未入力'));
+  assert.ok(html.indexOf('項目名未入力') < html.indexOf('成果'));
+  assert.match(html, /<div>項目名未入力<\/div><div>本文だけ<\/div>/);
+  assert.match(html, /<div>成果<\/div><div>未入力<\/div>/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>|<img src=x/);
+  assert.match(html, /職務経歴（続き） · 架空株式会社 · 検証担当 · 長文タイトル&lt;script&gt;/);
 });
 
 test('Japanese profile and credential links only activate HTTP URLs', () => {

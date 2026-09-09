@@ -60,6 +60,19 @@ export function validateState(value) {
   if (!['resume', 'career'].includes(value.documents?.ja?.activeDocument)) {
     errors.push('documents.ja.activeDocument is not supported');
   }
+
+  const careerKeys = ['company', 'companyInfo', 'detailSections', 'endDate', 'role', 'startDate'];
+  const careerDetailSectionKeys = ['content', 'title'];
+  value.documents?.ja?.careers?.forEach((career, index) => {
+    if (!isPlainObject(career) || Object.keys(career).sort().join(',') !== careerKeys.join(',')) {
+      errors.push(`state.documents.ja.careers[${index}] has an unsupported shape`);
+    }
+    career?.detailSections?.forEach((section, sectionIndex) => {
+      if (!isPlainObject(section) || Object.keys(section).sort().join(',') !== careerDetailSectionKeys.join(',')) {
+        errors.push(`state.documents.ja.careers[${index}].detailSections[${sectionIndex}] has an unsupported shape`);
+      }
+    });
+  });
   for (const locale of ['zh-CN', 'en']) {
     if (value.documents?.[locale]?.activeDocument !== 'resume') {
       errors.push(`documents.${locale}.activeDocument is not supported`);

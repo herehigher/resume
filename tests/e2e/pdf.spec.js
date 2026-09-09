@@ -295,6 +295,35 @@ test('PDF short: English の短いデータは 1 ページの Letter でテキ�
   expectPageSize(pages, LETTER);
 });
 
+test('PDF ja: 任意タイトルの複数詳細項目は順序・継続ラベル・末尾内容を保つ', async ({ page }) => {
+  const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'career', pageSize: 'A4' });
+  const lines = Array.from({ length: 13 }, (_, index) => `CUSTOM-DETAIL-LINE-${String(index + 1).padStart(2, '0')}`).join('\n');
+  state.documents.ja.careers[0].detailSections = [
+    { title: 'プロジェクト概要', content: '最初の詳細項目です。' },
+    { title: '使用技術', content: 'HTML, CSS, JavaScript' },
+    { title: 'チーム規模', content: '架空のチーム 5名' },
+    { title: '長いカスタム詳細タイトル', content: lines }
+  ];
+  await openLocale(page, 'ja');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'japanese-custom-career-details.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(state))
+  });
+  await expect(page.locator('#documentPreview')).toContainText('CUSTOM-DETAIL-LINE-13');
+  const pages = await inspectPdf(await printPdf(page));
+  const text = pages.map((item) => item.text).join(' ');
+  const normalizedText = text.normalize('NFKC').replace(/\s/g, '').replaceAll('⻑', '長');
+  expectPageSize(pages, A4);
+  expect(pages.every((item) => item.text.trim())).toBe(true);
+  expect(normalizedText.indexOf('プロジェクト概要')).toBeLessThan(normalizedText.indexOf('使用技術'));
+  expect(normalizedText.indexOf('使用技術')).toBeLessThan(normalizedText.indexOf('チーム規模'));
+  expect(normalizedText.indexOf('チーム規模')).toBeLessThan(normalizedText.indexOf('長いカスタム詳細タイトル'));
+  expect(text).toContain('CUSTOM-DETAIL-LINE-13');
+  expectPdfContext(text, '職務経歴（続き）');
+  expect(normalizedText).toContain('長いカスタム詳細タイトル');
+});
+
 test('PDF long record: 四書類は95行を保持し、読みやすい文字サイズと続きの文脈を保つ', async ({ page }) => {
   const details = Array.from(
     { length: 95 },
@@ -316,7 +345,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
       locale: 'ja',
       state: () => {
         const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'career', pageSize: 'A4' });
-        state.documents.ja.careers[0].responsibilities = details;
+        state.documents.ja.careers[0].detailSections[0].content = details;
         return state;
       },
       continuation: '職務経歴（続き） · 検証株式会社 1 · 印刷品質担当 · 担当業務',
