@@ -72,8 +72,10 @@ function fillJapanese(state, length, documentType, endMarker) {
     startDate: '2020-01',
     endDate: '',
     companyInfo: 'PDFページ分割の検証用データ',
-    responsibilities: lines('担当業務の検証行', length, `${endMarker}-RESPONSIBILITIES-${index + 1}`),
-    achievements: lines('実績の検証行', length, index === itemCount(length) - 1 ? endMarker : `${endMarker}-${index + 1}`)
+    detailSections: [
+      { title: '担当業務', content: lines('担当業務の検証行', length, `${endMarker}-RESPONSIBILITIES-${index + 1}`) },
+      { title: '実績・成果', content: lines('実績の検証行', length, index === itemCount(length) - 1 ? endMarker : `${endMarker}-${index + 1}`) }
+    ]
   }));
 }
 

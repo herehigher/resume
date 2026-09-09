@@ -26,6 +26,24 @@ export function createDefaultProfile() {
   };
 }
 
+export function createJapaneseCareerDetailSections() {
+  return [
+    { title: '担当業務', content: '' },
+    { title: '実績・成果', content: '' }
+  ];
+}
+
+export function createJapaneseCareer() {
+  return {
+    company: '',
+    role: '',
+    startDate: '',
+    endDate: '',
+    companyInfo: '',
+    detailSections: createJapaneseCareerDetailSections()
+  };
+}
+
 export function createJapaneseDocument() {
   return {
     activeDocument: 'resume',
@@ -42,15 +60,7 @@ export function createJapaneseDocument() {
     education: [{ date: '', detail: '' }],
     employment: [{ date: '', detail: '' }],
     qualification: [{ date: '', detail: '', url: '' }],
-    careers: [{
-      company: '',
-      role: '',
-      startDate: '',
-      endDate: '',
-      companyInfo: '',
-      responsibilities: '',
-      achievements: ''
-    }]
+    careers: [createJapaneseCareer()]
   };
 }
 
@@ -153,8 +163,10 @@ export function createJapaneseSampleState(sourceState) {
       startDate: '2015-04',
       endDate: '',
       companyInfo: '法人向けクラウドサービスの企画・開発・運営（従業員約300名）',
-      responsibilities: '・法人向けSaaSプロダクトの企画、要件定義\n・利用データおよび顧客インタビューに基づく改善施策の立案\n・エンジニア、デザイナー、営業とのプロジェクト推進\n・5名の企画チームのマネジメント',
-      achievements: '・オンボーディング改善により継続率を18ポイント向上\n・新機能の企画・提供により主要指標を前年比125%へ改善\n・開発プロセスの見直しによりリードタイムを30%短縮'
+      detailSections: [
+        { title: '担当業務', content: '・法人向けSaaSプロダクトの企画、要件定義\n・利用データおよび顧客インタビューに基づく改善施策の立案\n・エンジニア、デザイナー、営業とのプロジェクト推進\n・5名の企画チームのマネジメント' },
+        { title: '実績・成果', content: '・オンボーディング改善により継続率を18ポイント向上\n・新機能の企画・提供により主要指標を前年比125%へ改善\n・開発プロセスの見直しによりリードタイムを30%短縮' }
+      ]
     }]
   };
   return state;

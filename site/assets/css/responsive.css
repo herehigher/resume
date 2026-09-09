@@ -64,6 +64,9 @@
   .document-page { min-height: 842px; padding: 34px 37px; width: 595px; }
   .data-menu-panel .secondary-button,
   .data-menu-panel .danger-button { min-height: 44px; }
+  .remove-career-button,
+  .remove-career-detail-button,
+  .career-detail-add-button { min-height: 44px; }
 }
 
 @media (max-width: 520px) {

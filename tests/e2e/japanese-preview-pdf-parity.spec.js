@@ -293,8 +293,10 @@ test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の
       startDate: '2020-01',
       endDate: '',
       companyInfo: '架空の検証データ',
-      responsibilities: 'https://example.invalid/BASELINE-RESPONSIBILITIES',
-      achievements: 'https://example.invalid/BASELINE-ACHIEVEMENTS'
+      detailSections: [
+        { title: '担当業務', content: 'https://example.invalid/BASELINE-RESPONSIBILITIES' },
+        { title: '実績・成果', content: 'https://example.invalid/BASELINE-ACHIEVEMENTS' }
+      ]
     }];
     await importJapaneseState(page, baseline);
     const baselinePdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
@@ -306,8 +308,8 @@ test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の
       longInput.documents.ja.fields.motivation = longUrl;
     } else {
       longInput.documents.ja.fields.careerSummary = longUrl;
-      longInput.documents.ja.careers[0].responsibilities = longUrl;
-      longInput.documents.ja.careers[0].achievements = longUrl;
+      longInput.documents.ja.careers[0].detailSections[0].content = longUrl;
+      longInput.documents.ja.careers[0].detailSections[1].content = longUrl;
     }
     await importJapaneseState(page, longInput);
     const longPdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));

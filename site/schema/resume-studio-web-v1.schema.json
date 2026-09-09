@@ -125,11 +125,19 @@
     },
     "japaneseCareer": {
       "type": "object",
-      "required": ["company", "role", "startDate", "endDate", "companyInfo", "responsibilities", "achievements"],
+      "additionalProperties": false,
+      "required": ["company", "role", "startDate", "endDate", "companyInfo", "detailSections"],
       "properties": {
         "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" },
-        "companyInfo": { "$ref": "#/$defs/string" }, "responsibilities": { "$ref": "#/$defs/string" }, "achievements": { "$ref": "#/$defs/string" }
+        "companyInfo": { "$ref": "#/$defs/string" },
+        "detailSections": { "type": "array", "items": { "$ref": "#/$defs/japaneseCareerDetailSection" } }
       }
+    },
+    "japaneseCareerDetailSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "content"],
+      "properties": { "title": { "$ref": "#/$defs/string" }, "content": { "$ref": "#/$defs/string" } }
     },
     "chineseDocument": {
       "type": "object",

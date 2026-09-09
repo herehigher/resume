@@ -20,7 +20,7 @@
       "education": [{ "date": "2013-04", "detail": "Example University 入学" }],
       "employment": [{ "date": "2017-04", "detail": "Example Works 入社" }],
       "qualification": [{ "date": "2020-06", "detail": "Example Certification 取得", "url": "https://example.test/certification" }],
-      "careers": [{ "company": "Example Works", "role": "Project Lead", "startDate": "2017-04", "endDate": "", "companyInfo": "架空の組織です。", "responsibilities": "架空の担当業務です。", "achievements": "架空の成果です。" }]
+      "careers": [{ "company": "Example Works", "role": "Project Lead", "startDate": "2017-04", "endDate": "", "companyInfo": "架空の組織です。", "detailSections": [{ "title": "担当業務", "content": "架空の担当業務です。" }, { "title": "実績・成果", "content": "架空の成果です。" }] }]
     },
     "zh-CN": {
       "activeDocument": "resume",

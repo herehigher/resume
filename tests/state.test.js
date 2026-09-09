@@ -49,6 +49,45 @@ test('default state contains independent locale documents', () => {
   assert.equal(state.settings.locale, 'zh-CN');
   assert.notEqual(state.documents.ja, state.documents['zh-CN']);
   assert.notEqual(state.documents['zh-CN'], state.documents.en);
+  assert.deepEqual(state.documents.ja.careers[0].detailSections, [
+    { title: '担当業務', content: '' },
+    { title: '実績・成果', content: '' }
+  ]);
+});
+
+test('Japanese career detail sections are validated and survive JSON export/import in order', async () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.careers[0].detailSections = [
+    { title: 'プロジェクト概要', content: '架空のプロジェクトです。' },
+    { title: '使用技術', content: 'HTML, CSS, JavaScript' },
+    { title: 'チーム規模', content: '5名' }
+  ];
+  assert.equal(validateState(state).valid, true);
+
+  const storage = createMemoryStorage();
+  const source = createTestStore(storage, state);
+  const target = createTestStore(createMemoryStorage(), createDefaultState());
+  await target.importJson(source.exportJson());
+  assert.deepEqual(target.getState().documents.ja.careers[0].detailSections, state.documents.ja.careers[0].detailSections);
+
+  state.documents.ja.careers[0].detailSections[0].unexpected = 'unsupported';
+  const result = validateState(state);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes('state.documents.ja.careers[0].detailSections[0] has an unsupported shape'));
+});
+
+test('Japanese sample keeps the original responsibilities and achievements examples', () => {
+  const state = createJapaneseSampleState(createDefaultState('ja'));
+  assert.deepEqual(state.documents.ja.careers[0].detailSections, [
+    {
+      title: '担当業務',
+      content: '・法人向けSaaSプロダクトの企画、要件定義\n・利用データおよび顧客インタビューに基づく改善施策の立案\n・エンジニア、デザイナー、営業とのプロジェクト推進\n・5名の企画チームのマネジメント'
+    },
+    {
+      title: '実績・成果',
+      content: '・オンボーディング改善により継続率を18ポイント向上\n・新機能の企画・提供により主要指標を前年比125%へ改善\n・開発プロセスの見直しによりリードタイムを30%短縮'
+    }
+  ]);
 });
 
 test('page break settings are isolated and reject unsupported keys and duplicates', () => {
