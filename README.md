@@ -74,7 +74,7 @@ Chrome で `http://localhost:8000/` を開いて日本語 editor を直接始め
 - 保存 key は `resume-studio-web-v1` で、profile、写真、三言語の文書を現在の browser origin にまとめて保存します。
 - 下書き本文は localStorage に AES-GCM で暗号化して保存します。JSON export と PDF は暗号化されず、写真その他の個人情報を含む場合があるため、安全に保管してください。
 - browser data の消去、private browsing の終了、保存容量不足、browser による storage eviction で下書きを失うことがあります。重要な下書きは JSON で backup してください。
-- アプリ内削除は v1 state を消しますが、旧 `resume-studio-data-v1`、download 済み JSON/PDF、browser の download 履歴までは削除しません。
+- アプリ内削除は v1 state だけを消します。無関係な storage 項目、download 済み JSON/PDF、browser の download 履歴は削除しません。
 - Repository の `site/`、clone、fork は Analytics 無効で、同一 origin の静的 asset 以外へ解析 request を送りません。公式 CI は検証対象 commit の設定 manifest が有効な場合だけ、公開前の配布物へ標準 Cloudflare Web Analytics を追加します。承認後は同じ配布物を immutable stable tag と対応付けて公開します。Cookie、localStorage、利用者単位 ID、custom event は使わず、履歴書入力、写真、JSON、local draft は送信しません。画面の status 表示と Network panel で現在の mode を確認できます。
 
 詳細は [Privacy / 日本語](PRIVACY.md#privacy-ja) を確認してください。
