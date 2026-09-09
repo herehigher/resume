@@ -66,7 +66,7 @@
 .paper-table-header th:first-child { border-right: .5pt solid var(--ja-line-default); color: var(--ja-muted); width: var(--ja-key-column); }
 .paper-table-row { min-height: 34px; }
 .paper-table-row + .paper-table-row { border-top: .5pt solid var(--ja-line-soft); }
-.paper-table-date { border-right: .5pt solid var(--ja-line-default); color: var(--ja-muted); font-size: 12px; font-variant-numeric: tabular-nums; padding: 7px 6px; text-align: center; vertical-align: top; white-space: nowrap; width: var(--ja-key-column); }
+.paper-table-date { border-right: .5pt solid var(--ja-line-default); color: var(--ja-muted); font-size: 12px; font-variant-numeric: tabular-nums; padding: 7px 8px; text-align: left; vertical-align: top; white-space: nowrap; width: var(--ja-key-column); }
 .paper-table-detail { font-size: 14px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; padding: 7px 14px; vertical-align: top; white-space: pre-wrap; }
 .qualification-proof { color: var(--ja-link); display: block; font-family: "Yu Gothic", "Hiragino Sans", sans-serif; font-size: 11.5px; line-height: 1.45; margin-top: 3px; overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
 .paper-text-section { border-bottom: 1px solid var(--ja-line-strong); margin-top: 22px; min-height: 130px; }
@@ -88,7 +88,7 @@
 .career-company-heading { background: #eff4f9; border-bottom: 1px solid #9aa6b5; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 9px 11px; }
 .career-company-heading strong { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
 .career-company-heading span { font-size: 12px; }
-.career-company-info { border-bottom: 1px solid #c3cad3; font-size: 12px; padding: 7px 11px; }
+.career-company-info { border-bottom: 1px solid #c3cad3; font-size: 12px; min-width: 0; overflow-wrap: anywhere; padding: 7px 11px; white-space: pre-wrap; }
 .career-company-grid { display: grid; grid-template-columns: 105px minmax(0, 1fr); }
 .career-company-grid > div { border-bottom: 1px solid #cbd2da; font-size: 13.5px; line-height: 1.75; min-width: 0; overflow-wrap: anywhere; padding: 9px 11px; white-space: pre-wrap; }
 .career-company-grid > div:nth-child(odd) { background: #f8fafc; border-right: 1px solid #cbd2da; font-size: 12px; font-weight: 700; }

@@ -57,25 +57,20 @@ function renderCareerProfiles(fields) {
   return links.length ? `<div class="career-profile-links">${links.join('')}</div>` : '';
 }
 
-function continuationLabel(fields, category) {
-  const name = String(fields.fullName ?? '').trim() || '氏名未入力';
-  return `履歴書 · ${escapeHTML(name)} · ${category}`;
-}
-
-function renderHistoryRows(items, category, fields) {
+function renderHistoryRows(items, category) {
   const enteredItems = items.filter((item) => itemHasContent(item, ['date', 'detail']));
   if (!enteredItems.length) return '';
   const rows = enteredItems.map((item) => `<tr class="paper-table-row"><td class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</td><td class="paper-table-detail">${displayText(item.detail, '未入力')}</td></tr>`).join('');
-  return `<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月</th><th>${continuationLabel(fields, category)}</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月</th><th>${escapeHTML(category)}</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function renderQualificationRows(items, fields) {
+function renderQualificationRows(items) {
   const rows = items
     .filter((item) => itemHasContent(item, ['date', 'detail', 'url']))
     .map((item) => `<tr class="paper-table-row"><td class="paper-table-date">${escapeHTML(japaneseMonth(item.date))}</td><td class="paper-table-detail">${displayText(item.detail, '未入力')}${credentialLink(item.url)}</td></tr>`)
     .join('');
   if (!rows) return '';
-  return `<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月</th><th>${continuationLabel(fields, '免許・資格')}</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月</th><th>免許・資格</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderCareerPeriod(career) {
@@ -132,12 +127,12 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
       ${renderResumeProfiles(fields)}
       <section class="paper-section" data-section-key="history">
         <h3 class="resume-section-title">学歴・職歴</h3>
-        ${renderHistoryRows(document.education, '学歴', fields)}
-        ${renderHistoryRows(document.employment, '職歴', fields)}
+        ${renderHistoryRows(document.education, '学歴')}
+        ${renderHistoryRows(document.employment, '職歴')}
       </section>
       <section class="paper-section" data-section-key="qualifications">
         <h3 class="resume-section-title">免許・資格</h3>
-        ${renderQualificationRows(document.qualification, fields)}
+        ${renderQualificationRows(document.qualification)}
       </section>
       <section class="paper-text-section" data-section-key="motivation"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
       <section class="paper-text-section requests-section" data-section-key="requests"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(hasContent(fields.requests) ? fields.requests : '貴社規定に従います。')}</div></section>
