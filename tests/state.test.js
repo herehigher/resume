@@ -204,6 +204,56 @@ test('invalid import does not change current or persisted data', async () => {
   assert.equal(storage.getItem(STORAGE_KEY), beforeStored);
 });
 
+test('prepared import is side-effect free until confirmation and rejects a changed draft', async () => {
+  const storage = createMemoryStorage();
+  const store = createTestStore(storage, createDefaultState('ja'));
+  await store.save();
+  const beforeRaw = storage.getItem(STORAGE_KEY);
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported example';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  assert.equal(store.isImportPending(), true);
+  assert.equal(storage.getItem(STORAGE_KEY), beforeRaw);
+  assert.equal(store.getState().profile.fields.fullName, '');
+
+  store.update((state) => { state.profile.fields.fullName = 'New local edit'; });
+  await assert.rejects(() => store.importPrepared(prepared), (error) => error.code === 'state-changed');
+  assert.equal(store.isImportPending(), false);
+  assert.equal(store.getState().profile.fields.fullName, 'New local edit');
+  assert.equal(storage.getItem(STORAGE_KEY), beforeRaw);
+});
+
+test('prepared import replaces memory only after persistence succeeds', async () => {
+  const storage = createMemoryStorage();
+  const persistence = {
+    async save() { throw new Error('quota'); },
+    async load() { return null; },
+    async remove() {},
+    flush() { return Promise.resolve(); }
+  };
+  const store = createStore({ storage, initialState: createDefaultState('ja'), persistence });
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported example';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  await assert.rejects(() => store.importPrepared(prepared), /quota/);
+  assert.equal(store.getState().profile.fields.fullName, '');
+  assert.equal(storage.getItem(STORAGE_KEY), null);
+});
+
+test('future and invalid revision imports are rejected without opening an import transaction', () => {
+  const storage = createMemoryStorage();
+  const store = createTestStore(storage, createDefaultState());
+  const original = JSON.stringify(store.getState());
+
+  assert.throws(() => store.prepareImport(JSON.stringify({ version: 1, schemaRevision: 99 })), (error) => error.code === 'future-state');
+  assert.throws(() => store.prepareImport(JSON.stringify({ version: 1, schemaRevision: -1 })), (error) => error.code === 'unsupported-state');
+  assert.equal(store.isImportPending(), false);
+  assert.equal(JSON.stringify(store.getState()), original);
+  assert.equal(storage.getItem(STORAGE_KEY), null);
+});
+
 test('entering sample mode persists pending draft changes', async () => {
   const storage = createMemoryStorage();
   const store = createTestStore(storage, createDefaultState());

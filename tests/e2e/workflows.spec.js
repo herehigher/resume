@@ -116,6 +116,56 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await expect(page.locator('#clearDraftButton')).toBeFocused();
 });
 
+test('JSON import confirms before replacing a draft and preserves it on cancel', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const name = page.locator('[name="fullName"]');
+  await name.fill('Existing local draft');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBeNull();
+  const rawBefore = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported backup';
+  const input = page.locator('#importDataInput');
+
+  await input.setInputFiles({
+    name: 'resume-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(name).toHaveValue('Existing local draft');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(rawBefore);
+
+  await input.setInputFiles({
+    name: 'resume-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(name).toHaveValue('Imported backup');
+});
+
+test('[mobile] JSON import confirmation keeps cancel focus and the current draft', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLocale(page, 'en');
+  const name = page.locator('[data-profile-field="fullName"]');
+  await name.fill('Existing mobile draft');
+  const backup = createDefaultState('ja');
+  backup.profile.fields.fullName = 'Imported backup';
+
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'resume-mobile-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(name).toHaveValue('Existing mobile draft');
+});
+
 test('[mobile] 三言語の通常下書き状態は320–401pxで1行、操作は44px以上で横にはみ出さない', async ({ page }) => {
   const cases = [
     ['ja', '#japaneseWorkspace', '[name="fullName"]', '#saveStatus', '#loadSampleButton', '暗号化してこの端末に保存済み'],
@@ -564,6 +614,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(exported))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(name).toHaveValue('読み込んだ氏名');
 
   await page.locator('#importDataInput').setInputFiles({
@@ -571,7 +622,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
     mimeType: 'application/json',
     buffer: Buffer.from('{"version":999}')
   });
-  await expect(page.locator('#globalMessage')).toContainText('読み込めませんでした');
+  await expect(page.locator('#globalMessage')).toContainText('現在の形式に対応していない');
   await expect(name).toHaveValue('読み込んだ氏名');
   await expect.poll(() => page.evaluate((key) => {
     const raw = localStorage.getItem(key);

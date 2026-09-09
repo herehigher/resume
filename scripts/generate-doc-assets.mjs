@@ -317,6 +317,7 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
       mimeType: 'application/json',
       name: `fictional-${variant.locale}.json`
     });
+    await page.locator('#confirmSampleAdoptButton').click();
     await page.waitForFunction(
       ({ previewSelector, markerText }) => document.querySelector(previewSelector)?.textContent.includes(markerText),
       { markerText: marker, previewSelector: variant.previewSelector }

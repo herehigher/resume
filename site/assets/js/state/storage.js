@@ -166,6 +166,7 @@ export function createDraftStorage(storage, {
   let persistenceTail = Promise.resolve();
   let lastKnownRaw;
   let pendingMutation = null;
+  let lastLoadResult = null;
   function keys() {
     if (!keyStoreInstance) keyStoreInstance = keyStore || createKeyStore(indexedDB);
     return keyStoreInstance;
@@ -286,6 +287,7 @@ export function createDraftStorage(storage, {
     pendingMutation = null;
     if (!classified.result) {
       lastKnownRaw = raw;
+      lastLoadResult = null;
       return null;
     }
     const { result } = classified;
@@ -300,6 +302,7 @@ export function createDraftStorage(storage, {
       } else {
         lastKnownRaw = raw;
       }
+      lastLoadResult = { status: result.status };
       return result.state;
     }
     if (result.status === 'migrated' || result.status === 'salvaged') {
@@ -309,6 +312,7 @@ export function createDraftStorage(storage, {
       } else {
         await replaceIfUnchanged(raw, result.state, { allowKeyCreation: classified.plaintext });
       }
+      lastLoadResult = { status: result.status };
       return result.state;
     }
     if (result.status === 'too-old') {
@@ -319,6 +323,7 @@ export function createDraftStorage(storage, {
       } else {
         await replaceIfUnchanged(raw, replacement, { allowKeyCreation: classified.plaintext });
       }
+      lastLoadResult = { status: result.status };
       return replacement;
     }
     throw migrationError(result);
@@ -396,6 +401,7 @@ export function createDraftStorage(storage, {
     save,
     remove,
     getPendingMutation: () => pendingMutation,
+    getLastLoadResult: () => lastLoadResult,
     flush: () => persistenceTail
   };
 }
@@ -409,16 +415,26 @@ export function serializeState(state) {
   return `${JSON.stringify(state, null, 2)}\n`;
 }
 
-export function parseImportedState(text) {
+export function prepareImportedState(text) {
   let parsed;
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new TypeError('JSONの形式が正しくありません。');
+    const error = new TypeError('JSONの形式が正しくありません。');
+    error.code = 'unsupported-state';
+    throw error;
   }
   const result = migrateState(parsed);
   if (!['current', 'migrated', 'salvaged'].includes(result.status)) {
-    throw new TypeError('このバックアップは現在の Resume Studio では安全に読み込めません。');
+    const error = new TypeError('このバックアップは現在の Resume Studio では安全に読み込めません。');
+    error.code = result.status === 'future' ? 'future-state'
+      : result.status === 'too-old' ? 'too-old-state'
+        : 'unsupported-state';
+    throw error;
   }
-  return cloneData(result.state);
+  return { state: cloneData(result.state), status: result.status };
+}
+
+export function parseImportedState(text) {
+  return prepareImportedState(text).state;
 }

@@ -1,10 +1,12 @@
 import { createDefaultState, cloneData } from './defaults.js';
-import { createDraftStorage, parseImportedState, serializeState } from './storage.js';
+import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js';
 import { assertValidState } from './schema.js';
 
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
   let state = cloneData(assertValidState(initialState));
   let stored = hasStoredState;
+  let revision = 0;
+  let importPending = false;
   const listeners = new Set();
 
   function notify(type) {
@@ -17,12 +19,14 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     const next = cloneData(assertValidState(nextState));
     if (!persist) {
       state = next;
+      revision += 1;
       notify(type);
       return state;
     }
     return persistence.save(next).then(() => {
       state = next;
       stored = true;
+      revision += 1;
       notify(type);
       return state;
     });
@@ -38,6 +42,32 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       return replace(next, { persist, type });
     },
     replace,
+    prepareImport(text) {
+      const prepared = prepareImportedState(text);
+      importPending = true;
+      notify('import-pending');
+      return { ...prepared, revision };
+    },
+    cancelImport() {
+      if (!importPending) return;
+      importPending = false;
+      notify('import-cancel');
+    },
+    importPrepared(prepared) {
+      if (!prepared?.state || !Number.isSafeInteger(prepared.revision)) throw new TypeError('A prepared import is required.');
+      if (!importPending || prepared.revision !== revision) {
+        importPending = false;
+        notify('import-conflict');
+        const error = new Error('The draft changed while import confirmation was open.');
+        error.code = 'state-changed';
+        return Promise.reject(error);
+      }
+      importPending = false;
+      return replace(prepared.state, { persist: true, type: 'import' });
+    },
+    isImportPending() {
+      return importPending;
+    },
     save() {
       const snapshot = cloneData(state);
       return persistence.save(snapshot).then(() => {

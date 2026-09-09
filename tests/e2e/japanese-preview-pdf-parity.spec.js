@@ -102,6 +102,7 @@ async function importJapaneseState(page, state) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(importInput).toHaveValue('');
   await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
 }

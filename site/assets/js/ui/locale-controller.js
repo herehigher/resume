@@ -1,6 +1,8 @@
 import { SUPPORTED_LOCALES } from '../config.js';
 import { getMessages } from '../i18n/index.js';
 import { saveLocalePreference } from '../state/locale-preference.js';
+import { confirmAction } from './confirmation-dialog.js';
+import { messageForDraftStorageError } from './draft-storage-error.js';
 
 const publicEntryPaths = Object.freeze({
   ja: '../',
@@ -135,12 +137,28 @@ export function initLocaleController(store, {
     const file = importInput.files?.[0];
     if (!file) return;
     const currentCopy = getMessages(locale);
+    let prepared;
     try {
-      await store.importJson(await file.text());
+      prepared = store.prepareImport(await file.text());
+      const confirmed = await confirmAction({
+        title: currentCopy.importConfirmTitle,
+        body: currentCopy.importConfirmBody,
+        cancel: currentCopy.importConfirmCancel,
+        confirm: currentCopy.importConfirm
+      });
+      if (!confirmed) {
+        store.cancelImport();
+        return;
+      }
+      await store.importPrepared(prepared);
       applyLocale(true);
-      showMessage(getMessages(locale).importSuccess);
-    } catch (_error) {
-      showMessage(currentCopy.importError, true);
+      showMessage(prepared.status === 'salvaged' ? currentCopy.importSalvaged : getMessages(locale).importSuccess);
+    } catch (error) {
+      store.cancelImport();
+      const message = error?.code === 'state-changed'
+        ? currentCopy.importConflict
+        : messageForDraftStorageError(error, locale, currentCopy.importError);
+      showMessage(message, true);
     } finally {
       importInput.value = '';
     }

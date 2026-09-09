@@ -20,11 +20,13 @@ let storageError = getDraftStorageCapabilityError({
   isSecureContext: window.isSecureContext
 });
 let recoveredDraft = false;
+let draftLoadResult = null;
 if (!storageError) {
   try {
     const result = await persistence.loadAndRecoverUnreadableDraft();
     storedState = result.state;
     recoveredDraft = result.recovered;
+    draftLoadResult = persistence.getLastLoadResult();
   } catch (error) {
     storageError = error;
   }
@@ -83,6 +85,20 @@ if (storageError) {
     ja: '保存済みの下書きに問題があったため、新しい既定の下書きに自動復旧しました。',
     'zh-CN': '已因保存的草稿出现问题而自动恢复为新的默认草稿。',
     en: 'Because the saved draft had a problem, it was automatically recovered to a new default draft.'
+  }[locale];
+} else if (draftLoadResult?.status === 'salvaged') {
+  const message = document.getElementById('globalMessage');
+  message.textContent = {
+    ja: '保存済みの下書きの一部を安全に読み込み、現在の形式に更新しました。',
+    'zh-CN': '已安全读取保存草稿中的可用内容，并更新为当前格式。',
+    en: 'Usable content from your saved draft was restored and updated to the current format.'
+  }[locale];
+} else if (draftLoadResult?.status === 'too-old') {
+  const message = document.getElementById('globalMessage');
+  message.textContent = {
+    ja: '保存済みの下書きが古すぎたため、新しい下書きに安全に置き換えました。',
+    'zh-CN': '保存的草稿版本过旧，已安全替换为新的草稿。',
+    en: 'Your saved draft was too old and was safely replaced with a new draft.'
   }[locale];
 }
 initLocaleController(store, {

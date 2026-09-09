@@ -61,6 +61,7 @@ export async function checkOnlineEditor(baseUrl) {
         name: 'fictional-online-check.json', mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(example))
       });
+      await page.locator('#confirmSampleAdoptButton').click();
       await expect(page.locator(preview)).toContainText('Fictional Online Check');
       await expect(page.locator('#localeSelect')).toHaveValue(locale);
       await page.close();

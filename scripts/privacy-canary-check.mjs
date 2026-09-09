@@ -44,6 +44,7 @@ export async function exercisePrivacyCanary(page, { beforeReload, leaveUrl }) {
     mimeType: 'application/json',
     name: 'fictional-network-import.json'
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await page.locator('[name="fullName"]').waitFor({ state: 'visible' });
   await page.waitForFunction((value) => document.querySelector('[name="fullName"]')?.value === value, importCanary);
   await page.waitForFunction(({ before, key }) => {
