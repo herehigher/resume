@@ -60,6 +60,12 @@ export function validateState(value) {
   if (!['resume', 'career'].includes(value.documents?.ja?.activeDocument)) {
     errors.push('documents.ja.activeDocument is not supported');
   }
+  const japaneseCareerKeys = new Set(['company', 'role', 'startDate', 'endDate', 'companyInfo', 'detailSections']);
+  value.documents?.ja?.careers?.forEach((career, index) => {
+    if (Object.keys(career).some((key) => !japaneseCareerKeys.has(key))) {
+      errors.push(`documents.ja.careers[${index}] contains unsupported fields`);
+    }
+  });
   for (const locale of ['zh-CN', 'en']) {
     if (value.documents?.[locale]?.activeDocument !== 'resume') {
       errors.push(`documents.${locale}.activeDocument is not supported`);

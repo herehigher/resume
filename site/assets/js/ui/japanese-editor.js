@@ -1,9 +1,9 @@
-import { createJapaneseSampleState, cloneData } from '../state/defaults.js';
+import { createJapaneseCareer, createJapaneseSampleState, cloneData } from '../state/defaults.js';
 import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
-import { confirmSampleAdoption } from './confirmation-dialog.js';
+import { confirmAction, confirmSampleAdoption } from './confirmation-dialog.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 
 const PROFILE_FIELD_NAMES = new Set([
@@ -191,6 +191,19 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       item.querySelectorAll('[data-key]').forEach((field) => {
         field.value = career[field.dataset.key] || '';
       });
+      const detailList = item.querySelector('[data-career-detail-list]');
+      career.detailSections.forEach((section, detailIndex) => {
+        const detailItem = document.getElementById('careerDetailSectionTemplate').content.firstElementChild.cloneNode(true);
+        detailItem.dataset.careerDetailIndex = String(detailIndex);
+        const identity = `勤務先 ${index + 1} の項目 ${detailIndex + 1}${section.title.trim() ? `（${section.title.trim()}）` : ''}`;
+        detailItem.querySelectorAll('[data-career-detail-key]').forEach((field) => {
+          field.value = section[field.dataset.careerDetailKey] || '';
+          field.setAttribute('aria-label', `${identity}の${field.dataset.careerDetailKey === 'title' ? '項目名' : '本文'}`);
+        });
+        detailItem.querySelector('[data-remove-career-detail]').setAttribute('aria-label', `${identity}を削除`);
+        detailList.appendChild(detailItem);
+      });
+      item.querySelector('[data-add-career-detail]').setAttribute('aria-label', `勤務先 ${index + 1} に項目を追加`);
       container.appendChild(item);
     });
   }
@@ -267,7 +280,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     const sharedRequired = [fields.fullName, fields.birthDate, fields.address, fields.phone, fields.email];
     const documentRequired = document.activeDocument === 'resume'
       ? [document.education.some((item) => item.detail), document.employment.some((item) => item.detail), fields.motivation]
-      : [fields.careerSummary, fields.skills, document.careers.some((item) => item.company && item.responsibilities), fields.selfPromotion];
+      : [fields.careerSummary, fields.skills, document.careers.some((item) => item.company.trim() && item.detailSections.some((section) => section.content.trim())), fields.selfPromotion];
     const values = [...sharedRequired, ...documentRequired];
     const percentage = Math.round((values.filter(Boolean).length / values.length) * 100);
     completionBar.style.width = `${percentage}%`;
@@ -358,13 +371,16 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   }
 
   function onListInput(event) {
-    const field = event.target.closest('[data-key]');
+    const field = event.target.closest('[data-key], [data-career-detail-key]');
     if (!field) return;
     const simpleRow = field.closest('.repeating-row');
     const careerItem = field.closest('.career-editor-item');
+    const detailItem = field.closest('[data-career-detail-index]');
     mutate((state) => {
       if (simpleRow) {
         state.documents.ja[simpleRow.dataset.type][Number(simpleRow.dataset.index)][field.dataset.key] = field.value;
+      } else if (detailItem && careerItem) {
+        state.documents.ja.careers[Number(careerItem.dataset.index)].detailSections[Number(detailItem.dataset.careerDetailIndex)][field.dataset.careerDetailKey] = field.value;
       } else if (careerItem) {
         state.documents.ja.careers[Number(careerItem.dataset.index)][field.dataset.key] = field.value;
       }
@@ -375,15 +391,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   function addItem(type) {
     mutate((state) => {
       if (type === 'career') {
-        state.documents.ja.careers.push({
-          company: '',
-          role: '',
-          startDate: '',
-          endDate: '',
-          companyInfo: '',
-          responsibilities: '',
-          achievements: ''
-        });
+        state.documents.ja.careers.push(createJapaneseCareer());
       } else if (['education', 'employment', 'qualification'].includes(type)) {
         state.documents.ja[type].push(type === 'qualification'
           ? { date: '', detail: '', url: '' }
@@ -403,6 +411,56 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     });
     renderLists();
     renderPreview();
+  }
+
+  function announceCareerDetail(message) {
+    const live = document.getElementById('careerDetailLive');
+    live.textContent = '';
+    window.requestAnimationFrame(() => { live.textContent = message; });
+  }
+
+  function addCareerDetail(button) {
+    const careerItem = button.closest('.career-editor-item');
+    const careerIndex = Number(careerItem.dataset.index);
+    let detailIndex;
+    mutate((state) => {
+      const sections = state.documents.ja.careers[careerIndex].detailSections;
+      detailIndex = sections.length;
+      sections.push({ title: '', content: '' });
+    });
+    renderCareerList();
+    renderPreview();
+    const title = document.querySelector(`.career-editor-item[data-index="${careerIndex}"] [data-career-detail-index="${detailIndex}"] [data-career-detail-key="title"]`);
+    title?.focus();
+    announceCareerDetail(`勤務先 ${careerIndex + 1} に項目 ${detailIndex + 1} を追加しました`);
+  }
+
+  async function removeCareerDetail(button) {
+    const careerItem = button.closest('.career-editor-item');
+    const detailItem = button.closest('[data-career-detail-index]');
+    const careerIndex = Number(careerItem.dataset.index);
+    const detailIndex = Number(detailItem.dataset.careerDetailIndex);
+    const section = japaneseDocument().careers[careerIndex].detailSections[detailIndex];
+    if (section.title.trim() || section.content.trim()) {
+      const confirmed = await confirmAction({
+        title: '入力済みの項目を削除しますか？',
+        body: 'この項目のタイトルと本文は削除されます。この操作は取り消せません。',
+        cancel: 'キャンセル',
+        confirm: '削除する'
+      });
+      if (!confirmed) return;
+    }
+    mutate((state) => {
+      state.documents.ja.careers[careerIndex].detailSections.splice(detailIndex, 1);
+    });
+    renderCareerList();
+    renderPreview();
+    const currentCareer = document.querySelector(`.career-editor-item[data-index="${careerIndex}"]`);
+    const nextFocus = currentCareer?.querySelector(`[data-career-detail-index="${detailIndex}"] [data-career-detail-key="title"]`)
+      || currentCareer?.querySelector(`[data-career-detail-index="${detailIndex - 1}"] [data-career-detail-key="title"]`)
+      || currentCareer?.querySelector('[data-add-career-detail]');
+    nextFocus?.focus();
+    announceCareerDetail(`勤務先 ${careerIndex + 1} の項目を削除しました`);
   }
 
   async function handlePhoto(file) {
@@ -451,11 +509,15 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     const documentTab = event.target.closest('[data-document]');
     const addButton = event.target.closest('[data-add]');
     const removeButton = event.target.closest('.remove-row-button, .remove-career-button');
+    const addCareerDetailButton = event.target.closest('[data-add-career-detail]');
+    const removeCareerDetailButton = event.target.closest('[data-remove-career-detail]');
     const removeProfileLinkButton = event.target.closest('[data-remove-profile-link]');
     const mobileViewButton = event.target.closest('[data-mobile-view]');
     if (documentTab) switchDocument(documentTab.dataset.document);
     if (addButton) addItem(addButton.dataset.add);
     if (removeButton) removeItem(removeButton);
+    if (addCareerDetailButton) addCareerDetail(addCareerDetailButton);
+    if (removeCareerDetailButton) void removeCareerDetail(removeCareerDetailButton);
     if (removeProfileLinkButton) {
       mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
       renderProfileLinks();

@@ -351,6 +351,11 @@ test('published JSON Schema accepts exports and rejects primary invalid values',
   delete missingRequiredField.documents.en.resume.summary;
   assert.equal(validateSchema(schema, missingRequiredField), false);
 
+  const legacyJapaneseCareer = structuredClone(example);
+  legacyJapaneseCareer.documents.ja.careers[0].responsibilities = '旧形式';
+  assert.equal(validateSchema(schema, legacyJapaneseCareer), false);
+  assert.equal(validateState(legacyJapaneseCareer).valid, false);
+
   const unsafePhoto = structuredClone(example);
   unsafePhoto.profile.photo = 'https://example.test/photo.png';
   assert.equal(validateState(unsafePhoto).valid, false);

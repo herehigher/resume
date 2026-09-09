@@ -18,6 +18,54 @@ test('document tabs expose synchronized selection state and keyboard navigation'
   await expect(page.locator('#resumeDocumentTab')).toHaveAttribute('tabindex', '0');
 });
 
+test('Japanese career detail sections support editable ordered entries, confirmation, focus, and reload', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#careerDocumentTab').click();
+
+  const career = page.locator('#careerList .career-editor-item').first();
+  const details = career.locator('.career-detail-editor-item');
+  await expect(details).toHaveCount(2);
+  await expect(details.nth(0).locator('[data-career-detail-key="title"]')).toHaveValue('担当業務');
+  await expect(details.nth(1).locator('[data-career-detail-key="title"]')).toHaveValue('実績・成果');
+  await expect(details.nth(0).locator('[data-career-detail-key="title"]')).toHaveAccessibleName(/勤務先 1 の項目 1（担当業務）の項目名/);
+  await expect(details.nth(0).locator('[data-remove-career-detail]')).toHaveAccessibleName(/勤務先 1 の項目 1（担当業務）を削除/);
+
+  await details.nth(0).locator('[data-career-detail-key="content"]').fill('担当した架空の業務');
+  await career.locator('[data-add-career-detail]').click();
+  await expect(details).toHaveCount(3);
+  const added = details.nth(2);
+  await expect(added.locator('[data-career-detail-key="title"]')).toBeFocused();
+  await added.locator('[data-career-detail-key="title"]').fill('プロジェクト概要');
+  await added.locator('[data-career-detail-key="content"]').fill('架空プロジェクトの概要');
+  await expect(page.locator('#documentPreview')).toContainText('プロジェクト概要');
+  await expect(page.locator('#careerDetailLive')).toContainText('項目 3 を追加しました');
+
+  const remove = added.locator('[data-remove-career-detail]');
+  await remove.focus();
+  await remove.click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(added.locator('[data-career-detail-key="content"]')).toHaveValue('架空プロジェクトの概要');
+  await expect(remove).toBeFocused();
+
+  await remove.click();
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(details).toHaveCount(2);
+  await expect(details.nth(1).locator('[data-career-detail-key="title"]')).toBeFocused();
+  await expect(page.locator('#careerDetailLive')).toContainText('項目を削除しました');
+
+  await career.locator('[data-add-career-detail]').click();
+  await expect(details).toHaveCount(3);
+  await details.nth(2).locator('[data-remove-career-detail]').click();
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(details).toHaveCount(2);
+  await expect(page.locator('#saveStatus')).toHaveText('暗号化してこの端末に保存済み');
+  await page.reload();
+  await page.locator('#careerDocumentTab').click();
+  await expect(page.locator('#careerList .career-detail-editor-item').first().locator('[data-career-detail-key="content"]')).toHaveValue('担当した架空の業務');
+});
+
 test('[mobile] mobile view controls expose synchronized selection state', async ({ page }) => {
   await openLocale(page, 'ja');
   await expect(page.locator('[data-mobile-view="editor"]')).toHaveAttribute('aria-pressed', 'true');

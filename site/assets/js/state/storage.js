@@ -148,6 +148,11 @@ function isPlaintextState(value) {
   return value && typeof value === 'object' && validateState(value).valid;
 }
 
+function isUnsupportedPlaintextState(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && 'version' in value && 'settings' in value && 'profile' in value && 'documents' in value;
+}
+
 export function createDraftStorage(storage, { crypto = globalThis.crypto, indexedDB = globalThis.indexedDB, keyStore = null } = {}) {
   if (!storage) throw new TypeError('localStorage is required');
   const cryptography = crypto?.subtle ? crypto : null;
@@ -208,7 +213,10 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
     }
     try {
       const state = JSON.parse(new TextDecoder().decode(plaintext));
-      if (!isPlaintextState(state)) throw new DraftStorageError('corrupt-envelope');
+      if (!isPlaintextState(state)) {
+        if (isUnsupportedPlaintextState(state)) throw new DraftStorageError('unsupported-state');
+        throw new DraftStorageError('corrupt-envelope');
+      }
       return state;
     } catch (error) {
       throw error instanceof DraftStorageError ? error : new DraftStorageError('corrupt-envelope', error);
@@ -228,6 +236,7 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
       await save(parsed);
       return parsed;
     }
+    if (isUnsupportedPlaintextState(parsed)) throw new DraftStorageError('unsupported-state');
     return decrypt(parsed);
   }
   async function load() {
@@ -244,6 +253,7 @@ export function createDraftStorage(storage, { crypto = globalThis.crypto, indexe
         try {
           const parsed = JSON.parse(existing);
           if (isPlaintextState(parsed)) allowKeyCreation = true;
+          else if (isUnsupportedPlaintextState(parsed)) throw new DraftStorageError('unsupported-state');
           else {
             validateEnvelope(parsed);
             // Do not replace a ciphertext unless the current key proves it can decrypt it.

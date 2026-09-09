@@ -20,7 +20,8 @@ function memoryKeyStore() {
   return {
     async read() { return key; },
     async write(next) { key = next; },
-    async remove() { key = null; }
+    async remove() { key = null; },
+    current() { return key; }
   };
 }
 
@@ -81,6 +82,47 @@ test('a plaintext v1 draft migrates only after encrypted persistence succeeds', 
   failingStorage.setItem = () => { throw new Error('quota'); };
   await assert.rejects(() => persistence(failingStorage).load(), DraftStorageError);
   assert.equal(failingStorage.getItem(STORAGE_KEY), JSON.stringify(original));
+});
+
+test('schema-unsupported encrypted and plaintext v1 drafts are retained and reject default-state overwrites', async () => {
+  const unsupported = createDefaultState('ja');
+  unsupported.documents.ja.careers[0] = {
+    company: 'Unsupported Fixture', role: '', startDate: '', endDate: '', companyInfo: '',
+    responsibilities: 'Old responsibilities', achievements: 'Old achievements'
+  };
+  const legacy = JSON.stringify({ keep: 'legacy' });
+
+  const plaintextStorage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(unsupported), 'resume-studio-data-v1': legacy });
+  const plaintextRaw = plaintextStorage.getItem(STORAGE_KEY);
+  const plaintextKeys = memoryKeyStore();
+  const plaintextDraft = persistence(plaintextStorage, plaintextKeys);
+  await assert.rejects(() => plaintextDraft.loadAndRecoverUnreadableDraft(), (error) => error.code === 'unsupported-state');
+  await assert.rejects(() => plaintextDraft.save(createDefaultState()), (error) => error.code === 'unsupported-state');
+  assert.equal(plaintextStorage.getItem(STORAGE_KEY), plaintextRaw);
+  assert.equal(plaintextStorage.getItem('resume-studio-data-v1'), legacy);
+  assert.equal(plaintextKeys.current(), null);
+
+  const encryptedStorage = memoryStorage({ 'resume-studio-data-v1': legacy });
+  const encryptedKeys = memoryKeyStore();
+  const writer = persistence(encryptedStorage, encryptedKeys);
+  await writer.save(createDefaultState());
+  const key = encryptedKeys.current();
+  const nonce = webcrypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, new TextEncoder().encode(JSON.stringify(unsupported)));
+  const encoded = (value) => Buffer.from(value).toString('base64');
+  const unsupportedEnvelope = JSON.stringify({
+    format: ENCRYPTED_DRAFT_FORMAT,
+    algorithm: ENCRYPTED_DRAFT_ALGORITHM,
+    nonce: encoded(nonce),
+    ciphertext: encoded(new Uint8Array(ciphertext))
+  });
+  encryptedStorage.setItem(STORAGE_KEY, unsupportedEnvelope);
+  const encryptedDraft = persistence(encryptedStorage, encryptedKeys);
+  await assert.rejects(() => encryptedDraft.loadAndRecoverUnreadableDraft(), (error) => error.code === 'unsupported-state');
+  await assert.rejects(() => encryptedDraft.save(createDefaultState()), (error) => error.code === 'unsupported-state');
+  assert.equal(encryptedStorage.getItem(STORAGE_KEY), unsupportedEnvelope);
+  assert.equal(encryptedStorage.getItem('resume-studio-data-v1'), legacy);
+  assert.equal(encryptedKeys.current(), key);
 });
 
 test('corrupt envelopes, missing keys, IndexedDB, and crypto failures do not fall back to plaintext', async () => {

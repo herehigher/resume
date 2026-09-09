@@ -41,8 +41,7 @@ test('Japanese dates, age, and current employment use conventional labels', () =
     startDate: '2024-04',
     endDate: '',
     companyInfo: '',
-    responsibilities: '',
-    achievements: ''
+    detailSections: []
   }];
 
   assert.match(renderJapaneseDocument(state), /2024年 4月 〜 現在/);
@@ -78,11 +77,30 @@ test('Japanese PDF output omits blank rows and empty career entries', () => {
     startDate: '',
     endDate: '',
     companyInfo: '',
-    responsibilities: '\n',
-    achievements: ''
+    detailSections: [{ title: ' ', content: '\n' }]
   }];
   html = renderJapaneseDocument(state);
   assert.doesNotMatch(html, /class="career-company"/);
+});
+
+test('Japanese career detail sections preserve order, placeholders, and escaped content', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.careers = [{
+    company: '架空会社', role: '', startDate: '', endDate: '', companyInfo: '',
+    detailSections: [
+      { title: 'プロジェクト概要', content: '最初の本文' },
+      { title: '', content: '<script>not executable</script>' },
+      { title: '本文なし', content: '' },
+      { title: ' ', content: ' ' }
+    ]
+  }];
+  const html = renderJapaneseDocument(state);
+  assert.ok(html.indexOf('プロジェクト概要') < html.indexOf('項目名未入力'));
+  assert.ok(html.indexOf('項目名未入力') < html.indexOf('本文なし'));
+  assert.match(html, /&lt;script&gt;not executable&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>not executable<\/script>/);
+  assert.match(html, /本文なし[\s\S]*?未入力/);
 });
 
 test('Japanese profile and credential links only activate HTTP URLs', () => {

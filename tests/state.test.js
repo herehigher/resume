@@ -49,6 +49,20 @@ test('default state contains independent locale documents', () => {
   assert.equal(state.settings.locale, 'zh-CN');
   assert.notEqual(state.documents.ja, state.documents['zh-CN']);
   assert.notEqual(state.documents['zh-CN'], state.documents.en);
+  assert.deepEqual(state.documents.ja.careers[0].detailSections, [
+    { title: '担当業務', content: '' },
+    { title: '実績・成果', content: '' }
+  ]);
+});
+
+test('Japanese careers require ordered title and content detail sections without legacy fixed fields', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.careers[0].detailSections = [{ title: 'プロジェクト概要', content: '架空の説明' }];
+  assert.equal(validateState(state).valid, true);
+
+  state.documents.ja.careers[0].responsibilities = '旧形式';
+  state.documents.ja.careers[0].achievements = '旧形式';
+  assert.equal(validateState(state).valid, false);
 });
 
 test('page break settings are isolated and reject unsupported keys and duplicates', () => {

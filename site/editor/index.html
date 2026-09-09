@@ -267,12 +267,13 @@
           <details class="form-section" open>
             <summary>
               <span class="section-number">05</span>
-              <span><strong>職務経歴</strong><small>会社ごとに担当業務と実績を入力</small></span>
+              <span><strong>職務経歴</strong><small>会社ごとに任意の詳細項目を入力</small></span>
               <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
             </summary>
             <div class="section-content">
               <div class="list-heading"><strong>勤務先</strong><button class="small-add-button" type="button" data-add="career">＋ 追加</button></div>
               <div class="career-list" id="careerList"></div>
+              <div class="career-detail-live" id="careerDetailLive" aria-live="polite"></div>
             </div>
           </details>
 
@@ -418,9 +419,19 @@
         <label class="input-field"><span>退社年月</span><input type="month" data-key="endDate"><small class="field-help">在職中は空欄</small></label>
       </div>
       <label class="input-field"><span>事業内容・会社概要</span><textarea data-key="companyInfo" rows="2" placeholder="事業内容、従業員数など"></textarea></label>
-      <label class="input-field"><span>担当業務</span><textarea data-key="responsibilities" rows="5" placeholder="担当した業務、役割、プロジェクト内容"></textarea></label>
-      <label class="input-field"><span>実績・成果</span><textarea data-key="achievements" rows="4" placeholder="数値や具体例を交えて記載"></textarea></label>
+      <section class="career-detail-sections">
+        <div class="list-heading"><strong>詳細項目</strong><button class="small-add-button" type="button" data-add-career-detail>＋ 項目を追加</button></div>
+        <div class="career-detail-list" data-career-detail-list></div>
+      </section>
     </article>
+  </template>
+
+  <template id="careerDetailSectionTemplate">
+    <section class="career-detail-editor-item" data-career-detail-index>
+      <label class="input-field"><span>項目名</span><input type="text" data-career-detail-key="title" placeholder="例：プロジェクト概要"></label>
+      <label class="input-field"><span>本文</span><textarea data-career-detail-key="content" rows="4" placeholder="担当した内容や成果を入力"></textarea></label>
+      <button class="remove-career-detail-button" type="button" data-remove-career-detail>この項目を削除</button>
+    </section>
   </template>
 
   <script type="module" src="../assets/js/main.js"></script>

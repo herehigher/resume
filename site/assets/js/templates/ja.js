@@ -152,21 +152,24 @@ export function renderJapaneseCareer(state) {
       'role',
       'startDate',
       'endDate',
-      'companyInfo',
-      'responsibilities',
-      'achievements'
-    ]))
+      'companyInfo'
+    ]) || career.detailSections?.some((section) => hasContent(section.title) || hasContent(section.content)))
     .map((career) => {
       const period = renderCareerPeriod(career);
       const context = [career.company, career.role].map((value) => String(value ?? '').trim()).filter(Boolean).join(' · ') || '未入力';
+      const details = (career.detailSections || [])
+        .filter((section) => hasContent(section.title) || hasContent(section.content))
+        .map((section) => {
+          const title = hasContent(section.title) ? String(section.title).trim() : '項目名未入力';
+          return `<div>${escapeHTML(title)}</div><div>${renderCareerDetail(section.content, '未入力', `職務経歴（続き） · ${context} · ${title}`)}</div>`;
+        }).join('');
       return `
     <section class="career-company">
       <div class="career-company-heading"><strong>${displayText(career.company, '会社名未入力')}</strong>${period ? `<span>${period}</span>` : ''}</div>
       <div class="career-company-info">${displayText(career.companyInfo, '事業内容・会社概要')}</div>
       <div class="career-company-grid">
         <div>所属・役職</div><div>${displayText(career.role, '未入力')}</div>
-        <div>担当業務</div><div>${renderCareerDetail(career.responsibilities, '担当業務を入力してください', `職務経歴（続き） · ${context} · 担当業務`)}</div>
-        <div>実績・成果</div><div>${renderCareerDetail(career.achievements, '実績・成果を入力してください', `職務経歴（続き） · ${context} · 実績・成果`)}</div>
+        ${details}
       </div>
     </section>`;
     }).join('');

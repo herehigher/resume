@@ -316,7 +316,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
       locale: 'ja',
       state: () => {
         const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'career', pageSize: 'A4' });
-        state.documents.ja.careers[0].responsibilities = details;
+        state.documents.ja.careers[0].detailSections[0].content = details;
         return state;
       },
       continuation: '職務経歴（続き） · 検証株式会社 1 · 印刷品質担当 · 担当業務',
