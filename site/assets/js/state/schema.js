@@ -1,4 +1,4 @@
-import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
+import { CURRENT_SCHEMA_REVISION, PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createDefaultState } from './defaults.js';
 import { validatePageBreaks } from '../page-breaks.js';
 
@@ -40,11 +40,19 @@ function compareShape(value, template, path, errors) {
   }
 }
 
-export function validateState(value) {
+function validateStateShape(value, { requireCurrentRevision = false } = {}) {
   const errors = [];
   if (!isPlainObject(value)) return { valid: false, errors: ['state must be an object'] };
   if (value.version !== STATE_VERSION) errors.push(`version must be ${STATE_VERSION}`);
-  compareShape(value, createDefaultState(), 'state', errors);
+  const legacyTemplate = createDefaultState();
+  delete legacyTemplate.schemaRevision;
+  compareShape(value, legacyTemplate, 'state', errors);
+
+  const hasSchemaRevision = Object.hasOwn(value, 'schemaRevision');
+  if (requireCurrentRevision && !hasSchemaRevision) errors.push('schemaRevision is required');
+  if (hasSchemaRevision && value.schemaRevision !== CURRENT_SCHEMA_REVISION) {
+    errors.push(`schemaRevision must be ${CURRENT_SCHEMA_REVISION}`);
+  }
 
   if (!SUPPORTED_LOCALES.includes(value.settings?.locale)) {
     errors.push('settings.locale is not supported');
@@ -63,11 +71,12 @@ export function validateState(value) {
 
   const careerKeys = ['company', 'companyInfo', 'detailSections', 'endDate', 'role', 'startDate'];
   const careerDetailSectionKeys = ['content', 'title'];
-  value.documents?.ja?.careers?.forEach((career, index) => {
+  const careers = value.documents?.ja?.careers;
+  if (Array.isArray(careers)) careers.forEach((career, index) => {
     if (!isPlainObject(career) || Object.keys(career).sort().join(',') !== careerKeys.join(',')) {
       errors.push(`state.documents.ja.careers[${index}] has an unsupported shape`);
     }
-    career?.detailSections?.forEach((section, sectionIndex) => {
+    if (Array.isArray(career?.detailSections)) career.detailSections.forEach((section, sectionIndex) => {
       if (!isPlainObject(section) || Object.keys(section).sort().join(',') !== careerDetailSectionKeys.join(',')) {
         errors.push(`state.documents.ja.careers[${index}].detailSections[${sectionIndex}] has an unsupported shape`);
       }
@@ -90,6 +99,16 @@ export function validateState(value) {
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+// Keep the pre-migration reader compatible with a B0 payload until storage wires
+// the migrator in #156. New writes and public exports use validateCurrentState.
+export function validateState(value) {
+  return validateStateShape(value);
+}
+
+export function validateCurrentState(value) {
+  return validateStateShape(value, { requireCurrentRevision: true });
 }
 
 export function assertValidState(value) {

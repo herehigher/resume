@@ -24,6 +24,12 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 
 表示 locale の決定順は URL query、`resume-studio-locale-v1` の保存 preference、`navigator.languages`、`ja`。Import 内の locale は文書 data で、表示 preference を変更しません。`zh-TW` / `zh-Hant` を简体中文へ自動変換しません。
 
+## Schema revision と移行
+
+JSON payload の `version: 1` は Resume Studio web payload family を識別し、`schemaRevision` は data shape の revision を識別します。新規 state と公開 export は `schemaRevision: 1` を持ちます。R1〜R3 は、revision property がなく固定 B0 shape に厳密適合する payload だけを B0 として R1 に変換できます。R4 を追加する変更では B0 adapter と fixture を撤去し、revision がない payload は非対応として保護します。
+
+番号付き revision の対応下限は `max(1, currentRevision - 3)` です。新しい revision を加える PR は、個別の純粋 migration step、対応 fixture、境界 test、公開 schema/example を同時に更新します。migration の既定値は固定し、日付・browser locale・random 値を使いません。
+
 ## Open Graph 共有画像
 
 日本語・简体中文・English の公開入口で使う 1200 × 630 の共有画像は、repository root から次の command で3言語分をまとめて再生成します。

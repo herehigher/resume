@@ -343,6 +343,10 @@ test('published JSON Schema accepts exports and rejects primary invalid values',
   invalidVersion.version = 2;
   assert.equal(validateSchema(schema, invalidVersion), false);
 
+  const missingSchemaRevision = structuredClone(example);
+  delete missingSchemaRevision.schemaRevision;
+  assert.equal(validateSchema(schema, missingSchemaRevision), false);
+
   const invalidLocale = structuredClone(example);
   invalidLocale.settings.locale = 'fr';
   assert.equal(validateSchema(schema, invalidLocale), false);
