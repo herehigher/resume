@@ -341,8 +341,8 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
         state.documents.ja.employment = [];
         return state;
       },
-      continuation: '履歴書 · 印刷 試験 · 学歴',
-      firstRecordContext: '履歴書 · 印刷 試験 · 学歴'
+      continuation: '学歴',
+      firstRecordContext: '学歴'
     },
     {
       locale: 'ja',
