@@ -155,10 +155,7 @@ export function initLocaleController(store, {
       showMessage(prepared.status === 'salvaged' ? currentCopy.importSalvaged : getMessages(locale).importSuccess);
     } catch (error) {
       store.cancelImport();
-      const message = error?.code === 'state-changed'
-        ? currentCopy.importConflict
-        : messageForDraftStorageError(error, locale, currentCopy.importError);
-      showMessage(message, true);
+      showMessage(messageForDraftStorageError(error, locale, currentCopy.importError), true);
     } finally {
       importInput.value = '';
     }

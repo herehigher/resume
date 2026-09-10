@@ -20,7 +20,6 @@ export default {
   importConfirmCancel: 'Cancel',
   importConfirm: 'Import',
   importSalvaged: 'Usable content was imported safely and updated to the current format.',
-  importConflict: 'The draft changed while you were confirming. The import was cancelled.',
   draftMigrated: 'Your saved draft was updated to the current format.',
   draftSalvaged: 'Usable content from your saved draft was restored and updated to the current format.',
   draftTooOld: 'Your saved draft was too old and was safely replaced with a new draft.',

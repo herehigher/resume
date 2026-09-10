@@ -20,7 +20,6 @@ export default {
   importConfirmCancel: '取消',
   importConfirm: '导入',
   importSalvaged: '已安全导入可用内容并更新为当前格式。',
-  importConflict: '确认期间草稿已更改，已取消导入。',
   draftMigrated: '已将保存的草稿更新为当前格式。',
   draftSalvaged: '已安全读取保存草稿中的可用内容，并更新为当前格式。',
   draftTooOld: '保存的草稿版本过旧，已安全替换为新的草稿。',

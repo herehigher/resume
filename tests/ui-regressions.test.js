@@ -30,6 +30,7 @@ test('every locale has distinct import, export, and locale-save error messages',
     assert.ok(messages.backupMenuShortLabel);
     assert.match(messages.draftStorageCompatibilityError, /https:\/\/|http:\/\/localhost/);
     assert.notEqual(messages.exportError, messages.importError);
+    assert.equal('importConflict' in messages, false);
   }
 });
 
@@ -79,4 +80,5 @@ test('all locale editors and template styles are connected to the page', () => {
   assert.match(main, /japaneseEditor\.refresh\(\)/);
   assert.match(localeController, /'zh-CN': document\.getElementById\('chineseWorkspace'\)/);
   assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
+  assert.doesNotMatch(localeController, /state-changed|importConflict/);
 });

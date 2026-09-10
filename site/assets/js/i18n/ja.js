@@ -20,7 +20,6 @@ export default {
   importConfirmCancel: 'キャンセル',
   importConfirm: '読み込む',
   importSalvaged: '一部を安全に読み込んで、現在の形式に更新しました。',
-  importConflict: '確認中に下書きが変更されたため、読み込みを中止しました。',
   draftMigrated: '保存済みの下書きを現在の形式に更新しました。',
   draftSalvaged: '保存済みの下書きの一部を安全に読み込み、現在の形式に更新しました。',
   draftTooOld: '保存済みの下書きが古すぎたため、新しい下書きに安全に置き換えました。',
