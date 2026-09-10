@@ -685,7 +685,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       window.clearTimeout(saveTimer);
       return;
     }
-    if (event.type === 'import-cancel' || event.type === 'import-conflict') {
+    if (event.type === 'import-cancel' || event.type === 'import-conflict' || event.type === 'import-failed') {
       importPending = false;
       return;
     }

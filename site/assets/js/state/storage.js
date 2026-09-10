@@ -282,6 +282,9 @@ export function createDraftStorage(storage, {
     return encrypted;
   }
   async function loadInternal(canMutate) {
+    // This describes this load attempt only. In particular, a read-only
+    // fallback must not inherit a prior successful migration notification.
+    lastLoadResult = null;
     const raw = readRawDraft();
     const classified = await classifyRaw(raw);
     pendingMutation = null;
@@ -311,8 +314,8 @@ export function createDraftStorage(storage, {
         pendingMutation = 'migrate-draft';
       } else {
         await replaceIfUnchanged(raw, result.state, { allowKeyCreation: classified.plaintext });
+        lastLoadResult = { status: result.status };
       }
-      lastLoadResult = { status: result.status };
       return result.state;
     }
     if (result.status === 'too-old') {
@@ -322,8 +325,8 @@ export function createDraftStorage(storage, {
         pendingMutation = 'replace-too-old-draft';
       } else {
         await replaceIfUnchanged(raw, replacement, { allowKeyCreation: classified.plaintext });
+        lastLoadResult = { status: result.status };
       }
-      lastLoadResult = { status: result.status };
       return replacement;
     }
     throw migrationError(result);
@@ -412,6 +415,7 @@ export async function loadStoredState(storage, options) {
 
 export function serializeState(state) {
   assertValidState(state);
+  if (!validateCurrentState(state).valid) throw new TypeError('Only the current schema revision can be exported.');
   return `${JSON.stringify(state, null, 2)}\n`;
 }
 

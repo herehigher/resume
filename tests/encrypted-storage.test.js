@@ -568,6 +568,7 @@ test('missing Web Locks keep current and B0 drafts readable without committing t
   const b0Draft = persistence(b0Storage, keys, { locks: null });
   assert.equal((await b0Draft.load()).schemaRevision, 1);
   assert.equal(b0Draft.getPendingMutation(), 'migrate-draft');
+  assert.equal(b0Draft.getLastLoadResult(), null);
   assert.equal(b0Storage.getItem(STORAGE_KEY), b0Raw);
   assert.equal(keys.current(), key);
   await assert.rejects(() => b0Draft.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');
@@ -597,6 +598,7 @@ test('a rejected Web Lock request falls back to read-only current and B0 loads w
   const b0Draft = persistence(b0Storage, keys, { locks: rejectingLockManager() });
   assert.equal((await b0Draft.load()).schemaRevision, 1);
   assert.equal(b0Draft.getPendingMutation(), 'migrate-draft');
+  assert.equal(b0Draft.getLastLoadResult(), null);
   assert.equal(b0Storage.getItem(STORAGE_KEY), b0Raw);
   assert.equal(keys.current(), key);
   await assert.rejects(() => b0Draft.save(createDefaultState()), (error) => error.code === 'web-lock-unavailable');

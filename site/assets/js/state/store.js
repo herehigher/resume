@@ -1,5 +1,5 @@
 import { createDefaultState, cloneData } from './defaults.js';
-import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js';
+import { createDraftStorage, DraftStorageError, parseImportedState, prepareImportedState, serializeState } from './storage.js';
 import { assertValidState } from './schema.js';
 
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
@@ -7,6 +7,7 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   let stored = hasStoredState;
   let revision = 0;
   let importPending = false;
+  let storageOutOfSync = false;
   const listeners = new Set();
 
   function notify(type) {
@@ -32,6 +33,12 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     });
   }
 
+  function completeImport(type) {
+    if (!importPending) return;
+    importPending = false;
+    notify(type);
+  }
+
   return {
     getState() {
       return state;
@@ -49,26 +56,40 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       return { ...prepared, revision };
     },
     cancelImport() {
-      if (!importPending) return;
-      importPending = false;
-      notify('import-cancel');
+      completeImport('import-cancel');
     },
-    importPrepared(prepared) {
+    async importPrepared(prepared) {
       if (!prepared?.state || !Number.isSafeInteger(prepared.revision)) throw new TypeError('A prepared import is required.');
       if (!importPending || prepared.revision !== revision) {
-        importPending = false;
-        notify('import-conflict');
+        completeImport('import-conflict');
         const error = new Error('The draft changed while import confirmation was open.');
         error.code = 'state-changed';
-        return Promise.reject(error);
+        throw error;
       }
-      importPending = false;
-      return replace(prepared.state, { persist: true, type: 'import' });
+      const next = cloneData(assertValidState(prepared.state));
+      let completion = 'import-failed';
+      try {
+        await persistence.save(next);
+        if (prepared.revision !== revision) {
+          storageOutOfSync = true;
+          completion = 'import-conflict';
+          throw new DraftStorageError('storage-changed');
+        }
+        state = next;
+        stored = true;
+        storageOutOfSync = false;
+        revision += 1;
+        completion = 'import';
+        return state;
+      } finally {
+        completeImport(completion);
+      }
     },
     isImportPending() {
       return importPending;
     },
     save() {
+      if (storageOutOfSync) return Promise.reject(new DraftStorageError('storage-changed'));
       const snapshot = cloneData(state);
       return persistence.save(snapshot).then(() => {
         stored = true;
@@ -76,10 +97,14 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       });
     },
     async reload() {
+      // A reload begun while an import is saving must invalidate that import
+      // before either asynchronous operation can replace in-memory state.
+      revision += 1;
       const next = await persistence.load();
       if (!next) return false;
       state = cloneData(next);
       stored = true;
+      storageOutOfSync = false;
       notify('reload');
       return true;
     },
