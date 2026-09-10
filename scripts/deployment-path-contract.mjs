@@ -20,10 +20,10 @@ export const DEPLOYMENT_PATH_CONTRACTS = Object.freeze([
     artifactPath: 'sitemap.xml', kind: 'xml', marker: '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', semantic: 'sitemap', urlPath: 'sitemap.xml'
   }),
   Object.freeze({
-    artifactPath: 'schema/resume-studio-web-v1.schema.json', kind: 'json', marker: '"title": "Resume Studio web v1 export"', semantic: 'json-schema', urlPath: 'schema/resume-studio-web-v1.schema.json'
+    artifactPath: 'schema/resume-studio-web-v2.schema.json', kind: 'json', marker: '"title": "Resume Studio web v2 export"', semantic: 'json-schema', urlPath: 'schema/resume-studio-web-v2.schema.json'
   }),
   Object.freeze({
-    artifactPath: 'schema/resume-studio-web-v1.example.json', kind: 'json', marker: '"documents":', semantic: 'import-example', urlPath: 'schema/resume-studio-web-v1.example.json'
+    artifactPath: 'schema/resume-studio-web-v2.example.json', kind: 'json', marker: '"documents":', semantic: 'import-example', urlPath: 'schema/resume-studio-web-v2.example.json'
   }),
   Object.freeze({
     artifactPath: 'assets/js/config.js', kind: 'javascript', marker: 'export const APP_VERSION = ', semantic: 'version-config', urlPath: 'assets/js/config.js'

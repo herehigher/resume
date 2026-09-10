@@ -42,7 +42,7 @@ test('profile links preserve their order in the shared profile array and stop at
   assert.equal(fields.links.length, MAX_PROFILE_LINKS);
 });
 
-test('profile link arrays with more than three items are rejected by the v1 state validator', () => {
+test('profile link arrays with more than three items are rejected by the current state validator', () => {
   const state = createDefaultState('en');
   state.profile.fields.links = ['https://one.example.test', 'https://two.example.test', 'https://three.example.test', 'https://four.example.test'];
   assert.equal(validateState(state).valid, false);

@@ -1,6 +1,5 @@
 {
-  "version": 1,
-  "schemaRevision": 1,
+  "version": 2,
   "settings": {
     "locale": "en",
     "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" },

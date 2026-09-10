@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import packageJson from '../../package.json' with { type: 'json' };
-import { expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
+import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
 
 const REPOSITORY_URL = 'https://github.com/herehigher/resume';
 const PRIVACY_URLS = {
@@ -87,11 +87,11 @@ test('editing, local save, and JSON export remain available after going offline'
 
   const name = page.locator('[name="fullName"]');
   await name.fill('オフライン 編集');
-  await expect.poll(() => page.evaluate(() => Boolean(localStorage.getItem('resume-studio-web-v1')))).toBe(true);
-  await expect.poll(() => page.evaluate(() => {
-    const raw = localStorage.getItem('resume-studio-web-v1');
+  await expect.poll(() => page.evaluate((draftKey) => Boolean(localStorage.getItem(draftKey)), DRAFT_STORAGE_KEY)).toBe(true);
+  await expect.poll(() => page.evaluate((draftKey) => {
+    const raw = localStorage.getItem(draftKey);
     return raw && !raw.includes('オフライン 編集') && JSON.parse(raw).format;
-  })).toBe('resume-studio-local-encrypted-v1');
+  }, DRAFT_STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
 
   await page.locator('#dataMenuSummary').click();
   const downloadPromise = page.waitForEvent('download');

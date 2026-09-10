@@ -6,6 +6,10 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+### Changed / 変更
+
+- 草稿と JSON import/export の format version を単一の `version: 2` へ統合し、端末内草稿を version ごとの key、Web Lock、IndexedDB 鍵領域へ分離。明示した互換 key は新 key への保存成功後に自動消去し、対応範囲外の旧草稿は読込・変更・削除しないよう変更。
+
 ## [0.2.7] - 2026-09-10
 
 ### Added / 追加

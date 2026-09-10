@@ -1,4 +1,4 @@
-import { CURRENT_SCHEMA_REVISION, DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
+import { DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createEmptyPageBreaks } from '../page-breaks.js';
 
 function today() {
@@ -99,7 +99,6 @@ export function createDefaultState(locale = DEFAULT_LOCALE) {
   const safeLocale = SUPPORTED_LOCALES.includes(locale) ? locale : DEFAULT_LOCALE;
   return {
     version: STATE_VERSION,
-    schemaRevision: CURRENT_SCHEMA_REVISION,
     settings: {
       locale: safeLocale,
       pageSizeByLocale: {

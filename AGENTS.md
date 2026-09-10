@@ -5,7 +5,7 @@ Repository 全体に適用し、作業場所に近い `AGENTS.override.md` / `AG
 ## 必須原則
 
 - `site/` は標準 HTML / CSS / ES Modules で構成し、build なしで static server / GitHub Pages から動作させる。責務を分割し、循環依存を作らない。`file://` は対象外。
-- 保存形式は `resume-studio-web-v1`。草稿処理は設定された草稿 key だけを操作し、無関係な storage 項目を列挙・読込・変更しない。暗号化草稿の保護を維持し、保存 data の意図的な削除は利用者に確認する。承認済みの revision 判定で明示的に過旧と分かった端末内草稿を安全な既定値へ置換する場合だけは、この確認の例外とし、置換失敗時は元の raw と鍵を保持する。
+- 保存形式は `resume-studio-web-v2`。端末内草稿と JSON import/export は同じ単一の `version` を使う。対応中の旧 version は明示した key だけを read-only で読み、新 key への保存成功後に旧 raw と鍵を削除する。新 key への保存失敗時は旧草稿を保持する。対応範囲外や未設定の key は列挙・読込・変更・削除しない。暗号化草稿の保護を維持し、現在の草稿を意図的に削除する場合は利用者に確認する。
 - Locale は `ja`、`zh-CN`、`en`。文書は言語ごとに独立し、profile・連絡先・写真は共有する。
 - User input は HTML escape し、clickable link は `http://` / `https://` のみ。履歴書入力・写真・JSON・草稿を network request へ含めない。
 - Source の Analytics は無効。外部 API、CDN、外部 font、追加 analytics runtime を導入しない。公式 CI の標準 Cloudflare Web Analytics 注入だけを例外とし、[公開手順](docs/release-playbook.md#analytics-の扱い)に従う。

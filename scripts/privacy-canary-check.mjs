@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { STORAGE_KEY } from '../site/assets/js/config.js';
 
 export const PRIVACY_CANARIES = Object.freeze([
   'fictional-network-input-001',
@@ -7,7 +8,7 @@ export const PRIVACY_CANARIES = Object.freeze([
   'fictional-network-draft-004@example.invalid'
 ]);
 
-const DRAFT_STORAGE_KEY = 'resume-studio-web-v1';
+const DRAFT_STORAGE_KEY = STORAGE_KEY;
 const PHOTO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 export async function exercisePrivacyCanary(page, { beforeReload, leaveUrl }) {

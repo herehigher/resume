@@ -24,13 +24,15 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 
 表示 locale の決定順は URL query、`resume-studio-locale-v1` の保存 preference、`navigator.languages`、`ja`。Import 内の locale は文書 data で、表示 preference を変更しません。`zh-TW` / `zh-Hant` を简体中文へ自動変換しません。
 
-## Schema revision と移行
+## Data version と移行
 
-JSON payload の `version: 1` は Resume Studio web payload family を識別し、`schemaRevision` は data shape の revision を識別します。新規 state と公開 export は `schemaRevision: 1` を持ちます。R1〜R3 は、revision property がなく固定 B0 shape に厳密適合する payload だけを B0 として R1 に変換できます。R4 を追加する変更では B0 adapter と fixture を撤去し、revision がない payload は非対応として保護します。
+JSON payload の `version` は、端末内草稿を復号した state と JSON import/export が共有する唯一の data format version です。現在の新規 state、公開 export、公開 JSON Schema は `version: 2` を使い、`schemaRevision` は持ちません。暗号化 envelope の format version は暗号化した bytes の格納方法を表す別契約で、履歴書 data の version とは独立して維持します。利用実績のない旧 `version: 1` は対応 list に含めず、import でも端末内草稿でも非対応として扱います。
 
-番号付き revision の対応下限は `max(1, currentRevision - 3)` です。migration の既定値は固定し、日付・browser locale・random 値を使いません。
+対応可能な version の下限は `max(1, currentVersion - 3)` ですが、実際に移行できるのは migration registry に連続した step が明示されている version だけです。migration の既定値は固定し、日付・browser locale・random 値を使いません。
 
-revision を更新するときは、current を増やし、直前 revision だけを受け取る純粋 step と変更概要を追加します。続けて入力・期待出力 fixture、対応下限と境界 test、公開 schema/example を同じ PR で更新します。4世代以上前になった step と fixture は削除し、R4 では B0 adapter / fixture も削除します。最後に migration / storage / import の対象 test、同一 context の競合 test、privacy canary と必要な表示・PDF 確認を実施します。B0 を撤去した後も revision がない payload は非対応として保護し、自動破棄しません。
+端末内草稿は `resume-studio-web-v{STATE_VERSION}` と、同じ名前を元にした Web Lock / IndexedDB を使います。起動時は current key を先に読みます。対応中の旧草稿がある場合は `COMPATIBLE_DRAFT_STORAGE_KEYS` に key を新しい順で明示し、read-only で読んで migration 後の state を current key へ保存します。新草稿の保存成功後にだけ元の raw と IndexedDB key を自動削除し、保存が失敗した場合は旧草稿を保持します。対応外の key は list へ追加せず、列挙・読込・書込・削除をしません。現在の v2 では v1 を対応しないため、list は空です。
+
+data format を更新するときは `STATE_VERSION` を増やし、直前 version だけを受け取る純粋 step と変更概要を追加します。続けて対応範囲内の旧草稿 key を明示 list に追加し、入力・期待出力 fixture、対応下限と境界 test、公開 schema/example の version とファイル名を同じ PR で更新します。4世代以上前になった step / fixture / key は registry と明示 list から外しますが、すでに対応外となった端末内 data には触れません。最後に migration / storage / import の対象 test、同一 context の競合 test、privacy canary と必要な表示・PDF 確認を実施します。
 
 ## Open Graph 共有画像
 
