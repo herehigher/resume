@@ -6,6 +6,23 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-09-10
+
+### Added / 追加
+
+- 日本語の職務経歴書で、勤務先ごとの詳細項目を任意の見出しで追加・編集・削除できるようにし、入力例・preview・PDF・完了率・公開 JSON Schema を新しい構造へ対応。
+- 保存 data に初回 schema revision と移行 registry を導入し、旧形式の草稿と JSON import を現在の形式へ安全に移行。移行完了時は日本語・简体中文・English で通知。
+
+### Fixed / 修正
+
+- 日本語 PDF の学歴・職歴・免許／資格の表見出しと年月配置を整理し、職務経歴書の会社概要・事業内容で入力した改行と長い文字列を保持。
+- 草稿の変更・移行・復旧を Web Locks で直列化し、別 tab の新しい暗号化草稿を古い画面からの保存や削除で上書きしないよう修正。Lock、暗号化、容量、競合などの失敗時は既存 data と鍵を保持。
+- JSON import を保存前に確認し、成功後だけ画面と草稿を置換。Cancel、非対応 revision、保存失敗では既存 data・表示設定・自動保存状態を維持。
+
+### Security / Privacy
+
+- 草稿処理を設定済み key のみに限定し、無関係な storage 項目を列挙・読込・変更しないことを browser 統合 test で検証。
+
 ## [0.2.6] - 2026-09-08
 
 ### Added / 追加
