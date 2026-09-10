@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "generator": {
     "command": "node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>",
-    "inputHash": "c8d777b3d61650c448ca5e12d4f2d0db5d02f3afe8b3eb6ad3cff8ed42699330",
+    "inputHash": "bd7352c26f89de55beca3925a58ef96cf62af0a349c2b83b1288af4b20cd8a85",
     "inputHashAlgorithm": "sha256(relative-path + NUL + content + NUL)",
     "inputs": [
       "package-lock.json",
@@ -13,13 +13,13 @@
     "version": "1.4.0"
   },
   "source": {
-    "appVersion": "0.2.6",
-    "checkoutCommit": "d0dfdc2af00a84af7c7a925a9345ed59d5e0fda6",
+    "appVersion": "0.2.7",
+    "checkoutCommit": "8695be7317c74020af8b9039bb0d03d216949fb5",
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
-    "qualityRunId": "34221440129",
-    "siteHash": "5d0b036b66b3f37bbef1af5daa81a1c404fe5a7644f6594a42cf84afcd428bf3",
+    "qualityRunId": "34436360346",
+    "siteHash": "188f138b39d0ba49efc7ef764d2d3542032cef51ded7e517d2b2184d6d55a1f3",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -34,60 +34,60 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-5D0B036B66B3",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-188F138B39D0",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-5D0B036B66B3",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-188F138B39D0",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "eb98c57365b6a6bf5655d73e90b81919ee4377901ec3921cb49be94d9cf777b1"
+        "sha256": "28082039b35e8a603356809465fd6034138f36f1e70462d6bdf02b32d7889817"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/ja.png",
-        "sha256": "c7fc438c05452cc54cb0ff70d4440d6fe9f16d318e08dc119b4ba873091f51a5",
+        "sha256": "d8ba5dc6bc3ee2e360c4c35181abd2d768f4fa814a592f1ac84a8fb650c1ae66",
         "width": 1440
       }
     },
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-5D0B036B66B3",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-188F138B39D0",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-5D0B036B66B3",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-188F138B39D0",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "d5f9535d1830c0515e0d72daf554a5ca67fbda8c7d2916cdcccf1b91834fcf7a"
+        "sha256": "c34a0b0733d1beb87bed8f981ccae0caa4323ff9d419b4016172b1c85990210e"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/zh-CN.png",
-        "sha256": "911c58bf0203fa0aa711b1a7a6f487b18b55f56e2eb91522fdc603d68ddc7118",
+        "sha256": "d02a80ede9d31b05772b3bba5d7c49aeae6ff4e58b4596b891c8e6cd8e9af0a5",
         "width": 1440
       }
     },
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-5D0B036B66B3",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-188F138B39D0",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-5D0B036B66B3",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-188F138B39D0",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "bc33882102b2fc72390353a3a968dc50f91a786ebe0eefbea10147c60f6ea7a5"
+        "sha256": "7a7b37ac98c35f64ca225db8bd8276453c061792a7fa5dd105224745d74a8955"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/en.png",
-        "sha256": "6be326b868b97cec8f85d4c9c5a095a5828d290a8e6e3c41c7378c19d5db313c",
+        "sha256": "361286fee496f3f15ad6b78804bc13b1e2b72e0d2cb31f14c52f834b1d65b27a",
         "width": 1440
       }
     }
