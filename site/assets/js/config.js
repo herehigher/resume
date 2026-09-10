@@ -6,7 +6,7 @@ export const STORAGE_KEY = `resume-studio-web-v${STATE_VERSION}`;
 // registry. Keys outside this explicit list are never inspected.
 export const COMPATIBLE_DRAFT_STORAGE_KEYS = Object.freeze([]);
 export const LOCALE_PREFERENCE_KEY = 'resume-studio-locale-v1';
-export const APP_VERSION = '0.2.7';
+export const APP_VERSION = '0.2.8';
 export const REPOSITORY_URL = 'https://github.com/herehigher/resume';
 export const SUPPORTED_LOCALES = Object.freeze(['ja', 'zh-CN', 'en']);
 export const DEFAULT_LOCALE = 'ja';
