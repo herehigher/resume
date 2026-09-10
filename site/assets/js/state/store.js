@@ -5,7 +5,6 @@ import { assertValidState } from './schema.js';
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
   let state = cloneData(assertValidState(initialState));
   let stored = hasStoredState;
-  let revision = 0;
   let importPending = false;
   const listeners = new Set();
 
@@ -19,14 +18,12 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     const next = cloneData(assertValidState(nextState));
     if (!persist) {
       state = next;
-      revision += 1;
       notify(type);
       return state;
     }
     return persistence.save(next).then(() => {
       state = next;
       stored = true;
-      revision += 1;
       notify(type);
       return state;
     });
@@ -52,26 +49,19 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       const prepared = prepareImportedState(text);
       importPending = true;
       notify('import-pending');
-      return { ...prepared, revision };
+      return prepared;
     },
     cancelImport() {
       completeImport('import-cancel');
     },
     async importPrepared(prepared) {
-      if (!prepared?.state || !Number.isSafeInteger(prepared.revision)) throw new TypeError('A prepared import is required.');
-      if (!importPending || prepared.revision !== revision) {
-        completeImport('import-conflict');
-        const error = new Error('The draft changed while import confirmation was open.');
-        error.code = 'state-changed';
-        throw error;
-      }
+      if (!prepared?.state) throw new TypeError('A prepared import is required.');
       const next = cloneData(assertValidState(prepared.state));
       let completion = 'import-failed';
       try {
         await persistence.save(next);
         state = next;
         stored = true;
-        revision += 1;
         completion = 'import';
         return state;
       } finally {

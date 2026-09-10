@@ -190,30 +190,26 @@ test('B0 migration announces the completed update once in each editor language',
   }
 });
 
-test('a confirmed import overrides a same-page edit while its save waits for a lock', async ({ page }) => {
-  test.setTimeout(10_000);
+test('a confirmed import overrides a same-page edit before its asynchronous handler saves', async ({ page }) => {
   await openLocale(page, 'ja');
   const name = page.locator('[name="fullName"]');
   await name.fill('Original draft');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBeNull();
   const rawBefore = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
-  await page.evaluate((lockName) => {
-    void navigator.locks.request(lockName, () => new Promise((resolve) => {
-      window.__releaseImportLock = resolve;
-    }));
-  }, 'resume-studio-web-v1:draft');
-  await expect.poll(() => page.evaluate(() => typeof window.__releaseImportLock === 'function')).toBe(true);
   const backup = createDefaultState('en');
   backup.profile.fields.fullName = 'Imported backup';
 
   await page.locator('#importDataInput').setInputFiles({
     name: 'locked-import.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup))
   });
-  await page.locator('#confirmSampleAdoptButton').click();
-  await name.fill('Edited while import waits');
-  await page.evaluate(() => window.__releaseImportLock());
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), { timeout: 10_000 })
-    .not.toBe(rawBefore);
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.evaluate(() => {
+    document.getElementById('confirmSampleAdoptButton').click();
+    const input = document.querySelector('[name="fullName"]');
+    input.value = 'Edited after confirmation';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBe(rawBefore);
   await expect(name).toHaveValue('Imported backup');
   await expect(page.locator('#globalMessage')).not.toHaveClass(/is-error/);
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));

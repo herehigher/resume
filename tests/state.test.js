@@ -205,7 +205,7 @@ test('invalid import does not change current or persisted data', async () => {
   assert.equal(storage.getItem(STORAGE_KEY), beforeStored);
 });
 
-test('prepared import is side-effect free until confirmation and rejects a changed draft', async () => {
+test('prepared import is side-effect free until confirmation and then replaces a same-page edit', async () => {
   const storage = createMemoryStorage();
   const store = createTestStore(storage, createDefaultState('ja'));
   await store.save();
@@ -219,10 +219,10 @@ test('prepared import is side-effect free until confirmation and rejects a chang
   assert.equal(store.getState().profile.fields.fullName, '');
 
   store.update((state) => { state.profile.fields.fullName = 'New local edit'; });
-  await assert.rejects(() => store.importPrepared(prepared), (error) => error.code === 'state-changed');
+  await store.importPrepared(prepared);
   assert.equal(store.isImportPending(), false);
-  assert.equal(store.getState().profile.fields.fullName, 'New local edit');
-  assert.equal(storage.getItem(STORAGE_KEY), beforeRaw);
+  assert.equal(store.getState().profile.fields.fullName, 'Imported example');
+  assert.notEqual(storage.getItem(STORAGE_KEY), beforeRaw);
 });
 
 test('prepared import replaces memory only after persistence succeeds', async () => {
@@ -286,6 +286,20 @@ test('a same-page reload while an import save is pending is replaced after the i
   await importing;
   assert.equal(store.getState().settings.locale, 'en');
   assert.equal(store.getState().profile.fields.fullName, '');
+});
+
+test('a same-page reload before import persistence starts is replaced after the import succeeds', async () => {
+  const storage = createMemoryStorage();
+  const store = createTestStore(storage, createDefaultState('ja'));
+  await store.save();
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported after reload';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  await store.reload();
+  await store.importPrepared(prepared);
+
+  assert.equal(store.getState().profile.fields.fullName, 'Imported after reload');
 });
 
 test('every import persistence failure completes the transaction and leaves saving available', async () => {
