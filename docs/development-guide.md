@@ -28,7 +28,9 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 
 JSON payload の `version: 1` は Resume Studio web payload family を識別し、`schemaRevision` は data shape の revision を識別します。新規 state と公開 export は `schemaRevision: 1` を持ちます。R1〜R3 は、revision property がなく固定 B0 shape に厳密適合する payload だけを B0 として R1 に変換できます。R4 を追加する変更では B0 adapter と fixture を撤去し、revision がない payload は非対応として保護します。
 
-番号付き revision の対応下限は `max(1, currentRevision - 3)` です。新しい revision を加える PR は、個別の純粋 migration step、対応 fixture、境界 test、公開 schema/example を同時に更新します。migration の既定値は固定し、日付・browser locale・random 値を使いません。
+番号付き revision の対応下限は `max(1, currentRevision - 3)` です。migration の既定値は固定し、日付・browser locale・random 値を使いません。
+
+revision を更新するときは、current を増やし、直前 revision だけを受け取る純粋 step と変更概要を追加します。続けて入力・期待出力 fixture、対応下限と境界 test、公開 schema/example を同じ PR で更新します。4世代以上前になった step と fixture は削除し、R4 では B0 adapter / fixture も削除します。最後に migration / storage / import の対象 test、同一 context の競合 test、privacy canary と必要な表示・PDF 確認を実施します。B0 を撤去した後も revision がない payload は非対応として保護し、自動破棄しません。
 
 ## Open Graph 共有画像
 

@@ -16,6 +16,8 @@ Resume Studio は、現在の browser origin の `localStorage` に `resume-stud
 
 暗号化保存には secure context が必要です。`https://`、`http://localhost`、または `http://127.0.0.1` 以外の non-secure HTTP origin では草稿の保存・再読込を拒否し、既存の保存データを変更しません。
 
+現在形式と直近3世代の対応形式を読み込めます。将来版・非対応・過旧の JSON import は拒否し、既存の下書き、鍵、表示 preference を保持します。明示的に過旧と判定された端末内草稿だけは安全な既定値へ置換されることがありますが、lock、暗号化、保存のいずれかに失敗した場合は元の raw と既存鍵を保持します。Web Locks を利用できない browser では競合を避けるため保存、削除、移行を停止します。内容の確認と JSON export は可能な範囲で残ります。
+
 ### Network と外部送信
 
 Repository の `site/`、clone、fork では Analytics は無効で、HTML、CSS、JavaScript、画像などの同一 origin static asset request 以外の解析通信は発生しません。`herehigher/resume` の検証済み stable tag だけは、tag に固定された manifest が有効な場合に deployment-only adapter が Pages artifact へ Cloudflare Web Analytics を追加します。現在の状態は HTML の `data-analytics-mode` / `data-analytics-provider`、画面の status、Network panel で確認できます。未対応の組は configuration error として表示され、無効状態へ黙って降格しません。
@@ -40,6 +42,8 @@ Resume Studio 使用 key `resume-studio-web-v1`，把草稿保存在当前 brows
 
 加密保存需要安全上下文。在 `https://`、`http://localhost` 或 `http://127.0.0.1` 以外的非安全 HTTP origin 中，应用会拒绝保存和重新载入草稿，并且不会修改已有的保存数据。
 
+应用可以读取当前格式及最近三代兼容格式。未来版本、不支持或过旧的 JSON import 会被拒绝，现有草稿、密钥和显示 preference 将被保留。只有明确判定为过旧的本机草稿，才可能安全地替换为默认草稿；如果 lock、加密或保存失败，原始 raw 和已有密钥都会保留。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移；在可行范围内仍可查看内容和导出 JSON。
+
 ### 网络与外部提交
 
 Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics；除加载 HTML、CSS、JavaScript、图片等同一 origin 静态 asset 外，不会产生统计通信。仅官方 CI 可按待验证 commit 的配置 manifest，在发布前向产物加入 Cloudflare Web Analytics；批准后将同一产物与 immutable stable tag 对应发布。可通过 HTML 的 `data-analytics-mode` / `data-analytics-provider`、页面 status 和 Network panel 核查当前状态。未知组合会显示 configuration error，不会静默降级为禁用状态。
@@ -63,6 +67,8 @@ JSON 和 PDF 可能包含姓名、联系方式、经历及照片等个人信息�
 Resume Studio stores the draft in `localStorage` for the current browser origin under the key `resume-studio-web-v1`. Draft content is encrypted with Web Crypto AES-GCM; the stored internal envelope contains a format version, algorithm, nonce, and ciphertext. The decryption AES key is a non-extractable `CryptoKey`, kept separately in IndexedDB for the same origin and never in localStorage. One v1 state contains the profile, embedded photo, Japanese, Simplified Chinese, and English documents, plus locale and paper settings. An existing plaintext v1 draft is migrated to encrypted storage only after encrypted persistence succeeds. Draft handling operates only on its configured draft key and does not enumerate, read, or modify unrelated localStorage entries. In addition to autosave while editing, the user can save manually, export/import JSON, and save a PDF through the browser's print function. The public JSON format remains v1; the internal envelope is never exported.
 
 Encrypted persistence requires a secure context. On non-secure HTTP origins other than `http://localhost` or `http://127.0.0.1`, the app refuses to save or reload drafts and does not change existing saved data.
+
+The app can read the current format and compatible drafts from the previous three revisions. Future, unsupported, or too-old JSON imports are rejected and retain the existing draft, key, and display preference. Only an on-device draft explicitly classified as too old may be safely replaced with a default draft; if locking, encryption, or persistence fails, the original raw value and existing key are retained. When Web Locks are unavailable, saving, deletion, and migration stop to avoid conflicts. Viewing content and exporting JSON remain available where possible.
 
 ### Network and external submission
 
