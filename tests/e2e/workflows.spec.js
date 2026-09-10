@@ -190,7 +190,7 @@ test('B0 migration announces the completed update once in each editor language',
   }
 });
 
-test('editing while an import waits for its lock keeps memory and blocks a stale overwrite', async ({ page }) => {
+test('a confirmed import overrides a same-page edit while its save waits for a lock', async ({ page }) => {
   test.setTimeout(10_000);
   await openLocale(page, 'ja');
   const name = page.locator('[name="fullName"]');
@@ -212,13 +212,14 @@ test('editing while an import waits for its lock keeps memory and blocks a stale
   await page.locator('#confirmSampleAdoptButton').click();
   await name.fill('Edited while import waits');
   await page.evaluate(() => window.__releaseImportLock());
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBe(rawBefore);
-  const rawAfterImport = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
-  await expect(name).toHaveValue('Edited while import waits');
-  await expect(page.locator('#globalMessage')).toContainText('別のタブで下書きが更新された');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), { timeout: 10_000 })
+    .not.toBe(rawBefore);
+  await expect(name).toHaveValue('Imported backup');
+  await expect(page.locator('#globalMessage')).not.toHaveClass(/is-error/);
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
   await page.waitForTimeout(400);
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(rawAfterImport);
+  await page.reload();
+  await expect(name).toHaveValue('Imported backup');
 });
 
 test('three editors resume autosave after a failed import', async ({ page }) => {

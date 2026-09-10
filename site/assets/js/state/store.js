@@ -1,5 +1,5 @@
 import { createDefaultState, cloneData } from './defaults.js';
-import { createDraftStorage, DraftStorageError, parseImportedState, prepareImportedState, serializeState } from './storage.js';
+import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js';
 import { assertValidState } from './schema.js';
 
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
@@ -7,7 +7,6 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   let stored = hasStoredState;
   let revision = 0;
   let importPending = false;
-  let storageOutOfSync = false;
   const listeners = new Set();
 
   function notify(type) {
@@ -70,14 +69,8 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       let completion = 'import-failed';
       try {
         await persistence.save(next);
-        if (prepared.revision !== revision) {
-          storageOutOfSync = true;
-          completion = 'import-conflict';
-          throw new DraftStorageError('storage-changed');
-        }
         state = next;
         stored = true;
-        storageOutOfSync = false;
         revision += 1;
         completion = 'import';
         return state;
@@ -89,7 +82,6 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       return importPending;
     },
     save() {
-      if (storageOutOfSync) return Promise.reject(new DraftStorageError('storage-changed'));
       const snapshot = cloneData(state);
       return persistence.save(snapshot).then(() => {
         stored = true;
@@ -97,14 +89,10 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       });
     },
     async reload() {
-      // A reload begun while an import is saving must invalidate that import
-      // before either asynchronous operation can replace in-memory state.
-      revision += 1;
       const next = await persistence.load();
       if (!next) return false;
       state = cloneData(next);
       stored = true;
-      storageOutOfSync = false;
       notify('reload');
       return true;
     },

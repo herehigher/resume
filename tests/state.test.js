@@ -243,7 +243,7 @@ test('prepared import replaces memory only after persistence succeeds', async ()
   assert.equal(storage.getItem(STORAGE_KEY), null);
 });
 
-test('an edit while an import save is pending keeps memory and blocks stale autosave', async () => {
+test('a same-page edit while an import save is pending is replaced after the import succeeds', async () => {
   const storage = createMemoryStorage();
   let resolveSave;
   const persistence = {
@@ -261,14 +261,11 @@ test('an edit while an import save is pending keeps memory and blocks stale auto
   store.update((state) => { state.profile.fields.fullName = 'Edited while saving'; });
   resolveSave();
 
-  await assert.rejects(() => importing, (error) => error.code === 'storage-changed');
-  assert.equal(store.getState().profile.fields.fullName, 'Edited while saving');
-  await assert.rejects(() => store.save(), (error) => error.code === 'storage-changed');
-  await store.reload();
-  assert.equal(store.getState().settings.locale, 'en');
+  await importing;
+  assert.equal(store.getState().profile.fields.fullName, 'Imported example');
 });
 
-test('a reload started while an import save is pending keeps the reloaded memory state', async () => {
+test('a same-page reload while an import save is pending is replaced after the import succeeds', async () => {
   const storage = createMemoryStorage();
   let resolveSave;
   const reloaded = createDefaultState('en');
@@ -286,26 +283,9 @@ test('a reload started while an import save is pending keeps the reloaded memory
   await store.reload();
   resolveSave();
 
-  await assert.rejects(() => importing, (error) => error.code === 'storage-changed');
-  assert.equal(store.getState().profile.fields.fullName, 'Reloaded fictional draft');
-  await assert.rejects(() => store.save(), (error) => error.code === 'storage-changed');
-});
-
-test('reload during import confirmation changes the transaction token before save starts', async () => {
-  const storage = createMemoryStorage();
-  let saves = 0;
-  const persistence = {
-    async save() { saves += 1; },
-    async load() { return createDefaultState('en'); },
-    async remove() {},
-    flush() { return Promise.resolve(); }
-  };
-  const store = createStore({ storage, initialState: createDefaultState('ja'), persistence });
-  const prepared = store.prepareImport(JSON.stringify(createDefaultState('en')));
-
-  await store.reload();
-  await assert.rejects(() => store.importPrepared(prepared), (error) => error.code === 'state-changed');
-  assert.equal(saves, 0);
+  await importing;
+  assert.equal(store.getState().settings.locale, 'en');
+  assert.equal(store.getState().profile.fields.fullName, '');
 });
 
 test('every import persistence failure completes the transaction and leaves saving available', async () => {
