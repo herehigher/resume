@@ -74,7 +74,7 @@ npx --yes http-server site --port 8000
 - 保存 key 为 `resume-studio-web-v1`，会把 profile、照片和三种语言文档一起保存到当前 browser origin。
 - 草稿正文以 AES-GCM 加密后保存在 localStorage。导出的 JSON 和 PDF 不加密，并可能包含照片等个人信息，请安全保管。
 - 可以读取当前格式及最近三代兼容格式。未来版本、不支持或过旧的 JSON 不会导入，现有草稿会被保留。只有明确判定为过旧的本机草稿，才可能安全地更新为默认草稿。
-- 保存或迁移失败时会保留现有草稿和解密 key。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移。请先导出 JSON，再使用受支持的 browser 打开。
+- 保存或迁移失败时会保留现有草稿和解密 key。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移。未参与 Web Locks 的已部署旧 client 或手动 storage 操作不在此跨标签页互斥保证范围内。请先导出 JSON，再使用受支持的 browser 打开。
 - 清除 browser data、结束 private browsing、存储容量不足或 browser storage eviction 都可能导致草稿丢失。重要草稿请导出 JSON backup。
 - 应用内删除只清除 v1 state，不会删除无关的 storage 项、已下载的 JSON/PDF 或 browser download history。
 - Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics，不会向同一 origin 静态 asset 以外的地址发送统计请求。仅官方 CI 可按待验证 commit 的配置 manifest，在发布前向产物加入标准 Cloudflare Web Analytics；批准后将同一产物与 immutable stable tag 对应发布。它不使用 Cookie、localStorage、用户级 ID 或 custom event，也不会发送简历输入、照片、JSON 或设备草稿。可通过页面 status 与 Network panel 核查当前 mode。

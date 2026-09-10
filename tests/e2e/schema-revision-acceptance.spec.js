@@ -6,17 +6,20 @@ import { DRAFT_STORAGE_KEY, expect, openLocale, test } from './fixtures.js';
 const UNRELATED_STORAGE_KEY = 'unrelated-storage-acceptance-sentinel';
 const UNRELATED_STORAGE_VALUE = 'keep-this-unrelated-storage-value';
 const PHOTO_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const BOOTSTRAP_IMPORT_FIXTURE = JSON.parse(await readFile(
+  new URL('../fixtures/schema-migrations/bootstrap-b0.json', import.meta.url),
+  'utf8'
+));
 
 function createBootstrapImport() {
-  const state = createDefaultState('ja');
-  delete state.schemaRevision;
+  const state = structuredClone(BOOTSTRAP_IMPORT_FIXTURE);
   state.profile.fields.fullName = 'Schema integration profile canary';
   state.profile.photo = PHOTO_DATA_URL;
   state.documents.ja.fields.motivation = 'Schema integration Japanese document canary';
   state.documents['zh-CN'].resume.headline = 'Schema integration Chinese document canary';
   state.documents.en.resume.headline = 'Schema integration English document canary';
-  state.settings.pageBreaks.ja.A4.resume = ['qualifications'];
-  state.settings.pageBreaks.en.LETTER.resume = ['skills'];
+  state.settings.pageBreaks.ja.A4.resume = ['qualifications', 'motivation'];
+  state.settings.pageBreaks.en.LETTER.resume = ['skills', 'certifications'];
   return state;
 }
 
@@ -73,7 +76,11 @@ test('B0 JSON import preserves one shared profile, photo, three documents, page 
   });
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
   await page.locator('#confirmSampleAdoptButton').click();
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY))
+    .toContain('"format":"resume-studio-local-encrypted-v1"');
+  await page.reload();
 
+  await page.locator('#localeSelect').selectOption('ja');
   await expect(page.locator('[name="fullName"]')).toHaveValue('Schema integration profile canary');
   await expect(page.locator('[name="motivation"]')).toHaveValue('Schema integration Japanese document canary');
   await expect(page.locator('#photoThumbnail img')).toHaveAttribute('src', /^blob:/);
@@ -102,8 +109,8 @@ test('B0 JSON import preserves one shared profile, photo, three documents, page 
       en: { resume: { headline: 'Schema integration English document canary' } }
     }
   });
-  expect(exported.settings.pageBreaks.ja.A4.resume).toEqual(['qualifications']);
-  expect(exported.settings.pageBreaks.en.LETTER.resume).toEqual(['skills']);
+  expect(exported.settings.pageBreaks.ja.A4.resume).toEqual(['qualifications', 'motivation']);
+  expect(exported.settings.pageBreaks.en.LETTER.resume).toEqual(['skills', 'certifications']);
 
   const storage = await page.evaluate(() => window.__schemaAcceptanceStorage.read());
   expect(storage.draft).toContain('"format":"resume-studio-local-encrypted-v1"');

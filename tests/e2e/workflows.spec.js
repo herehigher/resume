@@ -212,8 +212,9 @@ test('a confirmed import overrides a same-page edit before its asynchronous hand
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBe(rawBefore);
   await expect(name).toHaveValue('Imported backup');
   await expect(page.locator('#globalMessage')).not.toHaveClass(/is-error/);
+  const rawBeforePageHide = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
-  await page.waitForTimeout(400);
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBe(rawBeforePageHide);
   await page.reload();
   await expect(name).toHaveValue('Imported backup');
 });
