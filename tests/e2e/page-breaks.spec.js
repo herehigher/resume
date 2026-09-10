@@ -23,6 +23,7 @@ test('desktop: English section boundary is a single button and persists its manu
   await page.locator('#importDataInput').setInputFiles({
     name: 'page-break-persistence.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   const boundary = page.locator('.page-break-boundary[data-page-break-key="summary"]');
   const previewScroll = page.locator('[data-en-preview-scroll]');
   await expect(boundary).toBeVisible();
@@ -213,6 +214,7 @@ test('[mobile] identity-only documents hide the page-break menu and retain no il
   await page.locator('#importDataInput').setInputFiles({
     name: 'identity-only.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await page.locator('[data-en-mobile-view="preview"]').click();
   const workspace = page.locator('[data-english-editor]');
   await expect(workspace.locator('.page-break-menu')).toBeHidden();
@@ -245,6 +247,7 @@ test('desktop: active classes follow English paper size and Japanese document ty
   await page.locator('#importDataInput').setInputFiles({
     name: 'isolated-breaks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await page.locator('[data-en-page-size]').selectOption('A4');
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);

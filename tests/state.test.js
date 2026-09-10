@@ -7,6 +7,7 @@ import { loadLocalePreference, saveLocalePreference } from '../site/assets/js/st
 import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { validateState } from '../site/assets/js/state/schema.js';
 import { createStore } from '../site/assets/js/state/store.js';
+import { DraftStorageError, serializeState } from '../site/assets/js/state/storage.js';
 import { protectDraftBeforeSample } from '../site/assets/js/ui/japanese-editor.js';
 import { persistLocaleChange } from '../site/assets/js/ui/locale-controller.js';
 
@@ -202,6 +203,148 @@ test('invalid import does not change current or persisted data', async () => {
   assert.throws(() => store.importJson('{"version":999}'));
   assert.equal(JSON.stringify(store.getState()), beforeState);
   assert.equal(storage.getItem(STORAGE_KEY), beforeStored);
+});
+
+test('prepared import is side-effect free until confirmation and then replaces a same-page edit', async () => {
+  const storage = createMemoryStorage();
+  const store = createTestStore(storage, createDefaultState('ja'));
+  await store.save();
+  const beforeRaw = storage.getItem(STORAGE_KEY);
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported example';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  assert.equal(store.isImportPending(), true);
+  assert.equal(storage.getItem(STORAGE_KEY), beforeRaw);
+  assert.equal(store.getState().profile.fields.fullName, '');
+
+  store.update((state) => { state.profile.fields.fullName = 'New local edit'; });
+  await store.importPrepared(prepared);
+  assert.equal(store.isImportPending(), false);
+  assert.equal(store.getState().profile.fields.fullName, 'Imported example');
+  assert.notEqual(storage.getItem(STORAGE_KEY), beforeRaw);
+});
+
+test('prepared import replaces memory only after persistence succeeds', async () => {
+  const storage = createMemoryStorage();
+  const persistence = {
+    async save() { throw new Error('quota'); },
+    async load() { return null; },
+    async remove() {},
+    flush() { return Promise.resolve(); }
+  };
+  const store = createStore({ storage, initialState: createDefaultState('ja'), persistence });
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported example';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  await assert.rejects(() => store.importPrepared(prepared), /quota/);
+  assert.equal(store.getState().profile.fields.fullName, '');
+  assert.equal(storage.getItem(STORAGE_KEY), null);
+});
+
+test('a same-page edit while an import save is pending is replaced after the import succeeds', async () => {
+  const storage = createMemoryStorage();
+  let resolveSave;
+  const persistence = {
+    save() { return new Promise((resolve) => { resolveSave = resolve; }); },
+    async load() { return createDefaultState('en'); },
+    async remove() {},
+    flush() { return Promise.resolve(); }
+  };
+  const store = createStore({ storage, initialState: createDefaultState('ja'), persistence });
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported example';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  const importing = store.importPrepared(prepared);
+  store.update((state) => { state.profile.fields.fullName = 'Edited while saving'; });
+  resolveSave();
+
+  await importing;
+  assert.equal(store.getState().profile.fields.fullName, 'Imported example');
+});
+
+test('a same-page reload while an import save is pending is replaced after the import succeeds', async () => {
+  const storage = createMemoryStorage();
+  let resolveSave;
+  const reloaded = createDefaultState('en');
+  reloaded.profile.fields.fullName = 'Reloaded fictional draft';
+  const persistence = {
+    save() { return new Promise((resolve) => { resolveSave = resolve; }); },
+    async load() { return reloaded; },
+    async remove() {},
+    flush() { return Promise.resolve(); }
+  };
+  const store = createStore({ storage, initialState: createDefaultState('ja'), persistence });
+  const prepared = store.prepareImport(JSON.stringify(createDefaultState('en')));
+  const importing = store.importPrepared(prepared);
+
+  await store.reload();
+  resolveSave();
+
+  await importing;
+  assert.equal(store.getState().settings.locale, 'en');
+  assert.equal(store.getState().profile.fields.fullName, '');
+});
+
+test('a same-page reload before import persistence starts is replaced after the import succeeds', async () => {
+  const storage = createMemoryStorage();
+  const store = createTestStore(storage, createDefaultState('ja'));
+  await store.save();
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported after reload';
+
+  const prepared = store.prepareImport(JSON.stringify(backup));
+  await store.reload();
+  await store.importPrepared(prepared);
+
+  assert.equal(store.getState().profile.fields.fullName, 'Imported after reload');
+});
+
+test('every import persistence failure completes the transaction and leaves saving available', async () => {
+  for (const code of ['storage-unavailable', 'web-lock-unavailable', 'storage-changed', 'crypto-unavailable']) {
+    const storage = createMemoryStorage();
+    let failed = true;
+    const events = [];
+    const persistence = {
+      async save() {
+        if (failed) throw new DraftStorageError(code);
+      },
+      async load() { return null; },
+      async remove() {},
+      flush() { return Promise.resolve(); }
+    };
+    const store = createStore({ storage, initialState: createDefaultState('ja'), persistence });
+    store.subscribe((_state, event) => events.push(event.type));
+    const prepared = store.prepareImport(JSON.stringify(createDefaultState('en')));
+
+    await assert.rejects(() => store.importPrepared(prepared), (error) => error.code === code);
+    assert.deepEqual(events, ['import-pending', 'import-failed']);
+    assert.equal(store.isImportPending(), false);
+    assert.equal(store.getState().settings.locale, 'ja');
+    failed = false;
+    await store.save();
+  }
+});
+
+test('future and invalid revision imports are rejected without opening an import transaction', () => {
+  const storage = createMemoryStorage();
+  const store = createTestStore(storage, createDefaultState());
+  const original = JSON.stringify(store.getState());
+
+  assert.throws(() => store.prepareImport(JSON.stringify({ version: 1, schemaRevision: 99 })), (error) => error.code === 'future-state');
+  assert.throws(() => store.prepareImport(JSON.stringify({ version: 1, schemaRevision: -1 })), (error) => error.code === 'unsupported-state');
+  assert.equal(store.isImportPending(), false);
+  assert.equal(JSON.stringify(store.getState()), original);
+  assert.equal(storage.getItem(STORAGE_KEY), null);
+});
+
+test('export rejects a bootstrap-shaped state without the current schema revision', () => {
+  const bootstrap = createDefaultState('ja');
+  delete bootstrap.schemaRevision;
+
+  assert.throws(() => serializeState(bootstrap), /current schema revision/);
 });
 
 test('entering sample mode persists pending draft changes', async () => {

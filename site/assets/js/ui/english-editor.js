@@ -215,6 +215,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   const completionLabel = root.querySelector('[data-en-completion-label]');
   let saveTimer;
   let sampleMode = false;
+  let importPending = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   let shouldPersistDraft = store.hasStoredState();
@@ -243,6 +244,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
       setStatus('The example is not being saved.');
       return;
     }
+    if (importPending) return;
     shouldPersistDraft = true;
     setStatus('Encrypting and saving…', 'saving');
     saveTimer = window.setTimeout(async () => {
@@ -517,11 +519,21 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
 
   function onPageHide() {
     window.clearTimeout(saveTimer);
-    if (sampleMode || !shouldPersistDraft) return;
+    if (sampleMode || importPending || !shouldPersistDraft) return;
     void store.save().catch(() => {});
   }
 
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'import-pending') {
+      importPending = true;
+      window.clearTimeout(saveTimer);
+      return;
+    }
+    if (event.type === 'import-cancel' || event.type === 'import-conflict' || event.type === 'import-failed') {
+      importPending = false;
+      return;
+    }
+    if (event.type === 'import') importPending = false;
     if (event.type === 'import' && sampleMode) {
       sampleMode = false;
       draftBeforeSample = null;

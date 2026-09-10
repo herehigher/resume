@@ -57,6 +57,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   let draftMessageTimer;
   let shouldPersistDraft = store.hasStoredState();
   let sampleMode = false;
+  let importPending = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   const pageBreakControls = initPageBreakControls({
@@ -90,7 +91,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
 
   function scheduleSave() {
     window.clearTimeout(saveTimer);
-    if (sampleMode) return;
+    if (sampleMode || importPending) return;
     shouldPersistDraft = true;
     setDraftStatus('暗号化して保存中…', 'saving');
     saveTimer = window.setTimeout(async () => {
@@ -674,11 +675,21 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   });
   window.addEventListener('pagehide', () => {
     window.clearTimeout(saveTimer);
-    if (sampleMode || !shouldPersistDraft) return;
+    if (sampleMode || importPending || !shouldPersistDraft) return;
     void store.save().catch(() => {});
   });
 
   store.subscribe((_state, event) => {
+    if (event.type === 'import-pending') {
+      importPending = true;
+      window.clearTimeout(saveTimer);
+      return;
+    }
+    if (event.type === 'import-cancel' || event.type === 'import-conflict' || event.type === 'import-failed') {
+      importPending = false;
+      return;
+    }
+    if (event.type === 'import') importPending = false;
     if (event.type === 'import' && sampleMode) {
       sampleMode = false;
       draftBeforeSample = null;

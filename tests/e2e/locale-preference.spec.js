@@ -67,6 +67,7 @@ test('import の settings.locale は表示 locale と preference を変更しな
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(imported))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[name="fullName"]')).toHaveValue('Imported Fictional Person');
   await expect(page.locator('#localeSelect')).toHaveValue('ja');
   await expect(readLocalePreference(page)).resolves.toBe('en');

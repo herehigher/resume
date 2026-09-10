@@ -1,5 +1,5 @@
 import { STORAGE_KEY } from './config.js';
-import { resolveLocale } from './i18n/index.js';
+import { getMessages, resolveLocale } from './i18n/index.js';
 import { createDefaultState, cloneData } from './state/defaults.js';
 import { createDraftStorage, getDraftStorageCapabilityError } from './state/storage.js';
 import { loadLocalePreference } from './state/locale-preference.js';
@@ -20,11 +20,13 @@ let storageError = getDraftStorageCapabilityError({
   isSecureContext: window.isSecureContext
 });
 let recoveredDraft = false;
+let draftLoadResult = null;
 if (!storageError) {
   try {
     const result = await persistence.loadAndRecoverUnreadableDraft();
     storedState = result.state;
     recoveredDraft = result.recovered;
+    draftLoadResult = persistence.getLastLoadResult();
   } catch (error) {
     storageError = error;
   }
@@ -84,6 +86,15 @@ if (storageError) {
     'zh-CN': '已因保存的草稿出现问题而自动恢复为新的默认草稿。',
     en: 'Because the saved draft had a problem, it was automatically recovered to a new default draft.'
   }[locale];
+} else if (draftLoadResult?.status === 'migrated') {
+  const message = document.getElementById('globalMessage');
+  message.textContent = getMessages(locale).draftMigrated;
+} else if (draftLoadResult?.status === 'salvaged') {
+  const message = document.getElementById('globalMessage');
+  message.textContent = getMessages(locale).draftSalvaged;
+} else if (draftLoadResult?.status === 'too-old') {
+  const message = document.getElementById('globalMessage');
+  message.textContent = getMessages(locale).draftTooOld;
 }
 initLocaleController(store, {
   locale,

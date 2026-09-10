@@ -74,6 +74,7 @@ async function printFixturePdf(page, fixtureCase) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator(previewSelector)).toContainText(endMarker);
   return { endMarker, pages: await inspectPdf(await printPdf(page)) };
 }
@@ -158,6 +159,7 @@ test('manual page breaks start their target sections on new non-empty PDF pages 
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-page-breaks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
   await page.emulateMedia({ media: 'print' });
@@ -177,6 +179,7 @@ test('manual page break after a naturally near-full section creates no blank PDF
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-near-boundary.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('[data-en-preview]')).toContainText(endMarker);
   const pages = await inspectPdf(await printPdf(page));
@@ -196,6 +199,7 @@ test('manual page-break target may span multiple PDF pages without losing its en
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-long-target.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('[data-en-preview]')).toContainText(endMarker);
   const pages = await inspectPdf(await printPdf(page));
@@ -212,6 +216,7 @@ test('Japanese manual page break starts the resume target on a later non-empty A
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-ja-resume.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-section-key="qualifications"]')).toHaveClass(/has-manual-page-break/);
   const pages = await inspectPdf(await printPdf(page));
   expectPageSize(pages, A4);
@@ -263,6 +268,7 @@ test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(state))
     });
+    await page.locator('#confirmSampleAdoptButton').click();
     await expect(page.locator('[data-en-preview]')).toContainText(endMarker);
     await page.emulateMedia({ media: 'print' });
     const layout = await page.evaluate(() => {
@@ -311,6 +317,7 @@ test('PDF ja: 任意タイトルの複数詳細項目は順序・継続ラベル
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('#documentPreview')).toContainText('CUSTOM-DETAIL-LINE-13');
   await expect(page.locator('#documentPreview')).not.toContainText('PDFに出さない空項目');
   const pages = await inspectPdf(await printPdf(page));
@@ -387,6 +394,8 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(state))
     });
+    await page.locator('#confirmSampleAdoptButton').click();
+    await expect(page.locator('#importDataInput')).toHaveValue('');
     await expect(page.locator(previewSelector)).toContainText('SYNTHETIC-ENTRY-095');
     const pages = await inspectPdf(await printPdf(page));
     const text = pages.map((item) => item.text).join(' ');
@@ -439,6 +448,7 @@ test('PDF long: English の超長文は複数 Letter ページになり末尾ま
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(state))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-en-preview]')).toContainText('LONG PDF END MARKER');
 
   const pages = await inspectPdf(await printPdf(page));

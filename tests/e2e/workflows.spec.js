@@ -116,6 +116,143 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await expect(page.locator('#clearDraftButton')).toBeFocused();
 });
 
+test('JSON import confirms before replacing a draft and preserves it on cancel', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const name = page.locator('[name="fullName"]');
+  await name.fill('Existing local draft');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBeNull();
+  const rawBefore = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported backup';
+  const input = page.locator('#importDataInput');
+
+  await input.setInputFiles({
+    name: 'resume-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+  await expect(name).toHaveValue('Existing local draft');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(rawBefore);
+
+  await input.setInputFiles({
+    name: 'resume-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(name).toHaveValue('Imported backup');
+});
+
+test('[mobile] JSON import confirmation keeps cancel focus and the current draft', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLocale(page, 'en');
+  const name = page.locator('[data-profile-field="fullName"]');
+  await name.fill('Existing mobile draft');
+  const backup = createDefaultState('ja');
+  backup.profile.fields.fullName = 'Imported backup';
+
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'resume-mobile-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(name).toHaveValue('Existing mobile draft');
+});
+
+test('B0 migration announces the completed update once in each editor language', async ({ page }) => {
+  const messages = {
+    ja: '保存済みの下書きを現在の形式に更新しました。',
+    'zh-CN': '已将保存的草稿更新为当前格式。',
+    en: 'Your saved draft was updated to the current format.'
+  };
+
+  for (const locale of ['ja', 'zh-CN', 'en']) {
+    const bootstrap = createDefaultState(locale);
+    delete bootstrap.schemaRevision;
+    bootstrap.profile.fields.fullName = `B0 ${locale} migration fixture`;
+    await page.goto('/editor/');
+    await page.evaluate(({ key, state }) => {
+      localStorage.setItem(key, JSON.stringify(state));
+    }, { key: STORAGE_KEY, state: bootstrap });
+    await openLocale(page, locale);
+    await expect(page.locator('#globalMessage')).toHaveText(messages[locale]);
+    await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).format, STORAGE_KEY))
+      .toBe('resume-studio-local-encrypted-v1');
+    await page.reload();
+    await expect(page.locator('#globalMessage')).toHaveText('');
+  }
+});
+
+test('a confirmed import overrides a same-page edit before its asynchronous handler saves', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const name = page.locator('[name="fullName"]');
+  await name.fill('Original draft');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBeNull();
+  const rawBefore = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+  const backup = createDefaultState('en');
+  backup.profile.fields.fullName = 'Imported backup';
+
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'locked-import.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup))
+  });
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.evaluate(() => {
+    document.getElementById('confirmSampleAdoptButton').click();
+    const input = document.querySelector('[name="fullName"]');
+    input.value = 'Edited after confirmation';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBe(rawBefore);
+  await expect(name).toHaveValue('Imported backup');
+  await expect(page.locator('#globalMessage')).not.toHaveClass(/is-error/);
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  await page.waitForTimeout(400);
+  await page.reload();
+  await expect(name).toHaveValue('Imported backup');
+});
+
+test('three editors resume autosave after a failed import', async ({ page }) => {
+  await page.addInitScript((key) => {
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function setItem(name, value) {
+      if (window.__rejectDraftWrites && name === key) throw new Error('fictional quota failure');
+      return originalSetItem.call(this, name, value);
+    };
+  }, STORAGE_KEY);
+  const cases = [
+    ['ja', '[name="fullName"]'],
+    ['zh-CN', '[data-profile="fullName"]'],
+    ['en', '[data-profile-field="fullName"]']
+  ];
+
+  for (const [locale, field] of cases) {
+    await openLocale(page, locale);
+    const input = page.locator(field);
+    await input.fill(`Original ${locale}`);
+    await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).not.toBeNull();
+    const rawBefore = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+    const backup = createDefaultState('en');
+    backup.profile.fields.fullName = `Imported ${locale}`;
+    await page.evaluate(() => { window.__rejectDraftWrites = true; });
+    await page.locator('#importDataInput').setInputFiles({
+      name: `failed-${locale}.json`, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup))
+    });
+    await page.locator('#confirmSampleAdoptButton').click();
+    await expect(page.locator('#globalMessage')).toHaveClass(/is-error/);
+    await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(rawBefore);
+    await page.evaluate(() => { window.__rejectDraftWrites = false; });
+    await input.fill(`Saved after failure ${locale}`);
+    await expect.poll(() => page.evaluate(({ key, previous }) => localStorage.getItem(key) !== previous, { key: STORAGE_KEY, previous: rawBefore })).toBe(true);
+  }
+});
+
 test('[mobile] 三言語の通常下書き状態は320–401pxで1行、操作は44px以上で横にはみ出さない', async ({ page }) => {
   const cases = [
     ['ja', '#japaneseWorkspace', '[name="fullName"]', '#saveStatus', '#loadSampleButton', '暗号化してこの端末に保存済み'],
@@ -564,6 +701,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(exported))
   });
+  await page.locator('#confirmSampleAdoptButton').click();
   await expect(name).toHaveValue('読み込んだ氏名');
 
   await page.locator('#importDataInput').setInputFiles({
@@ -571,7 +709,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
     mimeType: 'application/json',
     buffer: Buffer.from('{"version":999}')
   });
-  await expect(page.locator('#globalMessage')).toContainText('読み込めませんでした');
+  await expect(page.locator('#globalMessage')).toContainText('現在の形式に対応していない');
   await expect(name).toHaveValue('読み込んだ氏名');
   await expect.poll(() => page.evaluate((key) => {
     const raw = localStorage.getItem(key);

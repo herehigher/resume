@@ -224,6 +224,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   let saveTimer;
   let shouldPersistDraft = store.hasStoredState();
   let sampleMode = false;
+  let importPending = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   const pageBreakControls = initPageBreakControls({
@@ -245,7 +246,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
 
   function scheduleSave() {
     window.clearTimeout(saveTimer);
-    if (sampleMode) return;
+    if (sampleMode || importPending) return;
     shouldPersistDraft = true;
     setStatus(zhCN.savingStatus, 'saving');
     saveTimer = window.setTimeout(async () => {
@@ -569,7 +570,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
 
   function onPageHide() {
     window.clearTimeout(saveTimer);
-    if (sampleMode || !shouldPersistDraft) return;
+    if (sampleMode || importPending || !shouldPersistDraft) return;
     void store.save().catch(() => {});
   }
 
@@ -579,6 +580,16 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   window.addEventListener('resize', fitPreview);
   window.addEventListener('pagehide', onPageHide);
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'import-pending') {
+      importPending = true;
+      window.clearTimeout(saveTimer);
+      return;
+    }
+    if (event.type === 'import-cancel' || event.type === 'import-conflict' || event.type === 'import-failed') {
+      importPending = false;
+      return;
+    }
+    if (event.type === 'import') importPending = false;
     if (event.type === 'import' && sampleMode) {
       sampleMode = false;
       draftBeforeSample = null;

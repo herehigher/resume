@@ -1,10 +1,11 @@
 import { createDefaultState, cloneData } from './defaults.js';
-import { createDraftStorage, parseImportedState, serializeState } from './storage.js';
+import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js';
 import { assertValidState } from './schema.js';
 
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
   let state = cloneData(assertValidState(initialState));
   let stored = hasStoredState;
+  let importPending = false;
   const listeners = new Set();
 
   function notify(type) {
@@ -28,6 +29,12 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     });
   }
 
+  function completeImport(type) {
+    if (!importPending) return;
+    importPending = false;
+    notify(type);
+  }
+
   return {
     getState() {
       return state;
@@ -38,6 +45,32 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       return replace(next, { persist, type });
     },
     replace,
+    prepareImport(text) {
+      const prepared = prepareImportedState(text);
+      importPending = true;
+      notify('import-pending');
+      return prepared;
+    },
+    cancelImport() {
+      completeImport('import-cancel');
+    },
+    async importPrepared(prepared) {
+      if (!prepared?.state) throw new TypeError('A prepared import is required.');
+      const next = cloneData(assertValidState(prepared.state));
+      let completion = 'import-failed';
+      try {
+        await persistence.save(next);
+        state = next;
+        stored = true;
+        completion = 'import';
+        return state;
+      } finally {
+        completeImport(completion);
+      }
+    },
+    isImportPending() {
+      return importPending;
+    },
     save() {
       const snapshot = cloneData(state);
       return persistence.save(snapshot).then(() => {
