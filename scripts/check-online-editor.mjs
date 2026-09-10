@@ -33,7 +33,7 @@ export async function checkOnlineEditor(baseUrl) {
     const response = await context.request.get(new URL(examplePath, base).href);
     assert.equal(response.status(), 200, 'Published example must be available.');
     const example = await response.json();
-    assert.equal(example.version, 1);
+    assert.equal(example.version, 2);
     // Use a known fictional canary regardless of the served example's profile.
     example.profile = {
       photo: '',

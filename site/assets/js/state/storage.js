@@ -5,8 +5,8 @@ import { migrateState } from './migrations.js';
 
 export const ENCRYPTED_DRAFT_FORMAT = 'resume-studio-local-encrypted-v1';
 export const ENCRYPTED_DRAFT_ALGORITHM = 'AES-GCM';
-export const DRAFT_WEB_LOCK_NAME = 'resume-studio-web-v1:draft';
-const KEY_DATABASE = 'resume-studio-web-v1-keys';
+export const DRAFT_WEB_LOCK_NAME = `${STORAGE_KEY}:draft`;
+export const DRAFT_KEY_DATABASE = `${STORAGE_KEY}-keys`;
 const KEY_STORE = 'keys';
 const KEY_ID = 'draft-encryption-key';
 const NONCE_BYTES = 12;
@@ -60,7 +60,7 @@ function fromBase64(value, maximumBytes) {
   }
 }
 
-function createKeyStore(indexedDB) {
+function createKeyStore(indexedDB, keyDatabase = DRAFT_KEY_DATABASE) {
   if (!indexedDB) throw new DraftStorageError('indexeddb-unavailable');
   let databasePromise;
   function unavailable(error) {
@@ -71,7 +71,7 @@ function createKeyStore(indexedDB) {
     if (databasePromise) return databasePromise;
     databasePromise = new Promise((resolve, reject) => {
       let request;
-      try { request = indexedDB.open(KEY_DATABASE, 1); } catch (error) {
+      try { request = indexedDB.open(keyDatabase, 1); } catch (error) {
         reject(new DraftStorageError('indexeddb-unavailable', error));
         return;
       }
@@ -158,7 +158,10 @@ export function createDraftStorage(storage, {
   crypto = globalThis.crypto,
   indexedDB = globalThis.indexedDB,
   keyStore = null,
-  locks = globalThis.navigator?.locks ?? (typeof window === 'undefined' ? nodeTestLockManager() : null)
+  locks = globalThis.navigator?.locks ?? (typeof window === 'undefined' ? nodeTestLockManager() : null),
+  storageKey = STORAGE_KEY,
+  keyDatabase = `${storageKey}-keys`,
+  lockName = `${storageKey}:draft`
 } = {}) {
   if (!storage) throw new TypeError('localStorage is required');
   const cryptography = crypto?.subtle ? crypto : null;
@@ -168,7 +171,7 @@ export function createDraftStorage(storage, {
   let pendingMutation = null;
   let lastLoadResult = null;
   function keys() {
-    if (!keyStoreInstance) keyStoreInstance = keyStore || createKeyStore(indexedDB);
+    if (!keyStoreInstance) keyStoreInstance = keyStore || createKeyStore(indexedDB, keyDatabase);
     return keyStoreInstance;
   }
   function enqueue(operation) {
@@ -184,7 +187,7 @@ export function createDraftStorage(storage, {
     }
     let callbackStarted = false;
     try {
-      return await locks.request(DRAFT_WEB_LOCK_NAME, { mode: 'exclusive' }, () => {
+      return await locks.request(lockName, { mode: 'exclusive' }, () => {
         callbackStarted = true;
         return operation(true);
       });
@@ -248,7 +251,7 @@ export function createDraftStorage(storage, {
   }
   function readRawDraft() {
     let raw;
-    try { raw = storage.getItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+    try { raw = storage.getItem(storageKey); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
     return raw;
   }
   async function decodeRawDraft(raw) {
@@ -276,7 +279,7 @@ export function createDraftStorage(storage, {
     assertExpectedRaw(expectedRaw);
     const encrypted = await encrypt(state, allowKeyCreation);
     assertExpectedRaw(expectedRaw);
-    try { storage.setItem(STORAGE_KEY, encrypted); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+    try { storage.setItem(storageKey, encrypted); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
     lastKnownRaw = encrypted;
     pendingMutation = null;
     return encrypted;
@@ -334,6 +337,9 @@ export function createDraftStorage(storage, {
   function load() {
     return withLock(loadInternal);
   }
+  function loadReadOnly() {
+    return loadInternal(false);
+  }
   async function saveInternal(snapshot) {
     const existing = readRawDraft();
     const classified = await classifyRaw(existing);
@@ -362,12 +368,12 @@ export function createDraftStorage(storage, {
           throw new DraftStorageError('storage-changed');
         }
       }
-      try { storage.removeItem(STORAGE_KEY); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
+      try { storage.removeItem(storageKey); } catch (error) { throw new DraftStorageError('storage-unavailable', error); }
       try {
         await keys().remove();
       } catch (error) {
         if (existing !== null) {
-          try { storage.setItem(STORAGE_KEY, existing); } catch (restoreError) {
+          try { storage.setItem(storageKey, existing); } catch (restoreError) {
             throw new DraftStorageError('clear-partial-failure', restoreError);
           }
         }
@@ -400,6 +406,7 @@ export function createDraftStorage(storage, {
   }
   return {
     load,
+    loadReadOnly,
     loadAndRecoverUnreadableDraft,
     save,
     remove,
@@ -414,8 +421,7 @@ export async function loadStoredState(storage, options) {
 }
 
 export function serializeState(state) {
-  assertValidState(state);
-  if (!validateCurrentState(state).valid) throw new TypeError('Only the current schema revision can be exported.');
+  if (!validateCurrentState(state).valid) throw new TypeError('Only the current data version can be exported.');
   return `${JSON.stringify(state, null, 2)}\n`;
 }
 

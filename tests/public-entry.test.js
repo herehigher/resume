@@ -184,12 +184,12 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     assert.match(html, /PDF/i);
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/editor\/\?lang=/);
-    assert.match(html, /href="\.\.\/schema\/resume-studio-web-v1\.schema\.json"/);
+    assert.match(html, /href="\.\.\/schema\/resume-studio-web-v2\.schema\.json"/);
     assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="\\.\\.\\/assets\\/favicon\\/resume-studio-marmot-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
     assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
     assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
     assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
-    assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v1.schema.json', import.meta.url)), true);
+    assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v2.schema.json', import.meta.url)), true);
     assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
   }
@@ -262,7 +262,7 @@ test('public routes show the X contact link beside the copyright notice', () => 
 test('default Japanese entry opens the editor directly and the legacy Japanese URL consolidates to it', () => {
   const root = source('site/index.html');
   assert.match(root, /<a class="entry-button" href="\.\/editor\/\?lang=ja">日本語で編集を始める/);
-  assert.match(root, /href="\.\/schema\/resume-studio-web-v1\.schema\.json"/);
+  assert.match(root, /href="\.\/schema\/resume-studio-web-v2\.schema\.json"/);
   assert.match(root, /各言語の書類内容は独立して保存されます/);
   assert.doesNotMatch(root, /\.\/ja\//);
 
@@ -334,18 +334,23 @@ test('sitemap is well formed and lists only canonical public URLs', () => {
 });
 
 test('published JSON Schema accepts exports and rejects primary invalid values', () => {
-  const schema = JSON.parse(source('site/schema/resume-studio-web-v1.schema.json'));
-  const example = JSON.parse(source('site/schema/resume-studio-web-v1.example.json'));
+  const schema = JSON.parse(source('site/schema/resume-studio-web-v2.schema.json'));
+  const example = JSON.parse(source('site/schema/resume-studio-web-v2.example.json'));
   assert.equal(validateSchema(schema, example), true);
   assert.deepEqual(parseImportedState(JSON.stringify(example)), example);
 
   const invalidVersion = structuredClone(example);
-  invalidVersion.version = 2;
+  invalidVersion.version = 3;
   assert.equal(validateSchema(schema, invalidVersion), false);
 
-  const missingSchemaRevision = structuredClone(example);
-  delete missingSchemaRevision.schemaRevision;
-  assert.equal(validateSchema(schema, missingSchemaRevision), false);
+  const missingVersion = structuredClone(example);
+  delete missingVersion.version;
+  assert.equal(validateSchema(schema, missingVersion), false);
+
+  const retiredRevision = structuredClone(example);
+  retiredRevision.schemaRevision = 1;
+  assert.equal(validateSchema(schema, retiredRevision), false);
+  assert.equal(validateState(retiredRevision).valid, false);
 
   const invalidLocale = structuredClone(example);
   invalidLocale.settings.locale = 'fr';

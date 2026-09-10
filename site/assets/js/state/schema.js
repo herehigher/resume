@@ -1,4 +1,4 @@
-import { CURRENT_SCHEMA_REVISION, PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
+import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createDefaultState } from './defaults.js';
 import { validatePageBreaks } from '../page-breaks.js';
 
@@ -40,19 +40,15 @@ function compareShape(value, template, path, errors) {
   }
 }
 
-function validateStateShape(value, { requireCurrentRevision = false } = {}) {
+function validateStateShape(value) {
   const errors = [];
   if (!isPlainObject(value)) return { valid: false, errors: ['state must be an object'] };
-  if (value.version !== STATE_VERSION) errors.push(`version must be ${STATE_VERSION}`);
-  const legacyTemplate = createDefaultState();
-  delete legacyTemplate.schemaRevision;
-  compareShape(value, legacyTemplate, 'state', errors);
-
-  const hasSchemaRevision = Object.hasOwn(value, 'schemaRevision');
-  if (requireCurrentRevision && !hasSchemaRevision) errors.push('schemaRevision is required');
-  if (hasSchemaRevision && value.schemaRevision !== CURRENT_SCHEMA_REVISION) {
-    errors.push(`schemaRevision must be ${CURRENT_SCHEMA_REVISION}`);
+  const stateKeys = ['documents', 'profile', 'settings', 'version'];
+  if (Object.keys(value).sort().join(',') !== stateKeys.join(',')) {
+    errors.push('state has an unsupported shape');
   }
+  if (value.version !== STATE_VERSION) errors.push(`version must be ${STATE_VERSION}`);
+  compareShape(value, createDefaultState(), 'state', errors);
 
   if (!SUPPORTED_LOCALES.includes(value.settings?.locale)) {
     errors.push('settings.locale is not supported');
@@ -101,14 +97,12 @@ function validateStateShape(value, { requireCurrentRevision = false } = {}) {
   return { valid: errors.length === 0, errors };
 }
 
-// Keep the pre-migration reader compatible with a B0 payload until storage wires
-// the migrator in #156. New writes and public exports use validateCurrentState.
 export function validateState(value) {
   return validateStateShape(value);
 }
 
 export function validateCurrentState(value) {
-  return validateStateShape(value, { requireCurrentRevision: true });
+  return validateStateShape(value);
 }
 
 export function assertValidState(value) {

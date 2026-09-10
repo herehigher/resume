@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { STORAGE_KEY } from '../../site/assets/js/config.js';
+import { DRAFT_KEY_DATABASE as KEY_DATABASE } from '../../site/assets/js/state/storage.js';
 
-const STORAGE_KEY = 'resume-studio-web-v1';
-const KEY_DATABASE = 'resume-studio-web-v1-keys';
 const KEY_STORE = 'keys';
 const KEY_ID = 'draft-encryption-key';
 const encryptedDraft = JSON.stringify({

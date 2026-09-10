@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
 
 import { documentUrlPaths } from '../../scripts/deployment-path-contract.mjs';
+import { LOCALE_PREFERENCE_KEY, STORAGE_KEY } from '../../site/assets/js/config.js';
 
 const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
-export const DRAFT_STORAGE_KEY = 'resume-studio-web-v1';
-export const LOCALE_PREFERENCE_KEY = 'resume-studio-locale-v1';
+export const DRAFT_STORAGE_KEY = STORAGE_KEY;
+export { LOCALE_PREFERENCE_KEY };
 
 function collectStaticPaths(directory = siteRoot) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

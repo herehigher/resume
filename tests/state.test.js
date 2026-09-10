@@ -328,23 +328,23 @@ test('every import persistence failure completes the transaction and leaves savi
   }
 });
 
-test('future and invalid revision imports are rejected without opening an import transaction', () => {
+test('future and invalid version imports are rejected without opening an import transaction', () => {
   const storage = createMemoryStorage();
   const store = createTestStore(storage, createDefaultState());
   const original = JSON.stringify(store.getState());
 
-  assert.throws(() => store.prepareImport(JSON.stringify({ version: 1, schemaRevision: 99 })), (error) => error.code === 'future-state');
-  assert.throws(() => store.prepareImport(JSON.stringify({ version: 1, schemaRevision: -1 })), (error) => error.code === 'unsupported-state');
+  assert.throws(() => store.prepareImport(JSON.stringify({ version: 99 })), (error) => error.code === 'future-state');
+  assert.throws(() => store.prepareImport(JSON.stringify({ version: -1 })), (error) => error.code === 'unsupported-state');
   assert.equal(store.isImportPending(), false);
   assert.equal(JSON.stringify(store.getState()), original);
   assert.equal(storage.getItem(STORAGE_KEY), null);
 });
 
-test('export rejects a bootstrap-shaped state without the current schema revision', () => {
-  const bootstrap = createDefaultState('ja');
-  delete bootstrap.schemaRevision;
+test('export rejects a state from a non-current data version', () => {
+  const oldVersion = createDefaultState('ja');
+  oldVersion.version = 1;
 
-  assert.throws(() => serializeState(bootstrap), /current schema revision/);
+  assert.throws(() => serializeState(oldVersion), /current data version/);
 });
 
 test('entering sample mode persists pending draft changes', async () => {

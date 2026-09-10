@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { STORAGE_KEY } from '../site/assets/js/config.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
 import { createChineseSampleState } from '../site/assets/js/state/zh-CN.js';
 import { validateState } from '../site/assets/js/state/schema.js';
@@ -37,9 +38,9 @@ function createMemoryStorage() {
 
 function createTestPersistence(storage) {
   return {
-    async save(state) { storage.setItem('resume-studio-web-v1', JSON.stringify(state)); },
-    async load() { const raw = storage.getItem('resume-studio-web-v1'); return raw ? JSON.parse(raw) : null; },
-    async remove() { storage.removeItem('resume-studio-web-v1'); },
+    async save(state) { storage.setItem(STORAGE_KEY, JSON.stringify(state)); },
+    async load() { const raw = storage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; },
+    async remove() { storage.removeItem(STORAGE_KEY); },
     flush() { return Promise.resolve(); }
   };
 }
@@ -137,7 +138,7 @@ test('opening the Chinese sample protects the existing persisted draft', async (
   const snapshot = await protectChineseDraftBeforeSample(store, true);
   store.replace(createChineseSampleState(store.getState()), { type: 'zh-sample' });
 
-  const persisted = JSON.parse(storage.getItem('resume-studio-web-v1'));
+  const persisted = JSON.parse(storage.getItem(STORAGE_KEY));
   assert.equal(persisted.profile.fields.fullName, '需要保留的姓名');
   assert.equal(persisted.documents['zh-CN'].resume.summary, '需要保留的概述');
   assert.equal(snapshot.profile.fields.fullName, '需要保留的姓名');

@@ -1,17 +1,18 @@
 import { DRAFT_STORAGE_KEY, expect, openLocale, test } from './fixtures.js';
+import { DRAFT_KEY_DATABASE, DRAFT_WEB_LOCK_NAME } from '../../site/assets/js/state/storage.js';
 
-const DRAFT_LOCK_NAME = 'resume-studio-web-v1:draft';
+const DRAFT_LOCK_NAME = DRAFT_WEB_LOCK_NAME;
 
 async function resetDraft(page) {
-  await page.evaluate(async (draftKey) => {
+  await page.evaluate(async ({ databaseName, draftKey }) => {
     localStorage.removeItem(draftKey);
     await new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase('resume-studio-web-v1-keys');
+      const request = indexedDB.deleteDatabase(databaseName);
       request.onsuccess = resolve;
       request.onerror = () => reject(request.error);
       request.onblocked = () => reject(new Error('The test key database is still open.'));
     });
-  }, DRAFT_STORAGE_KEY);
+  }, { databaseName: DRAFT_KEY_DATABASE, draftKey: DRAFT_STORAGE_KEY });
 }
 
 async function createStorageHarness(page, name) {
@@ -129,36 +130,6 @@ test('同一 context の古い page は新しい encrypted draft を上書きで
   await expect(stalePage.locator('[data-en-save-status]')).toHaveClass(/is-error/);
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY)).toBe(newestRaw);
   await stalePage.close();
-});
-
-test('同一 context の migration と stale save は lock 内で順序付けられ、移行結果を保護する', async ({ context, page }) => {
-  await openLocale(page, 'en');
-  const savingPage = await context.newPage();
-  await openLocale(savingPage, 'en');
-  await resetDraft(page);
-  await createStorageHarness(savingPage, '__savingStorage');
-  await savingPage.evaluate(async () => window.__savingStorage.storage.load());
-  await savingPage.evaluate(() => {
-    const state = window.__savingStorage.state('Bootstrap migration fixture');
-    delete state.schemaRevision;
-    localStorage.setItem('resume-studio-web-v1', JSON.stringify(state));
-  });
-  await createStorageHarness(page, '__migrationStorage');
-  await observeLockRequests(page);
-  await observeLockRequests(savingPage);
-  await holdDraftLock(page);
-
-  await queueStorageOperation(page, '__migrationStorage', 'load');
-  await queueStorageOperation(savingPage, '__savingStorage', 'save', 'Stale save during migration');
-  await savingPage.waitForFunction(() => window.__draftLockRequestCount === 1);
-  await releaseDraftLock(page);
-
-  const migration = await storageOperationResult(page);
-  const staleSave = await storageOperationResult(savingPage);
-  expect(migration).toMatchObject({ ok: true, result: { schemaRevision: 1 } });
-  expect(staleSave).toEqual({ ok: false, code: 'storage-changed' });
-  await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).format, DRAFT_STORAGE_KEY)).toBe('resume-studio-local-encrypted-v1');
-  await savingPage.close();
 });
 
 test('同一 context の初回 key generation は一方だけが commit する', async ({ context, page }) => {

@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
-import { expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
+import { DRAFT_KEY_DATABASE } from '../../site/assets/js/state/storage.js';
+import { DRAFT_STORAGE_KEY as STORAGE_KEY, expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
 
-const STORAGE_KEY = 'resume-studio-web-v1';
 const PHOTO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const PHOTO_DATA_URL = `data:image/png;base64,${PHOTO_BASE64}`;
 const PROFILE_URL_CASES = [
@@ -52,8 +52,8 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await expect(preview).toContainText('E2E大学 入学');
 
   await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
-  await expect.poll(() => page.evaluate(async () => {
-    const request = indexedDB.open('resume-studio-web-v1-keys');
+  await expect.poll(() => page.evaluate(async (databaseName) => {
+    const request = indexedDB.open(databaseName);
     const database = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -65,7 +65,7 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
     });
     database.close();
     return key && { type: key.type, extractable: key.extractable, algorithm: key.algorithm.name, usages: [...key.usages].sort() };
-  })).toEqual({ type: 'secret', extractable: false, algorithm: 'AES-GCM', usages: ['decrypt', 'encrypt'] });
+  }, DRAFT_KEY_DATABASE)).toEqual({ type: 'secret', extractable: false, algorithm: 'AES-GCM', usages: ['decrypt', 'encrypt'] });
   await page.reload();
   await expect(name).toHaveValue(maliciousName);
 
@@ -98,8 +98,8 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await page.locator('#confirmClearButton').click();
   await expect(name).toHaveValue('');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
-  await expect.poll(() => page.evaluate(async () => {
-    const request = indexedDB.open('resume-studio-web-v1-keys');
+  await expect.poll(() => page.evaluate(async (databaseName) => {
+    const request = indexedDB.open(databaseName);
     const database = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -111,7 +111,7 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
     });
     database.close();
     return key ?? null;
-  })).toBeNull();
+  }, DRAFT_KEY_DATABASE)).toBeNull();
   await expect(page.locator('#clearDraftButton')).toBeVisible();
   await expect(page.locator('#clearDraftButton')).toBeFocused();
 });
@@ -164,30 +164,6 @@ test('[mobile] JSON import confirmation keeps cancel focus and the current draft
   await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(name).toHaveValue('Existing mobile draft');
-});
-
-test('B0 migration announces the completed update once in each editor language', async ({ page }) => {
-  const messages = {
-    ja: '保存済みの下書きを現在の形式に更新しました。',
-    'zh-CN': '已将保存的草稿更新为当前格式。',
-    en: 'Your saved draft was updated to the current format.'
-  };
-
-  for (const locale of ['ja', 'zh-CN', 'en']) {
-    const bootstrap = createDefaultState(locale);
-    delete bootstrap.schemaRevision;
-    bootstrap.profile.fields.fullName = `B0 ${locale} migration fixture`;
-    await page.goto('/editor/');
-    await page.evaluate(({ key, state }) => {
-      localStorage.setItem(key, JSON.stringify(state));
-    }, { key: STORAGE_KEY, state: bootstrap });
-    await openLocale(page, locale);
-    await expect(page.locator('#globalMessage')).toHaveText(messages[locale]);
-    await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).format, STORAGE_KEY))
-      .toBe('resume-studio-local-encrypted-v1');
-    await page.reload();
-    await expect(page.locator('#globalMessage')).toHaveText('');
-  }
 });
 
 test('a confirmed import overrides a same-page edit before its asynchronous handler saves', async ({ page }) => {
@@ -693,7 +669,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   await page.locator('#exportDataButton').click();
   const download = await downloadPromise;
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
-  expect(exported.version).toBe(1);
+  expect(exported.version).toBe(2);
   expect(exported.profile.fields.fullName).toBe('書き出し前の氏名');
 
   exported.profile.fields.fullName = '読み込んだ氏名';
@@ -710,7 +686,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
     mimeType: 'application/json',
     buffer: Buffer.from('{"version":999}')
   });
-  await expect(page.locator('#globalMessage')).toContainText('現在の形式に対応していない');
+  await expect(page.locator('#globalMessage')).toContainText('新しい版で作成されています');
   await expect(name).toHaveValue('読み込んだ氏名');
   await expect.poll(() => page.evaluate((key) => {
     const raw = localStorage.getItem(key);

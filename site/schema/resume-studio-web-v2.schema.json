@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v1.schema.json",
-  "title": "Resume Studio web v1 export",
+  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v2.schema.json",
+  "title": "Resume Studio web v2 export",
   "description": "The JSON backup format exported by Resume Studio. Resume data must not be uploaded, transmitted, or shared without the user's explicit authorization.",
   "type": "object",
-  "required": ["version", "schemaRevision", "settings", "profile", "documents"],
+  "additionalProperties": false,
+  "required": ["version", "settings", "profile", "documents"],
   "properties": {
-    "version": { "const": 1 },
-    "schemaRevision": { "const": 1 },
+    "version": { "const": 2 },
     "settings": {
       "type": "object",
       "required": ["locale", "pageSizeByLocale", "pageBreaks"],

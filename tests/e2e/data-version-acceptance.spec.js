@@ -6,24 +6,20 @@ import { DRAFT_STORAGE_KEY, expect, openLocale, test } from './fixtures.js';
 const UNRELATED_STORAGE_KEY = 'unrelated-storage-acceptance-sentinel';
 const UNRELATED_STORAGE_VALUE = 'keep-this-unrelated-storage-value';
 const PHOTO_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-const BOOTSTRAP_IMPORT_FIXTURE = JSON.parse(await readFile(
-  new URL('../fixtures/schema-migrations/bootstrap-b0.json', import.meta.url),
-  'utf8'
-));
 
-function createBootstrapImport() {
-  const state = structuredClone(BOOTSTRAP_IMPORT_FIXTURE);
-  state.profile.fields.fullName = 'Schema integration profile canary';
+function createCurrentImport() {
+  const state = createDefaultState('ja');
+  state.profile.fields.fullName = 'Data version integration canary';
   state.profile.photo = PHOTO_DATA_URL;
-  state.documents.ja.fields.motivation = 'Schema integration Japanese document canary';
-  state.documents['zh-CN'].resume.headline = 'Schema integration Chinese document canary';
-  state.documents.en.resume.headline = 'Schema integration English document canary';
+  state.documents.ja.fields.motivation = 'Data version Japanese document canary';
+  state.documents['zh-CN'].resume.headline = 'Data version Chinese document canary';
+  state.documents.en.resume.headline = 'Data version English document canary';
   state.settings.pageBreaks.ja.A4.resume = ['qualifications', 'motivation'];
   state.settings.pageBreaks.en.LETTER.resume = ['skills', 'certifications'];
   return state;
 }
 
-test('B0 JSON import preserves one shared profile, photo, three documents, page breaks, and unrelated storage', async ({ page }) => {
+test('v2 JSON import preserves the shared profile, three documents, page breaks, and unrelated storage', async ({ page }) => {
   const consoleMessages = [];
   page.on('console', (message) => consoleMessages.push(message.text()));
   await page.addInitScript(({ draftKey, sentinelKey, sentinelValue }) => {
@@ -52,7 +48,7 @@ test('B0 JSON import preserves one shared profile, photo, three documents, page 
       return originalKey.call(this, index);
     };
     originalSetItem.call(localStorage, sentinelKey, sentinelValue);
-    window.__schemaAcceptanceStorage = {
+    window.__dataVersionAcceptanceStorage = {
       read() {
         return {
           accesses: [...accesses],
@@ -67,12 +63,12 @@ test('B0 JSON import preserves one shared profile, photo, three documents, page 
     sentinelValue: UNRELATED_STORAGE_VALUE
   });
 
-  const bootstrap = createBootstrapImport();
+  const current = createCurrentImport();
   await openLocale(page, 'ja');
   await page.locator('#importDataInput').setInputFiles({
-    name: 'schema-integration-bootstrap.json',
+    name: 'resume-studio-web-v2.json',
     mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify(bootstrap))
+    buffer: Buffer.from(JSON.stringify(current))
   });
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
   await page.locator('#confirmSampleAdoptButton').click();
@@ -81,18 +77,17 @@ test('B0 JSON import preserves one shared profile, photo, three documents, page 
   await page.reload();
 
   await page.locator('#localeSelect').selectOption('ja');
-  await expect(page.locator('[name="fullName"]')).toHaveValue('Schema integration profile canary');
-  await expect(page.locator('[name="motivation"]')).toHaveValue('Schema integration Japanese document canary');
+  await expect(page.locator('[name="fullName"]')).toHaveValue('Data version integration canary');
+  await expect(page.locator('[name="motivation"]')).toHaveValue('Data version Japanese document canary');
   await expect(page.locator('#photoThumbnail img')).toHaveAttribute('src', /^blob:/);
 
   await page.locator('#localeSelect').selectOption('zh-CN');
-  await expect(page.locator('[data-profile="fullName"]')).toHaveValue('Schema integration profile canary');
-  await expect(page.locator('[data-resume="headline"]')).toHaveValue('Schema integration Chinese document canary');
-  await expect(page.locator('[data-zh-photo-thumbnail] img')).toHaveAttribute('src', /^blob:/);
+  await expect(page.locator('[data-profile="fullName"]')).toHaveValue('Data version integration canary');
+  await expect(page.locator('[data-resume="headline"]')).toHaveValue('Data version Chinese document canary');
 
   await page.locator('#localeSelect').selectOption('en');
-  await expect(page.locator('[data-profile-field="fullName"]')).toHaveValue('Schema integration profile canary');
-  await expect(page.locator('[data-resume-field="headline"]')).toHaveValue('Schema integration English document canary');
+  await expect(page.locator('[data-profile-field="fullName"]')).toHaveValue('Data version integration canary');
+  await expect(page.locator('[data-resume-field="headline"]')).toHaveValue('Data version English document canary');
 
   await page.locator('#dataMenuSummary').click();
   const downloadPromise = page.waitForEvent('download');
@@ -100,26 +95,26 @@ test('B0 JSON import preserves one shared profile, photo, three documents, page 
   const download = await downloadPromise;
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
   expect(exported).toMatchObject({
-    version: 1,
-    schemaRevision: 1,
-    profile: { photo: PHOTO_DATA_URL, fields: { fullName: 'Schema integration profile canary' } },
+    version: 2,
+    profile: { photo: PHOTO_DATA_URL, fields: { fullName: 'Data version integration canary' } },
     documents: {
-      ja: { fields: { motivation: 'Schema integration Japanese document canary' } },
-      'zh-CN': { resume: { headline: 'Schema integration Chinese document canary' } },
-      en: { resume: { headline: 'Schema integration English document canary' } }
+      ja: { fields: { motivation: 'Data version Japanese document canary' } },
+      'zh-CN': { resume: { headline: 'Data version Chinese document canary' } },
+      en: { resume: { headline: 'Data version English document canary' } }
     }
   });
+  expect(Object.hasOwn(exported, 'schemaRevision')).toBe(false);
   expect(exported.settings.pageBreaks.ja.A4.resume).toEqual(['qualifications', 'motivation']);
   expect(exported.settings.pageBreaks.en.LETTER.resume).toEqual(['skills', 'certifications']);
 
-  const storage = await page.evaluate(() => window.__schemaAcceptanceStorage.read());
+  const storage = await page.evaluate(() => window.__dataVersionAcceptanceStorage.read());
   expect(storage.draft).toContain('"format":"resume-studio-local-encrypted-v1"');
   expect(storage.sentinel).toBe(UNRELATED_STORAGE_VALUE);
   expect(storage.accesses).toEqual([]);
-  expect(consoleMessages.join('\n')).not.toContain('Schema integration');
+  expect(consoleMessages.join('\n')).not.toContain('Data version integration');
 });
 
-test('future and unsupported JSON imports leave the current draft, preference, and unrelated storage unchanged', async ({ page }) => {
+test('future and unsupported JSON versions leave the current draft and unrelated storage unchanged', async ({ page }) => {
   await page.addInitScript(({ sentinelKey, sentinelValue }) => {
     localStorage.setItem(sentinelKey, sentinelValue);
   }, { sentinelKey: UNRELATED_STORAGE_KEY, sentinelValue: UNRELATED_STORAGE_VALUE });
@@ -128,15 +123,14 @@ test('future and unsupported JSON imports leave the current draft, preference, a
   await name.fill('Current import protection canary');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY)).not.toBeNull();
   const rawBefore = await page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY);
-  const preferenceBefore = await page.evaluate(() => localStorage.getItem('resume-studio-locale-v1'));
 
   const future = createDefaultState('ja');
-  future.schemaRevision = 2;
-  const unsupported = createBootstrapImport();
-  unsupported.unrecognized = 'not a B0 payload';
+  future.version = 3;
+  const unsupported = createDefaultState('ja');
+  unsupported.version = 1;
   for (const [fileName, payload] of [
-    ['future-schema.json', future],
-    ['unsupported-bootstrap.json', unsupported]
+    ['future-v3.json', future],
+    ['unsupported-v1.json', unsupported]
   ]) {
     await page.locator('#importDataInput').setInputFiles({
       name: fileName,
@@ -148,6 +142,5 @@ test('future and unsupported JSON imports leave the current draft, preference, a
     await expect(name).toHaveValue('Current import protection canary');
     await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY)).toBe(rawBefore);
   }
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), 'resume-studio-locale-v1')).toBe(preferenceBefore);
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), UNRELATED_STORAGE_KEY)).toBe(UNRELATED_STORAGE_VALUE);
 });

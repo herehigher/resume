@@ -45,7 +45,7 @@ npx --yes http-server site --port 8000
 3. 输入会自动保存到当前 browser profile 的 `localStorage`。可用“保存草稿”手动保存，并用“重新载入草稿”恢复已保存内容。
 4. 选择“导出 PDF”，在 Chrome 打印界面选择“另存为 PDF”。纸张和打印选项请参照下面的限制说明。
 5. 从右上角数据 menu 导出 JSON 可创建 backup。恢复时选择“导入数据”并载入同一格式的 JSON。无效 file 不会替换现有草稿。
-6. 如需删除数据，请先切换到日本語，在页面最下方选择“保存した下書きを削除”，再在确认 dialog 中清除。该操作会删除 v1 格式的三种语言草稿和当前画面输入。
+6. 如需删除数据，请先切换到日本語，在页面最下方选择“保存した下書きを削除”，再在确认 dialog 中清除。该操作会删除当前 v2 格式中保存的三种语言草稿和当前画面输入。
 
 ## 主要功能
 
@@ -71,12 +71,12 @@ npx --yes http-server site --port 8000
 
 ## 数据和隐私
 
-- 保存 key 为 `resume-studio-web-v1`，会把 profile、照片和三种语言文档一起保存到当前 browser origin。
+- 当前草稿 key 为 `resume-studio-web-v2`，并与 JSON 导入/导出共用 `version: 2`。profile、照片和三种语言文档会一起保存；超出兼容范围的旧 key 不会被读取、修改或删除。仍受支持的旧 version 只会通过明确列出的 key 读取；成功保存到新 key 后，应用会自动删除旧草稿和旧密钥。
 - 草稿正文以 AES-GCM 加密后保存在 localStorage。导出的 JSON 和 PDF 不加密，并可能包含照片等个人信息，请安全保管。
-- 可以读取当前格式及最近三代兼容格式。未来版本、不支持或过旧的 JSON 不会导入，现有草稿会被保留。只有明确判定为过旧的本机草稿，才可能安全地更新为默认草稿。
+- 可以读取当前格式，以及最近三代中被明确列为支持的格式。未来版本、不支持或过旧的 JSON 不会导入，现有草稿会被保留。超出兼容范围的本机草稿也不会被读取、更新或删除。
 - 保存或迁移失败时会保留现有草稿和解密 key。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移。未参与 Web Locks 的已部署旧 client 或手动 storage 操作不在此跨标签页互斥保证范围内。请先导出 JSON，再使用受支持的 browser 打开。
 - 清除 browser data、结束 private browsing、存储容量不足或 browser storage eviction 都可能导致草稿丢失。重要草稿请导出 JSON backup。
-- 应用内删除只清除 v1 state，不会删除无关的 storage 项、已下载的 JSON/PDF 或 browser download history。
+- 应用内删除只清除当前 v2 state，不会删除无关的 storage 项、超出兼容范围的旧草稿、已下载的 JSON/PDF 或 browser download history。
 - Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics，不会向同一 origin 静态 asset 以外的地址发送统计请求。仅官方 CI 可按待验证 commit 的配置 manifest，在发布前向产物加入标准 Cloudflare Web Analytics；批准后将同一产物与 immutable stable tag 对应发布。它不使用 Cookie、localStorage、用户级 ID 或 custom event，也不会发送简历输入、照片、JSON 或设备草稿。可通过页面 status 与 Network panel 核查当前 mode。
 
 详情请阅读 [隐私说明 / 简体中文](PRIVACY.md#privacy-zh-cn)。

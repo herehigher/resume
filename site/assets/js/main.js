@@ -4,6 +4,7 @@ import { createDefaultState, cloneData } from './state/defaults.js';
 import { createDraftStorage, getDraftStorageCapabilityError } from './state/storage.js';
 import { loadLocalePreference } from './state/locale-preference.js';
 import { createStore } from './state/store.js';
+import { loadVersionedDraft } from './state/versioned-draft.js';
 import { messageForDraftStorageError } from './ui/draft-storage-error.js';
 import { renderEnglishWorkspace, initEnglishEditor } from './ui/english-editor.js';
 import { initJapaneseEditor } from './ui/japanese-editor.js';
@@ -23,10 +24,10 @@ let recoveredDraft = false;
 let draftLoadResult = null;
 if (!storageError) {
   try {
-    const result = await persistence.loadAndRecoverUnreadableDraft();
+    const result = await loadVersionedDraft(window.localStorage, { currentPersistence: persistence });
     storedState = result.state;
     recoveredDraft = result.recovered;
-    draftLoadResult = persistence.getLastLoadResult();
+    draftLoadResult = result.loadResult;
   } catch (error) {
     storageError = error;
   }

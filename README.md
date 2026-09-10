@@ -45,7 +45,7 @@ Chrome で `http://localhost:8000/` を開いて日本語 editor を直接始め
 3. 入力内容は現在の browser profile の `localStorage` に自動保存されます。「下書きを保存」で手動保存し、「保存内容を再読込」で保存済み内容へ戻せます。
 4. 「PDF出力」を選び、Chrome の印刷画面で「PDF に保存」を選びます。用紙と印刷設定は下記の制限事項を確認してください。
 5. 右上のデータ menu から JSON を書き出すと backup できます。復元するときは「データを読み込む」で同じ形式の JSON を選びます。不正な file は既存下書きを置き換えません。
-6. 保存データを削除するときは日本語画面の最下部で「保存した下書きを削除」を選び、確認 dialog で消去します。この操作は v1 形式の三言語すべての下書きと画面入力を削除します。
+6. 保存データを削除するときは日本語画面の最下部で「保存した下書きを削除」を選び、確認 dialog で消去します。この操作は現在の v2 形式に保存された三言語すべての下書きと画面入力を削除します。
 
 ## 主な機能
 
@@ -71,12 +71,12 @@ Chrome で `http://localhost:8000/` を開いて日本語 editor を直接始め
 
 ## データと privacy
 
-- 保存 key は `resume-studio-web-v1` で、profile、写真、三言語の文書を現在の browser origin にまとめて保存します。
+- 現在の草稿 key は `resume-studio-web-v2` で、JSON import/export と同じ `version: 2` を使います。profile、写真、三言語の文書をまとめて保存し、対応範囲外の旧 key は読込・変更・削除しません。対応中の旧 version は明示した key だけを読取り、新 key への保存成功後に旧草稿と鍵を自動削除します。
 - 下書き本文は localStorage に AES-GCM で暗号化して保存します。JSON export と PDF は暗号化されず、写真その他の個人情報を含む場合があるため、安全に保管してください。
-- 現在形式と直近3世代の対応形式を読み込めます。将来版・非対応・過旧の JSON は import せず、現在の下書きを保持します。明示的に過旧と判定された端末内下書きだけは、安全な既定値へ更新されることがあります。
+- 現在形式と、明示的に対応した最大直近3世代の形式を読み込めます。将来版・非対応・過旧の JSON は import せず、現在の下書きを保持します。対応範囲外の端末内下書きも読込・更新・削除しません。
 - 保存や移行に失敗したときは既存の下書きと復号 key を保持します。browser が Web Locks を利用できない場合は、競合を避けるため保存・削除・移行を停止します。Web Locks に参加しない既配信 client や手動 storage 操作は、この cross-tab 排他保証の対象外です。内容を JSON で書き出してから、対応する browser で開いてください。
 - browser data の消去、private browsing の終了、保存容量不足、browser による storage eviction で下書きを失うことがあります。重要な下書きは JSON で backup してください。
-- アプリ内削除は v1 state だけを消します。無関係な storage 項目、download 済み JSON/PDF、browser の download 履歴は削除しません。
+- アプリ内削除は現在の v2 state だけを消します。無関係な storage 項目、対応範囲外の旧草稿、download 済み JSON/PDF、browser の download 履歴は削除しません。
 - Repository の `site/`、clone、fork は Analytics 無効で、同一 origin の静的 asset 以外へ解析 request を送りません。公式 CI は検証対象 commit の設定 manifest が有効な場合だけ、公開前の配布物へ標準 Cloudflare Web Analytics を追加します。承認後は同じ配布物を immutable stable tag と対応付けて公開します。Cookie、localStorage、利用者単位 ID、custom event は使わず、履歴書入力、写真、JSON、local draft は送信しません。画面の status 表示と Network panel で現在の mode を確認できます。
 
 詳細は [Privacy / 日本語](PRIVACY.md#privacy-ja) を確認してください。

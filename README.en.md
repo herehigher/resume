@@ -45,7 +45,7 @@ AES-GCM draft encryption requires a secure context. Use `https://`, `http://loca
 3. Input is saved automatically to `localStorage` in the current browser profile. Use “Save draft” for a manual save and “Reload saved draft” to restore the saved content.
 4. Select “Save PDF,” then choose “Save as PDF” in Chrome's print dialog. Review the paper and print limitations below.
 5. Export JSON from the data menu in the upper-right corner to create a backup. To restore it, choose “Import data” and select a JSON file in the same format. An invalid file does not replace the existing draft.
-6. To delete saved data, switch to 日本語, select “保存した下書きを削除” at the bottom, and confirm the dialog. This removes the complete v1 draft and on-screen input for all three languages.
+6. To delete saved data, switch to 日本語, select “保存した下書きを削除” at the bottom, and confirm the dialog. This removes the complete current v2 draft and on-screen input for all three languages.
 
 ## Features
 
@@ -71,12 +71,12 @@ These historical showcase samples use fictional data. Their source at generation
 
 ## Data and privacy
 
-- The storage key is `resume-studio-web-v1`. The profile, photo, and all three language documents are stored together for the current browser origin.
+- The current draft key is `resume-studio-web-v2`, using the same `version: 2` as imported and exported JSON. It stores the profile, photo, and all three language documents together. Out-of-range keys are never read, changed, or deleted; supported prior versions are read only from an explicit key list, then their draft and encryption key are removed after the new-key save succeeds.
 - Draft content is AES-GCM encrypted in localStorage. Exported JSON and PDF files are not encrypted and may contain photos or other personal information, so store them securely.
-- The app can read the current format and compatible drafts from the previous three revisions. Future, unsupported, or too-old JSON is not imported and leaves the current draft intact. Only an on-device draft explicitly classified as too old may be safely replaced with a default draft.
+- The app can read the current format and explicitly supported formats from up to the previous three versions. Future, unsupported, or too-old JSON is not imported and leaves the current draft intact. Out-of-range on-device drafts are likewise never read, updated, or removed.
 - If saving or migration fails, the existing draft and decryption key are retained. When the browser cannot use Web Locks, saving, deletion, and migration stop to avoid conflicts. Previously deployed clients that do not participate in Web Locks, and manual storage operations, are outside this cross-tab exclusivity guarantee. Export JSON before reopening in a supported browser.
 - Clearing browser data, ending a private-browsing session, exceeding the storage quota, or browser storage eviction can remove a draft. Export important drafts as JSON backups.
-- In-app deletion clears only the v1 state. It does not delete unrelated storage entries, downloaded JSON/PDF files, or browser download history.
+- In-app deletion clears only the current v2 state. It does not delete unrelated storage entries, out-of-range older drafts, downloaded JSON/PDF files, or browser download history.
 - The repository `site/`, clones, and forks disable analytics by default and make no analytics requests beyond same-origin static assets. Only official CI adds standard Cloudflare Web Analytics to a prepared artifact when the source commit’s configuration manifest enables it. After approval, that same artifact is published with its immutable stable tag. It uses no cookies, localStorage, user-level IDs, or custom events and sends no resume input, photo, JSON, or on-device draft. The page status and Network panel expose the active mode.
 
 Read [Privacy / English](PRIVACY.md#privacy-en) for the complete policy.

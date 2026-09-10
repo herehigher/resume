@@ -169,7 +169,7 @@ function assertSemanticContract(contract, content, metadata, options) {
     } catch {
       failure(contract, metadata, 'is not valid JSON');
     }
-    if (schema.$id !== `${DEPLOYMENT_ORIGIN}${contract.artifactPath}` || schema.title !== 'Resume Studio web v1 export') {
+    if (schema.$id !== `${DEPLOYMENT_ORIGIN}${contract.artifactPath}` || schema.title !== 'Resume Studio web v2 export') {
       failure(contract, metadata, 'identity or title is invalid');
     }
     return;
@@ -181,7 +181,7 @@ function assertSemanticContract(contract, content, metadata, options) {
     } catch {
       failure(contract, metadata, 'is not valid JSON');
     }
-    if (example.version !== 1) failure(contract, metadata, 'version is invalid');
+    if (example.version !== 2) failure(contract, metadata, 'version is invalid');
     return;
   }
   if (contract.semantic === 'version-config') {
