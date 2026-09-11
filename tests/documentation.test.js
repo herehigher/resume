@@ -85,6 +85,25 @@ test('release version has one source of truth and a dated changelog entry', () =
   assert.ok(unreleasedIndex < changelog.search(release));
 });
 
+test('release instructions keep asset-only catch-up commits on the final-head full Quality path', () => {
+  const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
+  assert.match(playbook, /### Asset-only 追補 commit の fast path/);
+  assert.match(playbook, /導入しません/);
+  assert.match(playbook, /2026-09-11 に確認した 2026-09-10 の実測/);
+  assert.doesNotMatch(playbook, /2026-09-11 の実測/);
+  assert.match(playbook, /v0.2.8 candidate Quality | 3:48/);
+  assert.match(playbook, /asset supplement Quality | 2:55/);
+  assert.match(playbook, /asset supplement Release assets current | 0:13/);
+  assert.match(playbook, /merge result main Quality | 2:58/);
+  for (const runId of ['34478079250', '34478959420', '34479373432']) assert.match(playbook, new RegExp(runId));
+  assert.match(playbook, /final PR head の `Quality` と `Release assets current` を必ず要求/);
+  assert.match(playbook, /current head の fresh 生成 artifact/);
+  assert.match(playbook, /current-merge-ref provenance/);
+  assert.match(playbook, /cross-head\/base で一意に結び/);
+  assert.match(playbook, /約3分の短縮/);
+  assert.match(playbook, /main の full Quality、immutable tag、単一の prepared artifact、online smoke/);
+});
+
 test('the public v3 JSON example remains importable under the runtime data contract', () => {
   const schema = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v3.schema.json'), 'utf8'));
   const example = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v3.example.json'), 'utf8'));

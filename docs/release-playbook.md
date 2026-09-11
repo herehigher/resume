@@ -48,6 +48,19 @@ gh pr edit RELEASE_PR_NUMBER --body-file "$body_file"
 
 候補 branch の clean checkout で、PR の Quality が成功した後に `npm run promote:pr-doc-assets -- --pr PR_NUMBER` を実行します。run ID が分かっている場合は `--quality-run-id QUALITY_RUN_ID` を使います（両方は指定しません）。この入口は公式 repository の current `refs/pull/PR_NUMBER/merge`、成功した Quality run、`documentation-assets-MERGE_SHA` artifact、manifest の run ID と merge SHA を一意に照合します。空・複数・失効・不一致は停止します。候補 branch の HEAD は PR head SHA、`site/`・package・generator input は commit 済みでなければならず、temporary worktree で既存の `promote:doc-assets` 検証を実行してから、候補 branch には `docs/screenshots/{en,ja,zh-CN}.png`、`output/pdf/{en-letter,ja-a4,zh-CN-a4}.pdf`、`docs/assets-manifest.json` の7 fileだけを反映します。temporary artifact directory / worktree は成功・失敗のどちらでも削除されます。表示された7 file を目視・review して同じ公開 PR へ commit します。入口は GitHub read API、artifact download、PR merge ref の fetch だけを使い、owner approval、PR merge、tag 作成、push は行いません。再実行した `Release assets current` は manifest の Quality run ID から元の artifact を再取得し、commit 済み LFS file と manifest が promotion 元の exact bytes であることを先に確認します。そのうえで version、site hash、generator・browser・三言語の出力契約、PDF 全文・page、screenshot visual を現在の Quality evidence と照合します。Version を変えない PR で展示 asset を変更した場合は拒否します。別 run の Chromium rasterization bytes は完全一致を要求しません。CI 自身に repository 書込権限は与えません。
 
+### Asset-only 追補 commit の fast path
+
+現時点では導入しません。2026-09-11 に確認した 2026-09-10 の実測は次のとおりです。
+
+| 対象 | 所要時間 | 証拠 |
+| --- | --- | --- |
+| v0.2.8 candidate Quality | 3:48 | [Quality job](https://github.com/herehigher/resume/actions/runs/34478079250/job/102873681510) |
+| asset supplement Quality | 2:55 | [Quality job](https://github.com/herehigher/resume/actions/runs/34478959420/job/102876631797) |
+| asset supplement Release assets current | 0:13 | [Release assets current job](https://github.com/herehigher/resume/actions/runs/34478959420/job/102877603526) |
+| merge result main Quality | 2:58 | [Quality job](https://github.com/herehigher/resume/actions/runs/34479373432/job/102878008039) |
+
+managed asset 6 file と manifest だけの変更も現行 scope は documentation-only とは分類せず、final PR head の `Quality` と `Release assets current` を必ず要求します。後者は current head の fresh 生成 artifact を使い、promoted Quality artifact の exact LFS bytes、version、site hash、generator / browser、PDF と screenshot の契約を比較します。これは fast path が理論上不可能という意味ではありません。しかし約3分の短縮のためには、現行の current-merge-ref provenance に加え、過去の successful Quality の official repository、PR、base、head、artifact を cross-head/base で一意に結び、最終 head の fresh evidence まで証明する新しい連鎖が必要です。その設計と検証を導入するまでは fail-closed に full Quality を維持し、merge 後は main の full Quality、immutable tag、単一の prepared artifact、online smoke を通常どおり通します。
+
 Manifest の `source.checkoutCommit` は asset を生成した checkout の情報値であり、asset を取り込んだ後の最終 tag commit を表しません。`source.qualityRunId` と組み合わせ、公開 PR の check が repository 内の該当 Actions artifact を取得できて exact bytes が一致した場合にだけ promotion provenance として採用します。Merge 後の公開準備は失効し得る過去の artifact へ再依存せず、承認済み commit の展示 asset と最終 main Quality を candidate version、`siteHash`、generator input hash、PDF 全文・page contract、screenshot の visual comparison で再検証します。
 
 通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。公開 PR の merge 結果 commit に対する main Quality が成功すると、workflow がその Quality run ID と SHA を照合し、PR の base から version が変わったこと、対応する merged PR が1件であること、同じ version が現在も main の version であることを確認して自動的に準備・tag・deploy へ進みます。Repository で許可された merge commit・squash・rebase のいずれでも、GitHub が記録する merged PR の base / result SHA を基準にします。Version が変わらない通常の main 更新や、古い release commit の Quality 再実行では公開 job を開始しません。

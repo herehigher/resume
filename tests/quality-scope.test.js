@@ -11,7 +11,10 @@ import { documentationOnlyBetween, isDocumentationOnly } from '../scripts/qualit
 test('only explicit Markdown documentation paths may skip browser quality', () => {
   assert.equal(isDocumentationOnly(['AGENTS.md', 'docs/development-guide.md', '.github/pull_request_template.md']), true);
   for (const files of [[], ['site/readme.md'], ['scripts/readme.md'], ['docs/screenshots/ja.png'],
-    ['.github/workflows/ci.yml'], ['tests/documentation.test.js'], ['README.md', 'package.json']]) {
+    ['.github/workflows/ci.yml'], ['tests/documentation.test.js'], ['README.md', 'package.json'], [
+      'docs/assets-manifest.json', 'docs/screenshots/en.png', 'docs/screenshots/ja.png', 'docs/screenshots/zh-CN.png',
+      'output/pdf/en-letter.pdf', 'output/pdf/ja-a4.pdf', 'output/pdf/zh-CN-a4.pdf'
+    ]]) {
     assert.equal(isDocumentationOnly(files), false, JSON.stringify(files));
   }
   assert.equal(documentationOnlyBetween('main', 'HEAD'), false);
