@@ -43,7 +43,12 @@ export async function loadVersionedDraft(storage, {
       // namespace is retained rather than making the editor unusable.
       sourceRemoved = false;
     }
-    return { state: sourceState, recovered: false, loadResult: { status: 'migrated' }, sourceRemoved };
+    return {
+      state: sourceState,
+      recovered: false,
+      loadResult: { status: sourceRemoved ? 'migrated' : 'migration-incomplete' },
+      sourceRemoved
+    };
   }
 
   return { ...current, loadResult: null };

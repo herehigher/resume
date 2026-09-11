@@ -21,6 +21,7 @@ export default {
   importConfirm: '読み込む',
   importSalvaged: '一部を安全に読み込んで、現在の形式に更新しました。',
   draftMigrated: '保存済みの下書きを現在の形式に更新しました。',
+  draftMigrationIncomplete: '互換性のある保存済み下書きを現在の形式へコピーしましたが、元の下書きの削除は完了していません。元の下書きは保持されています。',
   draftSalvaged: '保存済みの下書きの一部を安全に読み込み、現在の形式に更新しました。',
   draftTooOld: '保存済みの下書きが古すぎたため、新しい下書きに安全に置き換えました。',
   localeSaveError: '表示言語は切り替えましたが、次回は記憶されない可能性があります。',

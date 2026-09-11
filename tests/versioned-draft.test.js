@@ -88,6 +88,28 @@ test('a failed current save never removes the compatible source namespace', asyn
   assert.equal(compatible.removes, 0);
 });
 
+test('a compatible source is retained and not reported as migrated when cleanup fails', async () => {
+  const migratedState = { version: 3, marker: 'fictional-compatible-draft' };
+  const current = fakePersistence();
+  const compatible = fakePersistence({
+    state: migratedState,
+    removeError: new Error('source changed after the read')
+  });
+
+  const result = await loadVersionedDraft(null, {
+    currentPersistence: current,
+    currentStorageKey: 'resume-studio-web-v3',
+    compatibleStorageKeys: ['resume-studio-web-v2'],
+    persistenceForKey: () => compatible
+  });
+
+  assert.equal(result.state, migratedState);
+  assert.equal(result.sourceRemoved, false);
+  assert.deepEqual(result.loadResult, { status: 'migration-incomplete' });
+  assert.deepEqual(current.saves, [migratedState]);
+  assert.equal(compatible.removes, 0);
+});
+
 test('listed but unsupported or too-old namespaces are ignored without blocking a new draft', async () => {
   const current = fakePersistence();
   const unsupported = fakePersistence({ loadError: new Error('unsupported') });
