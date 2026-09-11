@@ -90,6 +90,9 @@ if (storageError) {
 } else if (draftLoadResult?.status === 'migrated') {
   const message = document.getElementById('globalMessage');
   message.textContent = getMessages(locale).draftMigrated;
+} else if (draftLoadResult?.status === 'migration-incomplete') {
+  const message = document.getElementById('globalMessage');
+  message.textContent = getMessages(locale).draftMigrationIncomplete;
 } else if (draftLoadResult?.status === 'salvaged') {
   const message = document.getElementById('globalMessage');
   message.textContent = getMessages(locale).draftSalvaged;

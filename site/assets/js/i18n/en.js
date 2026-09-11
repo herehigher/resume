@@ -21,6 +21,7 @@ export default {
   importConfirm: 'Import',
   importSalvaged: 'Usable content was imported safely and updated to the current format.',
   draftMigrated: 'Your saved draft was updated to the current format.',
+  draftMigrationIncomplete: 'Your compatible saved draft was copied to the current format, but removing the original draft did not finish. The original draft was kept.',
   draftSalvaged: 'Usable content from your saved draft was restored and updated to the current format.',
   draftTooOld: 'Your saved draft was too old and was safely replaced with a new draft.',
   localeSaveError: 'The display language changed, but it may not be remembered next time.',

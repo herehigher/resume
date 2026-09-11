@@ -21,6 +21,7 @@ export default {
   importConfirm: '导入',
   importSalvaged: '已安全导入可用内容并更新为当前格式。',
   draftMigrated: '已将保存的草稿更新为当前格式。',
+  draftMigrationIncomplete: '已将兼容的保存草稿复制为当前格式，但未能完成删除原草稿。原草稿已保留。',
   draftSalvaged: '已安全读取保存草稿中的可用内容，并更新为当前格式。',
   draftTooOld: '保存的草稿版本过旧，已安全替换为新的草稿。',
   localeSaveError: '显示语言已切换，但下次打开时可能无法记住。',
