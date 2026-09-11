@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v2.schema.json",
-  "title": "Resume Studio web v2 export",
+  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v3.schema.json",
+  "title": "Resume Studio web v3 export",
   "description": "The JSON backup format exported by Resume Studio. Resume data must not be uploaded, transmitted, or shared without the user's explicit authorization.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "settings", "profile", "documents"],
   "properties": {
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "settings": {
       "type": "object",
       "required": ["locale", "pageSizeByLocale", "pageBreaks"],
@@ -83,11 +83,12 @@
     "string": { "type": "string" },
     "profileFields": {
       "type": "object",
-      "required": ["fullName", "birthDate", "gender", "postalCode", "address", "phone", "email", "links"],
+      "required": ["fullName", "birthDate", "gender", "nationality", "postalCode", "address", "phone", "email", "links"],
       "properties": {
         "fullName": { "$ref": "#/$defs/string" },
         "birthDate": { "$ref": "#/$defs/string" },
-        "gender": { "$ref": "#/$defs/string" },
+        "gender": { "enum": ["", "male", "female", "other"] },
+        "nationality": { "$ref": "#/$defs/string" },
         "postalCode": { "$ref": "#/$defs/string" },
         "address": { "$ref": "#/$defs/string" },
         "phone": { "$ref": "#/$defs/string" },
@@ -165,9 +166,9 @@
         "activeDocument": { "const": "resume" },
         "resume": {
           "type": "object",
-          "required": ["headline", "location", "summary", "education", "experience", "projects", "skills", "certifications"],
+          "required": ["showOptionalPersonalDetails", "headline", "location", "summary", "education", "experience", "projects", "skills", "certifications"],
           "properties": {
-            "headline": { "$ref": "#/$defs/string" }, "location": { "$ref": "#/$defs/string" }, "summary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" },
+            "showOptionalPersonalDetails": { "type": "boolean" }, "headline": { "$ref": "#/$defs/string" }, "location": { "$ref": "#/$defs/string" }, "summary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" },
             "education": { "type": "array", "items": { "$ref": "#/$defs/education" } },
             "experience": { "type": "array", "items": { "$ref": "#/$defs/experience" } },
             "projects": { "type": "array", "items": { "$ref": "#/$defs/project" } },

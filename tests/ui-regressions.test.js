@@ -47,7 +47,7 @@ test('draft storage compatibility failures use one actionable message per locale
 
 test('public application version matches package metadata without changing the state format', () => {
   assert.equal(APP_VERSION, packageJson.version);
-  assert.equal(STATE_VERSION, 2);
+  assert.equal(STATE_VERSION, 3);
   assert.equal(REPOSITORY_URL, 'https://github.com/herehigher/resume');
 });
 

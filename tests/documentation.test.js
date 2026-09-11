@@ -85,14 +85,14 @@ test('release version has one source of truth and a dated changelog entry', () =
   assert.ok(unreleasedIndex < changelog.search(release));
 });
 
-test('the public v2 JSON example remains importable under the runtime data contract', () => {
-  const schema = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v2.schema.json'), 'utf8'));
-  const example = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v2.example.json'), 'utf8'));
+test('the public v3 JSON example remains importable under the runtime data contract', () => {
+  const schema = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v3.schema.json'), 'utf8'));
+  const example = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v3.example.json'), 'utf8'));
 
-  assert.equal(schema.$id, 'https://herehigher.github.io/resume/schema/resume-studio-web-v2.schema.json');
-  assert.equal(schema.properties.version.const, 2);
+  assert.equal(schema.$id, 'https://herehigher.github.io/resume/schema/resume-studio-web-v3.schema.json');
+  assert.equal(schema.properties.version.const, 3);
   assert.equal(Object.hasOwn(schema.properties, 'schemaRevision'), false);
   assert.deepEqual(schema.properties.settings.properties.locale.enum, ['ja', 'zh-CN', 'en']);
   assert.deepEqual(Object.keys(example.documents).sort(), ['en', 'ja', 'zh-CN']);
-  assert.equal(parseImportedState(JSON.stringify(example)).version, 2);
+  assert.equal(parseImportedState(JSON.stringify(example)).version, 3);
 });

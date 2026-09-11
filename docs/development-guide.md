@@ -26,11 +26,11 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 
 ## Data version と移行
 
-JSON payload の `version` は、端末内草稿を復号した state と JSON import/export が共有する唯一の data format version です。現在の新規 state、公開 export、公開 JSON Schema は `version: 2` を使い、`schemaRevision` は持ちません。暗号化 envelope の format version は暗号化した bytes の格納方法を表す別契約で、履歴書 data の version とは独立して維持します。利用実績のない旧 `version: 1` は対応 list に含めず、import でも端末内草稿でも非対応として扱います。
+JSON payload の `version` は、端末内草稿を復号した state と JSON import/export が共有する唯一の data format version です。現在の新規 state、公開 export、公開 JSON Schema は `version: 3` を使い、`schemaRevision` は持ちません。暗号化 envelope の format version は暗号化した bytes の格納方法を表す別契約で、履歴書 data の version とは独立して維持します。利用実績のない旧 `version: 1` は対応 list に含めず、import でも端末内草稿でも非対応として扱います。
 
 対応可能な version の下限は `max(1, currentVersion - 3)` ですが、実際に移行できるのは migration registry に連続した step が明示されている version だけです。migration の既定値は固定し、日付・browser locale・random 値を使いません。
 
-端末内草稿は `resume-studio-web-v{STATE_VERSION}` と、同じ名前を元にした Web Lock / IndexedDB を使います。起動時は current key を先に読みます。対応中の旧草稿がある場合は `COMPATIBLE_DRAFT_STORAGE_KEYS` に key を新しい順で明示し、read-only で読んで migration 後の state を current key へ保存します。新草稿の保存成功後にだけ元の raw と IndexedDB key を自動削除し、保存が失敗した場合は旧草稿を保持します。読込後の旧草稿の更新検知または cleanup の失敗時も旧草稿を保持し、移行完了として表示しません。対応外の key は list へ追加せず、列挙・読込・書込・削除をしません。現在の v2 では v1 を対応しないため、list は空です。
+端末内草稿は `resume-studio-web-v{STATE_VERSION}` と、同じ名前を元にした Web Lock / IndexedDB を使います。起動時は current key を先に読みます。対応中の旧草稿がある場合は `COMPATIBLE_DRAFT_STORAGE_KEYS` に key を新しい順で明示し、read-only で読んで migration 後の state を current key へ保存します。新草稿の保存成功後にだけ元の raw と IndexedDB key を自動削除し、保存が失敗した場合は旧草稿を保持します。読込後の旧草稿の更新検知または cleanup の失敗時も旧草稿を保持し、移行完了として表示しません。対応外の key は list へ追加せず、列挙・読込・書込・削除をしません。現在の v3 は `resume-studio-web-v2` だけを互換対象にし、v1 は対象外です。
 
 data format を更新するときは `STATE_VERSION` を増やし、直前 version だけを受け取る純粋 step と変更概要を追加します。続けて対応範囲内の旧草稿 key を明示 list に追加し、入力・期待出力 fixture、対応下限と境界 test、公開 schema/example の version とファイル名を同じ PR で更新します。4世代以上前になった step / fixture / key は registry と明示 list から外しますが、すでに対応外となった端末内 data には触れません。最後に migration / storage / import の対象 test、同一 context の競合 test、privacy canary と必要な表示・PDF 確認を実施します。
 

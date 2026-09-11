@@ -107,8 +107,8 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
       '<link rel="canonical" href="https://example.invalid/">'
     ), /canonical URL/],
     ['editor', 'editor/index.html', (html) => html.replace('noindex,follow', 'index,follow'), /editor\/ \[artifact=editor\/index\.html; status=local; content-type=text\/html\]: must be noindex,follow/],
-    ['schema identity', 'schema/resume-studio-web-v2.schema.json', (schema) => schema.replace('https://herehigher.github.io/resume/schema/', 'https://example.invalid/'), /identity or title is invalid/],
-    ['import version', 'schema/resume-studio-web-v2.example.json', (example) => example.replace('"version": 2', '"version": 3'), /version is invalid/],
+    ['schema identity', 'schema/resume-studio-web-v3.schema.json', (schema) => schema.replace('https://herehigher.github.io/resume/schema/', 'https://example.invalid/'), /identity or title is invalid/],
+    ['import version', 'schema/resume-studio-web-v3.example.json', (example) => example.replace('"version": 3', '"version": 4'), /version is invalid/],
     ['version', 'assets/js/config.js', (config) => config.replace(`APP_VERSION = '${packageVersion}'`, "APP_VERSION = '9.9.9'"), /APP_VERSION/],
     ['beacon', 'index.html', (html) => `${html}<script data-cf-beacon="{}"></script>`, /analytics runtime/]
   ];

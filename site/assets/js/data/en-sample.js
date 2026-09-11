@@ -10,6 +10,7 @@ export function createEnglishSampleState(sourceState) {
       fullName: 'Alex Morgan',
       birthDate: '',
       gender: '',
+      nationality: '',
       postalCode: '',
       address: '',
       phone: '+1 206 555 0142',
@@ -20,6 +21,7 @@ export function createEnglishSampleState(sourceState) {
   state.documents.en = {
     activeDocument: 'resume',
     resume: {
+      showOptionalPersonalDetails: false,
       headline: 'Senior Product Manager',
       location: 'Seattle, WA / United States',
       summary: 'Product leader with 8+ years of experience turning customer problems into measurable growth. Led cross-functional teams that improved activation by 24% and reduced time to value by 35%.',

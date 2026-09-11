@@ -17,6 +17,7 @@ export function createDefaultProfile() {
       fullName: '',
       birthDate: '',
       gender: '',
+      nationality: '',
       postalCode: '',
       address: '',
       phone: '',
@@ -83,6 +84,7 @@ export function createEnglishDocument() {
   return {
     activeDocument: 'resume',
     resume: {
+      showOptionalPersonalDetails: false,
       headline: '',
       location: '',
       summary: '',
@@ -125,6 +127,7 @@ export function createJapaneseSampleState(sourceState) {
       fullName: '山田 太郎',
       birthDate: '1992-04-15',
       gender: '',
+      nationality: '',
       postalCode: '100-0001',
       address: '東京都千代田区千代田1-1',
       phone: '090-1234-5678',
