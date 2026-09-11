@@ -50,7 +50,16 @@ gh pr edit RELEASE_PR_NUMBER --body-file "$body_file"
 
 ### Asset-only 追補 commit の fast path
 
-導入しません。2026-09-11 に確認した現行 scope は managed asset 6 file と manifest だけの変更も documentation-only とは分類せず、final PR head の `Quality` と `Release assets current` を必ず要求します。後者は current head の fresh 生成 artifact を使い、promoted Quality artifact の exact LFS bytes、version、site hash、generator / browser、PDF と screenshot の契約を比較します。過去の Quality artifact は current `refs/pull/PR_NUMBER/merge` と結び付く provenance ではなく、最終 head の Quality を代替できません。したがって asset-only であっても product / test / generator / workflow を含む変更を見落とさず、merge 後は main の full Quality、immutable tag、単一の prepared artifact、online smoke を通常どおり通します。
+現時点では導入しません。2026-09-11 の実測は次のとおりです。
+
+| 対象 | 所要時間 | 証拠 |
+| --- | --- | --- |
+| v0.2.8 candidate Quality | 3:48 | [Quality job](https://github.com/herehigher/resume/actions/runs/34478079250/job/102873681510) |
+| asset supplement Quality | 2:55 | [Quality job](https://github.com/herehigher/resume/actions/runs/34478959420/job/102876631797) |
+| asset supplement Release assets current | 0:13 | [Release assets current job](https://github.com/herehigher/resume/actions/runs/34478959420/job/102877603526) |
+| merge result main Quality | 2:58 | [Quality job](https://github.com/herehigher/resume/actions/runs/34479373432/job/102878008039) |
+
+managed asset 6 file と manifest だけの変更も現行 scope は documentation-only とは分類せず、final PR head の `Quality` と `Release assets current` を必ず要求します。後者は current head の fresh 生成 artifact を使い、promoted Quality artifact の exact LFS bytes、version、site hash、generator / browser、PDF と screenshot の契約を比較します。これは fast path が理論上不可能という意味ではありません。しかし約3分の短縮のためには、現行の current-merge-ref provenance に加え、過去の successful Quality の official repository、PR、base、head、artifact を cross-head/base で一意に結び、最終 head の fresh evidence まで証明する新しい連鎖が必要です。その設計と検証を導入するまでは fail-closed に full Quality を維持し、merge 後は main の full Quality、immutable tag、単一の prepared artifact、online smoke を通常どおり通します。
 
 Manifest の `source.checkoutCommit` は asset を生成した checkout の情報値であり、asset を取り込んだ後の最終 tag commit を表しません。`source.qualityRunId` と組み合わせ、公開 PR の check が repository 内の該当 Actions artifact を取得できて exact bytes が一致した場合にだけ promotion provenance として採用します。Merge 後の公開準備は失効し得る過去の artifact へ再依存せず、承認済み commit の展示 asset と最終 main Quality を candidate version、`siteHash`、generator input hash、PDF 全文・page contract、screenshot の visual comparison で再検証します。
 
