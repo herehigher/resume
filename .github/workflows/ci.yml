@@ -26,7 +26,12 @@ jobs:
     outputs:
       release_assets_changed: ${{ steps.release_assets.outputs.changed }}
       release_assets_required: ${{ steps.release_assets.outputs.required }}
+      quality_run_id: ${{ steps.quality_identity.outputs.run_id }}
     steps:
+      - name: Record actual Quality run identity
+        id: quality_identity
+        run: echo "run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -131,24 +136,45 @@ jobs:
   release-assets-current:
     name: Release assets current
     needs: quality
-    if: ${{ github.event_name == 'pull_request' && needs.quality.result == 'success' }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
     steps:
-      - name: Report release assets are not required
-        if: ${{ needs.quality.outputs.release_assets_required != 'true' && needs.quality.outputs.release_assets_changed != 'true' }}
-        run: echo "This pull request does not change the package version."
+      - name: Checkout workflow summary tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
 
-      - name: Reject release asset changes outside a version pull request
-        if: ${{ needs.quality.outputs.release_assets_required != 'true' && needs.quality.outputs.release_assets_changed == 'true' }}
+      - name: Report Quality failure
+        if: ${{ needs.quality.result != 'success' }}
         run: |
-          echo "Release documentation assets may only change together with the package version." >&2
+          node scripts/release-assets-summary.mjs failure quality-failure
           exit 1
 
-      - name: Checkout
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+      - name: Classify release asset check
+        id: classification
+        if: ${{ needs.quality.result == 'success' }}
+        env:
+          ASSETS_CHANGED: ${{ needs.quality.outputs.release_assets_changed }}
+          ASSETS_REQUIRED: ${{ needs.quality.outputs.release_assets_required }}
+        run: node scripts/release-assets-summary.mjs classify "$ASSETS_REQUIRED" "$ASSETS_CHANGED"
+
+      - name: Report release assets are not required
+        if: ${{ steps.classification.outputs.classification == 'not-required' }}
+        run: echo "This pull request does not change the package version or release documentation assets."
+
+      - name: Reject release asset changes outside a version pull request
+        if: ${{ steps.classification.outputs.classification == 'versionless-asset-change' }}
+        run: |
+          node scripts/release-assets-summary.mjs failure versionless-asset-change
+          exit 1
+
+      - name: Checkout release asset verification source
+        if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
@@ -157,29 +183,73 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
         uses: actions/setup-node@v7
         with:
           node-version: 24
 
+      - name: Read candidate version from the checked-out merge source
+        id: candidate
+        if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
+        run: >-
+          node -e "const fs=require('node:fs'); const version=JSON.parse(fs.readFileSync('package.json','utf8')).version; if (!/^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$/.test(version || '')) process.exit(1); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'candidate_version=' + version + '\\n');"
+
+      - name: Resolve exact current Quality evidence
+        id: quality_evidence
+        if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          QUALITY_RUN_ID: ${{ needs.quality.outputs.quality_run_id }}
+          SOURCE_MERGE_SHA: ${{ github.sha }}
+        run: >-
+          node scripts/promote-pr-doc-assets.mjs evidence
+          --pr "${PR_NUMBER}"
+          --quality-run-id "${QUALITY_RUN_ID}"
+          --source-merge-sha "${SOURCE_MERGE_SHA}"
+
+      - name: Report unavailable current Quality evidence
+        if: ${{ (steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required') && steps.quality_evidence.outcome != 'success' }}
+        run: |
+          node scripts/release-assets-summary.mjs failure current-evidence-unavailable
+          exit 1
+
+      - name: Report promotion required
+        if: ${{ steps.classification.outputs.classification == 'promotion-required' && steps.quality_evidence.outcome == 'success' }}
+        env:
+          ARTIFACT_NAME: ${{ steps.quality_evidence.outputs.artifact_name }}
+          CANDIDATE_VERSION: ${{ steps.candidate.outputs.candidate_version }}
+          PR_NUMBER: ${{ steps.quality_evidence.outputs.pull_request_number }}
+          QUALITY_RUN_ID: ${{ steps.quality_evidence.outputs.quality_run_id }}
+          SOURCE_MERGE_SHA: ${{ steps.quality_evidence.outputs.source_merge_sha }}
+        run: |
+          node scripts/release-assets-summary.mjs promotion-required "$CANDIDATE_VERSION" "$PR_NUMBER" "$QUALITY_RUN_ID" "$SOURCE_MERGE_SHA" "$ARTIFACT_NAME"
+          exit 1
+
       - name: Install documentation asset verification dependencies
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        if: ${{ steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' }}
         run: npm ci
 
       - name: Resolve promoted Quality artifact provenance
         id: provenance
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        if: ${{ steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' }}
+        continue-on-error: true
         run: node scripts/release-doc-assets.mjs provenance --committed-root "${GITHUB_WORKSPACE}"
 
       - name: Download documentation asset evidence
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        id: current_evidence
+        if: ${{ steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' && steps.provenance.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           name: documentation-assets-${{ github.sha }}
           path: ${{ runner.temp }}/resume-documentation-assets
 
       - name: Download the originally promoted Quality artifact
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        id: promoted_evidence
+        if: ${{ steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' && steps.provenance.outcome == 'success' && steps.current_evidence.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
@@ -188,7 +258,9 @@ jobs:
           run-id: ${{ steps.provenance.outputs.quality_run_id }}
 
       - name: Verify release documentation assets are current
-        if: ${{ needs.quality.outputs.release_assets_required == 'true' }}
+        id: currentness
+        if: ${{ steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' && steps.provenance.outcome == 'success' && steps.current_evidence.outcome == 'success' && steps.promoted_evidence.outcome == 'success' }}
+        continue-on-error: true
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
           PROMOTED_ASSET_DIRECTORY: ${{ runner.temp }}/promoted-documentation-assets
@@ -199,3 +271,21 @@ jobs:
           --generated-root "${DOCUMENTATION_ASSET_DIRECTORY}"
           --promoted-root "${PROMOTED_ASSET_DIRECTORY}"
           --source-sha "${SOURCE_SHA}"
+
+      - name: Report invalid committed provenance
+        if: ${{ always() && steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' && steps.provenance.outcome != 'success' }}
+        run: |
+          node scripts/release-assets-summary.mjs failure provenance-invalid
+          exit 1
+
+      - name: Report unavailable promoted Quality artifact
+        if: ${{ always() && steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' && steps.provenance.outcome == 'success' && (steps.current_evidence.outcome != 'success' || steps.promoted_evidence.outcome != 'success') }}
+        run: |
+          node scripts/release-assets-summary.mjs failure promoted-evidence-unavailable
+          exit 1
+
+      - name: Report release asset integrity mismatch
+        if: ${{ always() && steps.classification.outputs.classification == 'verification-required' && steps.quality_evidence.outcome == 'success' && steps.provenance.outcome == 'success' && steps.current_evidence.outcome == 'success' && steps.promoted_evidence.outcome == 'success' && steps.currentness.outcome != 'success' }}
+        run: |
+          node scripts/release-assets-summary.mjs failure asset-integrity-mismatch
+          exit 1

@@ -15,6 +15,7 @@ import {
   assertCandidateSource,
   parseArguments,
   promotePullRequestDocumentationAssets,
+  resolvePullRequestQualityEvidence,
   resolvePromotionIdentity,
   selectExactArtifact,
   selectQualityRun
@@ -232,6 +233,32 @@ test('promotion identity accepts the PR merge artifact when branch HEAD differs'
   assertArtifactManifestProvenance({
     artifactName: artifact.name, checkoutCommit: mergeSha, qualityRunId: '34478079250'
   }, identity);
+});
+
+test('read-only evidence resolution uniquely binds Actions objects to the current merge SHA', () => {
+  const api = (endpoint) => {
+    if (endpoint === 'actions/workflows/ci.yml') return workflow;
+    if (endpoint === 'pulls/167') return pullRequest;
+    if (endpoint === `actions/runs/${run.id}`) return run;
+    if (endpoint.startsWith(`actions/runs/${run.id}/artifacts?`)) return [{ artifacts: [artifact] }];
+    throw new Error(`Unexpected API endpoint: ${endpoint}`);
+  };
+  const dependencies = {
+    api,
+    currentMergeSha: () => mergeSha,
+    git: (_directory, args) => args[0] === 'remote' ? 'https://github.com/herehigher/resume.git' : ''
+  };
+  assert.deepEqual(resolvePullRequestQualityEvidence({
+    candidateRoot: '/fictional/candidate', dependencies, pullRequestNumber: '167', qualityRunId: String(run.id), sourceMergeSha: mergeSha
+  }), {
+    artifactName: artifact.name, candidateSha, mergeSha, pullRequestNumber: '167', qualityRunId: String(run.id)
+  });
+  assert.throws(() => resolvePullRequestQualityEvidence({
+    candidateRoot: '/fictional/candidate', dependencies, pullRequestNumber: '167', qualityRunId: String(run.id), sourceMergeSha: candidateSha
+  }), /does not match this pull request merge SHA/);
+  assert.throws(() => resolvePullRequestQualityEvidence({
+    candidateRoot: '/fictional/candidate', dependencies, pullRequestNumber: '167', qualityRunId: '99', sourceMergeSha: mergeSha
+  }), /Unexpected API endpoint/);
 });
 
 test('promotion fails closed for run, artifact, and manifest provenance mismatches', () => {
