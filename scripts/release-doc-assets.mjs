@@ -13,10 +13,11 @@ const expectedOutputs = Object.freeze({
   ja: Object.freeze({ paper: 'A4', pdfPath: 'output/pdf/ja-a4.pdf', screenshotPath: 'docs/screenshots/ja.png' }),
   'zh-CN': Object.freeze({ paper: 'A4', pdfPath: 'output/pdf/zh-CN-a4.pdf', screenshotPath: 'docs/screenshots/zh-CN.png' })
 });
-const assetPaths = Object.freeze([
+export const releaseDocumentationAssetPaths = Object.freeze([
   ...Object.values(expectedOutputs).flatMap(({ pdfPath, screenshotPath }) => [pdfPath, screenshotPath]),
   'docs/assets-manifest.json'
 ]);
+const assetPaths = releaseDocumentationAssetPaths;
 
 function fail(message) {
   throw new Error(`Release documentation assets failed: ${message}`);
