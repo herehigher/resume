@@ -89,6 +89,8 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 
 | 状態 | 次の操作 |
 | --- | --- |
+| Release preflight: `deferred` | summary の `check` / `reason` に従って local、target、または重複 object を修正して再実行する。`pass` になるまで Version 更新へ進まない |
+| Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
 | PR の Quality 失敗 | Product・test・generator 自体の失敗として修正 commit を検証。Asset の promotion を先に繰り返さない |
 | PR の Release assets current 失敗 | Version 更新 PR なら Quality artifact を目視して promotion する。Version を変えず展示 asset を変更していた場合はその変更を分離する。不一致の一覧が version・site・生成契約・manifest digest のどれかを確認する |
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |

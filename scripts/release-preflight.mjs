@@ -88,11 +88,11 @@ export function compareStableSemVer(left, right) {
 }
 
 function normalizeAllowlistedPath(value) {
-  if (!value || path.isAbsolute(value) || value.split(path.sep).includes('..')) {
+  if (!value || path.isAbsolute(value)) {
     throw new Error('allowlisted untracked paths must be exact relative paths');
   }
-  const normalized = path.posix.normalize(value.replaceAll('\\', '/'));
-  if (normalized === '.' || normalized.startsWith('../') || normalized.includes('/./')) {
+  const normalized = value.replaceAll('\\', '/');
+  if (normalized.startsWith('/') || normalized.split('/').some((segment) => !segment || segment === '.' || segment === '..')) {
     throw new Error('allowlisted untracked paths must be exact relative paths');
   }
   return normalized;
@@ -233,7 +233,12 @@ export function runReleasePreflight({
     if (!stableSemVerPattern.test(targetVersion || '')) {
       fail({ check: 'target-version', reason: 'invalid', status: 'deferred', targetVersion });
     }
-    const normalizedAllowlist = [...new Set(allowUntracked.map(normalizeAllowlistedPath))];
+    let normalizedAllowlist;
+    try {
+      normalizedAllowlist = [...new Set(allowUntracked.map(normalizeAllowlistedPath))];
+    } catch {
+      fail({ check: 'untracked-worktree', reason: 'invalid-allowlist', status: 'deferred', targetVersion });
+    }
     currentVersion = readCurrentVersion(candidate);
     if (compareStableSemVer(targetVersion, currentVersion) <= 0) {
       fail({ check: 'target-version', currentVersion, reason: 'not-greater', status: 'deferred', targetVersion });

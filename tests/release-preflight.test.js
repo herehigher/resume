@@ -184,6 +184,12 @@ test('release preflight preserves untracked files, permits only exact explicit a
   assert.equal(runReleasePreflight({
     allowUntracked: ['local-only.txt'], dependencies: fixtureDependencies(), rootDirectory: fixture.candidate, targetVersion: '0.2.9'
   }).status, 'pass');
+  expectFailure(
+    () => runReleasePreflight({
+      allowUntracked: ['local-only\\..\\escaped.txt'], dependencies: fixtureDependencies(), rootDirectory: fixture.candidate, targetVersion: '0.2.9'
+    }),
+    { check: 'untracked-worktree', reason: 'invalid-allowlist', status: 'deferred' }
+  );
   git(fixture.candidate, 'add', 'local-only.txt');
   expectFailure(
     () => runReleasePreflight({ dependencies: fixtureDependencies(), rootDirectory: fixture.candidate, targetVersion: '0.2.9' }),
@@ -237,6 +243,8 @@ test('release preflight argument and SemVer helpers accept only stable, exact va
   });
   assert.throws(() => parseArguments(['--target', '0.2.9-rc.1']), /stable SemVer/);
   assert.throws(() => parseArguments(['--target', '0.2.9', '--allow-untracked', '../notes.txt']), /exact relative/);
+  assert.throws(() => parseArguments(['--target', '0.2.9', '--allow-untracked', 'notes\\..\\escaped.txt']), /exact relative/);
+  assert.throws(() => parseArguments(['--target', '0.2.9', '--allow-untracked', 'notes//duplicate.txt']), /exact relative/);
 });
 
 test('release preflight CLI emits a short structured failure summary without raw command output', () => {
@@ -259,6 +267,8 @@ test('the release playbook uses the release preflight command as its pre-version
   const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
   assert.match(playbook, /唯一の事前確認入口 `npm run release:preflight -- --target VERSION`/);
   assert.match(playbook, /`--allow-untracked PATH`/);
+  assert.match(playbook, /Release preflight: `deferred`[\s\S]*summary の `check` \/ `reason`[\s\S]*`pass` になるまで Version 更新へ進まない/);
+  assert.match(playbook, /Release preflight: `blocked`[\s\S]*`gh` \/ fetch \/ credential capability を復旧して再実行[\s\S]*成功を推定せず[\s\S]*`pass` になるまで Version 更新へ進まない/);
   assert.match(playbook, /`<<'EOF'`/);
   assert.match(playbook, /--body-file "\$body_file"/);
 });
