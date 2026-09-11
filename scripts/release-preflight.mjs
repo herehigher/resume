@@ -67,18 +67,22 @@ function remoteTagExists(rootDirectory, tagName) {
   fail({ check: 'tag', reason: 'remote-unavailable', status: 'blocked' });
 }
 
-function versionParts(version) {
-  return version.split('.').map((part) => Number(part));
+function compareNumericComponents(left, right) {
+  if (left.length !== right.length) return left.length - right.length;
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 export function compareStableSemVer(left, right) {
   if (!stableSemVerPattern.test(left || '') || !stableSemVerPattern.test(right || '')) {
     throw new Error('stable SemVer is required');
   }
-  const leftParts = versionParts(left);
-  const rightParts = versionParts(right);
+  const leftParts = left.split('.');
+  const rightParts = right.split('.');
   for (let index = 0; index < leftParts.length; index += 1) {
-    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+    const comparison = compareNumericComponents(leftParts[index], rightParts[index]);
+    if (comparison) return comparison;
   }
   return 0;
 }

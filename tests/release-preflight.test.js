@@ -229,6 +229,8 @@ test('release preflight classifies an unavailable origin/main fetch as blocked',
 
 test('release preflight argument and SemVer helpers accept only stable, exact values', () => {
   assert.equal(compareStableSemVer('0.2.9', '0.2.8') > 0, true);
+  assert.equal(compareStableSemVer('1.9007199254740993.0', '1.9007199254740992.0') > 0, true);
+  assert.equal(compareStableSemVer('1.9007199254740992.0', '1.9007199254740993.0') < 0, true);
   assert.throws(() => compareStableSemVer('0.2.9-rc.1', '0.2.8'), /stable SemVer/);
   assert.deepEqual(parseArguments(['--target', '0.2.9', '--allow-untracked', 'notes.txt']), {
     allowUntracked: ['notes.txt'], targetVersion: '0.2.9'
