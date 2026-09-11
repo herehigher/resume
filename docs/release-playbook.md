@@ -50,7 +50,7 @@ gh pr edit RELEASE_PR_NUMBER --body-file "$body_file"
 
 ### Asset-only 追補 commit の fast path
 
-現時点では導入しません。2026-09-11 の実測は次のとおりです。
+現時点では導入しません。2026-09-11 に確認した 2026-09-10 の実測は次のとおりです。
 
 | 対象 | 所要時間 | 証拠 |
 | --- | --- | --- |

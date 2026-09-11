@@ -89,6 +89,8 @@ test('release instructions keep asset-only catch-up commits on the final-head fu
   const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
   assert.match(playbook, /### Asset-only 追補 commit の fast path/);
   assert.match(playbook, /導入しません/);
+  assert.match(playbook, /2026-09-11 に確認した 2026-09-10 の実測/);
+  assert.doesNotMatch(playbook, /2026-09-11 の実測/);
   assert.match(playbook, /v0.2.8 candidate Quality | 3:48/);
   assert.match(playbook, /asset supplement Quality | 2:55/);
   assert.match(playbook, /asset supplement Release assets current | 0:13/);
