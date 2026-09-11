@@ -8,6 +8,7 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "generate:doc-assets": "node scripts/generate-doc-assets.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "promote:doc-assets": "node scripts/release-doc-assets.mjs promote",
     "promote:pr-doc-assets": "node scripts/promote-pr-doc-assets.mjs",
     "test": "node --test tests/*.test.js && npm run check",

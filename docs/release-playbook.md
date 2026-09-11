@@ -22,7 +22,9 @@ Version の基準は `package.json`。CHANGELOG の日付は RC を確定した�
 
 ## 公開入口
 
-Version 更新は repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。Version 更新を commit・push すると、Quality は候補 code から一時的な展示 asset を生成して upload します。Product・test の `Quality` と asset 更新状態の `Release assets current` は別 check です。古い asset は後者だけを失敗させ、原因を混同しません。
+Version 更新前に、latest `origin/main` の clean な `main` checkout で唯一の事前確認入口 `npm run release:preflight -- --target VERSION` を実行します。これは `herehigher/resume` へアクセスできる認証済み `gh` session、現在の `package.json` と target の stable SemVer、remote tag、同じ target / release branch の open PR、tracked / untracked worktree を read-only で確認します。明示的に `origin/main` を fetch し、stale な main や feature branch は最新 SHA とともに停止します。untracked file は既定で停止し、利用者が必要性を確認した exact relative path だけ `--allow-untracked PATH` を繰り返して許可できます。command は version、asset、index、tag、PR、remote を変更せず、credential や token も読み出しません。GitHub / fetch の capability が利用できない場合も `blocked` の summary で停止します。
+
+Version 更新は preflight 成功後に repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。Version 更新を commit・push すると、Quality は候補 code から一時的な展示 asset を生成して upload します。Product・test の `Quality` と asset 更新状態の `Release assets current` は別 check です。古い asset は後者だけを失敗させ、原因を混同しません。
 
 公開 PR の複数行本文も [contribution の安全な本文作成例](../CONTRIBUTING.md#issue-pr-の本文を安全に渡す) と同じ temporary file を使います。`body_file` は `mktemp` が返した file とし、本文の here-document は必ず `<<'EOF'` で引用します。本文に実在する履歴書 data、credential、token、test の raw log は書かず、架空 data を使った検証結果の要約と未確認事項だけを記載します。
 
@@ -87,6 +89,8 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 
 | 状態 | 次の操作 |
 | --- | --- |
+| Release preflight: `deferred` | summary の `check` / `reason` に従って local、target、または重複 object を修正して再実行する。`pass` になるまで Version 更新へ進まない |
+| Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
 | PR の Quality 失敗 | Product・test・generator 自体の失敗として修正 commit を検証。Asset の promotion を先に繰り返さない |
 | PR の Release assets current 失敗 | Version 更新 PR なら Quality artifact を目視して promotion する。Version を変えず展示 asset を変更していた場合はその変更を分離する。不一致の一覧が version・site・生成契約・manifest digest のどれかを確認する |
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
