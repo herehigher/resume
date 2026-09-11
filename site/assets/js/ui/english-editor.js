@@ -7,7 +7,7 @@ import { messageForDraftStorageError } from './draft-storage-error.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 import { confirmAction } from './confirmation-dialog.js';
 
-const PROFILE_FIELDS = new Set(['fullName', 'phone', 'email']);
+const PROFILE_FIELDS = new Set(['fullName', 'birthDate', 'gender', 'nationality', 'postalCode', 'address', 'phone', 'email']);
 const RESUME_FIELDS = new Set(['headline', 'location', 'summary', 'skills']);
 
 const ITEM_SHAPES = Object.freeze({
@@ -69,6 +69,26 @@ export function renderEnglishWorkspace() {
             <div class="profile-links-editor" data-en-profile-links></div>
             <button class="small-add-button" data-en-add-profile-link type="button">Add link</button>
             <span class="field-help">Up to 3 links. The site name and icon are matched from the URL.</span>
+            <section class="en-optional-details-editor" aria-labelledby="en-optional-details-heading">
+              <div class="en-optional-details-heading">
+                <div><strong id="en-optional-details-heading">Optional personal details</strong><p>Conventions vary by country and employer. When off, these details are saved but excluded from the preview and PDF.</p></div>
+                <label class="en-details-switch"><input data-en-optional-details-switch type="checkbox"><span>Show optional personal details in the English resume</span></label>
+              </div>
+              <div class="en-optional-details-fields">
+                <div class="photo-control">
+                  <div class="photo-thumbnail" data-en-photo-thumbnail><span>Photo</span></div>
+                  <label class="upload-button">Choose photo<input data-en-photo-input type="file" accept="image/png,image/jpeg,image/webp" hidden></label>
+                  <button class="text-button" data-en-remove-photo type="button" hidden>Remove</button>
+                </div>
+                <div class="field-grid two-columns">
+                  <label class="input-field"><span>Birth date</span><input data-profile-field="birthDate" type="date"></label>
+                  <label class="input-field"><span>Gender</span><select data-profile-field="gender"><option value="">Prefer not to say</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></label>
+                  <label class="input-field"><span>Full address</span><input data-profile-field="address" autocomplete="street-address"></label>
+                  <label class="input-field"><span>Postal code</span><input data-profile-field="postalCode" autocomplete="postal-code"></label>
+                  <label class="input-field"><span>Nationality</span><input data-profile-field="nationality" autocomplete="country-name"></label>
+                </div>
+              </div>
+            </section>
           </div>
         </details>
 
@@ -196,7 +216,7 @@ function renderEditorItem(type, item, index) {
   return element;
 }
 
-export function initEnglishEditor(store, { root = document.querySelector('[data-english-editor]') } = {}) {
+export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.querySelector('[data-english-editor]') } = {}) {
   if (!root) {
     return {
       available: false,
@@ -213,6 +233,7 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   const saveStatus = root.querySelector('[data-en-save-status]');
   const completionBar = root.querySelector('[data-en-completion-bar]');
   const completionLabel = root.querySelector('[data-en-completion-label]');
+  const optionalDetailsSwitch = root.querySelector('[data-en-optional-details-switch]');
   let saveTimer;
   let sampleMode = false;
   let importPending = false;
@@ -315,7 +336,10 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   }
 
   function renderPreview() {
-    preview.innerHTML = renderEnglishDocument(store.getState());
+    const state = store.getState();
+    preview.innerHTML = renderEnglishDocument(state, {
+      photoUrl: embeddedPhotoUrl?.resolve(state.profile.photo) || ''
+    });
     pageBreakControls.render();
     updateCompletion();
     window.requestAnimationFrame(fitPreview);
@@ -329,11 +353,68 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     root.querySelectorAll('[data-resume-field]').forEach((field) => {
       field.value = resume()[field.dataset.resumeField] || '';
     });
+    optionalDetailsSwitch.checked = resume().showOptionalPersonalDetails === true;
+    updatePhoto();
     Object.keys(ITEM_SHAPES).forEach(renderList);
     renderProfileLinks();
     pageSizeSelect.value = state.settings.pageSizeByLocale.en;
     setMobileView(root.dataset.mobileMode || 'editor');
     renderPreview();
+  }
+
+  function updatePhoto() {
+    const photo = store.getState().profile.photo;
+    const displayUrl = embeddedPhotoUrl?.resolve(photo) || '';
+    const thumbnail = root.querySelector('[data-en-photo-thumbnail]');
+    thumbnail.replaceChildren();
+    if (displayUrl) {
+      const image = document.createElement('img');
+      image.src = displayUrl;
+      image.alt = 'Photo preview';
+      thumbnail.append(image);
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.textContent = 'Photo';
+      thumbnail.append(placeholder);
+    }
+    root.querySelector('[data-en-remove-photo]').hidden = !photo;
+  }
+
+  async function handlePhoto(file) {
+    if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return;
+    const sourceUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const candidate = new Image();
+        candidate.onload = () => resolve(candidate);
+        candidate.onerror = reject;
+        candidate.src = sourceUrl;
+      });
+      const targetRatio = 4 / 5;
+      const sourceRatio = image.width / image.height;
+      let sx = 0;
+      let sy = 0;
+      let sw = image.width;
+      let sh = image.height;
+      if (sourceRatio > targetRatio) {
+        sw = image.height * targetRatio;
+        sx = (image.width - sw) / 2;
+      } else {
+        sh = image.width / targetRatio;
+        sy = (image.height - sh) / 2;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = 480;
+      canvas.height = 600;
+      canvas.getContext('2d').drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      mutate((state) => {
+        state.profile.photo = canvas.toDataURL('image/jpeg', .84);
+      });
+      updatePhoto();
+      renderPreview();
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
   }
 
   function setMobileView(view) {
@@ -462,11 +543,21 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
   }
 
   function onChange(event) {
-    if (event.target !== pageSizeSelect) return;
-    mutate((state) => {
-      state.settings.pageSizeByLocale.en = pageSizeSelect.value === 'A4' ? 'A4' : 'LETTER';
-    });
-    renderPreview();
+    if (event.target === pageSizeSelect) {
+      mutate((state) => {
+        state.settings.pageSizeByLocale.en = pageSizeSelect.value === 'A4' ? 'A4' : 'LETTER';
+      });
+      renderPreview();
+      return;
+    }
+    if (event.target === optionalDetailsSwitch) {
+      mutate((state) => {
+        state.documents.en.resume.showOptionalPersonalDetails = optionalDetailsSwitch.checked;
+      });
+      renderPreview();
+      return;
+    }
+    if (event.target.matches('[data-en-photo-input]')) void handlePhoto(event.target.files?.[0]);
   }
 
   async function onClick(event) {
@@ -488,6 +579,15 @@ export function initEnglishEditor(store, { root = document.querySelector('[data-
     if (removeProfileLinkButton) {
       mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
       renderProfileLinks();
+      renderPreview();
+      return;
+    }
+    if (event.target.closest('[data-en-remove-photo]')) {
+      mutate((state) => {
+        state.profile.photo = '';
+      });
+      root.querySelector('[data-en-photo-input]').value = '';
+      updatePhoto();
       renderPreview();
       return;
     }
