@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import { lstat, mkdtemp, mkdir, rm, copyFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -104,8 +105,8 @@ export function resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run,
   };
 }
 
-function assertOfficialOrigin(candidateRoot) {
-  const origin = git(candidateRoot, ['remote', 'get-url', 'origin']);
+function assertOfficialOrigin(candidateRoot, gitCommand = git) {
+  const origin = gitCommand(candidateRoot, ['remote', 'get-url', 'origin']);
   requireValue(/^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)(herehigher\/resume)(?:\.git)?\/?$/.test(origin),
     'candidate checkout origin is not the official repository');
 }
@@ -173,6 +174,27 @@ function currentMergeSha(candidateRoot, pullRequestNumber) {
   return mergeSha;
 }
 
+export function resolvePullRequestQualityEvidence({
+  candidateRoot = process.cwd(), dependencies = {}, pullRequestNumber, qualityRunId, sourceMergeSha
+}) {
+  requireValue(positiveId.test(String(pullRequestNumber || '')), 'pull request number is invalid');
+  requireValue(positiveId.test(String(qualityRunId || '')), 'Quality run ID is invalid');
+  requireValue(fullCommitPattern.test(sourceMergeSha || ''), 'source merge SHA is invalid');
+  const candidate = path.resolve(candidateRoot);
+  const api = dependencies.api || githubApi;
+  const currentMerge = dependencies.currentMergeSha || currentMergeSha;
+  const gitCommand = dependencies.git || git;
+  assertOfficialOrigin(candidate, gitCommand);
+  const workflow = api('actions/workflows/ci.yml');
+  const pullRequest = api(`pulls/${pullRequestNumber}`);
+  const mergeSha = currentMerge(candidate, pullRequestNumber);
+  const run = api(`actions/runs/${qualityRunId}`);
+  const artifact = exactArtifact(run.id, mergeSha, api);
+  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
+  requireValue(identity.mergeSha === sourceMergeSha, 'Quality evidence does not match this pull request merge SHA');
+  return identity;
+}
+
 export function selectQualityRun(candidates, pullRequest, mergeSha) {
   const matches = candidates.filter((run) => (
     run.head_sha === mergeSha && run.event === 'pull_request'
@@ -210,7 +232,7 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
   const removeTemporaryDirectory = dependencies.removeTemporaryDirectory
     || ((directory) => rm(directory, { force: true, recursive: true }));
   const candidate = path.resolve(candidateRoot);
-  assertOfficialOrigin(candidate);
+  assertOfficialOrigin(candidate, gitCommand);
   const workflow = api('actions/workflows/ci.yml');
   let pullRequest;
   let mergeSha;
@@ -281,8 +303,33 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const result = await promotePullRequestDocumentationAssets({ values: parseArguments(process.argv.slice(2)) });
-    console.log(`Promoted only these ${result.files.length} files from Quality run ${result.qualityRunId}:\n${result.files.map((file) => `- ${file}`).join('\n')}`);
+    const [command, ...args] = process.argv.slice(2);
+    if (command === 'evidence') {
+      const values = {};
+      for (let index = 0; index < args.length; index += 2) {
+        const name = args[index];
+        const value = args[index + 1];
+        if (!name?.startsWith('--') || !value || value.startsWith('--') || !(name.slice(2) in { pr: true, 'quality-run-id': true, 'source-merge-sha': true })
+          || name.slice(2) in values) fail('evidence arguments are invalid');
+        values[name.slice(2)] = value;
+      }
+      requireValue(Object.keys(values).length === 3, 'evidence requires --pr, --quality-run-id, and --source-merge-sha');
+      const result = resolvePullRequestQualityEvidence({
+        pullRequestNumber: values.pr, qualityRunId: values['quality-run-id'], sourceMergeSha: values['source-merge-sha']
+      });
+      if (process.env.GITHUB_OUTPUT) {
+        for (const [key, value] of Object.entries({
+          artifact_name: result.artifactName,
+          pull_request_number: result.pullRequestNumber,
+          quality_run_id: result.qualityRunId,
+          source_merge_sha: result.mergeSha
+        })) appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+      }
+      console.log(`Resolved exact documentation evidence from Quality run ${result.qualityRunId}.`);
+    } else {
+      const result = await promotePullRequestDocumentationAssets({ values: parseArguments([command, ...args]) });
+      console.log(`Promoted only these ${result.files.length} files from Quality run ${result.qualityRunId}:\n${result.files.map((file) => `- ${file}`).join('\n')}`);
+    }
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
