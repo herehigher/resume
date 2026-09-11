@@ -178,9 +178,15 @@ function openPullRequests(api) {
   } catch {
     fail({ check: 'open-pull-request', reason: 'unavailable', status: 'blocked' });
   }
-  if (!Array.isArray(pages)) fail({ check: 'open-pull-request', reason: 'unavailable', status: 'blocked' });
-  const pullRequests = pages.flatMap((page) => (Array.isArray(page) ? page : []));
-  if (!pullRequests.every((pullRequest) => Number.isInteger(pullRequest?.number))) {
+  if (!Array.isArray(pages) || !pages.every(Array.isArray)) {
+    fail({ check: 'open-pull-request', reason: 'unavailable', status: 'blocked' });
+  }
+  const pullRequests = pages.flat();
+  if (!pullRequests.every((pullRequest) => (
+    Number.isInteger(pullRequest?.number)
+      && typeof pullRequest.title === 'string'
+      && typeof pullRequest.head?.ref === 'string'
+  ))) {
     fail({ check: 'open-pull-request', reason: 'unavailable', status: 'blocked' });
   }
   return pullRequests;
@@ -191,9 +197,9 @@ function hasDuplicateReleasePullRequest(pullRequests, targetVersion) {
   const escapedVersion = targetVersion.replaceAll('.', '\\.');
   const targetInTitle = new RegExp(`(?:^|[^0-9A-Za-z.-])v?${escapedVersion}(?:$|[^0-9A-Za-z.-])`);
   return pullRequests.some((pullRequest) => (
-    pullRequest.head?.ref === releaseBranch
-      || pullRequest.head?.ref?.endsWith(`/${releaseBranch}`)
-      || targetInTitle.test(pullRequest.title || '')
+    pullRequest.head.ref === releaseBranch
+      || pullRequest.head.ref.endsWith(`/${releaseBranch}`)
+      || targetInTitle.test(pullRequest.title)
   ));
 }
 

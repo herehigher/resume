@@ -169,6 +169,25 @@ test('release preflight refuses duplicate target-version and release-branch open
   );
 });
 
+test('release preflight blocks malformed paginated open-pull-request responses', (t) => {
+  const fixture = createFixture();
+  t.after(() => rmSync(fixture.temporaryRoot, { force: true, recursive: true }));
+  const malformedPages = [
+    [{}],
+    [[{ head: { ref: 'other' }, number: 19 }]],
+    [[{ head: {}, number: 20, title: 'unrelated' }]]
+  ];
+  for (const pages of malformedPages) {
+    const api = (endpoint) => (endpoint === '' ? repository : pages);
+    expectFailure(
+      () => runReleasePreflight({
+        dependencies: fixtureDependencies(api), rootDirectory: fixture.candidate, targetVersion: '0.2.9'
+      }),
+      { check: 'open-pull-request', reason: 'unavailable', status: 'blocked' }
+    );
+  }
+});
+
 test('release preflight preserves untracked files, permits only exact explicit allowlist entries, and rejects staging', (t) => {
   const fixture = createFixture();
   t.after(() => rmSync(fixture.temporaryRoot, { force: true, recursive: true }));
