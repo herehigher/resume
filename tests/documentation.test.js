@@ -85,6 +85,15 @@ test('release version has one source of truth and a dated changelog entry', () =
   assert.ok(unreleasedIndex < changelog.search(release));
 });
 
+test('release instructions keep asset-only catch-up commits on the final-head full Quality path', () => {
+  const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
+  assert.match(playbook, /### Asset-only 追補 commit の fast path/);
+  assert.match(playbook, /導入しません/);
+  assert.match(playbook, /final PR head の `Quality` と `Release assets current` を必ず要求/);
+  assert.match(playbook, /current head の fresh 生成 artifact/);
+  assert.match(playbook, /main の full Quality、immutable tag、単一の prepared artifact、online smoke/);
+});
+
 test('the public v3 JSON example remains importable under the runtime data contract', () => {
   const schema = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v3.schema.json'), 'utf8'));
   const example = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v3.example.json'), 'utf8'));
