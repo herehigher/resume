@@ -136,12 +136,19 @@ jobs:
   release-assets-current:
     name: Release assets current
     needs: quality
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
     steps:
+      - name: Checkout workflow summary tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Report Quality failure
         if: ${{ needs.quality.result != 'success' }}
         run: |
@@ -166,7 +173,7 @@ jobs:
           node scripts/release-assets-summary.mjs failure versionless-asset-change
           exit 1
 
-      - name: Checkout
+      - name: Checkout release asset verification source
         if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
         uses: actions/checkout@v7
         with:

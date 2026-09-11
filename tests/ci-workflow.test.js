@@ -1,10 +1,28 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const qualityWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
 const releaseWorkflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 const playwrightConfig = readFileSync(new URL('../playwright.config.js', import.meta.url), 'utf8');
+
+const qualityWorkflowStructure = JSON.parse(execFileSync('ruby', ['-e', [
+  "require 'json'",
+  "require 'yaml'",
+  "puts JSON.generate(YAML.load_file(ARGV.fetch(0)))"
+].join('; '), fileURLToPath(new URL('../.github/workflows/ci.yml', import.meta.url))], { encoding: 'utf8' }));
+
+function qualityStep(name) {
+  const step = qualityWorkflowStructure.jobs['release-assets-current'].steps.find((item) => item.name === name);
+  assert.ok(step, `missing workflow step: ${name}`);
+  return step;
+}
+
+function qualityStepIndex(name) {
+  return qualityWorkflowStructure.jobs['release-assets-current'].steps.findIndex((item) => item.name === name);
+}
 
 test('quality cancels superseded pull request runs without grouping main runs', () => {
   assert.match(qualityWorkflow, /group: quality-\$\{\{ github\.event_name == 'pull_request' && github\.event\.pull_request\.number \|\| github\.run_id \}\}/);
@@ -12,7 +30,8 @@ test('quality cancels superseded pull request runs without grouping main runs', 
 });
 
 test('quality classifies scope after its primary checkout', () => {
-  assert.equal(qualityWorkflow.match(/uses: actions\/checkout@/g)?.length, 2);
+  const qualitySteps = qualityWorkflowStructure.jobs.quality.steps;
+  assert.ok(qualitySteps.findIndex((step) => step.name === 'Checkout') < qualitySteps.findIndex((step) => step.name === 'Classify pull request scope'));
   assert.doesNotMatch(qualityWorkflow, /^ {2}scope:\s*$/m);
   assert.match(qualityWorkflow, /quality:[\s\S]+- name: Checkout[\s\S]+- name: Classify pull request scope[\s\S]+- name: Setup Node\.js/);
   assert.doesNotMatch(qualityWorkflow, /needs\.scope/);
@@ -43,6 +62,32 @@ test('release asset status distinguishes promotion waiting from Quality, provena
   assert.match(qualityWorkflow, /Resolve exact current Quality evidence[\s\S]+promote-pr-doc-assets\.mjs evidence[\s\S]+--quality-run-id "\$\{QUALITY_RUN_ID\}"[\s\S]+--source-merge-sha "\$\{SOURCE_MERGE_SHA\}"/);
   assert.match(qualityWorkflow, /Report promotion required[\s\S]+promotion-required "\$CANDIDATE_VERSION" "\$PR_NUMBER" "\$QUALITY_RUN_ID" "\$SOURCE_MERGE_SHA" "\$ARTIFACT_NAME"[\s\S]+exit 1/);
   assert.match(qualityWorkflow, /Report invalid committed provenance[\s\S]+failure provenance-invalid[\s\S]+Report unavailable promoted Quality artifact[\s\S]+failure promoted-evidence-unavailable[\s\S]+Report release asset integrity mismatch[\s\S]+failure asset-integrity-mismatch/);
+});
+
+test('release asset reporting always runs after a minimal checkout and gates each classification path', () => {
+  const job = qualityWorkflowStructure.jobs['release-assets-current'];
+  assert.equal(job.if, '${' + "{ always() && github.event_name == 'pull_request' }}");
+
+  const summaryCheckout = qualityStep('Checkout workflow summary tooling');
+  assert.equal(summaryCheckout.uses, 'actions/checkout@v7');
+  assert.equal(summaryCheckout.with['fetch-depth'], 1);
+  assert.equal(summaryCheckout.with['persist-credentials'], false);
+  assert.equal(summaryCheckout.with.lfs, undefined);
+  for (const name of [
+    'Report Quality failure', 'Classify release asset check',
+    'Report release assets are not required', 'Reject release asset changes outside a version pull request'
+  ]) assert.ok(qualityStepIndex('Checkout workflow summary tooling') < qualityStepIndex(name), `${name} must follow the summary checkout`);
+
+  assert.match(qualityStep('Report Quality failure').if, /needs\.quality\.result != 'success'/);
+  assert.match(qualityStep('Classify release asset check').if, /needs\.quality\.result == 'success'/);
+  assert.match(qualityStep('Report release assets are not required').if, /classification == 'not-required'/);
+  assert.match(qualityStep('Reject release asset changes outside a version pull request').if, /classification == 'versionless-asset-change'/);
+  assert.match(qualityStep('Report promotion required').if, /classification == 'promotion-required'/);
+  assert.match(qualityStep('Install documentation asset verification dependencies').if, /classification == 'verification-required'/);
+
+  const verificationCheckout = qualityStep('Checkout release asset verification source');
+  assert.equal(verificationCheckout.with.lfs, true);
+  assert.ok(qualityStepIndex('Checkout workflow summary tooling') < qualityStepIndex('Checkout release asset verification source'));
 });
 
 test('release preparation checks committed assets against the final Quality evidence', () => {
