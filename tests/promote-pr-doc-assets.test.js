@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync } from 'node:fs';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { deflateSync } from 'node:zlib';
 
+import { computeGeneratorInputHash, computeSiteHash } from '../scripts/generate-doc-assets.mjs';
+import { releaseDocumentationAssetPaths } from '../scripts/release-doc-assets.mjs';
 import {
   assertArtifactManifestProvenance,
   assertCandidateSource,
   parseArguments,
+  promotePullRequestDocumentationAssets,
   resolvePromotionIdentity,
   selectExactArtifact,
   selectQualityRun
@@ -30,6 +36,192 @@ const artifact = {
   expired: false, name: `documentation-assets-${mergeSha}`,
   workflow_run: { head_sha: mergeSha, id: run.id }
 };
+
+const outputs = Object.freeze({
+  en: { paper: 'LETTER', pdfPath: 'output/pdf/en-letter.pdf', screenshotPath: 'docs/screenshots/en.png' },
+  ja: { paper: 'A4', pdfPath: 'output/pdf/ja-a4.pdf', screenshotPath: 'docs/screenshots/ja.png' },
+  'zh-CN': { paper: 'A4', pdfPath: 'output/pdf/zh-CN-a4.pdf', screenshotPath: 'docs/screenshots/zh-CN.png' }
+});
+
+function digest(contents) {
+  return createHash('sha256').update(contents).digest('hex');
+}
+
+function crc32(contents) {
+  let crc = 0xffffffff;
+  for (const byte of contents) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, contents) {
+  const name = Buffer.from(type, 'ascii');
+  const chunk = Buffer.alloc(contents.length + 12);
+  chunk.writeUInt32BE(contents.length, 0);
+  name.copy(chunk, 4);
+  contents.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([name, contents])), contents.length + 8);
+  return chunk;
+}
+
+function createPng(locale) {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(1, 0);
+  header.writeUInt32BE(1, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', header),
+    pngChunk('tEXt', Buffer.from(`fixture\0${locale}`)),
+    pngChunk('IDAT', deflateSync(Buffer.from([0, 10, 20, 30]))),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
+}
+
+function createPdf(text, { height, width }) {
+  const stream = `BT\n/F1 12 Tf\n72 ${height - 72} Td\n(${text}) Tj\nET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>`,
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets = [];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(Buffer.byteLength(body));
+    body += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+  const xrefOffset = Buffer.byteLength(body);
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  body += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body, 'latin1');
+}
+
+function git(directory, ...args) {
+  return execFileSync('git', args, {
+    cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
+  }).trim();
+}
+
+async function writeArtifact({ artifactRoot, qualityRunId, sourceRoot, sourceSha }) {
+  await mkdir(path.join(artifactRoot, 'docs/screenshots'), { recursive: true });
+  await mkdir(path.join(artifactRoot, 'output/pdf'), { recursive: true });
+  const manifestOutputs = [];
+  for (const [locale, expected] of Object.entries(outputs)) {
+    const screenshot = createPng(locale);
+    const dimensions = expected.paper === 'A4' ? { height: 841.89, width: 595.28 } : { height: 792, width: 612 };
+    const firstText = `first-${locale}`;
+    const lastText = `last-${locale}`;
+    const pdf = createPdf(`${firstText} ${lastText}`, dimensions);
+    await writeFile(path.join(artifactRoot, expected.screenshotPath), screenshot);
+    await writeFile(path.join(artifactRoot, expected.pdfPath), pdf);
+    manifestOutputs.push({
+      browserLocale: locale, firstText, lastText, locale, marker: `marker-${locale}`, paper: expected.paper,
+      pdf: { fixture: 'deterministic-print-example', path: expected.pdfPath, sha256: digest(pdf) },
+      screenshot: { fixture: 'fictional-documentation-example', height: 1, path: expected.screenshotPath, sha256: digest(screenshot), width: 1 }
+    });
+  }
+  const manifest = {
+    browser: { engine: 'Chromium', version: '123.0.0.0', viewport: { height: 1000, width: 1440 } },
+    generator: {
+      command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>',
+      inputHash: await computeGeneratorInputHash(sourceRoot),
+      inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
+      inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs'],
+      path: 'scripts/generate-doc-assets.mjs', version: '1.4.0'
+    },
+    outputs: manifestOutputs,
+    schemaVersion: 3,
+    source: {
+      appVersion: '0.3.0', checkoutCommit: sourceSha, fixedDate: '2026-09-01', markerHashLength: 12,
+      markerPrefix: 'RESUME-STUDIO-SAMPLE', qualityRunId, siteHash: await computeSiteHash(path.join(sourceRoot, 'site')),
+      siteHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)'
+    }
+  };
+  await writeFile(path.join(artifactRoot, 'docs/assets-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+async function createPromotionFixture({ manifestQualityRunId = '12345' } = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'resume-pr-doc-assets-integration-'));
+  const candidateRoot = path.join(root, 'candidate');
+  const artifactRoot = path.join(root, 'artifact');
+  const temporaryRoot = path.join(root, 'temporary');
+  await mkdir(path.join(candidateRoot, 'site'), { recursive: true });
+  await mkdir(path.join(candidateRoot, 'scripts'), { recursive: true });
+  await writeFile(path.join(candidateRoot, 'site/index.html'), '<title>fixture</title>\n');
+  await writeFile(path.join(candidateRoot, 'package.json'), '{"version":"0.3.0"}\n');
+  await writeFile(path.join(candidateRoot, 'package-lock.json'), '{"lockfileVersion":3}\n');
+  await writeFile(path.join(candidateRoot, 'scripts/generate-doc-assets.mjs'), '// generator fixture\n');
+  await writeFile(path.join(candidateRoot, 'scripts/verify-doc-assets.mjs'), '// verifier fixture\n');
+  for (const relativePath of releaseDocumentationAssetPaths) {
+    await mkdir(path.dirname(path.join(candidateRoot, relativePath)), { recursive: true });
+    await writeFile(path.join(candidateRoot, relativePath), `old ${relativePath}\n`);
+  }
+  git(candidateRoot, 'init', '--initial-branch=main');
+  git(candidateRoot, 'config', 'user.name', 'Promotion Integration Test');
+  git(candidateRoot, 'config', 'user.email', 'promotion-integration@example.invalid');
+  git(candidateRoot, 'remote', 'add', 'origin', 'https://github.com/herehigher/resume.git');
+  git(candidateRoot, 'add', '.');
+  git(candidateRoot, '-c', 'commit.gpgSign=false', 'commit', '-m', 'base');
+  git(candidateRoot, 'checkout', '-b', 'release-v0.2.8');
+  await writeFile(path.join(candidateRoot, 'candidate.txt'), 'candidate\n');
+  git(candidateRoot, 'add', 'candidate.txt');
+  git(candidateRoot, '-c', 'commit.gpgSign=false', 'commit', '-m', 'candidate');
+  const candidateSha = git(candidateRoot, 'rev-parse', 'HEAD');
+  git(candidateRoot, 'checkout', 'main');
+  await writeFile(path.join(candidateRoot, 'base.txt'), 'base\n');
+  git(candidateRoot, 'add', 'base.txt');
+  git(candidateRoot, '-c', 'commit.gpgSign=false', 'commit', '-m', 'base update');
+  git(candidateRoot, '-c', 'commit.gpgSign=false', 'merge', '--no-ff', 'release-v0.2.8', '-m', 'temporary merge');
+  const mergeSha = git(candidateRoot, 'rev-parse', 'HEAD');
+  git(candidateRoot, 'checkout', 'release-v0.2.8');
+  await writeArtifact({ artifactRoot, qualityRunId: manifestQualityRunId, sourceRoot: candidateRoot, sourceSha: mergeSha });
+  return { artifactRoot, candidateRoot, candidateSha, mergeSha, root, temporaryRoot };
+}
+
+function promotionDependencies(fixture, qualityRunId = '12345') {
+  const workflow = { id: 17, path: '.github/workflows/ci.yml' };
+  const pullRequest = {
+    base: { repo: repository }, head: { ref: 'release-v0.2.8', repo: repository, sha: fixture.candidateSha }, number: 167, state: 'open'
+  };
+  const run = {
+    conclusion: 'success', event: 'pull_request', head_branch: pullRequest.head.ref, head_repository: repository,
+    head_sha: fixture.mergeSha, id: Number(qualityRunId), path: workflow.path, pull_requests: [{ number: pullRequest.number }],
+    repository, status: 'completed', workflow_id: workflow.id
+  };
+  const qualityArtifact = {
+    expired: false, name: `documentation-assets-${fixture.mergeSha}`,
+    workflow_run: { head_sha: fixture.mergeSha, id: run.id }
+  };
+  return {
+    api(endpoint) {
+      if (endpoint === 'actions/workflows/ci.yml') return workflow;
+      if (endpoint === 'pulls/167') return pullRequest;
+      if (endpoint.startsWith('actions/workflows/17/runs?')) return [{ workflow_runs: [run] }];
+      if (endpoint === `actions/runs/${run.id}`) return run;
+      if (endpoint.startsWith(`actions/runs/${run.id}/artifacts?`)) return [{ artifacts: [qualityArtifact] }];
+      throw new Error(`Unexpected API endpoint: ${endpoint}`);
+    },
+    createTemporaryDirectory: async () => {
+      await mkdir(fixture.temporaryRoot);
+      return fixture.temporaryRoot;
+    },
+    currentMergeSha: () => fixture.mergeSha,
+    downloadArtifact: async (_runId, _name, destination) => {
+      cpSync(path.join(fixture.artifactRoot, 'docs'), path.join(destination, 'docs'), { recursive: true });
+      cpSync(path.join(fixture.artifactRoot, 'output'), path.join(destination, 'output'), { recursive: true });
+    },
+    git(directory, args) {
+      if (args[0] === 'lfs') return '';
+      return git(directory, ...args);
+    }
+  };
+}
 
 test('promotion identity accepts the PR merge artifact when branch HEAD differs', () => {
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
@@ -84,4 +276,64 @@ test('promotion accepts exactly one identifier and rejects a dirty candidate sou
 
   await writeFile(path.join(sourceRoot, 'site/index.html'), '<title>dirty</title>');
   assert.throws(() => assertCandidateSource(sourceRoot, sha), /uncommitted site, package, or generator changes/);
+});
+
+test('promotion orchestrates a temporary merge checkout and copies only seven verified files', async (t) => {
+  const fixture = await createPromotionFixture();
+  t.after(() => rm(fixture.root, { force: true, recursive: true }));
+  const result = await promotePullRequestDocumentationAssets({
+    candidateRoot: fixture.candidateRoot, dependencies: promotionDependencies(fixture), values: { pr: '167' }
+  });
+
+  assert.equal(result.candidateSha, fixture.candidateSha);
+  assert.equal(result.mergeSha, fixture.mergeSha);
+  assert.notEqual(result.candidateSha, result.mergeSha);
+  assert.deepEqual(result.files, releaseDocumentationAssetPaths);
+  assert.equal(existsSync(fixture.temporaryRoot), false);
+  assert.equal(git(fixture.candidateRoot, 'worktree', 'list', '--porcelain').includes(`${fixture.temporaryRoot}/source`), false);
+  assert.deepEqual(
+    git(fixture.candidateRoot, 'diff', '--name-only', '--no-renames').split('\n').filter(Boolean).sort(),
+    [...releaseDocumentationAssetPaths].sort()
+  );
+  for (const relativePath of releaseDocumentationAssetPaths) {
+    assert.deepEqual(
+      await readFile(path.join(fixture.candidateRoot, relativePath)),
+      await readFile(path.join(fixture.artifactRoot, relativePath))
+    );
+  }
+});
+
+test('promotion removes its temporary worktree and directory after manifest provenance failure', async (t) => {
+  const fixture = await createPromotionFixture({ manifestQualityRunId: '999' });
+  t.after(() => rm(fixture.root, { force: true, recursive: true }));
+  await assert.rejects(
+    promotePullRequestDocumentationAssets({
+      candidateRoot: fixture.candidateRoot, dependencies: promotionDependencies(fixture), values: { pr: '167' }
+    }),
+    /manifest provenance/
+  );
+  assert.equal(existsSync(fixture.temporaryRoot), false);
+  assert.equal(git(fixture.candidateRoot, 'worktree', 'list', '--porcelain').includes(`${fixture.temporaryRoot}/source`), false);
+  assert.equal(git(fixture.candidateRoot, 'status', '--porcelain'), '');
+});
+
+test('promotion rejects a candidate branch whose HEAD differs from the selected pull request head', async (t) => {
+  const fixture = await createPromotionFixture();
+  t.after(() => rm(fixture.root, { force: true, recursive: true }));
+  const dependencies = promotionDependencies(fixture);
+  const api = dependencies.api;
+  dependencies.api = (endpoint, paginate) => {
+    const response = api(endpoint, paginate);
+    return endpoint === 'pulls/167'
+      ? { ...response, head: { ...response.head, sha: 'c'.repeat(40) } }
+      : response;
+  };
+  await assert.rejects(
+    promotePullRequestDocumentationAssets({
+      candidateRoot: fixture.candidateRoot, dependencies, values: { pr: '167' }
+    }),
+    /source SHA does not match/
+  );
+  assert.equal(existsSync(fixture.temporaryRoot), false);
+  assert.equal(git(fixture.candidateRoot, 'status', '--porcelain'), '');
 });

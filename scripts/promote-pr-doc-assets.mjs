@@ -161,8 +161,8 @@ export function selectExactArtifact(artifacts, runId, mergeSha) {
   return matches[0];
 }
 
-function exactArtifact(runId, mergeSha) {
-  const pages = githubApi(`actions/runs/${runId}/artifacts?per_page=100`, true);
+function exactArtifact(runId, mergeSha, api = githubApi) {
+  const pages = api(`actions/runs/${runId}/artifacts?per_page=100`, true);
   return selectExactArtifact(pages.flatMap((page) => page.artifacts || []), runId, mergeSha);
 }
 
@@ -184,10 +184,10 @@ export function selectQualityRun(candidates, pullRequest, mergeSha) {
   return matches[0];
 }
 
-function findQualityRunForPullRequest(workflow, pullRequest, mergeSha) {
-  const pages = githubApi(`actions/workflows/${workflow.id}/runs?event=pull_request&status=success&per_page=100`, true);
+function findQualityRunForPullRequest(workflow, pullRequest, mergeSha, api = githubApi) {
+  const pages = api(`actions/workflows/${workflow.id}/runs?event=pull_request&status=success&per_page=100`, true);
   const selected = selectQualityRun(pages.flatMap((page) => page.workflow_runs || []), pullRequest, mergeSha);
-  return githubApi(`actions/runs/${selected.id}`);
+  return api(`actions/runs/${selected.id}`);
 }
 
 function downloadArtifact(runId, artifactName, destination) {
@@ -200,48 +200,56 @@ function downloadArtifact(runId, artifactName, destination) {
   }
 }
 
-export async function promotePullRequestDocumentationAssets({ candidateRoot = process.cwd(), values }) {
+export async function promotePullRequestDocumentationAssets({ candidateRoot = process.cwd(), dependencies = {}, values }) {
+  const api = dependencies.api || githubApi;
+  const currentMerge = dependencies.currentMergeSha || currentMergeSha;
+  const download = dependencies.downloadArtifact || downloadArtifact;
+  const gitCommand = dependencies.git || git;
+  const createTemporaryDirectory = dependencies.createTemporaryDirectory
+    || (() => mkdtemp(path.join(os.tmpdir(), 'resume-pr-doc-assets-')));
+  const removeTemporaryDirectory = dependencies.removeTemporaryDirectory
+    || ((directory) => rm(directory, { force: true, recursive: true }));
   const candidate = path.resolve(candidateRoot);
   assertOfficialOrigin(candidate);
-  const workflow = githubApi('actions/workflows/ci.yml');
+  const workflow = api('actions/workflows/ci.yml');
   let pullRequest;
   let mergeSha;
   let run;
 
   if (values.pr) {
-    pullRequest = githubApi(`pulls/${values.pr}`);
-    mergeSha = currentMergeSha(candidate, values.pr);
-    run = findQualityRunForPullRequest(workflow, pullRequest, mergeSha);
+    pullRequest = api(`pulls/${values.pr}`);
+    mergeSha = currentMerge(candidate, values.pr);
+    run = findQualityRunForPullRequest(workflow, pullRequest, mergeSha, api);
   } else {
-    run = githubApi(`actions/runs/${values['quality-run-id']}`);
+    run = api(`actions/runs/${values['quality-run-id']}`);
     requireValue(Array.isArray(run.pull_requests) && run.pull_requests.length === 1
       && positiveId.test(String(run.pull_requests[0]?.number || '')), 'Quality run must identify exactly one pull request');
-    pullRequest = githubApi(`pulls/${run.pull_requests[0].number}`);
-    mergeSha = currentMergeSha(candidate, pullRequest.number);
+    pullRequest = api(`pulls/${run.pull_requests[0].number}`);
+    mergeSha = currentMerge(candidate, pullRequest.number);
   }
 
-  const artifact = exactArtifact(run.id, mergeSha);
+  const artifact = exactArtifact(run.id, mergeSha, api);
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
   assertCandidateSource(candidate, identity.candidateSha);
   assertCleanAssetTargets(candidate);
 
-  const temporary = await mkdtemp(path.join(os.tmpdir(), 'resume-pr-doc-assets-'));
+  const temporary = await createTemporaryDirectory();
   const sourceRoot = path.join(temporary, 'source');
   const artifactRoot = path.join(temporary, 'artifact');
   let worktreeCreated = false;
   let operationError;
   let result;
   try {
-    git(candidate, ['worktree', 'add', '--detach', sourceRoot, identity.mergeSha]);
+    gitCommand(candidate, ['worktree', 'add', '--detach', sourceRoot, identity.mergeSha]);
     worktreeCreated = true;
-    git(sourceRoot, ['lfs', 'pull', '--include=docs/screenshots/*.png,output/pdf/*.pdf', '--exclude=']);
+    gitCommand(sourceRoot, ['lfs', 'pull', '--include=docs/screenshots/*.png,output/pdf/*.pdf', '--exclude=']);
     try {
       resolveSourceCommit(sourceRoot, identity.mergeSha);
     } catch (error) {
       fail(error.message);
     }
     await mkdir(artifactRoot);
-    downloadArtifact(identity.qualityRunId, identity.artifactName, artifactRoot);
+    await download(identity.qualityRunId, identity.artifactName, artifactRoot);
     assertArtifactManifestProvenance(await readReleaseAssetProvenance(artifactRoot), identity);
     await promoteReleaseAssets({ assetRoot: artifactRoot, sourceRoot, sourceSha: identity.mergeSha });
     await verifyDocumentationAssets({
@@ -255,13 +263,13 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
     let cleanupError;
     if (worktreeCreated) {
       try {
-        git(candidate, ['worktree', 'remove', '--force', sourceRoot]);
+        gitCommand(candidate, ['worktree', 'remove', '--force', sourceRoot]);
       } catch (error) {
         cleanupError = error;
       }
     }
     try {
-      await rm(temporary, { force: true, recursive: true });
+      await removeTemporaryDirectory(temporary);
     } catch (error) {
       cleanupError ||= error;
     }
