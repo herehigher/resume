@@ -33,11 +33,11 @@ export async function checkOnlineEditor(baseUrl) {
     const response = await context.request.get(new URL(examplePath, base).href);
     assert.equal(response.status(), 200, 'Published example must be available.');
     const example = await response.json();
-    assert.equal(example.version, 2);
+    assert.equal(example.version, 3);
     // Use a known fictional canary regardless of the served example's profile.
     example.profile = {
       photo: '',
-      fields: { fullName: 'Fictional Online Check', birthDate: '', gender: '', postalCode: '',
+      fields: { fullName: 'Fictional Online Check', birthDate: '', gender: '', nationality: '', postalCode: '',
         address: '', phone: '', email: 'online-check@example.invalid', links: [] }
     };
     for (const [locale, preview] of [

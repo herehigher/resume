@@ -511,7 +511,7 @@ test('future drafts remain protected from save and clear, and missing Web Locks 
   await writer.save(createDefaultState());
   const key = keys.current();
   const future = createDefaultState();
-  future.version = 3;
+  future.version = 4;
   const raw = await encryptUnsupportedState(future, key);
   storage.setItem(STORAGE_KEY, raw);
 

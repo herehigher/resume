@@ -29,9 +29,54 @@ export function mapValidArray(value, mapItem, fallback = []) {
   return result;
 }
 
+const V2_GENDER_VALUES = new Map([
+  ['男性', 'male'], ['男', 'male'], ['Male', 'male'],
+  ['女性', 'female'], ['女', 'female'], ['Female', 'female'],
+  ['その他', 'other'], ['其他', 'other'], ['Other', 'other'],
+  ['', '']
+]);
+
+function migrateV2Gender(value) {
+  return V2_GENDER_VALUES.has(value) ? V2_GENDER_VALUES.get(value) : '';
+}
+
+function migrateV2ToV3(source) {
+  const state = copy(source);
+  const fields = state.profile?.fields;
+  const resume = state.documents?.en?.resume;
+  if (!isObject(fields) || !isObject(resume)) return { state: { ...state, version: 3 } };
+
+  const gender = migrateV2Gender(fields.gender);
+  return {
+    salvaged: typeof fields.gender === 'string' && fields.gender !== '' && gender === '',
+    state: {
+      ...state,
+      version: 3,
+      profile: {
+        ...state.profile,
+        fields: { ...fields, gender, nationality: '' }
+      },
+      documents: {
+        ...state.documents,
+        en: {
+          ...state.documents.en,
+          resume: { ...resume, showOptionalPersonalDetails: false }
+        }
+      }
+    }
+  };
+}
+
 // Add only explicit, sequential version migrations. Version 1 is intentionally
 // unsupported because there are no production users whose drafts require it.
-export const MIGRATION_REGISTRY = Object.freeze([]);
+export const MIGRATION_REGISTRY = Object.freeze([
+  Object.freeze({
+    from: 2,
+    to: 3,
+    summary: 'Normalize gender and add nationality and English optional-detail defaults.',
+    migrate: migrateV2ToV3
+  })
+]);
 
 export function createMigrationRunner({
   currentVersion = STATE_VERSION,

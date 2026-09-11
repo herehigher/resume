@@ -54,6 +54,21 @@ test('default state contains independent locale documents', () => {
     { title: '担当業務', content: '' },
     { title: '実績・成果', content: '' }
   ]);
+  assert.deepEqual(state.profile.fields, {
+    fullName: '', birthDate: '', gender: '', nationality: '', postalCode: '', address: '', phone: '', email: '', links: []
+  });
+  assert.equal(state.documents.en.resume.showOptionalPersonalDetails, false);
+});
+
+test('v3 gender values are locale-independent and reject unrecognized values', () => {
+  const state = createDefaultState('ja');
+  for (const gender of ['', 'male', 'female', 'other']) {
+    state.profile.fields.gender = gender;
+    assert.equal(validateState(state).valid, true, gender || 'empty gender');
+  }
+  state.profile.fields.gender = '男性';
+  assert.equal(validateState(state).valid, false);
+  assert.ok(validateState(state).errors.includes('profile.fields.gender is not supported'));
 });
 
 test('Japanese career detail sections are validated and survive JSON export/import in order', async () => {

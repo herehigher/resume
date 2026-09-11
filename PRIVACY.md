@@ -12,11 +12,11 @@ Version 1.1 - Effective 2026-09-01
 
 ### 保存する情報
 
-Resume Studio は、現在の browser origin の `localStorage` に `resume-studio-web-v2` という data version 別 key で下書きを保存します。下書き本文は Web Crypto の AES-GCM で暗号化し、保存値は envelope format、algorithm、nonce、ciphertext を含む内部用 envelope です。復号用 AES key は取り出せない `CryptoKey` として同じ version 別の IndexedDB に分けて保存し、localStorage には保存しません。一つの `version: 2` state に profile、埋め込み写真、日本語・简体中文・English の文書、言語と用紙設定が含まれ、JSON import/export も同じ data version を使います。対応中の旧 version は明示された key だけを read-only で読み、新 key への保存成功後に旧 raw と鍵を自動削除します。保存失敗時は旧草稿を保持します。対応範囲外の旧 key は列挙、読み込み、変更、削除しません。入力時の自動保存に加え、利用者は手動保存、JSON 書き出し・読込、browser の印刷機能による PDF 保存を実行できます。暗号 envelope の format version は data version とは独立しており、export されません。
+Resume Studio は、現在の browser origin の `localStorage` に `resume-studio-web-v3` という data version 別 key で下書きを保存します。下書き本文は Web Crypto の AES-GCM で暗号化し、保存値は envelope format、algorithm、nonce、ciphertext を含む内部用 envelope です。復号用 AES key は取り出せない `CryptoKey` として同じ version 別の IndexedDB に分けて保存し、localStorage には保存しません。一つの `version: 3` state に profile、埋め込み写真、日本語・简体中文・English の文書、言語と用紙設定が含まれ、JSON import/export も同じ data version を使います。`resume-studio-web-v2` だけを互換 key として read-only で読み、新 key への保存成功後に旧 raw と鍵を自動削除します。保存失敗時は旧草稿を保持します。対応範囲外の旧 key は列挙、読み込み、変更、削除しません。入力時の自動保存に加え、利用者は手動保存、JSON 書き出し・読込、browser の印刷機能による PDF 保存を実行できます。暗号 envelope の format version は data version とは独立しており、export されません。
 
 暗号化保存には secure context が必要です。`https://`、`http://localhost`、または `http://127.0.0.1` 以外の non-secure HTTP origin では草稿の保存・再読込を拒否し、既存の保存データを変更しません。
 
-現在形式と、最大直近3世代のうち明示的に対応した形式を読み込めます。将来版・非対応・過旧の JSON import は拒否し、既存の下書き、鍵、表示 preference を保持します。現在の v2 では旧 v1 を対応範囲に含めません。Web Locks を利用できない browser では競合を避けるため保存、削除、移行を停止します。内容の確認と JSON export は可能な範囲で残ります。
+現在形式と、最大直近3世代のうち明示的に対応した形式を読み込めます。将来版・非対応・過旧の JSON import は拒否し、既存の下書き、鍵、表示 preference を保持します。現在の v3 は v2 を対応範囲に含め、v1 は含めません。Web Locks を利用できない browser では競合を避けるため保存、削除、移行を停止します。内容の確認と JSON export は可能な範囲で残ります。
 
 ### Network と外部送信
 
@@ -28,7 +28,7 @@ Repository の `site/`、clone、fork では Analytics は無効で、HTML、CSS
 
 localStorage の下書き本文は AES-GCM で暗号化されますが、export file は暗号化されません。鍵または browser data を消去、private browsing を終了、保存容量超過、または browser による storage eviction が起きると、下書きを復号できない・失う可能性があります。重要な下書きは JSON で安全な場所へ backup してください。この保護は same-origin script/XSS、悪意の browser extension、browser profile または端末の侵害を防ぐものではありません。
 
-アプリ内の削除 UI は日本語画面の最下部にあります。確認して削除すると現在の `resume-studio-web-v2` の三言語下書きと現在の画面入力をまとめて消去します。旧 version の草稿は削除しません。この操作は取り消せません。無関係な storage 項目、download 済み JSON/PDF、browser の download 履歴、別 origin/profile の data は削除しません。
+アプリ内の削除 UI は日本語画面の最下部にあります。確認して削除すると現在の `resume-studio-web-v3` の三言語下書きと現在の画面入力をまとめて消去します。旧 version の草稿は削除しません。この操作は取り消せません。無関係な storage 項目、download 済み JSON/PDF、browser の download 履歴、別 origin/profile の data は削除しません。
 
 JSON と PDF には氏名、連絡先、経歴、写真などの個人情報が含まれる場合があります。共有と保管は利用者自身で管理してください。
 
@@ -38,11 +38,11 @@ JSON と PDF には氏名、連絡先、経歴、写真などの個人情報が�
 
 ### 保存的信息
 
-Resume Studio 使用按 data version 区分的 key `resume-studio-web-v2`，把草稿保存在当前 browser origin 的 `localStorage` 中。草稿正文通过 Web Crypto AES-GCM 加密；保存值是内部 envelope，包含 envelope format、algorithm、nonce 和 ciphertext。用于解密的 AES key 是不可导出的 `CryptoKey`，单独存放在同 version 的 IndexedDB，不存入 localStorage。一个 `version: 2` state 包含 profile、嵌入照片、日本語、简体中文和 English 文档以及语言与纸张设置；JSON 导入/导出使用同一个 data version。受支持的旧 version 只会通过明确列出的 key 以 read-only 方式读取；成功保存到新 key 后，应用会自动删除旧 raw 和密钥，保存失败则保留旧草稿。超出兼容范围的旧 key 不会被枚举、读取、修改或删除。用户可以自动或手动保存、导出/导入 JSON，并通过 browser 打印功能保存 PDF。加密 envelope 的 format version 与 data version 独立，且不会被导出。
+Resume Studio 使用按 data version 区分的 key `resume-studio-web-v3`，把草稿保存在当前 browser origin 的 `localStorage` 中。草稿正文通过 Web Crypto AES-GCM 加密；保存值是内部 envelope，包含 envelope format、algorithm、nonce 和 ciphertext。用于解密的 AES key 是不可导出的 `CryptoKey`，单独存放在同 version 的 IndexedDB，不存入 localStorage。一个 `version: 3` state 包含 profile、嵌入照片、日本語、简体中文和 English 文档以及语言与纸张设置；JSON 导入/导出使用同一个 data version。只将 `resume-studio-web-v2` 作为兼容旧 key 以 read-only 方式读取；成功保存到新 key 后，应用会自动删除旧 raw 和密钥，保存失败则保留旧草稿。超出兼容范围的旧 key 不会被枚举、读取、修改或删除。用户可以自动或手动保存、导出/导入 JSON，并通过 browser 打印功能保存 PDF。加密 envelope 的 format version 与 data version 独立，且不会被导出。
 
 加密保存需要安全上下文。在 `https://`、`http://localhost` 或 `http://127.0.0.1` 以外的非安全 HTTP origin 中，应用会拒绝保存和重新载入草稿，并且不会修改已有的保存数据。
 
-应用可以读取当前格式，以及最近三代中被明确列为支持的格式。未来版本、不支持或过旧的 JSON import 会被拒绝，现有草稿、密钥和显示 preference 将被保留。当前 v2 不把旧 v1 纳入兼容范围。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移；在可行范围内仍可查看内容和导出 JSON。
+应用可以读取当前格式，以及最近三代中被明确列为支持的格式。未来版本、不支持或过旧的 JSON import 会被拒绝，现有草稿、密钥和显示 preference 将被保留。当前 v3 支持 v2，不支持 v1。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移；在可行范围内仍可查看内容和导出 JSON。
 
 ### 网络与外部提交
 
@@ -54,7 +54,7 @@ Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics；除加载 HT
 
 localStorage 中的草稿正文使用 AES-GCM 加密，但 export file 不加密。清除密钥或 browser data、结束 private browsing、超出存储容量或 browser storage eviction 都可能使草稿无法解密或丢失。请将重要草稿导出为 JSON 并安全 backup。该保护不能防护同源 script/XSS、恶意 browser extension、browser profile 或设备被入侵。
 
-应用内删除 UI 位于日本語页面最下方。确认删除后，当前 `resume-studio-web-v2` 中三种语言的草稿和当前画面输入会一起被清除，且无法撤销。旧 version 的草稿不会被删除。该操作不会删除无关的 storage 项、已经下载的 JSON/PDF、browser download history，也不会清除其他 origin/profile 的 data。
+应用内删除 UI 位于日本語页面最下方。确认删除后，当前 `resume-studio-web-v3` 中三种语言的草稿和当前画面输入会一起被清除，且无法撤销。旧 version 的草稿不会被删除。该操作不会删除无关的 storage 项、已经下载的 JSON/PDF、browser download history，也不会清除其他 origin/profile 的 data。
 
 JSON 和 PDF 可能包含姓名、联系方式、经历及照片等个人信息。用户需自行负责共享与保管。
 
@@ -64,11 +64,11 @@ JSON 和 PDF 可能包含姓名、联系方式、经历及照片等个人信息�
 
 ### Data stored
 
-Resume Studio stores the draft in `localStorage` for the current browser origin under the data-version-specific key `resume-studio-web-v2`. Draft content is encrypted with Web Crypto AES-GCM; the internal envelope contains an envelope format, algorithm, nonce, and ciphertext. The non-extractable decryption `CryptoKey` is kept in the matching version-specific IndexedDB database and never in localStorage. One `version: 2` state contains the profile, embedded photo, Japanese, Simplified Chinese, and English documents, plus locale and paper settings; JSON imports and exports use the same data version. Supported prior versions are read only from explicitly listed keys. After the new-key save succeeds, the old raw draft and encryption key are removed automatically; a failed save retains them. Out-of-range old keys are never enumerated, read, changed, or deleted. Users can save automatically or manually, import/export JSON, and save a PDF through browser printing. The encryption-envelope format version remains separate from the data version and is never exported.
+Resume Studio stores the draft in `localStorage` for the current browser origin under the data-version-specific key `resume-studio-web-v3`. Draft content is encrypted with Web Crypto AES-GCM; the internal envelope contains an envelope format, algorithm, nonce, and ciphertext. The non-extractable decryption `CryptoKey` is kept in the matching version-specific IndexedDB database and never in localStorage. One `version: 3` state contains the profile, embedded photo, Japanese, Simplified Chinese, and English documents, plus locale and paper settings; JSON imports and exports use the same data version. Only `resume-studio-web-v2` is read as a compatible prior key. After the new-key save succeeds, the old raw draft and encryption key are removed automatically; a failed save retains them. Out-of-range old keys are never enumerated, read, changed, or deleted. Users can save automatically or manually, import/export JSON, and save a PDF through browser printing. The encryption-envelope format version remains separate from the data version and is never exported.
 
 Encrypted persistence requires a secure context. On non-secure HTTP origins other than `http://localhost` or `http://127.0.0.1`, the app refuses to save or reload drafts and does not change existing saved data.
 
-The app can read the current format and explicitly supported formats from up to the previous three versions. Future, unsupported, or too-old JSON imports are rejected and retain the existing draft, key, and display preference. The current v2 does not include old v1 in its compatibility range. When Web Locks are unavailable, saving, deletion, and migration stop to avoid conflicts. Viewing content and exporting JSON remain available where possible.
+The app can read the current format and explicitly supported formats from up to the previous three versions. Future, unsupported, or too-old JSON imports are rejected and retain the existing draft, key, and display preference. The current v3 includes v2 but not v1 in its compatibility range. When Web Locks are unavailable, saving, deletion, and migration stop to avoid conflicts. Viewing content and exporting JSON remain available where possible.
 
 ### Network and external submission
 
@@ -80,6 +80,6 @@ An enabled official artifact loads the beacon script at a fixed URL from `static
 
 Draft content in localStorage is AES-GCM encrypted, but exported files are not encrypted. Clearing the key or browser data, ending a private-browsing session, exceeding storage quota, or browser storage eviction can make a draft undecryptable or remove it. Export important drafts as JSON and keep the backup secure. This protection does not defend against same-origin scripts/XSS, malicious browser extensions, or browser-profile or device compromise.
 
-The in-app deletion UI is at the bottom of the Japanese screen. After confirmation, it removes all three language drafts in the current `resume-studio-web-v2` namespace and resets the current on-screen input. This cannot be undone. Drafts in old version namespaces are not removed. It does not remove unrelated storage entries, downloaded JSON/PDF files, browser download history, or data belonging to another origin/profile.
+The in-app deletion UI is at the bottom of the Japanese screen. After confirmation, it removes all three language drafts in the current `resume-studio-web-v3` namespace and resets the current on-screen input. This cannot be undone. Drafts in old version namespaces are not removed. It does not remove unrelated storage entries, downloaded JSON/PDF files, browser download history, or data belonging to another origin/profile.
 
 JSON and PDF files may contain personal information such as a name, contact details, employment history, and photo. The user controls their storage and sharing.

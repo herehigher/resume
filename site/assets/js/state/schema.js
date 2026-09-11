@@ -94,6 +94,10 @@ function validateStateShape(value) {
     errors.push('profile.fields.links must contain at most 3 string entries');
   }
 
+  if (!['', 'male', 'female', 'other'].includes(value.profile?.fields?.gender)) {
+    errors.push('profile.fields.gender is not supported');
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

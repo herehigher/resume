@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "settings": {
     "locale": "en",
     "pageSizeByLocale": { "ja": "A4", "zh-CN": "A4", "en": "LETTER" },
@@ -11,7 +11,7 @@
   },
   "profile": {
     "photo": "",
-    "fields": { "fullName": "Avery Example", "birthDate": "1994-05-20", "gender": "", "postalCode": "100-0000", "address": "Example District, Example City", "phone": "+81-00-0000-0000", "email": "avery@example.test", "links": ["https://example.test/avery", "https://example.test/avery-linkedin", "https://example.test/avery-portfolio"] }
+    "fields": { "fullName": "Avery Example", "birthDate": "1994-05-20", "gender": "", "nationality": "", "postalCode": "100-0000", "address": "Example District, Example City", "phone": "+81-00-0000-0000", "email": "avery@example.test", "links": ["https://example.test/avery", "https://example.test/avery-linkedin", "https://example.test/avery-portfolio"] }
   },
   "documents": {
     "ja": {
@@ -28,7 +28,7 @@
     },
     "en": {
       "activeDocument": "resume",
-      "resume": { "headline": "Example Project Lead", "location": "Example City", "summary": "This is a fictional resume for import testing.", "education": [{ "startDate": "2013-09", "endDate": "2017-06", "school": "Example University", "degree": "Example Studies", "details": "Fictional education entry." }], "experience": [{ "startDate": "2017-07", "endDate": "", "company": "Example Works", "role": "Project Lead", "details": "Fictional experience entry." }], "projects": [{ "startDate": "2024-01", "endDate": "2024-06", "name": "Example Project", "role": "Lead", "details": "Fictional project entry.", "url": "https://example.test/project" }], "skills": "Writing, collaboration, project delivery", "certifications": [{ "date": "2020-06", "name": "Example Certification", "url": "https://example.test/certification" }] }
+      "resume": { "showOptionalPersonalDetails": false, "headline": "Example Project Lead", "location": "Example City", "summary": "This is a fictional resume for import testing.", "education": [{ "startDate": "2013-09", "endDate": "2017-06", "school": "Example University", "degree": "Example Studies", "details": "Fictional education entry." }], "experience": [{ "startDate": "2017-07", "endDate": "", "company": "Example Works", "role": "Project Lead", "details": "Fictional experience entry." }], "projects": [{ "startDate": "2024-01", "endDate": "2024-06", "name": "Example Project", "role": "Lead", "details": "Fictional project entry.", "url": "https://example.test/project" }], "skills": "Writing, collaboration, project delivery", "certifications": [{ "date": "2020-06", "name": "Example Certification", "url": "https://example.test/certification" }] }
     }
   }
 }

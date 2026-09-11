@@ -8,6 +8,7 @@ export function createChineseSampleState(sourceState) {
       fullName: '简立',
       birthDate: '',
       gender: '',
+      nationality: '',
       postalCode: '200000',
       address: '上海市',
       phone: '138 0000 0000',

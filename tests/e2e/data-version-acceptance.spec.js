@@ -19,7 +19,16 @@ function createCurrentImport() {
   return state;
 }
 
-test('v2 JSON import preserves the shared profile, three documents, page breaks, and unrelated storage', async ({ page }) => {
+function createV2Import() {
+  const state = createCurrentImport();
+  state.version = 2;
+  state.profile.fields.gender = '男性';
+  delete state.profile.fields.nationality;
+  delete state.documents.en.resume.showOptionalPersonalDetails;
+  return state;
+}
+
+test('v2 JSON import migrates shared profile data, three documents, page breaks, and unrelated storage', async ({ page }) => {
   const consoleMessages = [];
   page.on('console', (message) => consoleMessages.push(message.text()));
   await page.addInitScript(({ draftKey, sentinelKey, sentinelValue }) => {
@@ -63,7 +72,7 @@ test('v2 JSON import preserves the shared profile, three documents, page breaks,
     sentinelValue: UNRELATED_STORAGE_VALUE
   });
 
-  const current = createCurrentImport();
+  const current = createV2Import();
   await openLocale(page, 'ja');
   await page.locator('#importDataInput').setInputFiles({
     name: 'resume-studio-web-v2.json',
@@ -95,12 +104,12 @@ test('v2 JSON import preserves the shared profile, three documents, page breaks,
   const download = await downloadPromise;
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
   expect(exported).toMatchObject({
-    version: 2,
-    profile: { photo: PHOTO_DATA_URL, fields: { fullName: 'Data version integration canary' } },
+    version: 3,
+    profile: { photo: PHOTO_DATA_URL, fields: { fullName: 'Data version integration canary', gender: 'male', nationality: '' } },
     documents: {
       ja: { fields: { motivation: 'Data version Japanese document canary' } },
       'zh-CN': { resume: { headline: 'Data version Chinese document canary' } },
-      en: { resume: { headline: 'Data version English document canary' } }
+      en: { resume: { headline: 'Data version English document canary', showOptionalPersonalDetails: false } }
     }
   });
   expect(Object.hasOwn(exported, 'schemaRevision')).toBe(false);
@@ -125,11 +134,11 @@ test('future and unsupported JSON versions leave the current draft and unrelated
   const rawBefore = await page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY);
 
   const future = createDefaultState('ja');
-  future.version = 3;
+  future.version = 4;
   const unsupported = createDefaultState('ja');
   unsupported.version = 1;
   for (const [fileName, payload] of [
-    ['future-v3.json', future],
+    ['future-v4.json', future],
     ['unsupported-v1.json', unsupported]
   ]) {
     await page.locator('#importDataInput').setInputFiles({

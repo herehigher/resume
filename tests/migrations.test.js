@@ -9,6 +9,7 @@ import {
   preferValidValue
 } from '../site/assets/js/state/migrations.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
+import { COMPATIBLE_DRAFT_STORAGE_KEYS } from '../site/assets/js/config.js';
 
 function fakeValidator(currentVersion) {
   return (value) => ({
@@ -75,15 +76,55 @@ const testRegistry = [
   }
 ];
 
-test('the production v2 format is current and v1 is intentionally unsupported', () => {
+function createV2State(gender) {
+  const state = createDefaultState('en');
+  state.version = 2;
+  delete state.profile.fields.nationality;
+  delete state.documents.en.resume.showOptionalPersonalDetails;
+  state.profile.fields.gender = gender;
+  return state;
+}
+
+test('the production v3 format is current, migrates the explicit v2 namespace, and keeps v1 unsupported', () => {
   const current = createDefaultState('en');
 
-  assert.equal(current.version, 2);
+  assert.equal(current.version, 3);
   assert.equal(Object.hasOwn(current, 'schemaRevision'), false);
   assert.equal(migrateState(current).status, 'current');
   assert.deepEqual(migrateState({ ...current, schemaRevision: 1 }), { status: 'unsupported', reason: 'current-validation-failed' });
   assert.deepEqual(migrateState({ ...current, version: 1 }), { status: 'unsupported', reason: 'migration-step-missing' });
-  assert.deepEqual(MIGRATION_REGISTRY, []);
+  assert.deepEqual(COMPATIBLE_DRAFT_STORAGE_KEYS, ['resume-studio-web-v2']);
+  assert.deepEqual(MIGRATION_REGISTRY.map(({ from, to }) => ({ from, to })), [{ from: 2, to: 3 }]);
+});
+
+test('the v2 to v3 migration normalizes all recognized gender values and adds fixed defaults', () => {
+  for (const [legacyGender, gender] of [
+    ['男性', 'male'], ['男', 'male'], ['Male', 'male'],
+    ['女性', 'female'], ['女', 'female'], ['Female', 'female'],
+    ['その他', 'other'], ['其他', 'other'], ['Other', 'other'], ['', '']
+  ]) {
+    const source = createV2State(legacyGender);
+    const before = structuredClone(source);
+    const result = migrateState(source);
+    assert.equal(result.status, 'migrated', legacyGender || 'empty gender');
+    assert.equal(result.state.version, 3);
+    assert.equal(result.state.profile.fields.gender, gender);
+    assert.equal(result.state.profile.fields.nationality, '');
+    assert.equal(result.state.documents.en.resume.showOptionalPersonalDetails, false);
+    assert.deepEqual(source, before, 'migration never mutates the v2 input');
+  }
+});
+
+test('the v2 to v3 migration salvages unknown non-empty gender without discarding recognized data', () => {
+  const source = createV2State('Unrecognized fictional gender');
+  source.profile.fields.fullName = 'Fictional migration canary';
+  source.documents.ja.fields.motivation = 'Recognized document content remains intact.';
+
+  const result = migrateState(source);
+  assert.equal(result.status, 'salvaged');
+  assert.equal(result.state.profile.fields.gender, '');
+  assert.equal(result.state.profile.fields.fullName, 'Fictional migration canary');
+  assert.equal(result.state.documents.ja.fields.motivation, 'Recognized document content remains intact.');
 });
 
 test('version classification rejects malformed, future, old, and incomplete paths distinctly', () => {
@@ -93,7 +134,7 @@ test('version classification rejects malformed, future, old, and incomplete path
     candidate.version = version;
     assert.deepEqual(migrateState(candidate), { status: 'unsupported', reason: 'invalid-version' });
   }
-  assert.deepEqual(migrateState({ ...current, version: 3 }), { status: 'future', reason: 'future-version' });
+  assert.deepEqual(migrateState({ ...current, version: 4 }), { status: 'future', reason: 'future-version' });
 
   const runnerAtSix = createMigrationRunner({ currentVersion: 6, registry: testRegistry, validateCurrent: fakeValidator(6) });
   assert.deepEqual(runnerAtSix({ version: 2 }), { status: 'too-old', reason: 'version-window-expired' });
