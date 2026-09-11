@@ -54,20 +54,41 @@ test('experience entries render in reverse chronological order without changing 
   assert.ok(html.indexOf('Middle Co') < html.indexOf('Earlier Co'));
 });
 
-test('English template excludes sensitive profile fields and only links HTTP(S) URLs', () => {
+test('English optional personal details stay out of the template while the switch is off', () => {
   const state = createEnglishSampleState(createDefaultState('en'));
   state.profile.fields.birthDate = '1980-01-01';
-  state.profile.fields.gender = 'PRIVATE-GENDER';
+  state.profile.fields.gender = 'other';
+  state.profile.fields.nationality = 'Fictionland';
   state.profile.fields.postalCode = 'PRIVATE-POSTAL';
   state.profile.fields.address = 'PRIVATE-FULL-ADDRESS';
   state.profile.fields.links[1] = 'javascript:alert(1)';
   state.documents.en.resume.projects[0].url = 'https://example.com/a-very-long-project-url-that-remains-clickable';
 
   const html = renderEnglishResume(state);
-  assert.doesNotMatch(html, /1980-01-01|PRIVATE-GENDER|PRIVATE-POSTAL|PRIVATE-FULL-ADDRESS/);
+  assert.doesNotMatch(html, /1980-01-01|Other|Fictionland|PRIVATE-POSTAL|PRIVATE-FULL-ADDRESS|en-optional-personal-details/);
   assert.match(html, /Location:<\/span> Seattle, WA \/ United States/);
   assert.doesNotMatch(html, /href="javascript:/);
   assert.match(html, /href="https:\/\/example\.com\/a-very-long-project-url-that-remains-clickable"/);
+});
+
+test('English optional personal details render only entered values, escaped, when enabled', () => {
+  const state = createDefaultState('en');
+  state.documents.en.resume.showOptionalPersonalDetails = true;
+  state.profile.fields.gender = 'female';
+  state.profile.fields.nationality = '<Fiction & Co>';
+  const html = renderEnglishResume(state, { photoUrl: 'blob:https://example.test/photo-id' });
+
+  assert.match(html, /class="en-optional-personal-details"/);
+  assert.match(html, /class="en-profile-photo" src="blob:https:\/\/example\.test\/photo-id"/);
+  assert.match(html, /Gender:<\/strong> Female/);
+  assert.match(html, /Nationality:<\/strong> &lt;Fiction &amp; Co&gt;/);
+  assert.doesNotMatch(html, /Birth date:|Full address:|Postal code:/);
+  assert.doesNotMatch(html, /<Fiction & Co>/);
+
+  state.profile.fields.gender = '';
+  state.profile.fields.nationality = '';
+  const empty = renderEnglishResume(state);
+  assert.doesNotMatch(empty, /en-optional-personal-details|Birth date:|Gender:|Full address:|Nationality:/);
 });
 
 test('English profile Links use one stable label with a separate wrapping list', () => {
@@ -95,7 +116,7 @@ test('English page-size setting selects an A4 or US Letter document class', () =
   assert.match(renderEnglishResume(state), /en-page-size-a4[^>]+data-page-size="A4"/);
 });
 
-test('English sample and editor cover all ATS sections without private-profile controls', () => {
+test('English sample and editor cover all ATS sections and optional personal-detail controls', () => {
   const state = createEnglishSampleState(createDefaultState('ja'));
   assert.equal(state.settings.locale, 'en');
   assert.equal(state.profile.fields.birthDate, '');
@@ -104,10 +125,11 @@ test('English sample and editor cover all ATS sections without private-profile c
   assert.ok(state.documents.en.resume.experience.length >= 2);
 
   const editor = renderEnglishWorkspace();
-  for (const label of ['City, State / Country', 'Professional summary', 'Experience', 'Projects', 'Education', 'Skills and certifications', 'US Letter', 'A4']) {
+  for (const label of ['City, State / Country', 'Optional personal details', 'Show optional personal details in the English resume', 'Birth date', 'Gender', 'Full address', 'Nationality', 'Professional summary', 'Experience', 'Projects', 'Education', 'Skills and certifications', 'US Letter', 'A4']) {
     assert.match(editor, new RegExp(label));
   }
-  assert.doesNotMatch(editor, /Birth date|Gender|Full address|Photo/);
+  assert.match(editor, /data-en-optional-details-switch/);
+  assert.match(editor, /<option value="male">Male<\/option>/);
   assert.deepEqual(createEnglishItem('certifications'), { date: '', name: '', url: '' });
   assert.equal(createEnglishItem('unknown'), null);
 });

@@ -139,9 +139,9 @@
                   <span>性別</span>
                   <select name="gender">
                     <option value="">記載しない</option>
-                    <option>男性</option>
-                    <option>女性</option>
-                    <option>その他</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                    <option value="other">その他</option>
                   </select>
                 </label>
                 <label class="input-field">
@@ -181,6 +181,10 @@
                 <label class="input-field">
                   <span>メールアドレス</span>
                   <input name="email" type="email" autocomplete="email" placeholder="name@example.jp">
+                </label>
+                <label class="input-field">
+                  <span>国籍</span>
+                  <input name="nationality" autocomplete="country-name">
                 </label>
               </div>
             </div>

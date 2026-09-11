@@ -68,8 +68,19 @@ test('Chinese education and work histories sort newest first without mutating st
 test('empty optional sensitive fields do not reserve markup in the Chinese template', () => {
   const html = renderChineseResume(createDefaultState('zh-CN'));
 
-  assert.doesNotMatch(html, /has-photo|zh-profile-photo|出生日期：|性别：|zh-optional-details/);
+  assert.doesNotMatch(html, /has-photo|zh-profile-photo|出生日期：|性别：|国籍：|zh-optional-details/);
   assert.match(html, /zh-resume-document/);
+});
+
+test('Chinese nationality and locale-independent gender use Chinese labels and escape input', () => {
+  const state = createDefaultState('zh-CN');
+  state.profile.fields.gender = 'male';
+  state.profile.fields.nationality = '<虚构 & 国>';
+  const html = renderChineseResume(state);
+
+  assert.match(html, /性别：男/);
+  assert.match(html, /国籍：&lt;虚构 &amp; 国&gt;/);
+  assert.doesNotMatch(html, /<虚构 & 国>/);
 });
 
 test('Chinese template renders photos only from an explicit display URL', () => {
@@ -170,6 +181,8 @@ test('Chinese editor exposes all state-backed sections and accessible controls',
   assert.match(shell, /aria-label="中文简历填写表单"/);
   assert.match(shell, /aria-label="缩小预览"/);
   assert.match(shell, /data-profile="birthDate"/);
+  assert.match(shell, /data-profile="nationality"/);
+  assert.match(shell, /<option value="male">男<\/option>/);
   assert.match(shell, /选填/);
   assert.match(shell, /class="editor-legal"/);
   assert.doesNotMatch(shell, /data-zh-action="print"/);

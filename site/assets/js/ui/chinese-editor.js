@@ -9,7 +9,7 @@ import { confirmAction } from './confirmation-dialog.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 
 const PROFILE_FIELDS = new Set([
-  'fullName', 'birthDate', 'gender', 'postalCode', 'address', 'phone', 'email'
+  'fullName', 'birthDate', 'gender', 'nationality', 'postalCode', 'address', 'phone', 'email'
 ]);
 
 const ITEM_FACTORIES = Object.freeze({
@@ -92,7 +92,8 @@ export function renderChineseEditorShell() {
             </div>
             <div class="field-grid two-columns">
               <label class="input-field"><span>出生日期 <em>${zhCN.optionalLabel}</em></span><input data-profile="birthDate" type="date"></label>
-              <label class="input-field"><span>性别 <em>${zhCN.optionalLabel}</em></span><select data-profile="gender"><option value="">不填写</option><option>男</option><option>女</option><option>其他</option></select></label>
+              <label class="input-field"><span>性别 <em>${zhCN.optionalLabel}</em></span><select data-profile="gender"><option value="">不填写</option><option value="male">男</option><option value="female">女</option><option value="other">其他</option></select></label>
+              <label class="input-field"><span>国籍 <em>${zhCN.optionalLabel}</em></span><input data-profile="nationality" autocomplete="country-name"></label>
             </div>
             <div class="field-grid"><div class="list-heading"><strong>Links</strong><button class="small-add-button" data-zh-add-profile-link type="button">添加链接</button></div><span class="field-help">最多 3 条。输入 URL 后自动识别网站名称和图标。</span><div class="profile-links-editor" data-zh-profile-links></div></div>
           </div>

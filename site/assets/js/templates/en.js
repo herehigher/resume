@@ -1,5 +1,6 @@
 import { escapeHTML, isClickableUrl } from '../utils/html.js';
 import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
+import { genderLabel } from '../utils/personal-details.js';
 
 const MONTH_NAMES = Object.freeze([
   'January',
@@ -116,6 +117,21 @@ function renderContact(profile, location) {
   return contactItems.length ? `<ul class="en-contact-list">${contactItems.join('')}</ul>` : '';
 }
 
+function renderOptionalPersonalDetails(profile, photoUrl) {
+  const birthDate = String(profile.birthDate || '').trim();
+  const postalCode = String(profile.postalCode || '').trim();
+  const address = String(profile.address || '').trim();
+  const nationality = String(profile.nationality || '').trim();
+  const details = [
+    photoUrl ? `<img class="en-profile-photo" src="${escapeHTML(photoUrl)}" alt="">` : '',
+    birthDate ? `<span><strong>Birth date:</strong> ${text(birthDate)}</span>` : '',
+    genderLabel(profile.gender, 'en') ? `<span><strong>Gender:</strong> ${escapeHTML(genderLabel(profile.gender, 'en'))}</span>` : '',
+    address ? `<span><strong>Full address:</strong> ${postalCode ? `${text(postalCode)} · ` : ''}${text(address)}</span>` : '',
+    nationality ? `<span><strong>Nationality:</strong> ${text(nationality)}</span>` : ''
+  ].filter(Boolean);
+  return details.length ? `<div class="en-optional-personal-details">${details.join('')}</div>` : '';
+}
+
 function renderExperience(entries) {
   const items = sortEnglishEntriesDescending(entries, 'experience').map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
@@ -166,7 +182,7 @@ function renderCertifications(entries) {
   return items ? `<section class="en-section" data-section-key="certifications" aria-labelledby="en-certifications-heading"><h2 id="en-certifications-heading">Certifications</h2><ul class="en-certification-list">${items}</ul></section>` : '';
 }
 
-export function renderEnglishResume(state) {
+export function renderEnglishResume(state, { photoUrl = '' } = {}) {
   const profile = state.profile.fields;
   const resume = getEnglishResume(state);
   const pageSize = normalizeEnglishPageSize(state.settings.pageSizeByLocale.en);
@@ -178,6 +194,7 @@ export function renderEnglishResume(state) {
       <h1>${text(profile.fullName) || '<span class="empty-preview">Your Name</span>'}</h1>
       ${resume.headline ? `<p class="en-headline">${text(resume.headline)}</p>` : ''}
       ${renderContact(profile, resume.location)}
+      ${resume.showOptionalPersonalDetails ? renderOptionalPersonalDetails(profile, photoUrl) : ''}
     </header>
     ${summary ? `<section class="en-section" data-section-key="summary" aria-labelledby="en-summary-heading"><h2 id="en-summary-heading">Summary</h2><div class="en-section-body">${escapeHTML(summary)}</div></section>` : ''}
     ${renderExperience(resume.experience)}
@@ -188,6 +205,6 @@ export function renderEnglishResume(state) {
   </article>`;
 }
 
-export function renderEnglishDocument(state) {
-  return renderEnglishResume(state);
+export function renderEnglishDocument(state, options = {}) {
+  return renderEnglishResume(state, options);
 }

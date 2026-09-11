@@ -1,6 +1,7 @@
 import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../utils/date.js';
 import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js';
 import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
+import { genderLabel } from '../utils/personal-details.js';
 
 function hasContent(value) {
   return String(value ?? '').trim().length > 0;
@@ -114,7 +115,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <div class="profile-text">
           <div class="profile-kana"><span class="paper-label">ふりがな</span><span class="paper-value">${displayText(fields.nameKana)}</span></div>
           <div class="profile-name"><span class="paper-label">氏名</span><span class="paper-value">${displayText(fields.fullName, '氏名未入力')}</span></div>
-          <div class="profile-birth"><span class="paper-label">生年月日</span><span class="paper-value">${displayText(japaneseDate(fields.birthDate))} ${age ? `（${escapeHTML(age)}）` : ''}</span><span class="paper-value">${escapeHTML(fields.gender)}</span></div>
+          <div class="profile-birth"><span class="paper-label">生年月日</span><span class="paper-value">${displayText(japaneseDate(fields.birthDate))} ${age ? `（${escapeHTML(age)}）` : ''}</span><span class="paper-value">${escapeHTML(genderLabel(fields.gender, 'ja'))}</span></div>
         </div>
         <div class="profile-photo-column"><div class="profile-photo">${photo}</div></div>
       </section>
@@ -123,6 +124,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <div><span class="paper-label">現住所</span><span class="paper-value full-contact">${fields.postalCode ? `〒${escapeHTML(fields.postalCode)}　` : ''}${displayText(fields.address)}</span></div>
         <div><span class="paper-label">電話</span><span class="paper-value full-contact">${displayText(fields.phone)}</span></div>
         <div><span class="paper-label">E-mail</span><span class="paper-value full-contact">${displayText(fields.email)}</span></div>
+        ${hasContent(fields.nationality) ? `<div><span class="paper-label">国籍</span><span class="paper-value full-contact">${escapeHTML(fields.nationality)}</span></div>` : ''}
       </section>
       ${renderResumeProfiles(fields)}
       <section class="paper-section" data-section-key="history">
@@ -178,7 +180,7 @@ export function renderJapaneseCareer(state) {
     <article class="document-page career-document">
       <header class="career-doc-header" data-section-key="identity">
         <h2>職務経歴書</h2>
-        <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '作成日')}<br>${displayText(fields.fullName, '氏名未入力')}</div>
+        <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '作成日')}<br>${displayText(fields.fullName, '氏名未入力')}${hasContent(fields.nationality) ? `<br>国籍：${escapeHTML(fields.nationality)}` : ''}</div>
         ${renderCareerProfiles(fields)}
       </header>
       <section class="career-section" data-section-key="summary"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>

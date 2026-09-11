@@ -1,5 +1,6 @@
 import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js';
 import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
+import { genderLabel } from '../utils/personal-details.js';
 
 function hasText(value) {
   return Boolean(String(value || '').trim());
@@ -94,8 +95,9 @@ function renderProfiles(fields) {
 
 function renderOptionalDetails(fields) {
   const details = [
-    fields.birthDate && `<span>出生日期：${escapeHTML(formatChineseDate(fields.birthDate))}</span>`,
-    fields.gender && `<span>性别：${escapeHTML(fields.gender)}</span>`
+    hasText(fields.birthDate) ? `<span>出生日期：${escapeHTML(formatChineseDate(fields.birthDate))}</span>` : '',
+    genderLabel(fields.gender, 'zh-CN') ? `<span>性别：${escapeHTML(genderLabel(fields.gender, 'zh-CN'))}</span>` : '',
+    hasText(fields.nationality) ? `<span>国籍：${escapeHTML(String(fields.nationality).trim())}</span>` : ''
   ].filter(Boolean);
   return details.length ? `<div class="zh-optional-details">${details.join('')}</div>` : '';
 }

@@ -10,6 +10,7 @@ const PROFILE_FIELD_NAMES = new Set([
   'fullName',
   'birthDate',
   'gender',
+  'nationality',
   'postalCode',
   'address',
   'phone',

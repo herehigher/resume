@@ -68,7 +68,7 @@ document.getElementById('chineseWorkspace').insertAdjacentHTML('afterend', rende
 const embeddedPhotoUrl = createEmbeddedPhotoUrl();
 const japaneseEditor = initJapaneseEditor(store, { embeddedPhotoUrl });
 const chineseEditor = initChineseEditor(store, { embeddedPhotoUrl });
-const englishEditor = initEnglishEditor(store);
+const englishEditor = initEnglishEditor(store, { embeddedPhotoUrl });
 const privacySecurity = initPrivacySecurity(locale, {
   draftStorageAvailable: storageError?.code !== 'crypto-unavailable'
 });

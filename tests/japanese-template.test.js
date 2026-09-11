@@ -47,6 +47,20 @@ test('Japanese dates, age, and current employment use conventional labels', () =
   assert.match(renderJapaneseDocument(state), /2024年 4月 〜 現在/);
 });
 
+test('Japanese nationality is optional and locale-independent gender uses a Japanese label', () => {
+  const state = createDefaultState('ja');
+  state.profile.fields.gender = 'female';
+  state.profile.fields.nationality = '<架空 & 国>';
+  const html = renderJapaneseDocument(state);
+
+  assert.match(html, /女性/);
+  assert.match(html, /<span class="paper-label">国籍<\/span><span class="paper-value full-contact">&lt;架空 &amp; 国&gt;<\/span>/);
+  state.documents.ja.activeDocument = 'career';
+  assert.match(renderJapaneseDocument(state), /国籍：&lt;架空 &amp; 国&gt;/);
+  state.profile.fields.nationality = '';
+  assert.doesNotMatch(renderJapaneseDocument(state), /国籍/);
+});
+
 test('Japanese PDF output omits blank rows and empty career entries', () => {
   const state = createDefaultState('ja');
   state.documents.ja.education = [
