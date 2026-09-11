@@ -51,6 +51,103 @@ function expectCanonicalGeometry(measurements, { height, padding, width }) {
   }
 }
 
+const MOBILE_GEOMETRY_TOLERANCE = 1;
+const mobileGeometryPollOptions = {
+  intervals: [50, 100, 250],
+  timeout: 5_000
+};
+
+function mobilePreviewSnapshot({ finalSelector, locale, previewSelector, sampleText, scrollSelector, tolerance }) {
+  const preview = document.querySelector(previewSelector);
+  const scroll = document.querySelector(scrollSelector);
+  const page = preview?.querySelector('.document-page');
+  const final = document.querySelector(finalSelector);
+  const round = (value) => Math.round(value * 100) / 100;
+  const bounds = (element) => {
+    const rect = element?.getBoundingClientRect();
+    if (!rect) return null;
+    return Object.fromEntries(['bottom', 'left', 'right', 'top'].map((key) => [key, round(rect[key])]));
+  };
+
+  if (!preview || !scroll || !page || !final) {
+    return {
+      final: { bounds: bounds(final) },
+      locale,
+      page: { bounds: bounds(page) },
+      preview: { transform: null },
+      scroll: { bounds: bounds(scroll) },
+      viewport: { height: window.innerHeight, width: window.innerWidth }
+    };
+  }
+
+  const transform = getComputedStyle(preview).transform;
+  const scaleX = transform === 'none'
+    ? 1
+    : Number.parseFloat(transform.match(/^matrix\(([^,]+)/)?.[1]);
+  const pageBounds = bounds(page);
+  const scrollBounds = bounds(scroll);
+  const finalBounds = bounds(final);
+
+  return {
+    final: {
+      bottomWithinScroll: finalBounds.bottom <= scrollBounds.bottom + tolerance,
+      bounds: finalBounds,
+      topWithinScroll: finalBounds.top >= scrollBounds.top - tolerance
+    },
+    locale,
+    page: {
+      bounds: pageBounds,
+      leftWithinScroll: pageBounds.left >= scrollBounds.left - tolerance,
+      rightWithinScroll: pageBounds.right <= scrollBounds.right + tolerance
+    },
+    preview: {
+      isVisible: preview.getClientRects().length > 0,
+      scaleX: round(scaleX),
+      transform,
+      transformIsScaled: Number.isFinite(scaleX) && scaleX > 0 && scaleX < 1
+    },
+    sampleReady: preview.textContent.includes(sampleText),
+    scroll: {
+      bounds: scrollBounds,
+      clientHeight: scroll.clientHeight,
+      clientWidth: scroll.clientWidth,
+      scrollHeight: scroll.scrollHeight,
+      scrollLeft: scroll.scrollLeft,
+      scrollTop: scroll.scrollTop,
+      scrollWidth: scroll.scrollWidth
+    },
+    viewport: { height: window.innerHeight, width: window.innerWidth }
+  };
+}
+
+async function expectMobilePreviewState(page, item, expected, condition) {
+  let snapshot;
+  try {
+    await expect.poll(
+      async () => {
+        snapshot = await page.evaluate(mobilePreviewSnapshot, { ...item, tolerance: MOBILE_GEOMETRY_TOLERANCE });
+        return snapshot;
+      },
+      {
+        ...mobileGeometryPollOptions,
+        message: `${item.locale} mobile preview ${condition}`
+      }
+    ).toMatchObject(expected);
+  } catch (error) {
+    await test.info().attach(`${item.locale} mobile preview geometry`, {
+      body: JSON.stringify({ condition, expected, snapshot }, null, 2),
+      contentType: 'application/json'
+    });
+    throw error;
+  }
+}
+
+async function waitForRenderingFrames(page) {
+  await page.evaluate(() => new Promise((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+  }));
+}
+
 test('简体中文: A4 preview page-box and representative wrapping stay canonical across viewports', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
@@ -170,54 +267,44 @@ test('[mobile] 简体中文・English: scaled preview has no horizontal crop and
       finalSelector: '.zh-certifications li:last-child',
       mobilePreview: '[data-zh-mobile-view="preview"]',
       previewSelector: '[data-zh-preview]',
+      sampleText: '数据分析专业证书',
       sample: '[data-zh-action="sample"]',
-      scrollSelector: '[data-zh-preview-scroll]'
+      scrollSelector: '[data-zh-preview-scroll]',
+      workspaceSelector: '#chineseWorkspace'
     },
     {
       locale: 'en',
       finalSelector: '.en-certification-list li:last-child',
       mobilePreview: '[data-en-mobile-view="preview"]',
       previewSelector: '[data-en-preview]',
+      sampleText: 'Certifications',
       sample: '[data-en-load-sample]',
-      scrollSelector: '[data-en-preview-scroll]'
+      scrollSelector: '[data-en-preview-scroll]',
+      workspaceSelector: '[data-english-editor]'
     }
   ];
 
   for (const item of cases) {
     await openLocale(page, item.locale);
     await page.locator(item.sample).click();
+    await expect(page.locator(item.previewSelector)).toContainText(item.sampleText);
     await page.locator(item.mobilePreview).click();
-    await expect(page.locator(item.previewSelector)).toBeVisible();
-    await expect.poll(() => page.evaluate(({ previewSelector, scrollSelector }) => {
-      const pageBox = document.querySelector(previewSelector).querySelector('.document-page').getBoundingClientRect();
-      const scroll = document.querySelector(scrollSelector).getBoundingClientRect();
-      return pageBox.width <= scroll.width;
-    }, item)).toBe(true);
-    const result = await page.evaluate(({ finalSelector, scrollSelector }) => {
-      const final = document.querySelector(finalSelector);
+    await expect(page.locator(item.workspaceSelector)).toHaveAttribute('data-mobile-mode', 'preview');
+    await expect(page.locator(item.mobilePreview)).toHaveAttribute('aria-pressed', 'true');
+    await expectMobilePreviewState(page, item, {
+      preview: { isVisible: true, transformIsScaled: true },
+      sampleReady: true
+    }, 'waits for the locale sample, mobile view, and scaled transform');
+
+    await page.evaluate(({ scrollSelector }) => {
       const scroll = document.querySelector(scrollSelector);
       scroll.scrollLeft = 0;
       scroll.scrollTop = scroll.scrollHeight;
-      const finalRect = final.getBoundingClientRect();
-      const scrollRect = scroll.getBoundingClientRect();
-      const pageRect = final.closest('.document-page').getBoundingClientRect();
-      const previewRect = final.closest('.document-preview').getBoundingClientRect();
-      return {
-        finalBottom: finalRect.bottom,
-        finalTop: finalRect.top,
-        pageLeft: pageRect.left,
-        pageRight: pageRect.right,
-        scrollBottom: scrollRect.bottom,
-        scrollLeft: scrollRect.left,
-        scrollRight: scrollRect.right,
-        scrollTop: scrollRect.top,
-        previewLeft: previewRect.left,
-        previewRight: previewRect.right
-      };
     }, item);
-    expect(result.pageLeft).toBeGreaterThanOrEqual(result.scrollLeft - 1);
-    expect(result.pageRight).toBeLessThanOrEqual(result.scrollRight + 1);
-    expect(result.finalTop).toBeGreaterThanOrEqual(result.scrollTop - 1);
-    expect(result.finalBottom).toBeLessThanOrEqual(result.scrollBottom + 1);
+    await waitForRenderingFrames(page);
+    await expectMobilePreviewState(page, item, { page: { leftWithinScroll: true } }, 'keeps the page left edge reachable');
+    await expectMobilePreviewState(page, item, { page: { rightWithinScroll: true } }, 'keeps the page right edge reachable');
+    await expectMobilePreviewState(page, item, { final: { topWithinScroll: true } }, 'keeps the final content top reachable');
+    await expectMobilePreviewState(page, item, { final: { bottomWithinScroll: true } }, 'keeps the final content bottom reachable');
   }
 });
