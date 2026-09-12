@@ -10,6 +10,7 @@ import {
   compareStableSemVer,
   formatPreflightSummary,
   parseArguments,
+  repositoryEndpoint,
   runReleasePreflight
 } from '../scripts/release-preflight.mjs';
 
@@ -264,6 +265,12 @@ test('release preflight argument and SemVer helpers accept only stable, exact va
   assert.throws(() => parseArguments(['--target', '0.2.9', '--allow-untracked', '../notes.txt']), /exact relative/);
   assert.throws(() => parseArguments(['--target', '0.2.9', '--allow-untracked', 'notes\\..\\escaped.txt']), /exact relative/);
   assert.throws(() => parseArguments(['--target', '0.2.9', '--allow-untracked', 'notes//duplicate.txt']), /exact relative/);
+});
+
+test('release preflight builds the repository root API path without a trailing slash', () => {
+  assert.equal(repositoryEndpoint(''), 'repos/herehigher/resume');
+  assert.equal(repositoryEndpoint('pulls?state=open&per_page=100'),
+    'repos/herehigher/resume/pulls?state=open&per_page=100');
 });
 
 test('release preflight CLI emits a short structured failure summary without raw command output', () => {

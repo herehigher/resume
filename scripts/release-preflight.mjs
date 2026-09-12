@@ -45,11 +45,15 @@ function gitBuffer(rootDirectory, args) {
   }
 }
 
+export function repositoryEndpoint(endpoint) {
+  return endpoint ? `repos/${repository}/${endpoint}` : `repos/${repository}`;
+}
+
 function githubApi(endpoint, paginate = false) {
   try {
     const args = ['api'];
     if (paginate) args.push('--paginate', '--slurp');
-    args.push(`repos/${repository}/${endpoint}`);
+    args.push(repositoryEndpoint(endpoint));
     return JSON.parse(execFileSync('gh', args, {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024
     }));
