@@ -310,6 +310,23 @@ test('release asset comparison rejects committed bytes that differ from promoted
   );
 });
 
+test('release asset comparison rejects an unmaterialized LFS pointer before verification', async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'resume-release-assets-lfs-pointer-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const generatedRoot = path.join(directory, 'generated');
+  const committedRoot = path.join(directory, 'committed');
+  const promotedRoot = path.join(directory, 'promoted');
+  await writeAssetFixture(generatedRoot, { commit: 'a'.repeat(40) });
+  const committedManifest = await writePromotedFixture(committedRoot, promotedRoot, { commit: 'b'.repeat(40) });
+  const expectedDigest = committedManifest.outputs.find(({ locale }) => locale === 'en').screenshot.sha256;
+  await writeFile(path.join(committedRoot, 'docs/screenshots/en.png'),
+    `version https://git-lfs.github.com/spec/v1\noid sha256:${expectedDigest}\nsize 1\n`);
+  await assert.rejects(
+    compareReleaseAssets({ committedRoot, generatedRoot, promotedRoot, sourceSha: 'a'.repeat(40) }),
+    /committed asset validation failed: Release documentation assets failed: Git LFS pointer is not materialized/
+  );
+});
+
 test('promotion refuses overlapping generated and source roots', async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'resume-release-assets-promote-'));
   t.after(() => rm(directory, { recursive: true, force: true }));

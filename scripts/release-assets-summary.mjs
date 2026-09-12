@@ -37,18 +37,19 @@ export function promotionRequiredReport(fields) {
   return {
     annotation: `Promotion required for v${identity.candidateVersion}; Quality run ${identity.qualityRunId} has the exact documentation evidence.`,
     summary: [
-      '## Promotion required',
+      '## Promotion required after successful Quality',
       '',
       'Quality (product and tests) succeeded. Release assets are intentionally not current yet, so this required check remains failed.',
       '',
       `- Candidate version: \`${identity.candidateVersion}\``,
+      `- Pull request: \`#${identity.pullRequestNumber}\``,
       `- Quality run ID: \`${identity.qualityRunId}\``,
       `- Source merge SHA: \`${identity.sourceMergeSha}\``,
       `- Artifact: \`${identity.artifactName}\``,
       '',
       'Next step (from a clean checkout of this candidate branch):',
       '',
-      `\`npm run promote:pr-doc-assets -- --pr ${identity.pullRequestNumber}\``,
+      `\`npm run promote:pr-doc-assets -- --quality-run-id ${identity.qualityRunId}\``,
       '',
       'This only retrieves and verifies the exact Quality artifact, then updates the seven reviewable release asset files. Review and commit those files to this pull request; it does not approve, merge, tag, push, or publish.'
     ].join('\n')
@@ -69,9 +70,17 @@ export function releaseAssetFailureReport(category) {
       annotation: 'Committed release asset provenance is invalid.',
       summary: '## Release asset provenance failure\n\nThe committed manifest cannot identify a valid promoted Quality artifact. This is not a promotion waiting state; repair the manifest or asset provenance in a new commit.'
     },
-    'current-evidence-unavailable': {
-      annotation: 'The current Quality documentation artifact is unavailable.',
-      summary: '## Current Quality evidence unavailable\n\nThe documentation artifact from this pull request’s successful Quality run could not be downloaded. Re-run Quality if its artifact expired; do not treat this as a completed promotion.'
+    'current-evidence-github-api-or-artifact-unavailable': {
+      annotation: 'GitHub API or current Quality artifact evidence is unavailable.',
+      summary: '## Current Quality evidence unavailable\n\nGitHub Actions evidence or its documentation artifact is unavailable. Re-run Quality if the artifact expired, then resolve and promote fresh evidence; do not treat this as a completed promotion.'
+    },
+    'current-evidence-identity-mismatch': {
+      annotation: 'Current Quality evidence does not match the run, pull request, head, merge, or artifact identity.',
+      summary: '## Current Quality evidence identity failure\n\nThe resolved Quality evidence does not match this pull request identity. Re-run Quality for the current head and use its exact evidence; do not treat this as a completed promotion.'
+    },
+    'current-evidence-local-tooling-bootstrap-failure': {
+      annotation: 'Local checkout tooling could not resolve current Quality evidence.',
+      summary: '## Current Quality evidence bootstrap failure\n\nThe checkout tooling could not resolve the current Quality evidence. Re-run the check after the runner is available; do not treat this as a completed promotion.'
     },
     'promoted-evidence-unavailable': {
       annotation: 'The artifact recorded by committed promotion provenance is unavailable or expired.',

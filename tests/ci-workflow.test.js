@@ -51,7 +51,7 @@ test('release asset currentness is a separate check after Quality uploads eviden
   assert.match(qualityWorkflow, /github\.event_name == 'pull_request' }}\s+runs-on:[\s\S]+Report Quality failure[\s\S]+needs\.quality\.result != 'success'/);
   assert.match(qualityWorkflow, /Download documentation asset evidence[\s\S]+Verify release documentation assets are current/);
   assert.match(qualityWorkflow, /steps\.classification\.outputs\.classification == 'verification-required'/);
-  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+lfs: true/);
+  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+Materialize release asset LFS files/);
   assert.match(qualityWorkflow, /--quality-run-id "\$\{QUALITY_RUN_ID\}"/);
   assert.match(qualityWorkflow, /Resolve promoted Quality artifact provenance[\s\S]+Download the originally promoted Quality artifact/);
   assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--promoted-root "\$\{PROMOTED_ASSET_DIRECTORY\}"[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
@@ -62,33 +62,32 @@ test('release asset status distinguishes promotion waiting from Quality, provena
   assert.match(qualityWorkflow, /Record actual Quality run identity[\s\S]+run_id=\$\{GITHUB_RUN_ID\}/);
   assert.match(qualityWorkflow, /Classify release asset check[\s\S]+release-assets-summary\.mjs classify/);
   assert.match(qualityWorkflow, /Resolve exact current Quality evidence[\s\S]+promote-pr-doc-assets\.mjs evidence[\s\S]+--quality-run-id "\$\{QUALITY_RUN_ID\}"[\s\S]+--source-merge-sha "\$\{SOURCE_MERGE_SHA\}"/);
-  assert.match(qualityWorkflow, /Report promotion required[\s\S]+promotion-required "\$CANDIDATE_VERSION" "\$PR_NUMBER" "\$QUALITY_RUN_ID" "\$SOURCE_MERGE_SHA" "\$ARTIFACT_NAME"[\s\S]+exit 1/);
+  assert.match(qualityWorkflow, /EVIDENCE_FAILURE_CATEGORY[\s\S]+current-evidence-local-tooling-bootstrap-failure/);
+  assert.doesNotMatch(qualityWorkflow, /current-evidence-unavailable/);
+  assert.match(qualityWorkflow, /Report expected promotion merge block after successful Quality[\s\S]+promotion-required "\$CANDIDATE_VERSION" "\$PR_NUMBER" "\$QUALITY_RUN_ID" "\$SOURCE_MERGE_SHA" "\$ARTIFACT_NAME"[\s\S]+exit 1/);
   assert.match(qualityWorkflow, /Report invalid committed provenance[\s\S]+failure provenance-invalid[\s\S]+Report unavailable promoted Quality artifact[\s\S]+failure promoted-evidence-unavailable[\s\S]+Report release asset integrity mismatch[\s\S]+failure asset-integrity-mismatch/);
 });
 
-test('release asset reporting always runs after a minimal checkout and gates each classification path', () => {
+test('release asset reporting uses one authoritative checkout and gates each classification path', () => {
   assert.match(releaseAssetsCurrentJob, /^ {4}if: \$\{\{ always\(\) && github\.event_name == 'pull_request' \}\}$/m);
 
-  const summaryCheckout = workflowStep(releaseAssetsCurrentJob, 'Checkout workflow summary tooling');
-  assert.equal(workflowStepField(summaryCheckout, 'uses'), 'actions/checkout@v7');
-  assert.equal(workflowStepField(summaryCheckout, 'fetch-depth'), '1');
-  assert.equal(workflowStepField(summaryCheckout, 'persist-credentials'), 'false');
-  assert.equal(workflowStepField(summaryCheckout, 'lfs'), undefined);
+  const authoritativeCheckout = workflowStep(releaseAssetsCurrentJob, 'Checkout authoritative release asset source');
+  assert.equal(workflowStepField(authoritativeCheckout, 'uses'), 'actions/checkout@v7');
+  assert.equal(workflowStepField(authoritativeCheckout, 'fetch-depth'), '0');
+  assert.equal(workflowStepField(authoritativeCheckout, 'persist-credentials'), 'false');
+  assert.equal(workflowStepField(authoritativeCheckout, 'lfs'), undefined);
+  assert.equal((releaseAssetsCurrentJob.match(/uses: actions\/checkout@v7/g) || []).length, 1);
   for (const name of [
     'Report Quality failure', 'Classify release asset check',
     'Report release assets are not required', 'Reject release asset changes outside a version pull request'
-  ]) assert.ok(summaryCheckout.index < workflowStep(releaseAssetsCurrentJob, name).index, `${name} must follow the summary checkout`);
+  ]) assert.ok(authoritativeCheckout.index < workflowStep(releaseAssetsCurrentJob, name).index, `${name} must follow the authoritative checkout`);
 
   assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Report Quality failure'), 'if'), /needs\.quality\.result != 'success'/);
   assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Classify release asset check'), 'if'), /needs\.quality\.result == 'success'/);
   assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Report release assets are not required'), 'if'), /classification == 'not-required'/);
   assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Reject release asset changes outside a version pull request'), 'if'), /classification == 'versionless-asset-change'/);
-  assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Report promotion required'), 'if'), /classification == 'promotion-required'/);
+  assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Report expected promotion merge block after successful Quality'), 'if'), /classification == 'promotion-required'/);
   assert.match(workflowStepField(workflowStep(releaseAssetsCurrentJob, 'Install documentation asset verification dependencies'), 'if'), /classification == 'verification-required'/);
-
-  const verificationCheckout = workflowStep(releaseAssetsCurrentJob, 'Checkout release asset verification source');
-  assert.equal(workflowStepField(verificationCheckout, 'lfs'), 'true');
-  assert.ok(summaryCheckout.index < verificationCheckout.index);
 
   const lfsMaterialization = workflowStep(releaseAssetsCurrentJob, 'Materialize release asset LFS files');
   assert.match(workflowStepField(lfsMaterialization, 'if'), /classification == 'verification-required'/);
@@ -96,7 +95,9 @@ test('release asset reporting always runs after a minimal checkout and gates eac
     'docs/screenshots/en.png', 'docs/screenshots/ja.png', 'docs/screenshots/zh-CN.png',
     'output/pdf/en-letter.pdf', 'output/pdf/ja-a4.pdf', 'output/pdf/zh-CN-a4.pdf'
   ]) assert.match(lfsMaterialization.body, new RegExp(asset.replaceAll('.', '\\.')));
-  assert.ok(verificationCheckout.index < lfsMaterialization.index);
+  assert.match(lfsMaterialization.body, /git lfs pull/);
+  assert.doesNotMatch(releaseAssetsCurrentJob, /lfs: true|git lfs checkout/);
+  assert.ok(authoritativeCheckout.index < lfsMaterialization.index);
 });
 
 test('release preparation checks committed assets against the final Quality evidence', () => {
