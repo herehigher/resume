@@ -89,7 +89,8 @@ export function resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qual
     'Quality run workflow identity is invalid');
   requireValue(run.event === 'pull_request' && run.head_branch === pullRequest.head.ref,
     'Quality run pull request ref is invalid');
-  requireValue(run.status === 'completed', 'Quality run is not completed');
+  requireValue(['in_progress', 'completed'].includes(run.status),
+    'Quality run is not active or completed');
   requireValue(run.head_sha === pullRequest.head.sha, 'Quality run does not match the current pull request head');
   exactPullRequest(run, pullRequest.number);
   requireValue(qualityJob?.name === 'quality' && qualityJob.status === 'completed'

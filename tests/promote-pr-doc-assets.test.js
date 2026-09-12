@@ -244,10 +244,16 @@ test('promotion identity accepts the PR merge artifact when branch HEAD differs'
   assert.deepEqual(resolvePromotionIdentity({
     artifact, mergeSha, pullRequest, qualityJob, run: { ...run, head_repository: undefined }, workflow
   }), identity);
+  assert.deepEqual(resolvePromotionIdentity({
+    artifact, mergeSha, pullRequest, qualityJob, run: { ...run, status: 'in_progress' }, workflow
+  }), identity);
   assert.throws(() => resolvePromotionIdentity({
     artifact, mergeSha, pullRequest, qualityJob,
     run: { ...run, head_repository: { id: 2, full_name: 'untrusted/fork' } }, workflow
   }), /head repository/);
+  assert.throws(() => resolvePromotionIdentity({
+    artifact, mergeSha, pullRequest, qualityJob, run: { ...run, status: 'queued' }, workflow
+  }), /not active or completed/);
 });
 
 test('read-only evidence resolution uniquely binds Actions objects to the current merge SHA', () => {
