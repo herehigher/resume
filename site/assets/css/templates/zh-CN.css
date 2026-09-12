@@ -138,13 +138,15 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   padding-top: 2px;
+  transform: translateX(-6px);
   white-space: nowrap;
 }
 
 .zh-timeline-content {
   border-left: 1px solid #ccd6e1;
+  margin-left: -3px;
   min-width: 0;
-  padding-left: 14px;
+  padding-left: 17px;
   position: relative;
 }
 
@@ -306,6 +308,12 @@
   .zh-workspace > .preview-panel { height: calc(100% - 44px); }
   .zh-workspace[data-mobile-mode="editor"] > .preview-panel { display: none; }
   .zh-workspace[data-mobile-mode="preview"] > .editor-panel { display: none; }
+}
+
+@media (max-width: 640px) {
+  .zh-timeline-item { gap: 4px; grid-template-columns: 1fr; }
+  .zh-timeline-date { padding-top: 0; transform: none; }
+  .zh-timeline-content { margin-left: 0; padding-left: 14px; }
 }
 
 @media (max-width: 520px) {

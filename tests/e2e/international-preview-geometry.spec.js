@@ -1,4 +1,5 @@
 import { expect, openLocale, test } from './fixtures.js';
+import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 
 function previewGeometry({ pageSelector, paragraphSelector, previewSelector, scrollSelector }) {
   const page = document.querySelector(pageSelector);
@@ -188,6 +189,74 @@ test('简体中文: A4 preview page-box and representative wrapping stay canonic
     padding: beforeZoom.padding,
     pageWidth: beforeZoom.pageWidth
   });
+});
+
+test('简体中文: long experience dates clear the timeline rail without narrowing desktop text', async ({ page }) => {
+  const state = createDefaultState('zh-CN');
+  state.documents['zh-CN'].resume.experience = [{
+    startDate: '2019-01',
+    endDate: '2026-12',
+    company: 'Fictional Studio',
+    role: 'Layout Verification Lead',
+    details: 'This fictional entry verifies the date, timeline rail, and text-column geometry.'
+  }];
+
+  await openLocale(page, 'zh-CN');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'fictional-timeline-geometry.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[data-zh-preview]')).toContainText('Fictional Studio');
+
+  const desktop = await page.evaluate(() => {
+    const item = document.querySelector('[data-section-key="experience"] .zh-timeline-item');
+    const date = item?.querySelector('.zh-timeline-date');
+    const content = item?.querySelector('.zh-timeline-content');
+    const heading = content?.querySelector('h3');
+    const before = content && getComputedStyle(content, '::before');
+    if (!item || !date || !content || !heading || !before) return null;
+    const dateBounds = date.getBoundingClientRect();
+    const contentBounds = content.getBoundingClientRect();
+    const headingBounds = heading.getBoundingClientRect();
+    const nodeLeft = contentBounds.left + Number.parseFloat(before.left);
+    const documentPage = document.querySelector('.zh-resume-document');
+    const previewScale = documentPage
+      ? documentPage.getBoundingClientRect().width / documentPage.offsetWidth
+      : 1;
+    return {
+      dateToNodeGap: (nodeLeft - dateBounds.right) / previewScale,
+      headingOffset: headingBounds.left - item.getBoundingClientRect().left,
+      previewScale,
+      fontVariantNumeric: getComputedStyle(date).fontVariantNumeric,
+      whiteSpace: getComputedStyle(date).whiteSpace
+    };
+  });
+
+  expect(desktop).not.toBeNull();
+  expect(desktop.dateToNodeGap).toBeGreaterThanOrEqual(10);
+  expect(desktop.dateToNodeGap).toBeLessThanOrEqual(12);
+  expect(desktop.headingOffset / desktop.previewScale).toBeCloseTo(118, 0);
+  expect(desktop).toMatchObject({ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' });
+
+  await page.setViewportSize({ width: 639, height: 844 });
+  await page.locator('[data-zh-mobile-view="preview"]').click();
+  const mobile = await page.evaluate(() => {
+    const item = document.querySelector('[data-section-key="experience"] .zh-timeline-item');
+    const date = item?.querySelector('.zh-timeline-date');
+    const content = item?.querySelector('.zh-timeline-content');
+    if (!item || !date || !content) return null;
+    const dateBounds = date.getBoundingClientRect();
+    const contentBounds = content.getBoundingClientRect();
+    return {
+      contentToItemWidth: contentBounds.width / item.getBoundingClientRect().width,
+      dateAboveContent: dateBounds.bottom <= contentBounds.top
+    };
+  });
+
+  expect(mobile).toMatchObject({ dateAboveContent: true });
+  expect(mobile.contentToItemWidth).toBeGreaterThan(.99);
 });
 
 test('English: A4 and Letter preview page-boxes refit without changing their internal geometry', async ({ page }) => {
