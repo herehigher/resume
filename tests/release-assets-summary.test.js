@@ -52,4 +52,5 @@ test('non-waiting release asset failures have separate safe reports', () => {
   assert.match(releaseAssetFailureReport('promoted-evidence-unavailable').summary, /unavailable or expired/);
   assert.match(releaseAssetFailureReport('asset-integrity-mismatch').summary, /digests/);
   assert.match(releaseAssetFailureReport('current-evidence-identity-mismatch').summary, /does not match this pull request identity/);
+  assert.match(releaseAssetFailureReport('release-assets-missing').summary, /seven release documentation asset files/);
 });

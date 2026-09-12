@@ -94,6 +94,11 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /`docs\/assets-manifest\.json` の計7 fileだけ/);
   assert.match(playbook, /Asset-only の追補 commit に fast path は設けません/);
   assert.match(playbook, /最終 PR head の `Quality` と `Release assets current` をどちらも成功/);
+  assert.match(playbook, /候補 asset を生成・取り込み/);
+  assert.match(playbook, /候補生成 workflow/);
+  assert.match(playbook, /full Quality 2回/);
+  assert.match(playbook, /run.*attempt.*artifact.*digest/);
+  assert.match(playbook, /導入 PR.*main/);
   assert.match(playbook, /Version を変えない PR で展示 asset を変更してはいけません/);
   assert.match(playbook, /promotion 元 artifact の exact bytes/);
   assert.match(playbook, /最終 PR head の Quality が fresh に生成した artifact/);

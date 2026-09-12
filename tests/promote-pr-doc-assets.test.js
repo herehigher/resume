@@ -15,11 +15,16 @@ import {
   assertArtifactManifestProvenance,
   assertCandidateSource,
   classifyEvidenceFailure,
+  parseCandidateArguments,
   parseArguments,
+  promoteCandidateDocumentationAssets,
+  resolveCandidateAssetIdentity,
+  resolveCandidateDocumentationEvidence,
   promotePullRequestDocumentationAssets,
   resolvePullRequestQualityEvidence,
   resolvePromotionIdentity,
   selectExactArtifact,
+  selectExactCandidateArtifact,
   selectExactQualityJob,
   selectQualityRun
 } from '../scripts/promote-pr-doc-assets.mjs';
@@ -116,7 +121,10 @@ function git(directory, ...args) {
   }).trim();
 }
 
-async function writeArtifact({ artifactRoot, qualityRunId, sourceRoot, sourceSha }) {
+async function writeArtifact({
+  artifactRoot, qualityRunId, sourceRoot, sourceSha,
+  producer = { controlSha: sourceSha, kind: 'quality', runAttempt: '1', workflow: '.github/workflows/ci.yml' }
+}) {
   await mkdir(path.join(artifactRoot, 'docs/screenshots'), { recursive: true });
   await mkdir(path.join(artifactRoot, 'output/pdf'), { recursive: true });
   const manifestOutputs = [];
@@ -137,17 +145,22 @@ async function writeArtifact({ artifactRoot, qualityRunId, sourceRoot, sourceSha
   const manifest = {
     browser: { engine: 'Chromium', version: '123.0.0.0', viewport: { height: 1000, width: 1440 } },
     generator: {
-      command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>',
+      command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>',
       inputHash: await computeGeneratorInputHash(sourceRoot),
       inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
       inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs'],
       path: 'scripts/generate-doc-assets.mjs', version: '1.4.0'
     },
     outputs: manifestOutputs,
-    schemaVersion: 3,
+    schemaVersion: 4,
     source: {
       appVersion: '0.3.0', checkoutCommit: sourceSha, fixedDate: '2026-09-01', markerHashLength: 12,
-      markerPrefix: 'RESUME-STUDIO-SAMPLE', qualityRunId, siteHash: await computeSiteHash(path.join(sourceRoot, 'site')),
+      markerPrefix: 'RESUME-STUDIO-SAMPLE',
+      producer: {
+        controlSha: producer.controlSha, kind: producer.kind, runAttempt: producer.runAttempt,
+        runId: qualityRunId, workflow: producer.workflow
+      },
+      siteHash: await computeSiteHash(path.join(sourceRoot, 'site')),
       siteHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)'
     }
   };
@@ -366,6 +379,116 @@ test('promotion refuses empty, multiple, and expired run or artifact selections'
   assert.throws(() => selectExactArtifact([], run.id, mergeSha, candidateSha), /artifact is unavailable/);
   assert.throws(() => selectExactArtifact([artifact, artifact], run.id, mergeSha, candidateSha), /exactly one documentation artifact/);
   assert.throws(() => selectExactArtifact([{ ...artifact, expired: true }], run.id, mergeSha, candidateSha), /has expired/);
+});
+
+test('candidate evidence binds the trusted control workflow, source SHA, run attempt, artifact ID, and digest', () => {
+  const controlSha = 'c'.repeat(40);
+  const candidateWorkflow = { id: 18, path: '.github/workflows/release-candidate-assets.yml' };
+  const candidateRun = {
+    conclusion: 'success', event: 'workflow_dispatch', head_branch: 'main', head_repository: repository, head_sha: controlSha,
+    id: 91, path: candidateWorkflow.path, repository, run_attempt: 2, status: 'completed', workflow_id: candidateWorkflow.id
+  };
+  const candidateArtifact = {
+    digest: `sha256:${'d'.repeat(64)}`, expired: false,
+    id: 1234, name: `release-candidate-documentation-assets-${candidateSha}`,
+    workflow_run: { head_sha: controlSha, id: candidateRun.id }
+  };
+  const identity = resolveCandidateAssetIdentity({
+    artifact: candidateArtifact, controlSha, run: candidateRun, sourceSha: candidateSha, workflow: candidateWorkflow
+  });
+  assert.deepEqual(identity, {
+    artifactDigest: candidateArtifact.digest, artifactId: '1234', artifactName: candidateArtifact.name,
+    controlSha, runAttempt: '2', runId: '91', sourceSha: candidateSha
+  });
+  assert.deepEqual(parseCandidateArguments([
+    '--source-sha', candidateSha, '--run-id', '91', '--run-attempt', '2'
+  ]), { 'run-attempt': '2', 'run-id': '91', 'source-sha': candidateSha });
+  assert.throws(() => parseCandidateArguments(['--source-sha', candidateSha, '--run-id', '91']), /requires/);
+  assert.throws(() => selectExactCandidateArtifact([candidateArtifact, candidateArtifact], identity), /exactly one/);
+  assert.throws(() => selectExactCandidateArtifact([{ ...candidateArtifact, expired: true }], identity), /expired/);
+  assert.throws(() => resolveCandidateAssetIdentity({
+    artifact: { ...candidateArtifact, digest: 'sha256:not-a-digest' }, controlSha, run: candidateRun, sourceSha: candidateSha, workflow: candidateWorkflow
+  }), /artifact/);
+  assert.throws(() => resolveCandidateAssetIdentity({
+    artifact: candidateArtifact, controlSha, run: { ...candidateRun, head_branch: 'release-v0.3.2' }, sourceSha: candidateSha, workflow: candidateWorkflow
+  }), /control SHA/);
+  assert.throws(() => resolveCandidateAssetIdentity({
+    artifact: candidateArtifact, controlSha, run: candidateRun, sourceSha: mergeSha, workflow: candidateWorkflow
+  }), /artifact/);
+  assert.throws(() => resolveCandidateAssetIdentity({
+    artifact: candidateArtifact, controlSha, run: candidateRun, sourceSha: candidateSha, workflow: { ...candidateWorkflow, path: '.github/workflows/ci.yml' }
+  }), /workflow/);
+  const api = (endpoint) => {
+    if (endpoint === 'actions/workflows/release-candidate-assets.yml') return candidateWorkflow;
+    if (endpoint === 'actions/runs/91') return candidateRun;
+    if (endpoint.startsWith('actions/runs/91/attempts/2/artifacts?')) return [{ artifacts: [candidateArtifact] }];
+    throw new Error(`Unexpected API endpoint: ${endpoint}`);
+  };
+  assert.deepEqual(resolveCandidateDocumentationEvidence({ dependencies: { api }, provenance: {
+    artifactName: candidateArtifact.name, checkoutCommit: candidateSha,
+    producer: { controlSha, kind: 'release-candidate', runAttempt: '2', runId: '91', workflow: candidateWorkflow.path }
+  } }), identity);
+  assert.throws(() => resolveCandidateDocumentationEvidence({ dependencies: { api }, provenance: {
+    artifactName: candidateArtifact.name, checkoutCommit: candidateSha,
+    producer: { controlSha, kind: 'release-candidate', runAttempt: '1', runId: '91', workflow: candidateWorkflow.path }
+  } }), /attempt/);
+});
+
+test('candidate promotion copies only seven verified files from one explicit run attempt into a clean candidate checkout', async (t) => {
+  const fixture = await createPromotionFixture();
+  t.after(() => rm(fixture.root, { force: true, recursive: true }));
+  const controlSha = 'c'.repeat(40);
+  await rm(fixture.artifactRoot, { force: true, recursive: true });
+  await writeArtifact({
+    artifactRoot: fixture.artifactRoot, qualityRunId: '91', sourceRoot: fixture.candidateRoot, sourceSha: fixture.candidateSha,
+    producer: {
+      controlSha, kind: 'release-candidate', runAttempt: '2', workflow: '.github/workflows/release-candidate-assets.yml'
+    }
+  });
+  const candidateWorkflow = { id: 18, path: '.github/workflows/release-candidate-assets.yml' };
+  const candidateRun = {
+    conclusion: 'success', event: 'workflow_dispatch', head_branch: 'main', head_repository: repository, head_sha: controlSha,
+    id: 91, path: candidateWorkflow.path, repository, run_attempt: 2, status: 'completed', workflow_id: candidateWorkflow.id
+  };
+  const candidateArtifact = {
+    digest: `sha256:${'d'.repeat(64)}`, expired: false, id: 1234,
+    name: `release-candidate-documentation-assets-${fixture.candidateSha}`,
+    workflow_run: { head_sha: controlSha, id: candidateRun.id }
+  };
+  const temporaryRoot = path.join(fixture.root, 'candidate-temporary');
+  const result = await promoteCandidateDocumentationAssets({
+    candidateRoot: fixture.candidateRoot,
+    dependencies: {
+      api(endpoint) {
+        if (endpoint === 'actions/workflows/release-candidate-assets.yml') return candidateWorkflow;
+        if (endpoint === 'actions/runs/91') return candidateRun;
+        if (endpoint.startsWith('actions/runs/91/attempts/2/artifacts?')) return [{ artifacts: [candidateArtifact] }];
+        throw new Error(`Unexpected API endpoint: ${endpoint}`);
+      },
+      createTemporaryDirectory: async () => {
+        await mkdir(temporaryRoot);
+        return temporaryRoot;
+      },
+      downloadCandidateArtifact: async (_identity, destination) => {
+        cpSync(path.join(fixture.artifactRoot, 'docs'), path.join(destination, 'docs'), { recursive: true });
+        cpSync(path.join(fixture.artifactRoot, 'output'), path.join(destination, 'output'), { recursive: true });
+      }
+    },
+    values: { 'run-attempt': '2', 'run-id': '91', 'source-sha': fixture.candidateSha }
+  });
+  assert.deepEqual(result.files, releaseDocumentationAssetPaths);
+  assert.equal(result.artifactId, '1234');
+  assert.equal(existsSync(temporaryRoot), false);
+  assert.deepEqual(
+    git(fixture.candidateRoot, 'diff', '--name-only', '--no-renames').split('\n').filter(Boolean).sort(),
+    [...releaseDocumentationAssetPaths].sort()
+  );
+  for (const relativePath of releaseDocumentationAssetPaths) {
+    assert.deepEqual(
+      await readFile(path.join(fixture.candidateRoot, relativePath)),
+      await readFile(path.join(fixture.artifactRoot, relativePath))
+    );
+  }
 });
 
 test('promotion accepts exactly one identifier and rejects a dirty candidate source', async (t) => {

@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const fullCommitPattern = /^[0-9a-f]{40}$/;
+const producerWorkflows = Object.freeze({
+  quality: '.github/workflows/ci.yml',
+  'release-candidate': '.github/workflows/release-candidate-assets.yml'
+});
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const expectedOutputs = Object.freeze({
   en: Object.freeze({ paper: 'LETTER', pdfPath: 'output/pdf/en-letter.pdf', screenshotPath: 'docs/screenshots/en.png' }),
@@ -83,10 +87,10 @@ export function releaseAssetPathsChangedBetween(base, head, cwd = process.cwd())
 }
 
 function outputRecords(manifest, label) {
-  if (manifest.schemaVersion !== 3) fail(`${label} manifest schema is not current`);
+  if (![3, 4].includes(manifest.schemaVersion)) fail(`${label} manifest schema is unsupported`);
   if (!versionPattern.test(manifest.source?.appVersion || '')) fail(`${label} app version is invalid`);
   if (!fullCommitPattern.test(manifest.source?.checkoutCommit || '')) fail(`${label} source commit is invalid`);
-  if (!/^[1-9][0-9]*$/.test(manifest.source?.qualityRunId || '')) fail(`${label} Quality run ID is invalid`);
+  sourceProducer(manifest, label);
   if (!/^[0-9a-f]{64}$/.test(manifest.source?.siteHash || '')) fail(`${label} site hash is invalid`);
   if (!Array.isArray(manifest.outputs) || manifest.outputs.length !== 3) fail(`${label} must describe three locales`);
   const records = new Map();
@@ -101,6 +105,28 @@ function outputRecords(manifest, label) {
     records.set(output.locale, output);
   }
   return records;
+}
+
+function sourceProducer(manifest, label) {
+  if (manifest.schemaVersion === 3) {
+    if (!/^[1-9][0-9]*$/.test(manifest.source?.qualityRunId || '')) fail(`${label} Quality run ID is invalid`);
+    return {
+      controlSha: manifest.source.checkoutCommit,
+      kind: 'quality',
+      runAttempt: null,
+      runId: manifest.source.qualityRunId,
+      workflow: '.github/workflows/ci.yml'
+    };
+  }
+  const producer = manifest.source?.producer;
+  if (!Object.hasOwn(producerWorkflows, producer?.kind)
+    || producer?.workflow !== producerWorkflows[producer.kind]
+    || !/^[1-9][0-9]*$/.test(producer?.runId || '')
+    || !/^[1-9][0-9]*$/.test(producer?.runAttempt || '')
+    || !fullCommitPattern.test(producer?.controlSha || '')) {
+    fail(`${label} producer provenance is invalid`);
+  }
+  return producer;
 }
 
 async function recordedFileDigest(rootDirectory, relativePath) {
@@ -127,10 +153,12 @@ function recordMismatch(mismatches, label, generatedValue, committedValue) {
 export async function readReleaseAssetProvenance(committedRoot = root) {
   const manifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
   outputRecords(manifest, 'committed');
+  const producer = sourceProducer(manifest, 'committed');
   return {
-    artifactName: `documentation-assets-${manifest.source.checkoutCommit}`,
+    artifactName: `${producer.kind === 'release-candidate' ? 'release-candidate-documentation-assets' : 'documentation-assets'}-${manifest.source.checkoutCommit}`,
     checkoutCommit: manifest.source.checkoutCommit,
-    qualityRunId: manifest.source.qualityRunId
+    producer,
+    qualityRunId: producer.runId
   };
 }
 
@@ -190,8 +218,8 @@ async function compareReleaseAssetEvidence({ committedRoot = root, generatedRoot
   recordMismatch(
     mismatches,
     'source generation contract',
-    withoutKeys(generatedManifest.source, ['appVersion', 'checkoutCommit', 'qualityRunId', 'siteHash']),
-    withoutKeys(committedManifest.source, ['appVersion', 'checkoutCommit', 'qualityRunId', 'siteHash'])
+    withoutKeys(generatedManifest.source, ['appVersion', 'checkoutCommit', 'producer', 'qualityRunId', 'siteHash']),
+    withoutKeys(committedManifest.source, ['appVersion', 'checkoutCommit', 'producer', 'qualityRunId', 'siteHash'])
   );
 
   for (const locale of Object.keys(expectedOutputs)) {
@@ -333,9 +361,16 @@ async function main() {
     if (!values['committed-root']) fail('provenance expects a committed root');
     const provenance = await readReleaseAssetProvenance(path.resolve(values['committed-root']));
     if (process.env.GITHUB_OUTPUT) {
-      appendFileSync(process.env.GITHUB_OUTPUT, `artifact_name=${provenance.artifactName}\n`);
-      appendFileSync(process.env.GITHUB_OUTPUT, `checkout_commit=${provenance.checkoutCommit}\n`);
-      appendFileSync(process.env.GITHUB_OUTPUT, `quality_run_id=${provenance.qualityRunId}\n`);
+      for (const [key, value] of Object.entries({
+        artifact_name: provenance.artifactName,
+        checkout_commit: provenance.checkoutCommit,
+        control_sha: provenance.producer.controlSha,
+        producer_kind: provenance.producer.kind,
+        quality_run_id: provenance.qualityRunId,
+        run_attempt: provenance.producer.runAttempt || '',
+        run_id: provenance.producer.runId,
+        workflow: provenance.producer.workflow
+      })) appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
     }
     console.log(`Resolved documentation asset provenance for ${provenance.checkoutCommit}.`);
     return;
