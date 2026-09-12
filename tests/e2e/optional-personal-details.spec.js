@@ -40,8 +40,10 @@ test('English optional personal details persist, localize across editors, and ro
   await expect(page.locator('[data-profile-field="nationality"]')).toHaveValue('Fictionland');
 
   await page.locator('#localeSelect').selectOption('ja');
+  const japaneseSections = page.locator('#japaneseWorkspace .form-section');
   await expect(page.locator('[name="gender"]')).toHaveValue('female');
-  await expect(page.locator('[name="nationality"]')).toHaveValue('Fictionland');
+  await expect(japaneseSections.nth(0).locator('[name="nationality"]')).toHaveValue('Fictionland');
+  await expect(japaneseSections.nth(1).locator('[name="nationality"]')).toHaveCount(0);
   await expect(page.locator('#documentPreview')).toContainText('女性');
   await expect(page.locator('#documentPreview')).toContainText('国籍');
 
@@ -65,11 +67,17 @@ test('English optional personal details persist, localize across editors, and ro
   await expect(preview).not.toContainText('Imported Fictionland');
 });
 
-test('[mobile] English optional personal-details controls remain usable without horizontal overflow', async ({ page }) => {
+test('[mobile] personal-detail controls remain usable without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openLocale(page, 'en');
   await page.locator('[data-profile-field="nationality"]').fill('Fictionland');
   await page.locator('[data-en-optional-details-switch]').check();
   await expect(page.locator('[data-en-preview]')).toContainText('Nationality: Fictionland');
+  await expectNoPageOverflow(page);
+
+  await page.locator('#localeSelect').selectOption('ja');
+  const japaneseSections = page.locator('#japaneseWorkspace .form-section');
+  await expect(japaneseSections.nth(0).locator('[name="nationality"]')).toBeVisible();
+  await expect(japaneseSections.nth(1).locator('[name="nationality"]')).toHaveCount(0);
   await expectNoPageOverflow(page);
 });

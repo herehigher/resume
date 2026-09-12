@@ -59,7 +59,7 @@ export function renderEnglishWorkspace() {
             <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
           </summary>
           <div class="section-content">
-            <label class="input-field"><span>Full name <em>Required</em></span><input data-profile-field="fullName" autocomplete="name" required></label>
+            <label class="input-field"><span>Full name</span><input data-profile-field="fullName" autocomplete="name" required></label>
             <label class="input-field"><span>Professional headline</span><input data-resume-field="headline" placeholder="Senior Product Manager"></label>
             <div class="field-grid two-columns">
               <label class="input-field"><span>Phone</span><input data-profile-field="phone" type="tel" autocomplete="tel"></label>

@@ -76,7 +76,6 @@
 
 .input-field { display: block; min-width: 0; }
 .input-field > span { color: #526076; display: block; font-size: 9px; font-weight: 750; margin: 0 0 6px 1px; }
-.input-field em { color: var(--blue); font-size: 8px; font-style: normal; margin-left: 4px; }
 .input-field input,
 .input-field select,
 .input-field textarea {

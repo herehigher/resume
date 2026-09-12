@@ -54,8 +54,6 @@ export default {
   addItem: '添加',
   removeItem: '删除此项',
   currentEmploymentHelp: '在职请留空，将显示为“至今”',
-  optionalLabel: '选填',
-  requiredLabel: '必填',
   privacySecurity: {
     badgeLabel: '本地处理',
     badgeAria: '打开隐私与安全说明。本地处理，版本 {version}',

@@ -121,7 +121,7 @@
                 </div>
                 <div class="field-stack">
                   <label class="input-field">
-                    <span>氏名 <em>必須</em></span>
+                    <span>氏名</span>
                     <input name="fullName" autocomplete="name" placeholder="例：山田 太郎" required>
                   </label>
                   <label class="input-field">
@@ -143,6 +143,10 @@
                     <option value="female">女性</option>
                     <option value="other">その他</option>
                   </select>
+                </label>
+                <label class="input-field">
+                  <span>国籍</span>
+                  <input name="nationality" autocomplete="country-name">
                 </label>
                 <label class="input-field">
                   <span>作成日</span>
@@ -181,10 +185,6 @@
                 <label class="input-field">
                   <span>メールアドレス</span>
                   <input name="email" type="email" autocomplete="email" placeholder="name@example.jp">
-                </label>
-                <label class="input-field">
-                  <span>国籍</span>
-                  <input name="nationality" autocomplete="country-name">
                 </label>
               </div>
             </div>
