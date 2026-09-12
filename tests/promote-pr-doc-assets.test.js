@@ -18,6 +18,7 @@ import {
   resolvePullRequestQualityEvidence,
   resolvePromotionIdentity,
   selectExactArtifact,
+  selectExactQualityJob,
   selectQualityRun
 } from '../scripts/promote-pr-doc-assets.mjs';
 
@@ -29,13 +30,16 @@ const pullRequest = {
   base: { repo: repository }, head: { ref: 'release-v0.2.8', repo: repository, sha: candidateSha }, number: 167, state: 'open'
 };
 const run = {
-  conclusion: 'success', event: 'pull_request', head_branch: 'release-v0.2.8', head_repository: repository,
-  head_sha: mergeSha, id: 34478079250, path: workflow.path, pull_requests: [{ number: 167 }], repository,
+  conclusion: 'failure', event: 'pull_request', head_branch: 'release-v0.2.8', head_repository: repository,
+  head_sha: candidateSha, id: 34478079250, path: workflow.path, pull_requests: [{ number: 167 }], repository,
   status: 'completed', workflow_id: workflow.id
+};
+const qualityJob = {
+  conclusion: 'success', head_sha: candidateSha, name: 'quality', run_id: run.id, status: 'completed'
 };
 const artifact = {
   expired: false, name: `documentation-assets-${mergeSha}`,
-  workflow_run: { head_sha: mergeSha, id: run.id }
+  workflow_run: { head_sha: candidateSha, id: run.id }
 };
 
 const outputs = Object.freeze({
@@ -191,13 +195,16 @@ function promotionDependencies(fixture, qualityRunId = '12345') {
     base: { repo: repository }, head: { ref: 'release-v0.2.8', repo: repository, sha: fixture.candidateSha }, number: 167, state: 'open'
   };
   const run = {
-    conclusion: 'success', event: 'pull_request', head_branch: pullRequest.head.ref, head_repository: repository,
-    head_sha: fixture.mergeSha, id: Number(qualityRunId), path: workflow.path, pull_requests: [{ number: pullRequest.number }],
+    conclusion: 'failure', event: 'pull_request', head_branch: pullRequest.head.ref, head_repository: repository,
+    head_sha: fixture.candidateSha, id: Number(qualityRunId), path: workflow.path, pull_requests: [{ number: pullRequest.number }],
     repository, status: 'completed', workflow_id: workflow.id
+  };
+  const qualityJob = {
+    conclusion: 'success', head_sha: fixture.candidateSha, name: 'quality', run_id: run.id, status: 'completed'
   };
   const qualityArtifact = {
     expired: false, name: `documentation-assets-${fixture.mergeSha}`,
-    workflow_run: { head_sha: fixture.mergeSha, id: run.id }
+    workflow_run: { head_sha: fixture.candidateSha, id: run.id }
   };
   return {
     api(endpoint) {
@@ -205,6 +212,7 @@ function promotionDependencies(fixture, qualityRunId = '12345') {
       if (endpoint === 'pulls/167') return pullRequest;
       if (endpoint.startsWith('actions/workflows/17/runs?')) return [{ workflow_runs: [run] }];
       if (endpoint === `actions/runs/${run.id}`) return run;
+      if (endpoint.startsWith(`actions/runs/${run.id}/jobs?`)) return [{ jobs: [qualityJob] }];
       if (endpoint.startsWith(`actions/runs/${run.id}/artifacts?`)) return [{ artifacts: [qualityArtifact] }];
       throw new Error(`Unexpected API endpoint: ${endpoint}`);
     },
@@ -225,7 +233,7 @@ function promotionDependencies(fixture, qualityRunId = '12345') {
 }
 
 test('promotion identity accepts the PR merge artifact when branch HEAD differs', () => {
-  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
+  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
   assert.equal(identity.candidateSha, candidateSha);
   assert.equal(identity.mergeSha, mergeSha);
   assert.notEqual(identity.candidateSha, identity.mergeSha);
@@ -240,6 +248,7 @@ test('read-only evidence resolution uniquely binds Actions objects to the curren
     if (endpoint === 'actions/workflows/ci.yml') return workflow;
     if (endpoint === 'pulls/167') return pullRequest;
     if (endpoint === `actions/runs/${run.id}`) return run;
+    if (endpoint.startsWith(`actions/runs/${run.id}/jobs?`)) return [{ jobs: [qualityJob] }];
     if (endpoint.startsWith(`actions/runs/${run.id}/artifacts?`)) return [{ artifacts: [artifact] }];
     throw new Error(`Unexpected API endpoint: ${endpoint}`);
   };
@@ -263,24 +272,37 @@ test('read-only evidence resolution uniquely binds Actions objects to the curren
 
 test('promotion fails closed for run, artifact, and manifest provenance mismatches', () => {
   assert.throws(() => resolvePromotionIdentity({
-    artifact, mergeSha, pullRequest, run: { ...run, head_sha: candidateSha }, workflow
-  }), /merge commit/);
+    artifact, mergeSha, pullRequest, qualityJob, run: { ...run, head_sha: mergeSha }, workflow
+  }), /pull request head/);
   assert.throws(() => resolvePromotionIdentity({
-    artifact: { ...artifact, name: `documentation-assets-${candidateSha}` }, mergeSha, pullRequest, run, workflow
+    artifact: { ...artifact, name: `documentation-assets-${candidateSha}` },
+    mergeSha, pullRequest, qualityJob, run, workflow
   }), /artifact/);
-  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
+  assert.throws(() => resolvePromotionIdentity({
+    artifact: { ...artifact, workflow_run: { ...artifact.workflow_run, head_sha: mergeSha } },
+    mergeSha, pullRequest, qualityJob, run, workflow
+  }), /artifact/);
+  assert.throws(() => resolvePromotionIdentity({
+    artifact, mergeSha, pullRequest, qualityJob: { ...qualityJob, conclusion: 'failure' }, run, workflow
+  }), /Quality job/);
+  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
   assert.throws(() => assertArtifactManifestProvenance({
     artifactName: artifact.name, checkoutCommit: candidateSha, qualityRunId: identity.qualityRunId
   }, identity), /manifest provenance/);
 });
 
 test('promotion refuses empty, multiple, and expired run or artifact selections', () => {
-  assert.throws(() => selectQualityRun([], pullRequest, mergeSha), /exactly one successful Quality run/);
-  assert.throws(() => selectQualityRun([run, run], pullRequest, mergeSha), /exactly one successful Quality run/);
-  assert.equal(selectQualityRun([run], pullRequest, mergeSha), run);
-  assert.throws(() => selectExactArtifact([], run.id, mergeSha), /exactly one documentation artifact/);
-  assert.throws(() => selectExactArtifact([artifact, artifact], run.id, mergeSha), /exactly one documentation artifact/);
-  assert.throws(() => selectExactArtifact([{ ...artifact, expired: true }], run.id, mergeSha), /has expired/);
+  assert.throws(() => selectQualityRun([], pullRequest), /exactly one completed workflow run/);
+  assert.throws(() => selectQualityRun([run, run], pullRequest), /exactly one completed workflow run/);
+  assert.equal(selectQualityRun([run], pullRequest), run);
+  assert.throws(() => selectExactQualityJob([], run.id, candidateSha), /exactly one Quality job/);
+  assert.equal(selectExactQualityJob([qualityJob], run.id, candidateSha), qualityJob);
+  assert.throws(() => selectExactQualityJob([
+    { ...qualityJob, conclusion: 'failure' }
+  ], run.id, candidateSha), /Quality job does not match/);
+  assert.throws(() => selectExactArtifact([], run.id, mergeSha, candidateSha), /exactly one documentation artifact/);
+  assert.throws(() => selectExactArtifact([artifact, artifact], run.id, mergeSha, candidateSha), /exactly one documentation artifact/);
+  assert.throws(() => selectExactArtifact([{ ...artifact, expired: true }], run.id, mergeSha, candidateSha), /has expired/);
 });
 
 test('promotion accepts exactly one identifier and rejects a dirty candidate source', async (t) => {
@@ -349,11 +371,32 @@ test('promotion rejects a candidate branch whose HEAD differs from the selected 
   t.after(() => rm(fixture.root, { force: true, recursive: true }));
   const dependencies = promotionDependencies(fixture);
   const api = dependencies.api;
+  const selectedCandidateSha = 'c'.repeat(40);
   dependencies.api = (endpoint, paginate) => {
     const response = api(endpoint, paginate);
-    return endpoint === 'pulls/167'
-      ? { ...response, head: { ...response.head, sha: 'c'.repeat(40) } }
-      : response;
+    if (endpoint === 'pulls/167') {
+      return { ...response, head: { ...response.head, sha: selectedCandidateSha } };
+    }
+    if (endpoint.startsWith('actions/workflows/17/runs?')) {
+      return response.map((page) => ({
+        ...page, workflow_runs: page.workflow_runs.map((qualityRun) => ({ ...qualityRun, head_sha: selectedCandidateSha }))
+      }));
+    }
+    if (/^actions\/runs\/[1-9][0-9]*$/.test(endpoint)) return { ...response, head_sha: selectedCandidateSha };
+    if (endpoint.includes('/jobs?')) {
+      return response.map((page) => ({
+        ...page, jobs: page.jobs.map((job) => ({ ...job, head_sha: selectedCandidateSha }))
+      }));
+    }
+    if (endpoint.includes('/artifacts?')) {
+      return response.map((page) => ({
+        ...page,
+        artifacts: page.artifacts.map((qualityArtifact) => ({
+          ...qualityArtifact, workflow_run: { ...qualityArtifact.workflow_run, head_sha: selectedCandidateSha }
+        }))
+      }));
+    }
+    return response;
   };
   await assert.rejects(
     promotePullRequestDocumentationAssets({

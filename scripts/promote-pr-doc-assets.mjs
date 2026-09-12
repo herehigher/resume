@@ -76,7 +76,7 @@ export function parseArguments(args) {
   return values;
 }
 
-export function resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow }) {
+export function resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow }) {
   requireValue(workflow?.path === '.github/workflows/ci.yml' && Number.isInteger(workflow.id),
     'Quality workflow identity is invalid');
   requireValue(Number.isInteger(pullRequest?.number) && pullRequest.state === 'open'
@@ -87,14 +87,18 @@ export function resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run,
     && officialRepository(run.repository) && officialRepository(run.head_repository)
     && run.workflow_id === workflow.id && run.path === workflow.path
     && run.event === 'pull_request' && run.head_branch === pullRequest.head.ref
-    && run.status === 'completed' && run.conclusion === 'success' && run.head_sha === mergeSha,
-  'Quality run does not match the current pull request merge commit');
+    && run.status === 'completed' && run.head_sha === pullRequest.head.sha,
+  'Quality run does not match the current pull request head');
   exactPullRequest(run, pullRequest.number);
+  requireValue(qualityJob?.name === 'quality' && qualityJob.status === 'completed'
+    && qualityJob.conclusion === 'success' && String(qualityJob.run_id) === String(run.id)
+    && qualityJob.head_sha === pullRequest.head.sha,
+  'Quality job does not match the successful current pull request run');
 
   const artifactName = `documentation-assets-${mergeSha}`;
   requireValue(artifact?.name === artifactName && artifact.expired === false
     && String(artifact.workflow_run?.id) === String(run.id)
-    && artifact.workflow_run?.head_sha === mergeSha,
+    && artifact.workflow_run?.head_sha === pullRequest.head.sha,
   'documentation artifact does not match the exact Quality run and merge commit');
   return {
     artifactName,
@@ -151,20 +155,34 @@ async function copyPromotedFiles({ candidateRoot, sourceRoot }) {
   }
 }
 
-export function selectExactArtifact(artifacts, runId, mergeSha) {
+export function selectExactArtifact(artifacts, runId, mergeSha, candidateSha) {
   const name = `documentation-assets-${mergeSha}`;
   const matches = artifacts.filter((artifact) => artifact.name === name);
   requireValue(matches.length === 1, 'expected exactly one documentation artifact for the Quality run');
   requireValue(matches[0].expired === false, 'documentation artifact has expired');
   requireValue(String(matches[0].workflow_run?.id) === String(runId)
-    && matches[0].workflow_run?.head_sha === mergeSha,
+    && matches[0].workflow_run?.head_sha === candidateSha,
   'documentation artifact does not match the exact Quality run and merge commit');
   return matches[0];
 }
 
-function exactArtifact(runId, mergeSha, api = githubApi) {
+function exactArtifact(runId, mergeSha, candidateSha, api = githubApi) {
   const pages = api(`actions/runs/${runId}/artifacts?per_page=100`, true);
-  return selectExactArtifact(pages.flatMap((page) => page.artifacts || []), runId, mergeSha);
+  return selectExactArtifact(pages.flatMap((page) => page.artifacts || []), runId, mergeSha, candidateSha);
+}
+
+export function selectExactQualityJob(jobs, runId, candidateSha) {
+  const matches = jobs.filter((job) => job.name === 'quality');
+  requireValue(matches.length === 1, 'expected exactly one Quality job for the current workflow attempt');
+  requireValue(matches[0].status === 'completed' && matches[0].conclusion === 'success'
+    && String(matches[0].run_id) === String(runId) && matches[0].head_sha === candidateSha,
+  'Quality job does not match the successful current pull request run');
+  return matches[0];
+}
+
+function exactQualityJob(runId, candidateSha, api = githubApi) {
+  const pages = api(`actions/runs/${runId}/jobs?filter=latest&per_page=100`, true);
+  return selectExactQualityJob(pages.flatMap((page) => page.jobs || []), runId, candidateSha);
 }
 
 function currentMergeSha(candidateRoot, pullRequestNumber) {
@@ -189,26 +207,27 @@ export function resolvePullRequestQualityEvidence({
   const pullRequest = api(`pulls/${pullRequestNumber}`);
   const mergeSha = currentMerge(candidate, pullRequestNumber);
   const run = api(`actions/runs/${qualityRunId}`);
-  const artifact = exactArtifact(run.id, mergeSha, api);
-  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
+  const qualityJob = exactQualityJob(run.id, pullRequest.head.sha, api);
+  const artifact = exactArtifact(run.id, mergeSha, pullRequest.head.sha, api);
+  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
   requireValue(identity.mergeSha === sourceMergeSha, 'Quality evidence does not match this pull request merge SHA');
   return identity;
 }
 
-export function selectQualityRun(candidates, pullRequest, mergeSha) {
+export function selectQualityRun(candidates, pullRequest) {
   const matches = candidates.filter((run) => (
-    run.head_sha === mergeSha && run.event === 'pull_request'
-      && run.status === 'completed' && run.conclusion === 'success'
+    run.head_sha === pullRequest.head.sha && run.event === 'pull_request'
+      && run.status === 'completed'
       && Array.isArray(run.pull_requests) && run.pull_requests.length === 1
       && Number(run.pull_requests[0]?.number) === pullRequest.number
   ));
-  requireValue(matches.length === 1, 'expected exactly one successful Quality run for the current pull request merge commit');
+  requireValue(matches.length === 1, 'expected exactly one completed workflow run for the current pull request head');
   return matches[0];
 }
 
-function findQualityRunForPullRequest(workflow, pullRequest, mergeSha, api = githubApi) {
-  const pages = api(`actions/workflows/${workflow.id}/runs?event=pull_request&status=success&per_page=100`, true);
-  const selected = selectQualityRun(pages.flatMap((page) => page.workflow_runs || []), pullRequest, mergeSha);
+function findQualityRunForPullRequest(workflow, pullRequest, api = githubApi) {
+  const pages = api(`actions/workflows/${workflow.id}/runs?event=pull_request&status=completed&per_page=100`, true);
+  const selected = selectQualityRun(pages.flatMap((page) => page.workflow_runs || []), pullRequest);
   return api(`actions/runs/${selected.id}`);
 }
 
@@ -241,7 +260,7 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
   if (values.pr) {
     pullRequest = api(`pulls/${values.pr}`);
     mergeSha = currentMerge(candidate, values.pr);
-    run = findQualityRunForPullRequest(workflow, pullRequest, mergeSha, api);
+    run = findQualityRunForPullRequest(workflow, pullRequest, api);
   } else {
     run = api(`actions/runs/${values['quality-run-id']}`);
     requireValue(Array.isArray(run.pull_requests) && run.pull_requests.length === 1
@@ -250,8 +269,9 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
     mergeSha = currentMerge(candidate, pullRequest.number);
   }
 
-  const artifact = exactArtifact(run.id, mergeSha, api);
-  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, run, workflow });
+  const qualityJob = exactQualityJob(run.id, pullRequest.head.sha, api);
+  const artifact = exactArtifact(run.id, mergeSha, pullRequest.head.sha, api);
+  const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
   assertCandidateSource(candidate, identity.candidateSha);
   assertCleanAssetTargets(candidate);
 
