@@ -226,16 +226,19 @@ test('简体中文: long experience dates clear the timeline rail without narrow
       ? documentPage.getBoundingClientRect().width / documentPage.offsetWidth
       : 1;
     return {
-      dateToNodeGap: nodeLeft - dateBounds.right,
+      dateToNodeGap: (nodeLeft - dateBounds.right) / previewScale,
       headingOffset: headingBounds.left - item.getBoundingClientRect().left,
-      previewScale
+      previewScale,
+      fontVariantNumeric: getComputedStyle(date).fontVariantNumeric,
+      whiteSpace: getComputedStyle(date).whiteSpace
     };
   });
 
   expect(desktop).not.toBeNull();
   expect(desktop.dateToNodeGap).toBeGreaterThanOrEqual(10);
-  expect(desktop.dateToNodeGap).toBeLessThanOrEqual(14);
+  expect(desktop.dateToNodeGap).toBeLessThanOrEqual(12);
   expect(desktop.headingOffset / desktop.previewScale).toBeCloseTo(118, 0);
+  expect(desktop).toMatchObject({ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' });
 
   await page.setViewportSize({ width: 639, height: 844 });
   await page.locator('[data-zh-mobile-view="preview"]').click();
