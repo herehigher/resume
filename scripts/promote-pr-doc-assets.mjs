@@ -81,12 +81,16 @@ export function resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qual
     && officialRepository(pullRequest.base?.repo) && officialRepository(pullRequest.head?.repo)
     && fullCommitPattern.test(pullRequest.head?.sha || ''), 'pull request identity is invalid');
   requireValue(fullCommitPattern.test(mergeSha || ''), 'pull request merge SHA is invalid');
-  requireValue(String(run?.id) && positiveId.test(String(run.id))
-    && officialRepository(run.repository) && officialRepository(run.head_repository)
-    && run.workflow_id === workflow.id && run.path === workflow.path
-    && run.event === 'pull_request' && run.head_branch === pullRequest.head.ref
-    && run.status === 'completed' && run.head_sha === pullRequest.head.sha,
-  'Quality run does not match the current pull request head');
+  requireValue(String(run?.id) && positiveId.test(String(run.id)), 'Quality run ID is invalid');
+  requireValue(officialRepository(run.repository), 'Quality run repository is invalid');
+  requireValue(!run.head_repository || officialRepository(run.head_repository),
+    'Quality run head repository is invalid');
+  requireValue(run.workflow_id === workflow.id && run.path === workflow.path,
+    'Quality run workflow identity is invalid');
+  requireValue(run.event === 'pull_request' && run.head_branch === pullRequest.head.ref,
+    'Quality run pull request ref is invalid');
+  requireValue(run.status === 'completed', 'Quality run is not completed');
+  requireValue(run.head_sha === pullRequest.head.sha, 'Quality run does not match the current pull request head');
   exactPullRequest(run, pullRequest.number);
   requireValue(qualityJob?.name === 'quality' && qualityJob.status === 'completed'
     && qualityJob.conclusion === 'success' && String(qualityJob.run_id) === String(run.id)
