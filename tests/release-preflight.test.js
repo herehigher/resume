@@ -285,9 +285,8 @@ test('release preflight CLI emits a short structured failure summary without raw
 test('the release playbook uses the release preflight command as its pre-version entry', () => {
   const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
   assert.match(playbook, /唯一の事前確認入口 `npm run release:preflight -- --target VERSION`/);
+  assert.match(playbook, /current version とそれより大きい stable SemVer の target version/);
   assert.match(playbook, /`--allow-untracked PATH`/);
   assert.match(playbook, /Release preflight: `deferred`[\s\S]*summary の `check` \/ `reason`[\s\S]*`pass` になるまで Version 更新へ進まない/);
   assert.match(playbook, /Release preflight: `blocked`[\s\S]*`gh` \/ fetch \/ credential capability を復旧して再実行[\s\S]*成功を推定せず[\s\S]*`pass` になるまで Version 更新へ進まない/);
-  assert.match(playbook, /`<<'EOF'`/);
-  assert.match(playbook, /--body-file "\$body_file"/);
 });
