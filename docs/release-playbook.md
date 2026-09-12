@@ -4,7 +4,7 @@
 
 Public release、tag、Pages 設定、repository visibility の変更には owner の明示承認が必要です。通常公開では、version を更新した公開 PR を owner が merge する操作を、その merge 結果 commit の tag 作成と Pages 公開に対する明示承認とします。Merge 後に同じ対象への追加承認や ID・digest の転記は要求しません。Tag は移動・上書き・削除しません。
 
-## 1回の公開で行うこと
+## 公開の全体像
 
 「担当者」は開発者または依頼を受けた agent、「所有者」は production 公開を承認する人です。配布物は Pages に置く HTML / CSS / JavaScript 一式です。
 
@@ -20,54 +20,31 @@ Public release、tag、Pages 設定、repository visibility の変更には owne
 
 Version の基準は `package.json`。CHANGELOG の日付は RC を確定した日であり、実際の公開時刻は GitHub の実行記録を参照します。日付跨ぎだけで version や test をやり直しません。対象は GitHub が merged PR に記録した結果 commit であり、その後の main tip や PR head に切り替えません。
 
-## 公開入口
+## 通常公開の実行手順
 
-Version 更新前に、latest `origin/main` の clean な `main` checkout で唯一の事前確認入口 `npm run release:preflight -- --target VERSION` を実行します。これは `herehigher/resume` へアクセスできる認証済み `gh` session、現在の `package.json` と target の stable SemVer、remote tag、同じ target / release branch の open PR、tracked / untracked worktree を read-only で確認します。明示的に `origin/main` を fetch し、stale な main や feature branch は最新 SHA とともに停止します。untracked file は既定で停止し、利用者が必要性を確認した exact relative path だけ `--allow-untracked PATH` を繰り返して許可できます。command は version、asset、index、tag、PR、remote を変更せず、credential や token も読み出しません。GitHub / fetch の capability が利用できない場合も `blocked` の summary で停止します。
+### 1. 事前確認
 
-Version 更新は preflight 成功後に repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行します。Package、lock、APP_VERSION と CHANGELOG を同期するため、変更内容を確認して公開 PR に含めます。Version 更新を commit・push すると、Quality は候補 code から一時的な展示 asset を生成して upload します。Product・test の `Quality` と asset 更新状態の `Release assets current` は別 check です。古い asset は後者だけを失敗させ、原因を混同しません。
+公開 version を決めたら、Version 更新前に `main` checkout で唯一の事前確認入口 `npm run release:preflight -- --target VERSION` を実行します。認証済み `gh` session、latest `origin/main` と同じ `main`、clean な tracked worktree、current version とそれより大きい stable SemVer の target version、remote tag、重複する open PR、untracked file を read-only で確認し、結果が `pass` になるまで次へ進みません。Untracked file は既定で停止し、利用者が必要性を確認した exact relative path だけ `--allow-untracked PATH` を繰り返して許可できます。`deferred` / `blocked` の扱いは「失敗したとき」を参照します。
 
-公開 PR の複数行本文も [contribution の安全な本文作成例](../CONTRIBUTING.md#issue-pr-の本文を安全に渡す) と同じ temporary file を使います。`body_file` は `mktemp` が返した file とし、本文の here-document は必ず `<<'EOF'` で引用します。本文に実在する履歴書 data、credential、token、test の raw log は書かず、架空 data を使った検証結果の要約と未確認事項だけを記載します。
+### 2. Version と公開 PR
 
-```bash
-body_file="$(mktemp)"
-trap 'rm -f "$body_file"' EXIT
-node scripts/write-github-body-file.mjs --output "$body_file" <<'EOF'
-## 架空の公開 PR 本文
+Repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` を1回実行し、package、lock、APP_VERSION、CHANGELOG の差分を確認して1件の公開 PR に含めます。
 
-- `literal --body`
-- $(not-a-command)
-- "double quotes" and 'single quotes'
-- [Issue #123](https://github.com/OWNER/REPOSITORY/issues/123) と [PR #456](https://github.com/OWNER/REPOSITORY/pull/456)
-EOF
+公開 PR の作成・更新には [contribution の安全な本文作成例](../CONTRIBUTING.md#issue-pr-の本文を安全に渡す) と同じ temporary file と `--body-file` を使います。実在する履歴書 data、credential、token、test の raw log は書かず、架空 data を使った検証結果の要約と未確認事項だけを記載します。
 
-gh pr create --base main --title '架空の release PR title' --body-file "$body_file"
-gh pr edit RELEASE_PR_NUMBER --body-file "$body_file"
-```
+### 3. 展示 asset を取り込む
 
-`gh` の認証設定、owner approval、PR の merge、tag 作成、push はこの手順の本文作成とは別であり、この例は実行しません。
+Version 更新を push し、PR の `Quality` が成功したら、候補 branch の clean checkout で `npm run promote:pr-doc-assets -- --pr PR_NUMBER` を実行します。run ID を直接指定する場合は、代わりに `--quality-run-id QUALITY_RUN_ID` を使います。この入口は公式 repository の current PR merge ref、成功した Quality run、artifact、manifest を一意に照合し、空・複数・失効・不一致では停止します。
 
-候補 branch の clean checkout で、PR の Quality が成功した後に `npm run promote:pr-doc-assets -- --pr PR_NUMBER` を実行します。run ID が分かっている場合は `--quality-run-id QUALITY_RUN_ID` を使います（両方は指定しません）。この入口は公式 repository の current `refs/pull/PR_NUMBER/merge`、成功した Quality run、`documentation-assets-MERGE_SHA` artifact、manifest の run ID と merge SHA を一意に照合します。空・複数・失効・不一致は停止します。候補 branch の HEAD は PR head SHA、`site/`・package・generator input は commit 済みでなければならず、temporary worktree で既存の `promote:doc-assets` 検証を実行してから、候補 branch には `docs/screenshots/{en,ja,zh-CN}.png`、`output/pdf/{en-letter,ja-a4,zh-CN-a4}.pdf`、`docs/assets-manifest.json` の7 fileだけを反映します。temporary artifact directory / worktree は成功・失敗のどちらでも削除されます。表示された7 file を目視・review して同じ公開 PR へ commit します。入口は GitHub read API、artifact download、PR merge ref の fetch だけを使い、owner approval、PR merge、tag 作成、push は行いません。再実行した `Release assets current` は manifest の Quality run ID から元の artifact を再取得し、commit 済み LFS file と manifest が promotion 元の exact bytes であることを先に確認します。そのうえで version、site hash、generator・browser・三言語の出力契約、PDF 全文・page、screenshot visual を現在の Quality evidence と照合します。Version を変えない PR で展示 asset を変更した場合は拒否します。別 run の Chromium rasterization bytes は完全一致を要求しません。CI 自身に repository 書込権限は与えません。
+反映するのは `docs/screenshots/{en,ja,zh-CN}.png` の3 file、`output/pdf/{en-letter,ja-a4,zh-CN-a4}.pdf` の3 file、`docs/assets-manifest.json` の計7 fileだけです。表示された file を目視・review し、同じ公開 PR へ commit します。Manifest の `source.checkoutCommit` は生成元の情報値なので、asset を取り込んだ後の PR head に手作業で書き換えません。
 
-### Asset-only 追補 commit の fast path
+Asset-only の追補 commit に fast path は設けません。最終 PR head の `Quality` と `Release assets current` をどちらも成功させます。Version を変えない PR で展示 asset を変更してはいけません。判断の経緯は [#178](https://github.com/herehigher/resume/issues/178) を参照します。
 
-現時点では導入しません。2026-09-11 に確認した 2026-09-10 の実測は次のとおりです。
+### 4. 承認して公開を確認する
 
-| 対象 | 所要時間 | 証拠 |
-| --- | --- | --- |
-| v0.2.8 candidate Quality | 3:48 | [Quality job](https://github.com/herehigher/resume/actions/runs/34478079250/job/102873681510) |
-| asset supplement Quality | 2:55 | [Quality job](https://github.com/herehigher/resume/actions/runs/34478959420/job/102876631797) |
-| asset supplement Release assets current | 0:13 | [Release assets current job](https://github.com/herehigher/resume/actions/runs/34478959420/job/102877603526) |
-| merge result main Quality | 2:58 | [Quality job](https://github.com/herehigher/resume/actions/runs/34479373432/job/102878008039) |
+Version、変更内容、必要な目視結果、`Quality` と `Release assets current` を所有者が確認し、公開 PR を main へ merge します。この merge が、GitHub が記録した merge 結果 commit の tag 作成と Pages 公開に対する承認です。
 
-managed asset 6 file と manifest だけの変更も現行 scope は documentation-only とは分類せず、final PR head の `Quality` と `Release assets current` を必ず要求します。後者は current head の fresh 生成 artifact を使い、promoted Quality artifact の exact LFS bytes、version、site hash、generator / browser、PDF と screenshot の契約を比較します。これは fast path が理論上不可能という意味ではありません。しかし約3分の短縮のためには、現行の current-merge-ref provenance に加え、過去の successful Quality の official repository、PR、base、head、artifact を cross-head/base で一意に結び、最終 head の fresh evidence まで証明する新しい連鎖が必要です。その設計と検証を導入するまでは fail-closed に full Quality を維持し、merge 後は main の full Quality、immutable tag、単一の prepared artifact、online smoke を通常どおり通します。
-
-Manifest の `source.checkoutCommit` は asset を生成した checkout の情報値であり、asset を取り込んだ後の最終 tag commit を表しません。`source.qualityRunId` と組み合わせ、公開 PR の check が repository 内の該当 Actions artifact を取得できて exact bytes が一致した場合にだけ promotion provenance として採用します。Merge 後の公開準備は失効し得る過去の artifact へ再依存せず、承認済み commit の展示 asset と最終 main Quality を candidate version、`siteHash`、generator input hash、PDF 全文・page contract、screenshot の visual comparison で再検証します。
-
-通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。公開 PR の merge 結果 commit に対する main Quality が成功すると、workflow がその Quality run ID と SHA を照合し、PR の base から version が変わったこと、対応する merged PR が1件であること、同じ version が現在も main の version であることを確認して自動的に準備・tag・deploy へ進みます。Repository で許可された merge commit・squash・rebase のいずれでも、GitHub が記録する merged PR の base / result SHA を基準にします。Version が変わらない通常の main 更新や、古い release commit の Quality 再実行では公開 job を開始しません。
-
-Analytics 有効時は、生成した配布物で実際の provider script を動かす互換性検査も準備に含まれます。未知の payload 契約や予期しない通信は公開を失敗させます。準備後の publish と deploy は、同じ workflow run が出力した exact artifact ID の保存済み bytes をそれぞれ再検証して使い、承認後の再 build や別 artifact への差し替えを行いません。Production lock の取得後にも current main version を再確認し、並行した新 version の後から旧 version を deploy しません。
-
-準備 artifact は30日間保持します。同じ run 全体を再実行した場合は新しい artifact ID になりますが、その再実行内でも prepare・publish・deploy は同じ ID を引き継ぎます。確認用画像・PDF は Quality run の7日間保持 artifact です。公開 PR の merge 前に失効した場合は候補 branch の Quality を再実行し、新しい artifact を再度取り込んで `source.qualityRunId` を更新します。Merge 後の公開準備は過去の promotion artifact の保持期間に依存しません。
+通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。Merge 結果 commit の main Quality が成功すると、immutable tag、同じ workflow run が準備した単一の artifact、deploy、online smoke へ自動的に進みます。Summary の tag、commit、run、公開 URL、結果、未確認事項を確認して完了です。
 
 ## 変更内容に応じた確認
 
@@ -84,7 +61,11 @@ Analytics 有効時は、生成した配布物で実際の provider script を�
 
 CI は保存・読込・言語分離・PDF・データ保護、version、source SHA、site bytes、asset の生成・semantic contract と各 artifact 自身の digest を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
 
-Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。アプリの deterministic mock test と、準備時の実 provider script による互換性検査を区別します。後者は架空 data の操作・再読込・移動を行い、headless browser で自然には発生しないページ非表示は明示的に模擬します。RUM を送信前に intercept するため、Cloudflare 側の受信成功を検証しません。観測範囲は summary と準備 artifact に同梱した `provider-compatibility.json` に記録し、自動 test 成功を包括的な実 provider 検証と呼びません。
+PR の `Release assets current` は manifest が示す Quality artifact を再取得し、commit 済みの7 file が promotion 元 artifact の exact bytes と一致することを先に確認します。そのうえで、最終 PR head の Quality が fresh に生成した artifact を使い、version、site、generator、browser、PDF、screenshot の契約と照合します。別 run の Chromium rasterization bytes の完全一致は要求しません。Version を変えない PR の展示 asset 変更は拒否します。
+
+Merge 後の Release Pages は merge 結果 commit の main Quality、PR の base からの version 変更、対応する merged PR、current main version を照合します。通常の main 更新や古い release commit の Quality 再実行からは公開を開始しません。Prepare、publish、deploy は同じ workflow run の exact artifact を再検証して使い、承認後に rebuild や差し替えを行いません。Production lock の取得後にも current main version を確認し、新しい version の後から古い version を deploy しません。
+
+Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。
 
 ## Analytics の扱い
 
@@ -93,6 +74,8 @@ Source は既定で無効です。公式 CI だけが設定 manifest の mode / 
 公開 beacon site token は repository variable `CLOUDFLARE_WEB_ANALYTICS_TOKEN` から渡す通常の site 設定です。存在、書式、安全な埋込みを検証し、専用の秘密管理・fingerprint・承認・ログ検査は設けません。GitHub 認証情報やアカウント操作用 API token は実 credential として保護します。
 
 許可する外部 runtime は `https://static.cloudflareinsights.com/beacon.min.js` の GET と `https://cloudflareinsights.com/cdn-cgi/rum` の標準 POST です。履歴書入力・写真・import/export JSON・草稿・custom event・利用者単位 ID を送信する変更は認めません。Cookie、localStorage、fingerprinting を追加しません。固定 URL や HTML digest は第三者 script 内容を固定するものではありません。利用者向け説明は [PRIVACY.md](../PRIVACY.md) を参照します。
+
+Analytics 有効時は、準備した配布物で実 provider script の互換性を検査します。架空 data の操作・再読込・移動を行い、headless browser で自然には発生しないページ非表示は明示的に模擬します。未知の payload 契約や予期しない通信は公開を失敗させます。RUM は送信前に intercept するため、Cloudflare 側の受信成功は検証しません。観測範囲は summary と準備 artifact 内の `provider-compatibility.json` に記録します。
 
 Field の根拠と互換性検査の範囲は [provider contract](cloudflare-analytics-contract.md) にまとめています。
 
@@ -106,6 +89,7 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 | Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
 | PR の Quality 失敗 | Product・test・generator 自体の失敗として修正 commit を検証。Asset の promotion を先に繰り返さない |
 | PR の Release assets current 失敗 | Version 更新 PR なら Quality artifact を目視して promotion する。Version を変えず展示 asset を変更していた場合はその変更を分離する。不一致の一覧が version・site・生成契約・manifest digest のどれかを確認する |
+| PR の Quality artifact が失効 | 候補 branch の Quality を再実行し、新しい artifact を目視して promotion command を再実行する。新しい run ID を記録した manifest を同じ公開 PR へ取り込む |
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
 | 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release Pages を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
 | Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |

@@ -43,7 +43,7 @@ test('GitHub body-file writer requires an absolute temporary-file path', () => {
   assert.match(result.stderr, /absolute temporary-file path/);
 });
 
-test('contribution and release instructions use body files while preserving the Japanese PR template headings', () => {
+test('contribution instructions are the body-file source of truth for release PRs', () => {
   const contributing = readFileSync(path.join(root, 'CONTRIBUTING.md'), 'utf8');
   const releasePlaybook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
   const template = readFileSync(path.join(root, '.github/pull_request_template.md'), 'utf8');
@@ -51,7 +51,7 @@ test('contribution and release instructions use body files while preserving the 
   assert.match(contributing, /gh issue create[\s\S]*--body-file "\$body_file"/);
   assert.match(contributing, /gh pr create[\s\S]*--body-file "\$body_file"/);
   assert.match(contributing, /gh pr edit[\s\S]*--body-file "\$body_file"/);
-  assert.match(releasePlaybook, /gh pr create[\s\S]*--body-file "\$body_file"/);
-  assert.match(releasePlaybook, /gh pr edit[\s\S]*--body-file "\$body_file"/);
+  assert.match(releasePlaybook, /\(\.\.\/CONTRIBUTING\.md#issue-pr-の本文を安全に渡す\)/);
+  assert.match(releasePlaybook, /公開 PR の作成・更新には[\s\S]*`--body-file`/);
   assert.match(template, /^## 問題と変更後の動作[\s\S]*^## 検証[\s\S]*^## 関連 Issue/m);
 });
