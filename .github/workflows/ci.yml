@@ -142,11 +142,12 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Checkout workflow summary tooling
+      - name: Checkout authoritative release asset source
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
+          lfs: true
           persist-credentials: false
 
       - name: Report Quality failure
@@ -172,15 +173,6 @@ jobs:
         run: |
           node scripts/release-assets-summary.mjs failure versionless-asset-change
           exit 1
-
-      - name: Checkout release asset verification source
-        if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          lfs: true
-          persist-credentials: false
 
       - name: Materialize release asset LFS files
         if: ${{ steps.classification.outputs.classification == 'verification-required' }}
@@ -222,11 +214,13 @@ jobs:
 
       - name: Report unavailable current Quality evidence
         if: ${{ (steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required') && steps.quality_evidence.outcome != 'success' }}
+        env:
+          EVIDENCE_FAILURE_CATEGORY: ${{ steps.quality_evidence.outputs.evidence_failure_category }}
         run: |
-          node scripts/release-assets-summary.mjs failure current-evidence-unavailable
+          node scripts/release-assets-summary.mjs failure "${EVIDENCE_FAILURE_CATEGORY:-current-evidence-local-tooling-bootstrap-failure}"
           exit 1
 
-      - name: Report promotion required
+      - name: Report expected promotion merge block after successful Quality
         if: ${{ steps.classification.outputs.classification == 'promotion-required' && steps.quality_evidence.outcome == 'success' }}
         env:
           ARTIFACT_NAME: ${{ steps.quality_evidence.outputs.artifact_name }}

@@ -46,6 +46,17 @@ function githubApi(endpoint, paginate = false) {
   }
 }
 
+export function classifyEvidenceFailure(error) {
+  const message = error instanceof Error ? error.message : '';
+  if (/GitHub API response is unavailable|documentation artifact/.test(message)) {
+    return 'current-evidence-github-api-or-artifact-unavailable';
+  }
+  if (/git .* could not complete|candidate checkout origin/.test(message)) {
+    return 'current-evidence-local-tooling-bootstrap-failure';
+  }
+  return 'current-evidence-identity-mismatch';
+}
+
 function officialRepository(value) {
   return value?.id && value.full_name === repository;
 }
@@ -352,7 +363,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       console.log(`Promoted only these ${result.files.length} files from Quality run ${result.qualityRunId}:\n${result.files.map((file) => `- ${file}`).join('\n')}`);
     }
   } catch (error) {
-    console.error(error.message);
+    if (process.argv[2] === 'evidence') {
+      const category = classifyEvidenceFailure(error);
+      if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `evidence_failure_category=${category}\n`);
+      console.error('Current Quality evidence could not be resolved.');
+    } else {
+      console.error(error.message);
+    }
     process.exitCode = 1;
   }
 }

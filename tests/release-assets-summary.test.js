@@ -23,8 +23,10 @@ test('version bump-only promotion report uses validated Actions identity fields 
     artifactName, candidateVersion: '0.3.0', pullRequestNumber: '177', qualityRunId: '456789', sourceMergeSha
   });
   assert.match(report.annotation, /Promotion required for v0\.3\.0/);
+  assert.match(report.summary, /^## Promotion required after successful Quality/);
   assert.match(report.summary, /Quality \(product and tests\) succeeded/);
   assert.match(report.summary, /Candidate version: `0\.3\.0`/);
+  assert.match(report.summary, /Pull request: `#177`/);
   assert.match(report.summary, /Quality run ID: `456789`/);
   assert.match(report.summary, new RegExp(`Source merge SHA: \`${sourceMergeSha}\``));
   assert.match(report.summary, new RegExp(`Artifact: \`${artifactName}\``));
@@ -37,8 +39,9 @@ test('version bump-only promotion report uses validated Actions identity fields 
 
 test('non-waiting release asset failures have separate safe reports', () => {
   for (const category of [
-    'quality-failure', 'versionless-asset-change', 'provenance-invalid', 'current-evidence-unavailable',
-    'promoted-evidence-unavailable', 'asset-integrity-mismatch'
+    'quality-failure', 'versionless-asset-change', 'provenance-invalid',
+    'current-evidence-github-api-or-artifact-unavailable', 'current-evidence-identity-mismatch',
+    'current-evidence-local-tooling-bootstrap-failure', 'promoted-evidence-unavailable', 'asset-integrity-mismatch'
   ]) {
     const report = releaseAssetFailureReport(category);
     assert.match(report.annotation, /[.]$/);
@@ -47,4 +50,5 @@ test('non-waiting release asset failures have separate safe reports', () => {
   assert.match(releaseAssetFailureReport('versionless-asset-change').summary, /not a promotion waiting state/);
   assert.match(releaseAssetFailureReport('promoted-evidence-unavailable').summary, /unavailable or expired/);
   assert.match(releaseAssetFailureReport('asset-integrity-mismatch').summary, /digests/);
+  assert.match(releaseAssetFailureReport('current-evidence-identity-mismatch').summary, /does not match this pull request identity/);
 });

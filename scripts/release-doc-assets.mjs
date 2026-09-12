@@ -110,9 +110,7 @@ async function recordedFileDigest(rootDirectory, relativePath) {
   const contents = await readFile(file);
   const pointer = contents.toString('utf8');
   if (pointer.startsWith('version https://git-lfs.github.com/spec/v1')) {
-    const match = pointer.match(/^version https:\/\/git-lfs\.github\.com\/spec\/v1\noid sha256:([0-9a-f]{64})\nsize [1-9][0-9]*\n?$/);
-    if (!match) fail(`Git LFS pointer is invalid: ${relativePath}`);
-    return match[1];
+    fail(`Git LFS pointer is not materialized: ${relativePath}`);
   }
   return createHash('sha256').update(contents).digest('hex');
 }
@@ -154,6 +152,7 @@ async function compareReleaseAssetEvidence({ committedRoot = root, generatedRoot
   if (promotedRoot) validationTargets.push(['promoted', promotedRoot, false]);
   for (const [label, assetRoot, requireExactSource] of validationTargets) {
     try {
+      for (const relativePath of assetPaths) await recordedFileDigest(assetRoot, relativePath);
       await verifyDocumentationAssets({ assetRoot, requireExactSource, sourceRoot: committedRoot, sourceSha });
     } catch (error) {
       fail(`${label} asset validation failed: ${error.message}`);

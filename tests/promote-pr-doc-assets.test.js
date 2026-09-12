@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,6 +13,7 @@ import { releaseDocumentationAssetPaths } from '../scripts/release-doc-assets.mj
 import {
   assertArtifactManifestProvenance,
   assertCandidateSource,
+  classifyEvidenceFailure,
   parseArguments,
   promotePullRequestDocumentationAssets,
   resolvePullRequestQualityEvidence,
@@ -256,6 +257,22 @@ test('promotion identity accepts the PR merge artifact when branch HEAD differs'
   }), /not active or completed/);
 });
 
+test('evidence module graph loads without node_modules and failure reports stay safely classified', (t) => {
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-evidence-module-'));
+  t.after(() => rm(temporary, { force: true, recursive: true }));
+  const moduleUrl = new URL('../scripts/promote-pr-doc-assets.mjs', import.meta.url).href;
+  const loaded = spawnSync(process.execPath, ['--input-type=module', '--eval', `await import(${JSON.stringify(moduleUrl)})`], {
+    cwd: temporary, encoding: 'utf8'
+  });
+  assert.equal(loaded.status, 0, loaded.stderr);
+  assert.equal(classifyEvidenceFailure(new Error('GitHub API response is unavailable for actions/runs/1')),
+    'current-evidence-github-api-or-artifact-unavailable');
+  assert.equal(classifyEvidenceFailure(new Error('Pull request documentation asset promotion failed: git fetch could not complete')),
+    'current-evidence-local-tooling-bootstrap-failure');
+  assert.equal(classifyEvidenceFailure(new Error('Pull request documentation asset promotion failed: Quality run does not match the current pull request head')),
+    'current-evidence-identity-mismatch');
+});
+
 test('read-only evidence resolution uniquely binds Actions objects to the current merge SHA', () => {
   const api = (endpoint) => {
     if (endpoint === 'actions/workflows/ci.yml') return workflow;
@@ -297,6 +314,9 @@ test('promotion fails closed for run, artifact, and manifest provenance mismatch
   }), /artifact/);
   assert.throws(() => resolvePromotionIdentity({
     artifact, mergeSha, pullRequest, qualityJob: { ...qualityJob, conclusion: 'failure' }, run, workflow
+  }), /Quality job/);
+  assert.throws(() => resolvePromotionIdentity({
+    artifact, mergeSha, pullRequest, qualityJob: { ...qualityJob, run_id: run.id + 1 }, run, workflow
   }), /Quality job/);
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
   assert.throws(() => assertArtifactManifestProvenance({
