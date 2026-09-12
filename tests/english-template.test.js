@@ -130,6 +130,7 @@ test('English sample and editor cover all ATS sections and optional personal-det
   }
   assert.match(editor, /data-en-optional-details-switch/);
   assert.match(editor, /<option value="male">Male<\/option>/);
+  assert.doesNotMatch(editor, /<em>Required<\/em>/);
   assert.deepEqual(createEnglishItem('certifications'), { date: '', name: '', url: '' });
   assert.equal(createEnglishItem('unknown'), null);
 });

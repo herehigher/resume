@@ -6,6 +6,17 @@ import { createDefaultState, createJapaneseSampleState } from '../site/assets/js
 import { renderJapaneseDocument } from '../site/assets/js/templates/ja.js';
 import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../site/assets/js/utils/date.js';
 
+test('Japanese editor keeps nationality in basic information without required badges', () => {
+  const editor = readFileSync(new URL('../site/editor/index.html', import.meta.url), 'utf8');
+  const basicInformation = editor.indexOf('<strong>基本情報</strong>');
+  const nationality = editor.indexOf('name="nationality"');
+  const contactDetails = editor.indexOf('<strong>連絡先</strong>');
+
+  assert.ok(basicInformation < nationality);
+  assert.ok(nationality < contactDetails);
+  assert.doesNotMatch(editor, /<em>必須<\/em>/);
+});
+
 test('Japanese document renderer switches between resume and career templates', () => {
   const state = createDefaultState('ja');
   state.profile.fields.fullName = '山田 花子';

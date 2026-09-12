@@ -183,7 +183,7 @@ test('Chinese editor exposes all state-backed sections and accessible controls',
   assert.match(shell, /data-profile="birthDate"/);
   assert.match(shell, /data-profile="nationality"/);
   assert.match(shell, /<option value="male">男<\/option>/);
-  assert.match(shell, /选填/);
+  assert.doesNotMatch(shell, /<em>(?:选填|必填)<\/em>/);
   assert.match(shell, /class="editor-legal"/);
   assert.doesNotMatch(shell, /data-zh-action="print"/);
 });

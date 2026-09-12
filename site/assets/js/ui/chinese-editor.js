@@ -80,7 +80,7 @@ export function renderChineseEditorShell() {
                 <button class="text-button" type="button" data-zh-action="remove-photo" hidden>删除照片</button>
               </div>
               <div class="field-stack">
-                <label class="input-field"><span>姓名 <em>${zhCN.requiredLabel}</em></span><input data-profile="fullName" autocomplete="name" required placeholder="例：简立"></label>
+                <label class="input-field"><span>姓名</span><input data-profile="fullName" autocomplete="name" required placeholder="例：简立"></label>
                 <label class="input-field"><span>求职方向 / 职业定位</span><input data-resume="headline" placeholder="例：高级产品经理｜企业服务"></label>
               </div>
             </div>
@@ -88,12 +88,12 @@ export function renderChineseEditorShell() {
               <label class="input-field"><span>手机号码</span><input data-profile="phone" type="tel" autocomplete="tel"></label>
               <label class="input-field"><span>电子邮箱</span><input data-profile="email" type="email" autocomplete="email"></label>
               <label class="input-field"><span>所在城市 / 地址</span><input data-profile="address" autocomplete="street-address"></label>
-              <label class="input-field"><span>邮政编码 <em>${zhCN.optionalLabel}</em></span><input data-profile="postalCode" autocomplete="postal-code"></label>
+              <label class="input-field"><span>邮政编码</span><input data-profile="postalCode" autocomplete="postal-code"></label>
             </div>
             <div class="field-grid two-columns">
-              <label class="input-field"><span>出生日期 <em>${zhCN.optionalLabel}</em></span><input data-profile="birthDate" type="date"></label>
-              <label class="input-field"><span>性别 <em>${zhCN.optionalLabel}</em></span><select data-profile="gender"><option value="">不填写</option><option value="male">男</option><option value="female">女</option><option value="other">其他</option></select></label>
-              <label class="input-field"><span>国籍 <em>${zhCN.optionalLabel}</em></span><input data-profile="nationality" autocomplete="country-name"></label>
+              <label class="input-field"><span>出生日期</span><input data-profile="birthDate" type="date"></label>
+              <label class="input-field"><span>性别</span><select data-profile="gender"><option value="">不填写</option><option value="male">男</option><option value="female">女</option><option value="other">其他</option></select></label>
+              <label class="input-field"><span>国籍</span><input data-profile="nationality" autocomplete="country-name"></label>
             </div>
             <div class="field-grid"><div class="list-heading"><strong>Links</strong><button class="small-add-button" data-zh-add-profile-link type="button">添加链接</button></div><span class="field-help">最多 3 条。输入 URL 后自动识别网站名称和图标。</span><div class="profile-links-editor" data-zh-profile-links></div></div>
           </div>
