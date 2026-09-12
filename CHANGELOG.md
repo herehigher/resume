@@ -14,7 +14,7 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ### Fixed / 修正
 
-- 公開 PR の Quality run と artifact が GitHub API で候補 branch の head SHA を示す契約に合わせ、候補 SHA と一時 merge SHA をそれぞれ正しく照合して展示 asset を取り込めるよう修正。
+- 公開 PR の Quality run と artifact が GitHub API で候補 branch の head SHA を示す契約に合わせ、同じ run の Quality job 成功、候補 SHA、一時 merge SHA をそれぞれ照合。軽量な証拠解決を browser / PDF dependency の導入前にも実行でき、検証済み展示 asset を取り込めるよう修正。
 
 ## [0.2.8] - 2026-09-10
 

@@ -5,13 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveSourceCommit } from './generate-doc-assets.mjs';
 import {
   promoteReleaseAssets,
   readReleaseAssetProvenance,
   releaseDocumentationAssetPaths
 } from './release-doc-assets.mjs';
-import { verifyDocumentationAssets } from './verify-doc-assets.mjs';
 
 const repository = 'herehigher/resume';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
@@ -120,8 +118,9 @@ function assertCleanAssetTargets(candidateRoot) {
   requireValue(!status, 'candidate checkout already has uncommitted documentation asset changes');
 }
 
-export function assertCandidateSource(candidateRoot, candidateSha) {
+export async function assertCandidateSource(candidateRoot, candidateSha) {
   try {
+    const { resolveSourceCommit } = await import('./generate-doc-assets.mjs');
     return resolveSourceCommit(candidateRoot, candidateSha);
   } catch (error) {
     fail(error.message);
@@ -272,7 +271,7 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
   const qualityJob = exactQualityJob(run.id, pullRequest.head.sha, api);
   const artifact = exactArtifact(run.id, mergeSha, pullRequest.head.sha, api);
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
-  assertCandidateSource(candidate, identity.candidateSha);
+  await assertCandidateSource(candidate, identity.candidateSha);
   assertCleanAssetTargets(candidate);
 
   const temporary = await createTemporaryDirectory();
@@ -285,15 +284,12 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
     gitCommand(candidate, ['worktree', 'add', '--detach', sourceRoot, identity.mergeSha]);
     worktreeCreated = true;
     gitCommand(sourceRoot, ['lfs', 'pull', '--include=docs/screenshots/*.png,output/pdf/*.pdf', '--exclude=']);
-    try {
-      resolveSourceCommit(sourceRoot, identity.mergeSha);
-    } catch (error) {
-      fail(error.message);
-    }
+    await assertCandidateSource(sourceRoot, identity.mergeSha);
     await mkdir(artifactRoot);
     await download(identity.qualityRunId, identity.artifactName, artifactRoot);
     assertArtifactManifestProvenance(await readReleaseAssetProvenance(artifactRoot), identity);
     await promoteReleaseAssets({ assetRoot: artifactRoot, sourceRoot, sourceSha: identity.mergeSha });
+    const { verifyDocumentationAssets } = await import('./verify-doc-assets.mjs');
     await verifyDocumentationAssets({
       assetRoot: sourceRoot, requireExactSource: false, sourceRoot: candidate, sourceSha: identity.candidateSha
     });

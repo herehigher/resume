@@ -320,11 +320,11 @@ test('promotion accepts exactly one identifier and rejects a dirty candidate sou
   execFileSync('git', ['add', 'site/index.html'], { cwd: sourceRoot });
   execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '-m', 'fixture'], { cwd: sourceRoot, stdio: 'ignore' });
   const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRoot, encoding: 'utf8' }).trim();
-  assert.equal(assertCandidateSource(sourceRoot, sha), sha);
-  assert.throws(() => assertCandidateSource(sourceRoot, candidateSha), /source SHA does not match/);
+  assert.equal(await assertCandidateSource(sourceRoot, sha), sha);
+  await assert.rejects(assertCandidateSource(sourceRoot, candidateSha), /source SHA does not match/);
 
   await writeFile(path.join(sourceRoot, 'site/index.html'), '<title>dirty</title>');
-  assert.throws(() => assertCandidateSource(sourceRoot, sha), /uncommitted site, package, or generator changes/);
+  await assert.rejects(assertCandidateSource(sourceRoot, sha), /uncommitted site, package, or generator changes/);
 });
 
 test('promotion orchestrates a temporary merge checkout and copies only seven verified files', async (t) => {
