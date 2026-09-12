@@ -49,7 +49,7 @@ test('candidate generation is a separate trusted workflow and does not claim pro
   assert.match(candidateWorkflow, /Resolve official candidate branch[\s\S]+git fetch --no-tags origin "refs\/heads\/\$CANDIDATE_REF"[\s\S]+rev-parse FETCH_HEAD/);
   assert.match(candidateWorkflow, /Checkout immutable candidate source[\s\S]+ref: \$\{\{ inputs\.candidate_sha \}\}/);
   assert.match(candidateWorkflow, /producer-kind release-candidate[\s\S]+producer-workflow \.github\/workflows\/release-candidate-assets\.yml[\s\S]+producer-run-attempt/);
-  assert.match(candidateWorkflow, /Upload candidate documentation evidence[\s\S]+release-candidate-documentation-assets-\$\{\{ inputs\.candidate_sha \}\}/);
+  assert.match(candidateWorkflow, /Upload candidate documentation evidence[\s\S]+release-candidate-documentation-assets-\$\{\{ inputs\.candidate_sha \}\}-attempt-\$\{\{ github\.run_attempt \}\}/);
   assert.doesNotMatch(candidateWorkflow, /npm test|test:e2e|workflow_call/);
 });
 

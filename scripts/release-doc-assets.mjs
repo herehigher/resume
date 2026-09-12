@@ -154,8 +154,11 @@ export async function readReleaseAssetProvenance(committedRoot = root) {
   const manifest = await readJson(path.join(committedRoot, 'docs/assets-manifest.json'), 'committed manifest');
   outputRecords(manifest, 'committed');
   const producer = sourceProducer(manifest, 'committed');
+  const artifactName = producer.kind === 'release-candidate'
+    ? `release-candidate-documentation-assets-${manifest.source.checkoutCommit}-attempt-${producer.runAttempt}`
+    : `documentation-assets-${manifest.source.checkoutCommit}`;
   return {
-    artifactName: `${producer.kind === 'release-candidate' ? 'release-candidate-documentation-assets' : 'documentation-assets'}-${manifest.source.checkoutCommit}`,
+    artifactName,
     checkoutCommit: manifest.source.checkoutCommit,
     producer,
     qualityRunId: producer.runId

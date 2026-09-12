@@ -101,7 +101,7 @@ jobs:
         id: evidence
         uses: actions/upload-artifact@v7
         with:
-          name: release-candidate-documentation-assets-${{ inputs.candidate_sha }}
+          name: release-candidate-documentation-assets-${{ inputs.candidate_sha }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/resume-candidate-documentation-assets/
           if-no-files-found: error
           retention-days: 7

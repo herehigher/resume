@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
-import { lstat, mkdtemp, mkdir, readFile, rm, copyFile } from 'node:fs/promises';
+import { lstat, mkdtemp, mkdir, readFile, rm, copyFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +36,12 @@ function fail(message, category) {
 
 function requireValue(condition, message) {
   if (!condition) fail(message);
+}
+
+function candidateArtifactName(sourceSha, runAttempt) {
+  requireValue(fullCommitPattern.test(sourceSha || '') && positiveId.test(String(runAttempt || '')),
+    'candidate artifact source SHA or run attempt is invalid');
+  return `release-candidate-documentation-assets-${sourceSha}-attempt-${runAttempt}`;
 }
 
 function git(cwd, args) {
@@ -234,7 +240,7 @@ export function resolveCandidateAssetIdentity({ artifact, controlSha, run, sourc
   requireValue(run.workflow_id === workflow.id && run.path === workflow.path && run.event === 'workflow_dispatch'
     && run.head_branch === 'main' && run.status === 'completed' && run.conclusion === 'success' && run.head_sha === controlSha,
   'candidate run does not match the trusted workflow control SHA');
-  const artifactName = `release-candidate-documentation-assets-${sourceSha}`;
+  const artifactName = candidateArtifactName(sourceSha, run.run_attempt);
   requireValue(artifact?.name === artifactName && artifact.expired === false
     && String(artifact.workflow_run?.id) === String(run.id) && artifact.workflow_run?.head_sha === controlSha
     && positiveId.test(String(artifact.id)) && artifactDigestPattern.test(artifact.digest || ''),
@@ -259,7 +265,10 @@ export function selectExactCandidateArtifact(artifacts, identity) {
 }
 
 function exactCandidateArtifact(runId, runAttempt, identity, api = githubApi) {
-  const pages = apiRequest(api, `actions/runs/${runId}/attempts/${runAttempt}/artifacts?per_page=100`, true);
+  requireValue(positiveId.test(String(runAttempt || ''))
+    && identity?.artifactName === candidateArtifactName(identity?.sourceSha, runAttempt),
+  'candidate artifact request does not match the explicit run attempt');
+  const pages = apiRequest(api, `actions/runs/${runId}/artifacts?per_page=100`, true);
   return selectExactCandidateArtifact(pages.flatMap((page) => page.artifacts || []), identity);
 }
 
@@ -268,12 +277,14 @@ export function resolveCandidateDocumentationEvidence({ dependencies = {}, prove
     && provenance.producer.workflow === candidateWorkflowPath,
   'committed asset producer is not the trusted release candidate workflow');
   const producer = provenance.producer;
+  requireValue(provenance.artifactName === candidateArtifactName(provenance.checkoutCommit, producer.runAttempt),
+    'committed candidate artifact name does not match source and run attempt provenance');
   const api = dependencies.api || githubApi;
   const workflow = apiRequest(api, 'actions/workflows/release-candidate-assets.yml');
   const run = apiRequest(api, `actions/runs/${producer.runId}`);
   requireValue(String(run.run_attempt) === String(producer.runAttempt), 'candidate run attempt does not match committed provenance');
   const provisional = {
-    artifactName: provenance.artifactName,
+    artifactName: candidateArtifactName(provenance.checkoutCommit, producer.runAttempt),
     controlSha: producer.controlSha,
     sourceSha: provenance.checkoutCommit
   };
@@ -359,9 +370,11 @@ function downloadArtifact(runId, artifactName, destination) {
 async function downloadCandidateArtifact(identity, destination) {
   const archive = path.join(destination, 'artifact.zip');
   try {
-    execFileSync('gh', ['api', `repos/${repository}/actions/artifacts/${identity.artifactId}/zip`, '--output', archive], {
-      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024
+    const archiveContents = execFileSync('gh', ['api', `repos/${repository}/actions/artifacts/${identity.artifactId}/zip`], {
+      stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024
     });
+    requireValue(Buffer.isBuffer(archiveContents), 'candidate artifact archive did not return binary content');
+    await writeFile(archive, archiveContents);
     const digest = createHash('sha256').update(await readFile(archive)).digest('hex');
     requireValue(identity.artifactDigest === `sha256:${digest}`, 'candidate artifact archive digest does not match the API identity');
     execFileSync('unzip', ['-q', archive, '-d', destination], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -387,7 +400,7 @@ export async function promoteCandidateDocumentationAssets({ candidateRoot = proc
   const run = apiRequest(api, `actions/runs/${values['run-id']}`);
   requireValue(String(run.run_attempt) === values['run-attempt'], 'candidate run attempt does not match the requested attempt');
   const provisional = {
-    artifactName: `release-candidate-documentation-assets-${values['source-sha']}`,
+    artifactName: candidateArtifactName(values['source-sha'], values['run-attempt']),
     controlSha: run.head_sha,
     sourceSha: values['source-sha']
   };
@@ -496,7 +509,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (command === 'candidate-evidence') {
       const values = parseCandidateArguments(args);
       const provenance = {
-        artifactName: `release-candidate-documentation-assets-${values['source-sha']}`,
+        artifactName: candidateArtifactName(values['source-sha'], values['run-attempt']),
         checkoutCommit: values['source-sha'],
         producer: {
           controlSha: values['control-sha'], kind: 'release-candidate', runAttempt: values['run-attempt'],
