@@ -182,6 +182,17 @@ jobs:
           lfs: true
           persist-credentials: false
 
+      - name: Materialize release asset LFS files
+        if: ${{ steps.classification.outputs.classification == 'verification-required' }}
+        run: >-
+          git lfs checkout --
+          docs/screenshots/en.png
+          docs/screenshots/ja.png
+          docs/screenshots/zh-CN.png
+          output/pdf/en-letter.pdf
+          output/pdf/ja-a4.pdf
+          output/pdf/zh-CN-a4.pdf
+
       - name: Setup Node.js
         if: ${{ steps.classification.outputs.classification == 'promotion-required' || steps.classification.outputs.classification == 'verification-required' }}
         uses: actions/setup-node@v7

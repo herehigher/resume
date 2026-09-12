@@ -89,6 +89,14 @@ test('release asset reporting always runs after a minimal checkout and gates eac
   const verificationCheckout = workflowStep(releaseAssetsCurrentJob, 'Checkout release asset verification source');
   assert.equal(workflowStepField(verificationCheckout, 'lfs'), 'true');
   assert.ok(summaryCheckout.index < verificationCheckout.index);
+
+  const lfsMaterialization = workflowStep(releaseAssetsCurrentJob, 'Materialize release asset LFS files');
+  assert.match(workflowStepField(lfsMaterialization, 'if'), /classification == 'verification-required'/);
+  for (const asset of [
+    'docs/screenshots/en.png', 'docs/screenshots/ja.png', 'docs/screenshots/zh-CN.png',
+    'output/pdf/en-letter.pdf', 'output/pdf/ja-a4.pdf', 'output/pdf/zh-CN-a4.pdf'
+  ]) assert.match(lfsMaterialization.body, new RegExp(asset.replaceAll('.', '\\.')));
+  assert.ok(verificationCheckout.index < lfsMaterialization.index);
 });
 
 test('release preparation checks committed assets against the final Quality evidence', () => {
