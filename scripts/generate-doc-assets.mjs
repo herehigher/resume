@@ -13,6 +13,10 @@ const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
 const generatorVersion = '1.4.0';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
+const producerWorkflows = Object.freeze({
+  quality: '.github/workflows/ci.yml',
+  'release-candidate': '.github/workflows/release-candidate-assets.yml'
+});
 const fixedPdfDate = `D:${fixedDate.replaceAll('-', '')}000000+00'00'`;
 const generatorInputPaths = Object.freeze([
   'package-lock.json',
@@ -389,11 +393,21 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
 export async function generateDocumentationAssets({
   outputRoot,
   qualityRunId,
+  producerControlSha,
+  producerKind,
+  producerRunAttempt,
+  producerWorkflow,
   sourceCommit,
   sourceRoot = root
 } = {}) {
   if (!/^[1-9][0-9]*$/.test(qualityRunId || '')) {
     throw new Error('Documentation assets require a positive Quality run ID.');
+  }
+  if (!Object.hasOwn(producerWorkflows, producerKind || 'quality')
+    || producerWorkflow !== undefined && producerWorkflow !== producerWorkflows[producerKind]
+    || !/^[1-9][0-9]*$/.test(producerRunAttempt || '1')
+    || !fullCommitPattern.test(producerControlSha || sourceCommit)) {
+    throw new Error('Documentation assets require valid producer provenance.');
   }
   const verifiedSourceCommit = resolveSourceCommit(sourceRoot, sourceCommit);
   const verifiedOutputRoot = await prepareDocumentationOutputDirectory({ outputRoot, sourceRoot });
@@ -420,9 +434,9 @@ export async function generateDocumentationAssets({
       outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot: verifiedOutputRoot }));
     }
     const manifest = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       generator: {
-        command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>',
+        command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>',
         inputHash: await computeGeneratorInputHash(sourceRoot),
         inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
         inputs: generatorInputPaths,
@@ -435,7 +449,13 @@ export async function generateDocumentationAssets({
         fixedDate,
         markerHashLength: 12,
         markerPrefix: 'RESUME-STUDIO-SAMPLE',
-        qualityRunId,
+        producer: {
+          controlSha: producerControlSha || sourceCommit,
+          kind: producerKind || 'quality',
+          runAttempt: producerRunAttempt || '1',
+          runId: qualityRunId,
+          workflow: producerWorkflow || producerWorkflows[producerKind || 'quality']
+        },
         siteHash,
         siteHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)'
       },
@@ -473,11 +493,27 @@ export function parseArguments(args) {
       index += 1;
       continue;
     }
+    const producerArguments = {
+      '--producer-kind': 'producerKind',
+      '--producer-workflow': 'producerWorkflow',
+      '--producer-run-attempt': 'producerRunAttempt',
+      '--producer-control-sha': 'producerControlSha'
+    };
+    if (producerArguments[argument] && !values[producerArguments[argument]]
+      && args[index + 1] && !args[index + 1].startsWith('--')) {
+      values[producerArguments[argument]] = args[index + 1];
+      index += 1;
+      continue;
+    }
     throw new Error('Invalid documentation asset arguments.');
   }
   if (!values.outputRoot || !values.sourceCommit || !values.qualityRunId) {
     throw new Error('Provide --output-dir, --source-sha, and --quality-run-id for temporary documentation assets.');
   }
+  values.producerKind ||= 'quality';
+  values.producerWorkflow ||= producerWorkflows[values.producerKind];
+  values.producerRunAttempt ||= '1';
+  values.producerControlSha ||= values.sourceCommit;
   return values;
 }
 

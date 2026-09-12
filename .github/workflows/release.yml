@@ -6,6 +6,7 @@ on:
   workflow_run:
     workflows: [Quality]
     types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       recovery_tag:

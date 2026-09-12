@@ -66,6 +66,10 @@ export function releaseAssetFailureReport(category) {
       annotation: 'Release documentation assets changed without a package version change.',
       summary: '## Release asset policy failure\n\nRelease documentation assets changed without a package version change. Split the asset change from this pull request; this is not a promotion waiting state.'
     },
+    'release-assets-missing': {
+      annotation: 'A version change is missing its required release documentation assets.',
+      summary: '## Release documentation assets missing\n\nThis version-changing pull request does not contain the required seven release documentation asset files. Generate candidate evidence for the fixed candidate SHA, promote it into a clean checkout, then commit and review the resulting files before opening or updating the pull request.'
+    },
     'provenance-invalid': {
       annotation: 'Committed release asset provenance is invalid.',
       summary: '## Release asset provenance failure\n\nThe committed manifest cannot identify a valid promoted Quality artifact. This is not a promotion waiting state; repair the manifest or asset provenance in a new commit.'

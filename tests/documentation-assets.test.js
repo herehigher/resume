@@ -20,6 +20,10 @@ test('documentation asset commands require explicit temporary output and source 
     '--output-dir', '/private/tmp/doc-assets', '--source-sha', sourceSha, '--quality-run-id', '12345'
   ]), {
     outputRoot: '/private/tmp/doc-assets',
+    producerControlSha: sourceSha,
+    producerKind: 'quality',
+    producerRunAttempt: '1',
+    producerWorkflow: '.github/workflows/ci.yml',
     qualityRunId: '12345',
     sourceCommit: sourceSha
   });

@@ -11,6 +11,10 @@ import { computeGeneratorInputHash, computeSiteHash } from './generate-doc-asset
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const fullCommitPattern = /^[0-9a-f]{40}$/;
+const producerWorkflows = Object.freeze({
+  quality: '.github/workflows/ci.yml',
+  'release-candidate': '.github/workflows/release-candidate-assets.yml'
+});
 const expectedOutputs = Object.freeze({
   en: { paper: 'LETTER', pdfPath: 'output/pdf/en-letter.pdf', screenshotPath: 'docs/screenshots/en.png' },
   ja: { paper: 'A4', pdfPath: 'output/pdf/ja-a4.pdf', screenshotPath: 'docs/screenshots/ja.png' },
@@ -220,12 +224,17 @@ export async function verifyDocumentationAssets({
   const packageVersion = JSON.parse(await readFile(path.join(sourceRoot, 'package.json'), 'utf8')).version;
   const siteHash = await computeSiteHash(path.join(sourceRoot, 'site'));
   const generatorInputHash = await computeGeneratorInputHash(sourceRoot);
-  if (manifest.schemaVersion !== 3) throw new Error('Documentation asset manifest schema is not current.');
+  if (manifest.schemaVersion !== 4) throw new Error('Documentation asset manifest schema is not current.');
   if (requireExactSource && manifest.source?.checkoutCommit !== sourceSha) {
     throw new Error('Documentation asset source SHA does not match the manifest.');
   }
-  if (!/^[1-9][0-9]*$/.test(manifest.source?.qualityRunId || '')) {
-    throw new Error('Documentation asset Quality run ID is invalid.');
+  const producer = manifest.source?.producer;
+  if (!Object.hasOwn(producerWorkflows, producer?.kind)
+    || producer?.workflow !== producerWorkflows[producer.kind]
+    || !/^[1-9][0-9]*$/.test(producer?.runId || '')
+    || !/^[1-9][0-9]*$/.test(producer?.runAttempt || '')
+    || !fullCommitPattern.test(producer?.controlSha || '')) {
+    throw new Error('Documentation asset producer provenance is invalid.');
   }
   if (manifest.source?.appVersion !== packageVersion) {
     throw new Error('Documentation asset app version does not match the source checkout.');

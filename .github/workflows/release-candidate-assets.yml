@@ -1,0 +1,107 @@
+name: Release candidate assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Official candidate branch name
+        required: true
+        type: string
+      candidate_sha:
+        description: Full candidate commit SHA to generate
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate immutable candidate input
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]
+          [[ "$CANDIDATE_REF" != main ]]
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Checkout trusted workflow control
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve official candidate branch
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/heads/$CANDIDATE_REF"
+          test "$(git rev-parse FETCH_HEAD)" = "$CANDIDATE_SHA"
+
+      - name: Checkout immutable candidate source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify checked out candidate source
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install generator dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Generate temporary candidate documentation assets
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-candidate-documentation-assets
+        run: >-
+          npm run generate:doc-assets --
+          --output-dir "${DOCUMENTATION_ASSET_DIRECTORY}"
+          --source-sha "${CANDIDATE_SHA}"
+          --quality-run-id "${{ github.run_id }}"
+          --producer-kind release-candidate
+          --producer-workflow .github/workflows/release-candidate-assets.yml
+          --producer-run-attempt "${{ github.run_attempt }}"
+          --producer-control-sha "${{ github.sha }}"
+
+      - name: Verify temporary candidate documentation assets
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-candidate-documentation-assets
+        run: >-
+          npm run verify:doc-assets --
+          --asset-root "${DOCUMENTATION_ASSET_DIRECTORY}"
+          --source-root "${GITHUB_WORKSPACE}"
+          --source-sha "${CANDIDATE_SHA}"
+
+      - name: Upload candidate documentation evidence
+        id: evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-candidate-documentation-assets-${{ inputs.candidate_sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/resume-candidate-documentation-assets/
+          if-no-files-found: error
+          retention-days: 7

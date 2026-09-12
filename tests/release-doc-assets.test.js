@@ -129,9 +129,9 @@ async function writeAssetFixture(root, {
     });
   }
   const manifest = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     generator: {
-      command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>',
+      command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>',
       inputHash: generatorInputHash,
       inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
       inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs'],
@@ -144,7 +144,13 @@ async function writeAssetFixture(root, {
       fixedDate: '2026-09-01',
       markerHashLength: 12,
       markerPrefix: 'RESUME-STUDIO-SAMPLE',
-      qualityRunId,
+      producer: {
+        controlSha: commit,
+        kind: 'quality',
+        runAttempt: '1',
+        runId: qualityRunId,
+        workflow: '.github/workflows/ci.yml'
+      },
       siteHash,
       siteHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)'
     },
@@ -223,6 +229,9 @@ test('committed assets may differ in bytes across runs when rendered content sta
   assert.deepEqual(await readReleaseAssetProvenance(committedRoot), {
     artifactName: `documentation-assets-${'b'.repeat(40)}`,
     checkoutCommit: 'b'.repeat(40),
+    producer: {
+      controlSha: 'b'.repeat(40), kind: 'quality', runAttempt: '1', runId: '12345', workflow: '.github/workflows/ci.yml'
+    },
     qualityRunId: '12345'
   });
 });
