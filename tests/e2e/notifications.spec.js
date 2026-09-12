@@ -51,3 +51,23 @@ test('import updates the active Draft Status while App Notice announces the resu
     await expect(page.locator('#statusAnnouncer')).toHaveText(/.+/);
   }
 });
+
+test('a successful import resolves its earlier App Notice error', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'invalid-fictional.json', mimeType: 'application/json', buffer: Buffer.from('{"version":999}')
+  });
+  await expect(page.locator('#globalMessage')).toHaveText('この下書きは新しい版で作成されています。更新後にもう一度開いてください。');
+  await expect(page.locator('#appNotice')).toHaveClass(/is-error/);
+
+  const imported = createDefaultState('ja');
+  imported.profile.fields.fullName = 'Fictional recovered import';
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'valid-fictional.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[name="fullName"]')).toHaveValue('Fictional recovered import');
+  await expect(page.locator('#saveStatus')).toHaveText('暗号化してこの端末に保存済み');
+  await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
+  await expect(page.locator('#appNotice')).not.toHaveClass(/is-error/);
+});

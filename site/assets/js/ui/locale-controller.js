@@ -59,8 +59,8 @@ export function initLocaleController(store, {
   let renderedLocale = '';
   let dataMenuPointerDownInside = false;
 
-  function showMessage(message, { persistent = false, tone = 'success' } = {}) {
-    statusController?.showAppNotice(message, { persistent, tone });
+  function showMessage(message, { persistent = false, source = null, tone = 'success' } = {}) {
+    statusController?.showAppNotice(message, { persistent, source, tone });
   }
 
   function applyLocale(force = false) {
@@ -111,8 +111,9 @@ export function initLocaleController(store, {
     applyLocale(true);
     try {
       saveLocalePreference(preferenceStorage, nextLocale);
+      statusController?.resolveAppNotice('locale-preference');
     } catch (_error) {
-      showMessage(getMessages(nextLocale).localeSaveError, { persistent: true, tone: 'error' });
+      showMessage(getMessages(nextLocale).localeSaveError, { persistent: true, source: 'locale-preference', tone: 'error' });
     }
   });
 
@@ -121,10 +122,10 @@ export function initLocaleController(store, {
     try {
       downloadState(store, locale);
       dataMenu.open = false;
-      showMessage(copy.exportSuccess);
+      showMessage(copy.exportSuccess, { source: 'export' });
     } catch {
       dataMenu.open = false;
-      showMessage(copy.exportError, { persistent: true, tone: 'error' });
+      showMessage(copy.exportError, { persistent: true, source: 'export', tone: 'error' });
     }
   });
 
@@ -150,11 +151,11 @@ export function initLocaleController(store, {
       await store.importPrepared(prepared);
       applyLocale(true);
       dataMenu.open = false;
-      showMessage(prepared.status === 'salvaged' ? currentCopy.importSalvaged : getMessages(locale).importSuccess);
+      showMessage(prepared.status === 'salvaged' ? currentCopy.importSalvaged : getMessages(locale).importSuccess, { source: 'import' });
     } catch (error) {
       store.cancelImport();
       dataMenu.open = false;
-      showMessage(messageForDraftStorageError(error, locale, currentCopy.importError), { persistent: true, tone: 'error' });
+      showMessage(messageForDraftStorageError(error, locale, currentCopy.importError), { persistent: true, source: 'import', tone: 'error' });
     } finally {
       importInput.value = '';
     }

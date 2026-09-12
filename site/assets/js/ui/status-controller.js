@@ -44,11 +44,14 @@ export function initStatusController() {
     syncNoticeHeight();
   }
 
-  function showAppNotice(message, { tone = 'success', persistent = false, blocking = false, announce: shouldAnnounce = true } = {}) {
+  function showAppNotice(message, {
+    tone = 'success', persistent = false, blocking = false, source = null, announce: shouldAnnounce = true
+  } = {}) {
     const nextPriority = blocking ? 4 : noticePriority(tone);
-    if (activeNotice?.persistent && activeNotice.priority > nextPriority) return false;
+    const resolvesActiveNotice = source && source === activeNotice?.source && tone !== 'error';
+    if (activeNotice?.persistent && activeNotice.priority > nextPriority && !resolvesActiveNotice) return false;
     window.clearTimeout(timer);
-    activeNotice = { message, tone, persistent, priority: nextPriority };
+    activeNotice = { message, tone, persistent, priority: nextPriority, source };
     notice.hidden = false;
     noticeMessage.textContent = message;
     notice.classList.toggle('is-success', tone === 'success');
@@ -66,6 +69,10 @@ export function initStatusController() {
     draftStatuses.set(locale, { element, controls });
   }
 
+  function resolveAppNotice(source) {
+    if (source && activeNotice?.persistent && activeNotice.source === source) clearNotice();
+  }
+
   function setDraftStatus(locale, message, tone = '', { announce: shouldAnnounce = true } = {}) {
     const draft = draftStatuses.get(locale);
     if (!draft) return;
@@ -78,5 +85,5 @@ export function initStatusController() {
   }
 
   dismissButton.addEventListener('click', clearNotice);
-  return { announce, clearNotice, registerDraftStatus, setDraftStatus, showAppNotice };
+  return { announce, clearNotice, registerDraftStatus, resolveAppNotice, setDraftStatus, showAppNotice };
 }
