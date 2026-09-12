@@ -49,7 +49,7 @@ export function promotionRequiredReport(fields) {
       '',
       'Next step (from a clean checkout of this candidate branch):',
       '',
-      `\`npm run promote:pr-doc-assets -- --pr ${identity.pullRequestNumber}\``,
+      `\`npm run promote:pr-doc-assets -- --quality-run-id ${identity.qualityRunId}\``,
       '',
       'This only retrieves and verifies the exact Quality artifact, then updates the seven reviewable release asset files. Review and commit those files to this pull request; it does not approve, merge, tag, push, or publish.'
     ].join('\n')

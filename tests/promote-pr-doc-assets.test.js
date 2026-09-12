@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdtempSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deflateSync } from 'node:zlib';
 
 import { computeGeneratorInputHash, computeSiteHash } from '../scripts/generate-doc-assets.mjs';
@@ -25,6 +26,7 @@ import {
 
 const candidateSha = 'a'.repeat(40);
 const mergeSha = 'b'.repeat(40);
+const root = fileURLToPath(new URL('../', import.meta.url));
 const repository = { id: 1, full_name: 'herehigher/resume' };
 const workflow = { id: 17, path: '.github/workflows/ci.yml' };
 const pullRequest = {
@@ -257,20 +259,46 @@ test('promotion identity accepts the PR merge artifact when branch HEAD differs'
   }), /not active or completed/);
 });
 
-test('evidence module graph loads without node_modules and failure reports stay safely classified', (t) => {
+test('evidence module graph loads from a tree without repository dependencies', (t) => {
   const temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-evidence-module-'));
   t.after(() => rm(temporary, { force: true, recursive: true }));
-  const moduleUrl = new URL('../scripts/promote-pr-doc-assets.mjs', import.meta.url).href;
+  const scripts = path.join(temporary, 'scripts');
+  mkdirSync(scripts);
+  for (const file of ['promote-pr-doc-assets.mjs', 'release-doc-assets.mjs']) {
+    cpSync(path.join(root, 'scripts', file), path.join(scripts, file));
+  }
+  const moduleUrl = pathToFileURL(path.join(scripts, 'promote-pr-doc-assets.mjs')).href;
   const loaded = spawnSync(process.execPath, ['--input-type=module', '--eval', `await import(${JSON.stringify(moduleUrl)})`], {
     cwd: temporary, encoding: 'utf8'
   });
   assert.equal(loaded.status, 0, loaded.stderr);
-  assert.equal(classifyEvidenceFailure(new Error('GitHub API response is unavailable for actions/runs/1')),
+});
+
+function failureCategory(callback) {
+  try {
+    callback();
+  } catch (error) {
+    return classifyEvidenceFailure(error);
+  }
+  assert.fail('expected evidence resolution to fail');
+}
+
+test('evidence failures carry stable categories from their sources', () => {
+  assert.equal(failureCategory(() => selectExactArtifact([], run.id, mergeSha, candidateSha)),
     'current-evidence-github-api-or-artifact-unavailable');
-  assert.equal(classifyEvidenceFailure(new Error('Pull request documentation asset promotion failed: git fetch could not complete')),
+  assert.equal(failureCategory(() => selectExactArtifact([{ ...artifact, expired: true }], run.id, mergeSha, candidateSha)),
+    'current-evidence-github-api-or-artifact-unavailable');
+  assert.equal(failureCategory(() => selectExactArtifact([
+    { ...artifact, workflow_run: { ...artifact.workflow_run, id: run.id + 1 } }
+  ], run.id, mergeSha, candidateSha)), 'current-evidence-identity-mismatch');
+  assert.equal(failureCategory(() => resolvePullRequestQualityEvidence({
+    candidateRoot: '/fictional/candidate', dependencies: {
+      api: () => { throw new Error('network failure'); },
+      git: () => 'https://github.com/herehigher/resume.git'
+    }, pullRequestNumber: '167', qualityRunId: String(run.id), sourceMergeSha: mergeSha
+  })), 'current-evidence-github-api-or-artifact-unavailable');
+  assert.equal(classifyEvidenceFailure(new Error('unexpected local bootstrap failure')),
     'current-evidence-local-tooling-bootstrap-failure');
-  assert.equal(classifyEvidenceFailure(new Error('Pull request documentation asset promotion failed: Quality run does not match the current pull request head')),
-    'current-evidence-identity-mismatch');
 });
 
 test('read-only evidence resolution uniquely binds Actions objects to the current merge SHA', () => {
@@ -297,7 +325,7 @@ test('read-only evidence resolution uniquely binds Actions objects to the curren
   }), /does not match this pull request merge SHA/);
   assert.throws(() => resolvePullRequestQualityEvidence({
     candidateRoot: '/fictional/candidate', dependencies, pullRequestNumber: '167', qualityRunId: '99', sourceMergeSha: mergeSha
-  }), /Unexpected API endpoint/);
+  }), /GitHub API response is unavailable/);
 });
 
 test('promotion fails closed for run, artifact, and manifest provenance mismatches', () => {
@@ -333,7 +361,7 @@ test('promotion refuses empty, multiple, and expired run or artifact selections'
   assert.throws(() => selectExactQualityJob([
     { ...qualityJob, conclusion: 'failure' }
   ], run.id, candidateSha), /Quality job does not match/);
-  assert.throws(() => selectExactArtifact([], run.id, mergeSha, candidateSha), /exactly one documentation artifact/);
+  assert.throws(() => selectExactArtifact([], run.id, mergeSha, candidateSha), /artifact is unavailable/);
   assert.throws(() => selectExactArtifact([artifact, artifact], run.id, mergeSha, candidateSha), /exactly one documentation artifact/);
   assert.throws(() => selectExactArtifact([{ ...artifact, expired: true }], run.id, mergeSha, candidateSha), /has expired/);
 });

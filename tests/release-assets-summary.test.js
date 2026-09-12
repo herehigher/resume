@@ -30,7 +30,8 @@ test('version bump-only promotion report uses validated Actions identity fields 
   assert.match(report.summary, /Quality run ID: `456789`/);
   assert.match(report.summary, new RegExp(`Source merge SHA: \`${sourceMergeSha}\``));
   assert.match(report.summary, new RegExp(`Artifact: \`${artifactName}\``));
-  assert.match(report.summary, /npm run promote:pr-doc-assets -- --pr 177/);
+  assert.match(report.summary, /npm run promote:pr-doc-assets -- --quality-run-id 456789/);
+  assert.doesNotMatch(report.summary, /--pr 177/);
   assert.match(report.summary, /does not approve, merge, tag, push, or publish/);
   assert.throws(() => promotionRequiredReport({
     artifactName: 'documentation-assets-wrong', candidateVersion: '0.3.0', pullRequestNumber: '177', qualityRunId: '456789', sourceMergeSha

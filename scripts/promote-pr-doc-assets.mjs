@@ -14,9 +14,21 @@ import {
 const repository = 'herehigher/resume';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
 const positiveId = /^[1-9][0-9]*$/;
+export const evidenceFailureCategories = Object.freeze({
+  identityMismatch: 'current-evidence-identity-mismatch',
+  toolingBootstrapFailure: 'current-evidence-local-tooling-bootstrap-failure',
+  unavailable: 'current-evidence-github-api-or-artifact-unavailable'
+});
 
-function fail(message) {
-  throw new Error(`Pull request documentation asset promotion failed: ${message}`);
+class EvidenceFailure extends Error {
+  constructor(message, category = evidenceFailureCategories.identityMismatch) {
+    super(`Pull request documentation asset promotion failed: ${message}`);
+    this.category = category;
+  }
+}
+
+function fail(message, category) {
+  throw new EvidenceFailure(message, category);
 }
 
 function requireValue(condition, message) {
@@ -29,7 +41,7 @@ function git(cwd, args) {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
     }).trim();
   } catch {
-    fail(`git ${args[0]} could not complete`);
+    fail(`git ${args[0]} could not complete`, evidenceFailureCategories.toolingBootstrapFailure);
   }
 }
 
@@ -42,19 +54,23 @@ function githubApi(endpoint, paginate = false) {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024
     }));
   } catch {
-    fail(`GitHub API response is unavailable for ${endpoint}`);
+    fail(`GitHub API response is unavailable for ${endpoint}`, evidenceFailureCategories.unavailable);
   }
 }
 
 export function classifyEvidenceFailure(error) {
-  const message = error instanceof Error ? error.message : '';
-  if (/GitHub API response is unavailable|documentation artifact/.test(message)) {
-    return 'current-evidence-github-api-or-artifact-unavailable';
+  return Object.values(evidenceFailureCategories).includes(error?.category)
+    ? error.category
+    : evidenceFailureCategories.toolingBootstrapFailure;
+}
+
+function apiRequest(api, endpoint, paginate = false) {
+  try {
+    return api(endpoint, paginate);
+  } catch (error) {
+    if (error instanceof EvidenceFailure) throw error;
+    fail('GitHub API response is unavailable', evidenceFailureCategories.unavailable);
   }
-  if (/git .* could not complete|candidate checkout origin/.test(message)) {
-    return 'current-evidence-local-tooling-bootstrap-failure';
-  }
-  return 'current-evidence-identity-mismatch';
 }
 
 function officialRepository(value) {
@@ -173,8 +189,13 @@ async function copyPromotedFiles({ candidateRoot, sourceRoot }) {
 export function selectExactArtifact(artifacts, runId, mergeSha, candidateSha) {
   const name = `documentation-assets-${mergeSha}`;
   const matches = artifacts.filter((artifact) => artifact.name === name);
+  if (matches.length === 0) {
+    fail('documentation artifact is unavailable for the Quality run', evidenceFailureCategories.unavailable);
+  }
   requireValue(matches.length === 1, 'expected exactly one documentation artifact for the Quality run');
-  requireValue(matches[0].expired === false, 'documentation artifact has expired');
+  if (matches[0].expired !== false) {
+    fail('documentation artifact has expired', evidenceFailureCategories.unavailable);
+  }
   requireValue(String(matches[0].workflow_run?.id) === String(runId)
     && matches[0].workflow_run?.head_sha === candidateSha,
   'documentation artifact does not match the exact Quality run and merge commit');
@@ -182,7 +203,7 @@ export function selectExactArtifact(artifacts, runId, mergeSha, candidateSha) {
 }
 
 function exactArtifact(runId, mergeSha, candidateSha, api = githubApi) {
-  const pages = api(`actions/runs/${runId}/artifacts?per_page=100`, true);
+  const pages = apiRequest(api, `actions/runs/${runId}/artifacts?per_page=100`, true);
   return selectExactArtifact(pages.flatMap((page) => page.artifacts || []), runId, mergeSha, candidateSha);
 }
 
@@ -196,7 +217,7 @@ export function selectExactQualityJob(jobs, runId, candidateSha) {
 }
 
 function exactQualityJob(runId, candidateSha, api = githubApi) {
-  const pages = api(`actions/runs/${runId}/jobs?filter=latest&per_page=100`, true);
+  const pages = apiRequest(api, `actions/runs/${runId}/jobs?filter=latest&per_page=100`, true);
   return selectExactQualityJob(pages.flatMap((page) => page.jobs || []), runId, candidateSha);
 }
 
@@ -218,10 +239,10 @@ export function resolvePullRequestQualityEvidence({
   const currentMerge = dependencies.currentMergeSha || currentMergeSha;
   const gitCommand = dependencies.git || git;
   assertOfficialOrigin(candidate, gitCommand);
-  const workflow = api('actions/workflows/ci.yml');
-  const pullRequest = api(`pulls/${pullRequestNumber}`);
+  const workflow = apiRequest(api, 'actions/workflows/ci.yml');
+  const pullRequest = apiRequest(api, `pulls/${pullRequestNumber}`);
   const mergeSha = currentMerge(candidate, pullRequestNumber);
-  const run = api(`actions/runs/${qualityRunId}`);
+  const run = apiRequest(api, `actions/runs/${qualityRunId}`);
   const qualityJob = exactQualityJob(run.id, pullRequest.head.sha, api);
   const artifact = exactArtifact(run.id, mergeSha, pullRequest.head.sha, api);
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
@@ -241,9 +262,9 @@ export function selectQualityRun(candidates, pullRequest) {
 }
 
 function findQualityRunForPullRequest(workflow, pullRequest, api = githubApi) {
-  const pages = api(`actions/workflows/${workflow.id}/runs?event=pull_request&status=completed&per_page=100`, true);
+  const pages = apiRequest(api, `actions/workflows/${workflow.id}/runs?event=pull_request&status=completed&per_page=100`, true);
   const selected = selectQualityRun(pages.flatMap((page) => page.workflow_runs || []), pullRequest);
-  return api(`actions/runs/${selected.id}`);
+  return apiRequest(api, `actions/runs/${selected.id}`);
 }
 
 function downloadArtifact(runId, artifactName, destination) {

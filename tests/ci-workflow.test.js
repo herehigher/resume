@@ -51,7 +51,7 @@ test('release asset currentness is a separate check after Quality uploads eviden
   assert.match(qualityWorkflow, /github\.event_name == 'pull_request' }}\s+runs-on:[\s\S]+Report Quality failure[\s\S]+needs\.quality\.result != 'success'/);
   assert.match(qualityWorkflow, /Download documentation asset evidence[\s\S]+Verify release documentation assets are current/);
   assert.match(qualityWorkflow, /steps\.classification\.outputs\.classification == 'verification-required'/);
-  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+lfs: true/);
+  assert.match(qualityWorkflow, /release-assets-current:[\s\S]+Materialize release asset LFS files/);
   assert.match(qualityWorkflow, /--quality-run-id "\$\{QUALITY_RUN_ID\}"/);
   assert.match(qualityWorkflow, /Resolve promoted Quality artifact provenance[\s\S]+Download the originally promoted Quality artifact/);
   assert.match(qualityWorkflow, /release-doc-assets\.mjs compare[\s\S]+--promoted-root "\$\{PROMOTED_ASSET_DIRECTORY\}"[\s\S]+--source-sha "\$\{SOURCE_SHA\}"/);
@@ -75,7 +75,7 @@ test('release asset reporting uses one authoritative checkout and gates each cla
   assert.equal(workflowStepField(authoritativeCheckout, 'uses'), 'actions/checkout@v7');
   assert.equal(workflowStepField(authoritativeCheckout, 'fetch-depth'), '0');
   assert.equal(workflowStepField(authoritativeCheckout, 'persist-credentials'), 'false');
-  assert.equal(workflowStepField(authoritativeCheckout, 'lfs'), 'true');
+  assert.equal(workflowStepField(authoritativeCheckout, 'lfs'), undefined);
   assert.equal((releaseAssetsCurrentJob.match(/uses: actions\/checkout@v7/g) || []).length, 1);
   for (const name of [
     'Report Quality failure', 'Classify release asset check',
@@ -95,6 +95,8 @@ test('release asset reporting uses one authoritative checkout and gates each cla
     'docs/screenshots/en.png', 'docs/screenshots/ja.png', 'docs/screenshots/zh-CN.png',
     'output/pdf/en-letter.pdf', 'output/pdf/ja-a4.pdf', 'output/pdf/zh-CN-a4.pdf'
   ]) assert.match(lfsMaterialization.body, new RegExp(asset.replaceAll('.', '\\.')));
+  assert.match(lfsMaterialization.body, /git lfs pull/);
+  assert.doesNotMatch(releaseAssetsCurrentJob, /lfs: true|git lfs checkout/);
   assert.ok(authoritativeCheckout.index < lfsMaterialization.index);
 });
 
