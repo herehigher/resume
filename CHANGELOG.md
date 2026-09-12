@@ -6,9 +6,15 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-12
+
 ### Changed / 変更
 
 - 保存・JSON 契約を v3 へ更新し、共有 profile の gender を locale 非依存値へ正規化、nationality と English の任意個人情報表示設定を追加。v2 は明示 migration でのみ受理する。
+
+### Fixed / 修正
+
+- 公開 PR の Quality run と artifact が GitHub API で候補 branch の head SHA を示す契約に合わせ、同じ run の Quality job 成功、候補 SHA、一時 merge SHA をそれぞれ照合。軽量な証拠解決を browser / PDF dependency の導入前にも実行でき、検証済み展示 asset を取り込めるよう修正。
 
 ## [0.2.8] - 2026-09-10
 
