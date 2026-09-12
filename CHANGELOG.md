@@ -6,6 +6,17 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-12
+
+### Changed / 変更
+
+- 日本語・简体中文・English の入力欄から必須・任意を示す補助 label を削除し、日本語版の国籍入力欄を共有 profile data と validation を維持したまま基本情報へ移動。
+- `Release assets current` を単一の authoritative LFS checkout に整理し、Quality 成功後の asset promotion 手順を Job Summary の先頭で案内するよう変更。
+
+### Fixed / 修正
+
+- 公開 asset の current Quality evidence 取得失敗を GitHub API / artifact、identity、local tooling の原因別に安全に分類し、LFS pointer を検証前に拒否するよう修正。
+
 ## [0.3.0] - 2026-09-12
 
 ### Changed / 変更
