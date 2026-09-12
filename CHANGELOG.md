@@ -6,6 +6,8 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-12
+
 ### Changed / 変更
 
 - 保存・JSON 契約を v3 へ更新し、共有 profile の gender を locale 非依存値へ正規化、nationality と English の任意個人情報表示設定を追加。v2 は明示 migration でのみ受理する。
