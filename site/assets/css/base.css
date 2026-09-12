@@ -12,6 +12,7 @@
   --blue-soft: #eef4ff;
   --green: #0f8a68;
   --danger: #c93c3c;
+  --app-notice-height: 0px;
   --shadow: 0 18px 50px rgba(23, 32, 51, .12);
   font-family: Inter, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
 }

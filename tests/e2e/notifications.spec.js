@@ -20,12 +20,14 @@ test('[mobile] App Notice wraps in document flow at 320–401px and export close
       const header = box('.app-header');
       const notice = box('#appNotice');
       const switcher = box('.mobile-view-switch');
-      return { header, notice, switcher, viewport: document.documentElement.clientWidth };
+      const workspace = box('#japaneseWorkspace');
+      return { header, notice, switcher, workspace, viewport: document.documentElement.clientWidth, viewportHeight: window.innerHeight };
     });
     expect(layout.notice.left).toBeGreaterThanOrEqual(0);
     expect(layout.notice.right).toBeLessThanOrEqual(layout.viewport);
     expect(layout.notice.top).toBeGreaterThanOrEqual(layout.header.bottom);
     expect(layout.notice.bottom).toBeLessThanOrEqual(layout.switcher.top);
+    expect(layout.workspace.bottom).toBeLessThanOrEqual(layout.viewportHeight);
     await expectNoPageOverflow(page);
   }
 });

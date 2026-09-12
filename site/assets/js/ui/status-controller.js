@@ -24,6 +24,14 @@ export function initStatusController() {
 
   function announce(message, tone = '') { announceStatus(message, tone); }
 
+  function syncNoticeHeight() {
+    const height = notice.hidden ? 0 : notice.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--app-notice-height', `${height}px`);
+  }
+
+  const noticeObserver = new ResizeObserver(syncNoticeHeight);
+  noticeObserver.observe(notice);
+
   function clearNotice() {
     window.clearTimeout(timer);
     timer = null;
@@ -33,6 +41,7 @@ export function initStatusController() {
     notice.classList.remove('is-success', 'is-saving', 'is-error');
     noticeMessage.classList.remove('is-error');
     dismissButton.hidden = true;
+    syncNoticeHeight();
   }
 
   function showAppNotice(message, { tone = 'success', persistent = false, blocking = false, announce: shouldAnnounce = true } = {}) {
@@ -47,6 +56,7 @@ export function initStatusController() {
     notice.classList.toggle('is-error', tone === 'error');
     noticeMessage.classList.toggle('is-error', tone === 'error');
     dismissButton.hidden = !persistent;
+    syncNoticeHeight();
     if (shouldAnnounce) announce(message, tone);
     if (!persistent) timer = window.setTimeout(clearNotice, NOTICE_DURATION);
     return true;
