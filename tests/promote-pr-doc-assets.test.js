@@ -235,7 +235,7 @@ function promotionDependencies(fixture, qualityRunId = '12345') {
   };
 }
 
-test('promotion identity accepts the PR merge artifact when branch HEAD differs', () => {
+test('promotion identity accepts the current PR merge artifact while its parent run is in progress and the same Quality job succeeded', () => {
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
   assert.equal(identity.candidateSha, candidateSha);
   assert.equal(identity.mergeSha, mergeSha);
@@ -247,9 +247,11 @@ test('promotion identity accepts the PR merge artifact when branch HEAD differs'
   assert.deepEqual(resolvePromotionIdentity({
     artifact, mergeSha, pullRequest, qualityJob, run: { ...run, head_repository: undefined }, workflow
   }), identity);
-  assert.deepEqual(resolvePromotionIdentity({
-    artifact, mergeSha, pullRequest, qualityJob, run: { ...run, status: 'in_progress' }, workflow
-  }), identity);
+  const inProgressRun = { ...run, conclusion: null, status: 'in_progress' };
+  assert.equal(qualityJob.run_id, inProgressRun.id);
+  assert.equal(qualityJob.status, 'completed');
+  assert.equal(qualityJob.conclusion, 'success');
+  assert.deepEqual(resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run: inProgressRun, workflow }), identity);
   assert.throws(() => resolvePromotionIdentity({
     artifact, mergeSha, pullRequest, qualityJob,
     run: { ...run, head_repository: { id: 2, full_name: 'untrusted/fork' } }, workflow
