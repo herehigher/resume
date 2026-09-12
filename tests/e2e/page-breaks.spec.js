@@ -108,7 +108,7 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await expect(row).toHaveAttribute('aria-label', '基本信息之后、个人概述之前添加分页');
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-pressed', 'true');
-  await expect(workspace.locator('.page-break-live')).toHaveText('个人概述之前的分页已添加');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('个人概述之前的分页已添加');
   await expect(row).toBeFocused();
   await page.keyboard.press('Tab');
   const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
@@ -118,7 +118,7 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await expect(experience).toHaveAttribute('aria-pressed', 'true');
   await expect(experience).toBeFocused();
   await expect(experience).toHaveCount(1);
-  await expect(workspace.locator('.page-break-live')).toHaveText('工作经历之前的分页已添加');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('工作经历之前的分页已添加');
   const lastRow = workspace.locator('.page-break-row').last();
   await lastRow.focus();
   await page.keyboard.press('Tab');
@@ -149,7 +149,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(summary).toHaveCount(1);
   await expect(summary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
-  await expect(workspace.locator('.page-break-live')).toHaveText('个人概述之前的分页已添加');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('个人概述之前的分页已添加');
 
   await blurFocusedControlOnNextPointerUp(experience);
   await experience.tap();
@@ -158,7 +158,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(experience).toHaveAttribute('aria-pressed', 'true');
   await expect(experience).toBeFocused();
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
-  await expect(workspace.locator('.page-break-live')).toHaveText('工作经历之前的分页已添加');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('工作经历之前的分页已添加');
 
   await blurFocusedControlOnNextPointerUp(experience);
   await experience.tap();
@@ -167,7 +167,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(experience).toHaveAttribute('aria-pressed', 'false');
   await expect(experience).toBeFocused();
   await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
-  await expect(workspace.locator('.page-break-live')).toHaveText('工作经历之前的分页已取消');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('工作经历之前的分页已取消');
 
   await blurFocusedControlOnNextPointerUp(projects);
   await projects.tap();
@@ -176,7 +176,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(projects).toHaveAttribute('aria-pressed', 'true');
   await expect(projects).toBeFocused();
   await expect(page.locator('[data-section-key="projects"]')).toHaveClass(/has-manual-page-break/);
-  await expect(workspace.locator('.page-break-live')).toHaveText('项目经历之前的分页已添加');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('项目经历之前的分页已添加');
 
   await blurFocusedControlOnNextPointerUp(trigger);
   await trigger.tap();

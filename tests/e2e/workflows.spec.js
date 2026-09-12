@@ -23,7 +23,8 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await expect(page.locator('#clearDraftButton')).toHaveText('この端末の下書きを消去');
   await expect(page.locator('#japaneseWorkspace .draft-clear-notice')).toHaveCount(0);
   await expect(page.locator('#saveStatus')).toHaveText('入力すると暗号化してこの端末に保存されます');
-  await expect(page.locator('#saveStatus')).toHaveAttribute('role', 'status');
+  await expect(page.locator('#saveStatus')).not.toHaveAttribute('aria-live');
+  await expect(page.locator('#statusAnnouncer')).toHaveAttribute('aria-atomic', 'true');
 
   const name = page.locator('[name="fullName"]');
   const motivation = page.locator('[name="motivation"]');
@@ -320,7 +321,8 @@ test('[mobile] 三言語の入力例は唯一のlive statusで説明し、320–
       const workspace = page.locator(workspaceSelector);
       await workspace.locator(sampleSelector).click();
       await expect(workspace.locator(statusSelector)).toHaveText(sampleStatus);
-      await expect(workspace.locator('.draft-message[role="status"]')).toHaveCount(1);
+      await expect(workspace.locator('.draft-message[aria-live]')).toHaveCount(0);
+      await expect(page.locator('[aria-live]')).toHaveCount(1);
       await expect(workspace.locator('.sample-mode-copy')).toHaveCount(0);
       for (const action of await workspace.locator(`${actionsSelector} .secondary-button, ${actionsSelector} .primary-button`).all()) {
         await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
@@ -709,7 +711,7 @@ test('三言語で暗号化保存の状態を表示し、削除をバックア�
     await expect(sampleButton).toBeVisible();
     await expect(sampleButton).toHaveText(sampleLabel);
     await expect(sampleButton.locator('xpath=ancestor::*[contains(@class, "draft-controls")]')).toHaveCount(1);
-    await expect(workspace.locator('.draft-primary-row .draft-message')).toHaveAttribute('role', 'status');
+    await expect(workspace.locator('.draft-primary-row .draft-message')).not.toHaveAttribute('aria-live');
     await expect(workspace.locator('.draft-primary-row .draft-message')).toHaveText(unsavedStatus);
     await expect(workspace.locator('.draft-clear-button, .draft-clear-notice')).toHaveCount(0);
     await expect(workspace.locator('.draft-controls')).toHaveCSS('position', 'sticky');

@@ -64,6 +64,7 @@
   .document-page { min-height: 842px; padding: 34px 37px; width: 595px; }
   .data-menu-panel .secondary-button,
   .data-menu-panel .danger-button { min-height: 44px; }
+  .app-notice { font-size: 11px; padding: 9px 14px; }
   .remove-career-button,
   .remove-career-detail-button,
   .career-detail-add-button { min-height: 44px; }
@@ -77,6 +78,8 @@
   .data-menu-chevron { display: none; }
   .data-menu-icon { display: block; }
   .primary-button { font-size: 10px; min-height: 34px; }
+  .app-notice { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .app-notice-dismiss { min-height: 36px; }
   .editor-heading { align-items: start; }
   .editor-heading h1 { font-size: 24px; }
   .section-content { padding-left: 0; }

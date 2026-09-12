@@ -47,7 +47,7 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   const thirdTitle = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 3 の項目名' });
   const thirdContent = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 3 の内容' });
   await expect(thirdTitle).toBeFocused();
-  await expect(page.locator('#careerDetailStatus')).toHaveText('勤務先 1 に詳細項目を追加しました。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 に詳細項目を追加しました。');
   await thirdTitle.fill('使用技術');
   await thirdContent.fill('HTML, CSS, JavaScript');
   await expect(page.locator('#documentPreview')).toContainText('使用技術');
@@ -64,7 +64,7 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toHaveValue('実績・成果');
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toBeFocused();
-  await expect(page.locator('#careerDetailStatus')).toHaveText('勤務先 1 の詳細項目を削除しました。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 の詳細項目を削除しました。');
 
   const emptyAdd = firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' });
   await emptyAdd.click();
@@ -98,7 +98,7 @@ test('日本語の勤務先は確認後にだけ削除される', async ({ page 
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(careerList.locator('.career-editor-item')).toHaveCount(0);
   await expect(page.locator('[data-add="career"]')).toBeFocused();
-  await expect(page.locator('#careerDetailStatus')).toHaveText('勤務先 1 を削除しました。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 を削除しました。');
 });
 
 test('日本語の空の勤務先と既定の空詳細項目は確認なしで削除できる', async ({ page }) => {

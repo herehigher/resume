@@ -1,3 +1,5 @@
+import { announceStatus } from './ui/status-controller.js';
+
 export const PAGE_BREAK_LABELS = Object.freeze({
   ja: {
     add: '改頁', remove: '解除', menu: '改頁', positions: '改頁位置', after: 'の後'
@@ -107,10 +109,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   panel.className = 'page-break-panel';
   panel.hidden = true;
   toolbar.append(panel);
-  const live = document.createElement('p');
-  live.className = 'page-break-live';
-  live.setAttribute('aria-live', 'polite');
-  toolbar.append(live);
   let lastFocusKey = null;
 
   function activeContext() {
@@ -157,7 +155,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       section.style.removeProperty('--page-break-paper-right-offset');
     });
     menu.hidden = validTargets.length === 0;
-    if (menu.hidden) { setOpen(false); panel.replaceChildren(); live.textContent = ''; return; }
+    if (menu.hidden) { setOpen(false); panel.replaceChildren(); return; }
     menu.textContent = `${labels.menu} ${active.length}`;
     panel.replaceChildren();
     const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
@@ -188,9 +186,9 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     });
     if (lastFocusKey) {
       const target = getRegisteredSections(locale, type).find((section) => section.key === lastFocusKey);
-      if (locale === 'ja') live.textContent = `${target.label}の前に改ページを${targets.includes(lastFocusKey) ? '追加しました' : '解除しました'}`;
-      else if (locale === 'zh-CN') live.textContent = `${target.label}之前的分页已${targets.includes(lastFocusKey) ? '添加' : '取消'}`;
-      else live.textContent = `Page break ${targets.includes(lastFocusKey) ? 'added' : 'removed'} before ${target.label}`;
+      if (locale === 'ja') announceStatus(`${target.label}の前に改ページを${targets.includes(lastFocusKey) ? '追加しました' : '解除しました'}`);
+      else if (locale === 'zh-CN') announceStatus(`${target.label}之前的分页已${targets.includes(lastFocusKey) ? '添加' : '取消'}`);
+      else announceStatus(`Page break ${targets.includes(lastFocusKey) ? 'added' : 'removed'} before ${target.label}`);
     }
     if (lastFocusKey) {
       const focusTarget = window.matchMedia('(max-width: 820px)').matches

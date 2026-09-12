@@ -4,7 +4,7 @@ import { cloneData } from '../state/defaults.js';
 import { getChineseFields, renderChineseDocument } from '../templates/zh-CN.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
-import { messageForDraftStorageError } from './draft-storage-error.js';
+import { draftStatusMessageForError } from './draft-storage-error.js';
 import { confirmAction } from './confirmation-dialog.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 
@@ -59,7 +59,7 @@ export function renderChineseEditorShell() {
       <div class="completion-track" aria-hidden="true"><span data-zh-completion-bar></span></div>
       <section class="draft-controls" data-zh-draft-controls aria-label="草稿状态与操作">
         <div class="draft-primary-row">
-          <span class="draft-message" data-zh-draft-message role="status" aria-live="polite">${zhCN.saveStatus}</span>
+          <span class="draft-message" data-zh-draft-message>${zhCN.saveStatus}</span>
           <div class="draft-normal-actions" data-zh-normal-actions>
             <button class="secondary-button" type="button" data-zh-action="sample">${zhCN.loadSample}</button>
           </div>
@@ -211,7 +211,7 @@ function renderEntry(documentObject, type, item, index) {
   return article;
 }
 
-export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWorkspace' } = {}) {
+export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWorkspace', statusController } = {}) {
   if (!embeddedPhotoUrl) throw new TypeError('Embedded photo URL helper is required');
   const rootElement = typeof root === 'string' ? document.querySelector(root) : root;
   if (!rootElement) throw new TypeError('Chinese editor root element is required');
@@ -237,13 +237,19 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     return store.getState().documents['zh-CN'].resume;
   }
 
-  function setStatus(message, tone = '') {
+  function setStatus(message, tone = '', options) {
+    if (statusController) {
+      statusController.setDraftStatus('zh-CN', message, tone, options);
+      return;
+    }
     saveStatus.textContent = message;
     saveStatus.classList.toggle('is-success', tone === 'success');
     saveStatus.classList.toggle('is-saving', tone === 'saving');
     saveStatus.classList.toggle('is-error', tone === 'error');
     rootElement.querySelector('[data-zh-draft-controls]').classList.toggle('is-error', tone === 'error');
   }
+
+  statusController?.registerDraftStatus('zh-CN', saveStatus, rootElement.querySelector('[data-zh-draft-controls]'));
 
   function scheduleSave() {
     window.clearTimeout(saveTimer);
@@ -255,7 +261,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
         await store.save();
         setStatus(zhCN.savedStatus, 'success');
       } catch (error) {
-        setStatus(messageForDraftStorageError(error, 'zh-CN', zhCN.saveError), 'error');
+        setStatus(draftStatusMessageForError(error, 'zh-CN', zhCN.saveError), 'error');
       }
     }, 300);
   }
@@ -373,7 +379,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     try {
       draftBeforeSample = await protectChineseDraftBeforeSample(store, shouldPersistDraft);
     } catch (error) {
-      setStatus(messageForDraftStorageError(error, 'zh-CN', '无法保护当前草稿，示例未打开。'), 'error');
+      setStatus(draftStatusMessageForError(error, 'zh-CN', '无法保护当前草稿，示例未打开。'), 'error');
       return;
     }
     draftBeforeSampleWasStored = shouldPersistDraft;
@@ -412,7 +418,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       setSampleMode(false);
       setStatus('示例已保存为草稿。', 'success');
     } catch (error) {
-      setStatus(messageForDraftStorageError(error, 'zh-CN', '无法将示例保存为草稿。'), 'error');
+      setStatus(draftStatusMessageForError(error, 'zh-CN', '无法将示例保存为草稿。'), 'error');
     }
   }
 
@@ -435,7 +441,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       setSampleMode(false);
       setStatus('草稿已清除。');
     } catch (error) {
-      setStatus(messageForDraftStorageError(error, 'zh-CN', '无法清除草稿。'), 'error');
+      setStatus(draftStatusMessageForError(error, 'zh-CN', '无法清除草稿。'), 'error');
     }
   }
 
@@ -590,7 +596,11 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       importPending = false;
       return;
     }
-    if (event.type === 'import') importPending = false;
+    if (event.type === 'import') {
+      importPending = false;
+      shouldPersistDraft = true;
+      setStatus(zhCN.savedStatus, 'success', { announce: false });
+    }
     if (event.type === 'import' && sampleMode) {
       sampleMode = false;
       draftBeforeSample = null;
@@ -601,7 +611,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     if (['import', 'reload', 'reset', 'zh-sample', 'zh-restore'].includes(event.type)) hydrate();
   });
   hydrate();
-  setStatus(shouldPersistDraft ? zhCN.savedStatus : zhCN.saveStatus, shouldPersistDraft ? 'success' : '');
+  setStatus(shouldPersistDraft ? zhCN.savedStatus : zhCN.saveStatus, shouldPersistDraft ? 'success' : '', { announce: false });
 
   return {
     refresh: hydrate,
