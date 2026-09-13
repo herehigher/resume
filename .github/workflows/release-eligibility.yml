@@ -1,0 +1,58 @@
+name: Release eligibility
+
+on:
+  workflow_run:
+    workflows: [Quality]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    outputs:
+      quality_run_id: ${{ steps.eligibility.outputs.quality_run_id }}
+      release_required: ${{ steps.eligibility.outputs.release_required }}
+      release_sha: ${{ steps.eligibility.outputs.release_sha }}
+    steps:
+      - name: Checkout trusted release eligibility tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate completed main Quality and release eligibility
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALITY_RUN_ID: ${{ github.event.workflow_run.id }}
+          QUALITY_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: >-
+          node scripts/validate-release-run.mjs eligibility
+          --run-id "${QUALITY_RUN_ID}"
+          --sha "${QUALITY_SHA}"
+
+      - name: Record ineligible main update
+        if: ${{ steps.eligibility.outputs.release_required != 'true' }}
+        run: |
+          {
+            echo '## Release not dispatched'
+            echo "- Reason: \`${{ steps.eligibility.outputs.reason }}\`"
+            echo "- Quality: ${{ steps.eligibility.outputs.run_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch Release Pages for the eligible Quality run
+        if: ${{ steps.eligibility.outputs.release_required == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALITY_RUN_ID: ${{ steps.eligibility.outputs.quality_run_id }}
+        run: >-
+          gh workflow run release.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref main
+          -f quality_run_id="${QUALITY_RUN_ID}"
