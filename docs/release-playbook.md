@@ -13,10 +13,10 @@ Public release、tag、Pages 設定、repository visibility の変更には owne
 | 1 | 担当者 | 変更範囲と公開 version を決める | 安定版番号が決まっている |
 | 2 | 担当者 | 公式 repository の候補 branch で version、CHANGELOG、公開内容を commit する | 候補 source が40桁の commit SHAで固定されている |
 | 3 | CI・担当者 | 候補 asset を生成・取り込み、7 fileを目視して候補 branch へ commit する | 展示 asset が候補 version・site bytes・生成契約と一致する |
-| 4 | 担当者・CI | 完成した公開 PR を1件作り、`Quality`、`Release assets current`、review を完了する | 最終 PR の fresh 検証と候補 artifact の照合が成功する |
+| 4 | 担当者・CI | 完成した公開 PR を1件作り、`Quality` と review を完了する | `quality` に含まれる fresh 検証と候補 artifact の照合が成功する |
 | 5 | 所有者 | Version・変更内容・必要な目視結果を確認し、公開 PR を main へ merge して本番公開を承認する | 対象の merge 結果 commit が確定し、追加の公開承認なしで自動処理へ進める |
-| 6 | CI | Merge 結果 commit の main Quality 成功を待ち、PR の base からの version 変更と merged PR を照合する | 通常の main 更新ではなく、承認済み公開 PR の source だと確認できる |
-| 7 | CI | 同じ commit の Quality 展示 asset を照合し、配布物を生成・検査して immutable tag を作成・deploy する | Tag、commit、配布物が一致する |
+| 6 | CI | Main Quality の成功後に `Release eligibility` が Quality run、merged PR、version を照合する | 承認済み公開 PR の source だけが `Release Pages` へ渡る |
+| 7 | CI | `Release Pages` が資格を再確認し、同じ commit の Quality 展示 asset を照合して配布物を生成・検査し、immutable tag を作成・deploy する | Tag、commit、配布物が一致する |
 | 8 | CI・担当者 | 公開 URL の自動検査と summary を確認する | Deploy と online smoke が成功する |
 
 通常公開で実行する full Quality 2回は、完成した公開 PR と merge 結果の main が対象です。候補生成 workflow は展示 asset だけを生成・検証し、product Quality や公開承認の代わりにはなりません。公開までの asset 生成は候補、最終 PR、main の3回です。
@@ -64,13 +64,13 @@ Promotion 入口は公式 repository、workflow、control SHA、source SHA、run
 
 Version、CHANGELOG、公開内容、7 fileが揃った候補 branch から公開 PR を1件作ります。公開 PR の作成・更新には [contribution の安全な本文作成例](../CONTRIBUTING.md#issue-pr-の本文を安全に渡す) と同じ temporary file と `--body-file` を使います。実在する履歴書 data、credential、token、test の raw log は書かず、架空 data を使った検証結果の要約と未確認事項だけを記載します。
 
-Asset-only の追補 commit に fast path は設けません。最終 PR head の `Quality` と `Release assets current` をどちらも成功させます。Version を変えない PR で展示 asset を変更してはいけません。
+Asset-only の追補 commit に fast path は設けません。最終 PR head の `Quality` を成功させます。`quality` は候補 artifact と commit 済み7 fileの exact bytes、最終 PR の fresh evidence を照合します。Required check の移行中に `Release assets current` が表示される場合は、`quality` と同じ結果になることも確認します。Version を変えない PR で展示 asset を変更してはいけません。
 
 ### 5. 承認して公開を確認する
 
-Version、変更内容、必要な目視結果、`Quality` と `Release assets current` を所有者が確認し、公開 PR を main へ merge します。この merge が、GitHub が記録した merge 結果 commit の tag 作成と Pages 公開に対する承認です。
+Version、変更内容、必要な目視結果、`Quality` を所有者が確認し、公開 PR を main へ merge します。この merge が、GitHub が記録した merge 結果 commit の tag 作成と Pages 公開に対する承認です。
 
-通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。Merge 結果 commit の main Quality が成功すると、immutable tag、同じ workflow run が準備した単一の artifact、deploy、online smoke へ自動的に進みます。Summary の tag、commit、run、公開 URL、結果、未確認事項を確認して完了です。
+通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。Merge 結果 commit の main Quality が成功すると `Release eligibility` が公開資格を確認し、該当する公開 PR の場合だけ `Release Pages` を開始します。通常の main 更新は資格確認で終了し、`Release Pages` の run を作りません。公開時は immutable tag、同じ workflow run が準備した単一の artifact、deploy、online smoke へ進みます。Summary の tag、commit、run、公開 URL、結果、未確認事項を確認して完了です。
 
 ## 変更内容に応じた確認
 
@@ -87,9 +87,9 @@ Version、変更内容、必要な目視結果、`Quality` と `Release assets c
 
 CI は保存・読込・言語分離・PDF・データ保護、version、source SHA、site bytes、asset の生成・semantic contract と各 artifact 自身の digest を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
 
-PR の `Release assets current` は manifest が示す候補 artifact を再取得し、commit 済みの7 file が promotion 元 artifact の exact bytes と一致することを先に確認します。そのうえで、最終 PR head の Quality が fresh に生成した artifact を使い、version、site、generator、browser、PDF、screenshot の契約と照合します。別 run の Chromium rasterization bytes の完全一致は要求しません。Asset が未準備、不一致、失効している場合は実際の失敗として扱い、準備待ちを意図的な失敗にはしません。Quality 自体が失敗した場合は同じ原因を重ねず、`Release assets current` は skipped になります。Version を変えない PR の展示 asset 変更は拒否します。
+PR の `quality` は manifest が示す候補 artifact を取得し、commit 済みの7 file が promotion 元 artifact の exact bytes と一致することを先に確認します。そのうえで、同じ job が fresh に生成した artifact を使い、version、site、generator、browser、PDF、screenshot の契約と照合します。別 run の Chromium rasterization bytes の完全一致は要求しません。Asset が未準備、不一致、失効している場合は `quality` を失敗させます。Version を変えない PR の展示 asset 変更も拒否します。Required check の移行中に表示される `Release assets current` は `quality` の成否だけを反映します。
 
-Merge 後の Release Pages は merge 結果 commit の main Quality、PR の base からの version 変更、対応する merged PR、current main version を照合します。通常の main 更新や古い release commit の Quality 再実行からは公開を開始しません。Prepare、publish、deploy は同じ workflow run の exact artifact を再検証して使い、承認後に rebuild や差し替えを行いません。Production lock の取得後にも current main version を確認し、新しい version の後から古い version を deploy しません。
+Merge 後の `Release eligibility` は official main Quality の完了・成功、full Quality、対象 SHA、対応する唯一の merged PR、PR base からの version 変更、current main version を照合します。照合不能な状態は失敗し、通常の main 更新と current main version に一致しない release は `Release Pages` を開始しません。`Release Pages` は渡された Quality run ID から同じ資格を再確認します。Prepare、publish、deploy は同じ workflow run の exact artifact を再検証して使い、承認後に rebuild や差し替えを行いません。Production lock の取得後にも current main version を確認し、新しい version の後から古い version を deploy しません。
 
 Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。
 
@@ -115,8 +115,9 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 | Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
 | 候補生成 workflow の失敗 | Candidate SHA と branch、generator、依存関係を確認する。候補内容を直した場合は新しい SHA、run、attempt で生成し直す |
 | 候補 artifact が失効・不一致 | 同じ固定 SHA で候補生成 workflow を再実行し、新しい run と attempt を指定して promotion する。別 artifact を代用しない |
-| PR の Quality 失敗 | Product・test・generator 自体の失敗として修正 commit を検証する。修正で candidate SHA が変わった場合は候補生成と promotion からやり直す |
-| PR の Release assets current 失敗 | Source SHA、run、attempt、artifact、digest、7 fileのどこが不一致かを確認する。Version を変えず展示 asset を変更していた場合はその変更を分離する |
+| PR の Quality 失敗 | Product・test・generator、または release asset の source SHA、run、attempt、artifact、digest、7 fileの不一致を該当 step と summary で確認する。修正で candidate SHA が変わった場合は候補生成と promotion からやり直す |
+| PR の Release assets current 失敗（移行中） | `quality` の失敗原因を確認する。この check 自体は release asset 検証を繰り返さない |
+| Release eligibility の失敗 | Quality run、repository・workflow・SHA、full Quality、merged PR、base / current version の照合結果を確認する。Release Pages を手動で迂回しない |
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
 | 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release Pages を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
 | Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |
@@ -133,7 +134,7 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 
 ## 初回設定・設定変更時だけ行うこと
 
-Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。Main の merge ruleset は `quality` と `Release assets current` の両方を required check にします。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。通常公開は version を更新した公開 PR の merge、旧版復旧は `recovery_tag` を指定した手動実行を、それぞれ承認の実行とします。
+Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。Main の merge ruleset が要求する check は `quality` です。`Release assets current` がまだ required の場合は互換 check を維持し、main の `quality` で統合済み検証が成功した後に ruleset を `quality` のみに変更します。既存 PR を再実行して pending がないことを確認してから互換 check を削除します。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。通常公開は version を更新した公開 PR の merge、旧版復旧は `recovery_tag` を指定した手動実行を、それぞれ承認の実行とします。
 
 Local の GitHub query / PR 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は、許可された sandbox 外の実行へ切り替えます。Token を抽出・export・複製せず、特定 OS の credential backend は要件にしません。
 
