@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "generator": {
-    "command": "node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID>",
-    "inputHash": "bbd4b3dc683dea25bda4e09967d628fbc1c2dfee521c9013cd5fe017695d17dc",
+    "command": "node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>",
+    "inputHash": "b871676a5ecef04919d029e06d1cd52dd65aaa20343419236e7810be6d2e9dea",
     "inputHashAlgorithm": "sha256(relative-path + NUL + content + NUL)",
     "inputs": [
       "package-lock.json",
@@ -13,13 +13,19 @@
     "version": "1.4.0"
   },
   "source": {
-    "appVersion": "0.3.1",
-    "checkoutCommit": "dd0afc2dff32af1a2da41ce8416ff03d1dae9b66",
+    "appVersion": "0.3.2",
+    "checkoutCommit": "ff66fcea64a92c2b9cad23450dabf88c44002d83",
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
-    "qualityRunId": "34679267923",
-    "siteHash": "3353469f05784b744ae6f1780ecf80c6ca49acc2af63bd7b1ee0ef9dd0b2b166",
+    "producer": {
+      "controlSha": "58bc0fa9427163cdf57c5f71a3de3e60aa6b754e",
+      "kind": "release-candidate",
+      "runAttempt": "1",
+      "runId": "34751415345",
+      "workflow": ".github/workflows/release-candidate-assets.yml"
+    },
+    "siteHash": "f73e8b109f7591573fe9155f1e47ff312a3b3d0c11b7a6e9bfd1b2f85c8e2d0b",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -34,60 +40,60 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-3353469F0578",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-F73E8B109F75",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-3353469F0578",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-F73E8B109F75",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "7d46c2dc402d31f6446aa801932ae5ad33bf0a2c8b5f39dbec651db83c2a5c8e"
+        "sha256": "372fda3362304623be5fd25738084dc9e0ae5f6d0e1e527ec4ab86a94b431c3a"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/ja.png",
-        "sha256": "376e808a510091f08c6b300b0c5a4b65179d6912fe191fb745479f5311e80e08",
+        "sha256": "e8b149a3df3a160c6765506d0a34f99d10c728992b1e85c82f1211f2959e54d3",
         "width": 1440
       }
     },
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-3353469F0578",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-F73E8B109F75",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-3353469F0578",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-F73E8B109F75",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "cd985adb059f60715d4cb0715942d05972df47353edcea2efe70556b9eb48c92"
+        "sha256": "a7c5b92b39a936645fea00abe21a4611f9f2ac9cce1f3ee9e407028fb413d652"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/zh-CN.png",
-        "sha256": "c18473a693ba6b9a51b6050d759c0b7545073091a1dfaaef5cd11a4e7e820990",
+        "sha256": "57abf6d6c0c31f3a025bf99bba0d022abd5f0b99aff8476d761b137046cb66a2",
         "width": 1440
       }
     },
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-3353469F0578",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-F73E8B109F75",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-3353469F0578",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-F73E8B109F75",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "8436383d262077dfa94f433c0bf97bd0f3a574e93ec01fe62fdb11553f8e0a9c"
+        "sha256": "56eebf5e158c0ca3a2cc08e8d41fe2401596454b91a22568428ddf3cd1c5229f"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/en.png",
-        "sha256": "cde6041dcdeae04adda27c45ffa7ad969073a81c10f2eb28bd7448fe1872123c",
+        "sha256": "4ba6f4737f53f1179cecbf4a115207d2d9c97d6f934a69598513767941fa7537",
         "width": 1440
       }
     }
