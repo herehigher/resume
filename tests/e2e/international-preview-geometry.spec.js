@@ -191,7 +191,7 @@ test('简体中文: A4 preview page-box and representative wrapping stay canonic
   });
 });
 
-test('简体中文: long experience dates clear the timeline rail without narrowing desktop text', async ({ page }) => {
+test('简体中文: long experience dates stay inside the page and clear the timeline rail', async ({ page }) => {
   const state = createDefaultState('zh-CN');
   state.documents['zh-CN'].resume.experience = [{
     startDate: '2019-01',
@@ -217,16 +217,19 @@ test('简体中文: long experience dates clear the timeline rail without narrow
     const heading = content?.querySelector('h3');
     const before = content && getComputedStyle(content, '::before');
     if (!item || !date || !content || !heading || !before) return null;
-    const dateBounds = date.getBoundingClientRect();
     const contentBounds = content.getBoundingClientRect();
     const headingBounds = heading.getBoundingClientRect();
+    const dateRange = document.createRange();
+    dateRange.selectNodeContents(date);
+    const dateTextBounds = dateRange.getBoundingClientRect();
     const nodeLeft = contentBounds.left + Number.parseFloat(before.left);
     const documentPage = document.querySelector('.zh-resume-document');
     const previewScale = documentPage
       ? documentPage.getBoundingClientRect().width / documentPage.offsetWidth
       : 1;
     return {
-      dateToNodeGap: (nodeLeft - dateBounds.right) / previewScale,
+      dateTextOffset: (dateTextBounds.left - item.getBoundingClientRect().left) / previewScale,
+      dateToNodeGap: (nodeLeft - dateTextBounds.right) / previewScale,
       headingOffset: headingBounds.left - item.getBoundingClientRect().left,
       previewScale,
       fontVariantNumeric: getComputedStyle(date).fontVariantNumeric,
@@ -235,9 +238,10 @@ test('简体中文: long experience dates clear the timeline rail without narrow
   });
 
   expect(desktop).not.toBeNull();
+  expect(desktop.dateTextOffset).toBeGreaterThanOrEqual(0);
   expect(desktop.dateToNodeGap).toBeGreaterThanOrEqual(10);
   expect(desktop.dateToNodeGap).toBeLessThanOrEqual(12);
-  expect(desktop.headingOffset / desktop.previewScale).toBeCloseTo(118, 0);
+  expect(desktop.headingOffset / desktop.previewScale).toBeCloseTo(140, 0);
   expect(desktop).toMatchObject({ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' });
 
   await page.setViewportSize({ width: 639, height: 844 });

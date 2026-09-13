@@ -130,7 +130,7 @@
   break-inside: auto;
   display: grid;
   gap: 15px;
-  grid-template-columns: 88px 1fr;
+  grid-template-columns: 110px 1fr;
 }
 
 .zh-timeline-date {
@@ -138,7 +138,6 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   padding-top: 2px;
-  transform: translateX(-6px);
   white-space: nowrap;
 }
 

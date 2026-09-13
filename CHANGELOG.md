@@ -15,7 +15,7 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ### Fixed / 修正
 
-- 简体中文履歴書の timeline で長い勤務期間と node・縦線の間隔を確保し、狭い画面と PDF でも本文幅を維持。
+- 简体中文履歴書の timeline で長い勤務期間と node・縦線の間隔を確保し、狭い画面と PDF で日付の文字切れ・重なりを防止。
 - 日本語の職務経歴書で複数の詳細項目を追加・削除したとき、状態通知に対象項目の番号を含めて識別できるよう修正。
 
 ## [0.3.1] - 2026-09-12
