@@ -93,7 +93,7 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /`output\/pdf\/\{en-letter,ja-a4,zh-CN-a4\}\.pdf` の3 file/);
   assert.match(playbook, /`docs\/assets-manifest\.json` の計7 fileだけ/);
   assert.match(playbook, /Asset-only の追補 commit に fast path は設けません/);
-  assert.match(playbook, /最終 PR head の `Quality` と `Release assets current` をどちらも成功/);
+  assert.match(playbook, /最終 PR head の `Quality` を成功/);
   assert.match(playbook, /候補 asset を生成・取り込み/);
   assert.match(playbook, /候補生成 workflow/);
   assert.match(playbook, /full Quality 2回/);
@@ -101,8 +101,9 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /導入 PR.*main/);
   assert.match(playbook, /Version を変えない PR で展示 asset を変更してはいけません/);
   assert.match(playbook, /promotion 元 artifact の exact bytes/);
-  assert.match(playbook, /最終 PR head の Quality が fresh に生成した artifact/);
-  assert.match(playbook, /Merge 結果 commit の main Quality[\s\S]*immutable tag[\s\S]*単一の artifact[\s\S]*online smoke/);
+  assert.match(playbook, /同じ job が fresh に生成した artifact/);
+  assert.match(playbook, /Release eligibility[\s\S]*通常の main 更新[\s\S]*`Release Pages` の run を作りません/);
+  assert.match(playbook, /Release Pages[\s\S]*immutable tag[\s\S]*単一の artifact[\s\S]*online smoke/);
 });
 
 test('the public v3 JSON example remains importable under the runtime data contract', () => {

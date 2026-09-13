@@ -3,26 +3,21 @@ name: Release Pages
 run-name: Release Pages
 
 on:
-  workflow_run:
-    workflows: [Quality]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
+      quality_run_id:
+        description: Completed eligible Quality workflow run ID
+        required: false
+        type: string
       recovery_tag:
         description: Accepted historical release tag to restore
-        required: true
+        required: false
         type: string
 
 permissions: {}
 
 jobs:
   authorize:
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
-          (github.event.workflow_run.conclusion == 'success' &&
-           github.event.workflow_run.event == 'push' &&
-           github.event.workflow_run.head_branch == github.event.repository.default_branch) }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -47,19 +42,17 @@ jobs:
         id: release
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          EVENT_NAME: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
-          QUALITY_RUN_ID: ${{ github.event.workflow_run.id }}
-          QUALITY_SHA: ${{ github.event.workflow_run.head_sha }}
+          QUALITY_RUN_ID: ${{ inputs.quality_run_id || '' }}
           RECOVERY_TAG: ${{ inputs.recovery_tag || '' }}
-          REPOSITORY: ${{ github.repository }}
           WORKFLOW_REF: ${{ github.ref }}
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = 'herehigher/resume'
           test "$WORKFLOW_REF" = "refs/heads/$DEFAULT_BRANCH"
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+          if [[ -n "$RECOVERY_TAG" ]]; then
+            test -z "$QUALITY_RUN_ID"
             node scripts/release-publication.mjs rollback --tag "$RECOVERY_TAG"
             release_sha="$(git rev-parse --verify --end-of-options "$RECOVERY_TAG^{commit}")"
             git merge-base --is-ancestor "$release_sha" "origin/$DEFAULT_BRANCH"
@@ -68,63 +61,23 @@ jobs:
             release_required=true
             release_tag="$RECOVERY_TAG"
           else
-            test -z "$RECOVERY_TAG"
-            release_sha="$QUALITY_SHA"
-            quality_run_id="$QUALITY_RUN_ID"
+            test -n "$QUALITY_RUN_ID"
+            eligibility="$RUNNER_TEMP/release-eligibility"
+            GITHUB_OUTPUT="$eligibility" node scripts/validate-release-run.mjs eligibility --run-id "$QUALITY_RUN_ID"
+            quality_run_id="$(sed -n 's/^quality_run_id=//p' "$eligibility")"
+            release_required="$(sed -n 's/^release_required=//p' "$eligibility")"
+            release_sha="$(sed -n 's/^release_sha=//p' "$eligibility")"
+            release_tag="$(sed -n 's/^release_tag=//p' "$eligibility")"
+            test "$quality_run_id" = "$QUALITY_RUN_ID"
             [[ "$release_sha" =~ ^[0-9a-f]{40}$ ]]
-            [[ "$quality_run_id" =~ ^[1-9][0-9]*$ ]]
-            node scripts/validate-release-run.mjs quality --sha "$release_sha" --run-id "$quality_run_id"
-            git fetch --no-tags origin "$release_sha"
-            git merge-base --is-ancestor "$release_sha" "origin/$DEFAULT_BRANCH"
-            read -ra parents <<<"$(git rev-list --parents -n 1 "$release_sha")"
-            test "${#parents[@]}" -ge 2
-            pull_requests="$(gh api "repos/$REPOSITORY/commits/$release_sha/pulls")"
-            authorized="$(jq --arg branch "$DEFAULT_BRANCH" --arg repository "$REPOSITORY" --arg sha "$release_sha" \
-              '[.[] | select(.state == "closed" and .merged_at != null and .base.ref == $branch and
-                .base.repo.full_name == $repository and .merge_commit_sha == $sha)]' <<<"$pull_requests")"
-            authorized_count="$(jq 'length' <<<"$authorized")"
-            test "$authorized_count" -le 1
-            if [[ "$authorized_count" -eq 1 ]]; then
-              base_sha="$(jq -r '.[0].base.sha' <<<"$authorized")"
-              [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
-              git merge-base --is-ancestor "$base_sha" "$release_sha"
-            else
-              base_sha="${parents[1]}"
-            fi
-            classification="$RUNNER_TEMP/release-classification"
-            GITHUB_OUTPUT="$classification" node scripts/release-doc-assets.mjs required \
-              --base "$base_sha" --head "$release_sha"
-            release_required="$(sed -n 's/^required=//p' "$classification")"
-            test "$release_required" = true || test "$release_required" = false
+            test "$release_required" = true
+            test -n "$release_tag"
             recovery=false
-            if [[ "$release_required" == false ]]; then
-              release_tag=''
-              {
-                echo '## No release requested'
-                echo "The successful main Quality source did not change the package version: \`$release_sha\`."
-              } >> "$GITHUB_STEP_SUMMARY"
-            else
-              test "$authorized_count" -eq 1
-              package_version="$(git show "$release_sha:package.json" | jq -er '.version')"
-              [[ "$package_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-              current_version="$(git show "origin/$DEFAULT_BRANCH:package.json" | jq -er '.version')"
-              if [[ "$package_version" != "$current_version" ]]; then
-                release_required=false
-                release_tag=''
-                {
-                  echo '## Stale release ignored'
-                  echo "The authorized source version \`$package_version\` is not current main version \`$current_version\`."
-                } >> "$GITHUB_STEP_SUMMARY"
-              else
-                release_tag="v$package_version"
-                {
-                  echo '## Release authorized by merge'
-                  echo "- Pull request: #$(jq -r '.[0].number' <<<"$authorized")"
-                  echo "- Tag / source: \`$release_tag\` / \`$release_sha\`"
-                  echo "- Quality: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${quality_run_id}"
-                } >> "$GITHUB_STEP_SUMMARY"
-              fi
-            fi
+            {
+              echo '## Release authorization revalidated'
+              echo "- Tag / source: \`$release_tag\` / \`$release_sha\`"
+              echo "- Quality: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${quality_run_id}"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "quality_run_id=$quality_run_id" >> "$GITHUB_OUTPUT"
           echo "recovery=$recovery" >> "$GITHUB_OUTPUT"
