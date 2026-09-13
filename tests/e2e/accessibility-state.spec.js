@@ -47,7 +47,7 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   const thirdTitle = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 3 の項目名' });
   const thirdContent = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 3 の内容' });
   await expect(thirdTitle).toBeFocused();
-  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 に詳細項目を追加しました。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 に詳細項目 3 を追加しました。');
   await thirdTitle.fill('使用技術');
   await thirdContent.fill('HTML, CSS, JavaScript');
   await expect(page.locator('#documentPreview')).toContainText('使用技術');
@@ -64,7 +64,7 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toHaveValue('実績・成果');
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toBeFocused();
-  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 の詳細項目を削除しました。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先 1 の詳細項目 1 を削除しました。');
 
   const emptyAdd = firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' });
   await emptyAdd.click();
@@ -78,6 +78,88 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   await page.locator('#careerDocumentTab').click();
   await expect(page.locator('.career-editor-item').first().getByRole('textbox', { name: '勤務先 1 の詳細項目 2 の項目名' })).toHaveValue('使用技術');
   await expect(page.locator('#documentPreview')).toContainText('HTML, CSS, JavaScript');
+});
+
+test('日本語の詳細項目操作は連続した状態通知で追加・削除した項目番号を伝える', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  await page.locator('#careerDocumentTab').click();
+  const sampleCareer = page.locator('#careerList .career-editor-item').first();
+  await sampleCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[data-add="career"]')).toBeFocused();
+  await page.locator('[data-add="career"]').click();
+  const firstCareer = page.locator('#careerList .career-editor-item').first();
+  const status = page.locator('#statusAnnouncer');
+
+  async function observeStatusTransition(expectedMessage, action) {
+    const transition = page.evaluate((expected) => new Promise((resolve, reject) => {
+      const announcer = document.querySelector('#statusAnnouncer');
+      if (!announcer) {
+        reject(new Error('status announcer is unavailable'));
+        return;
+      }
+      const snapshots = [];
+      let timeout;
+      let sawClear = false;
+      const observer = new MutationObserver(() => {
+        const snapshot = announcer.textContent;
+        snapshots.push(snapshot);
+        if (snapshot === '') sawClear = true;
+        if (sawClear && snapshot === expected) {
+          window.clearTimeout(timeout);
+          observer.disconnect();
+          resolve({ cleared: true, message: snapshot, snapshots });
+        }
+      });
+      timeout = window.setTimeout(() => {
+        observer.disconnect();
+        reject(new Error('status announcement did not clear and update'));
+      }, 1_000);
+      observer.observe(announcer, { childList: true, characterData: true, subtree: true });
+    }), expectedMessage);
+    await action();
+    return transition;
+  }
+
+  const addDetail = firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' });
+  await addDetail.click();
+  await expect(status).toHaveText('勤務先 1 に詳細項目 3 を追加しました。');
+
+  for (const detailNumber of [4, 5]) {
+    const message = `勤務先 1 に詳細項目 ${detailNumber} を追加しました。`;
+    const transition = await observeStatusTransition(message, async () => {
+      await addDetail.click();
+      await expect(firstCareer.getByRole('textbox', { name: `勤務先 1 の詳細項目 ${detailNumber} の項目名` })).toBeFocused();
+    });
+    expect(transition.cleared).toBe(true);
+    expect(transition.message).toBe(message);
+  }
+
+  const deleteFirstDetailMessage = '勤務先 1 の詳細項目 1 を削除しました。';
+  for (let deletion = 0; deletion < 2; deletion += 1) {
+    const transition = await observeStatusTransition(deleteFirstDetailMessage, async () => {
+      await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' }).click();
+      await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
+      await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toBeFocused();
+    });
+    expect(transition.cleared).toBe(true);
+    expect(transition.message).toBe(deleteFirstDetailMessage);
+  }
+
+  const thirdTitle = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 3 の項目名' });
+  await thirdTitle.fill('架空の詳細項目');
+  const thirdDeleteMessage = '勤務先 1 の詳細項目 3 を削除しました。';
+  const transition = await observeStatusTransition(thirdDeleteMessage, async () => {
+    await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 3 を削除' }).click();
+    await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
+    await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
+    await page.locator('#confirmSampleAdoptButton').click();
+    await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 2 の項目名' })).toBeFocused();
+  });
+  expect(transition.cleared).toBe(true);
+  expect(transition.message).toBe(thirdDeleteMessage);
 });
 
 test('日本語の勤務先は確認後にだけ削除される', async ({ page }) => {
