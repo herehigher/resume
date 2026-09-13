@@ -56,16 +56,16 @@ test('release eligibility only accepts one merged version pull request at the cu
   });
 
   responses.set(`commits/${sha}/pulls`, []);
-  assert.equal(authorizeReleaseEligibility({ api, environment: { GITHUB_REPOSITORY: 'herehigher/resume' }, values }).reason,
-    'no-merged-pull-request');
+  assert.throws(() => authorizeReleaseEligibility({ api, environment: { GITHUB_REPOSITORY: 'herehigher/resume' }, values }),
+    /exactly one trusted merged pull request/);
 
   responses.set(`commits/${sha}/pulls`, [pullRequest, { ...pullRequest, number: 199 }]);
   assert.throws(() => authorizeReleaseEligibility({ api, environment: { GITHUB_REPOSITORY: 'herehigher/resume' }, values }),
-    /more than one merged pull request/);
+    /exactly one trusted merged pull request/);
 
   responses.set(`commits/${sha}/pulls`, [{ ...pullRequest, merge_commit_sha: 'c'.repeat(40) }]);
   assert.throws(() => authorizeReleaseEligibility({ api, environment: { GITHUB_REPOSITORY: 'herehigher/resume' }, values }),
-    /merged pull request identity/);
+    /exactly one trusted merged pull request/);
 
   responses.set(`commits/${sha}/pulls`, [pullRequest]);
   responses.set('contents/package.json?ref=main', packageResponse('0.3.2'));

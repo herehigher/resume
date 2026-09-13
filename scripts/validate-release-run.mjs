@@ -78,14 +78,8 @@ function exactMergedPullRequest(pullRequests, run) {
     && pullRequest.base?.repo?.id === run.repository.id
     && pullRequest.merge_commit_sha === run.head_sha
   ));
-  requireValue(matches.length <= 1, 'more than one merged pull request matches this Quality SHA');
-  const mainMerge = pullRequests.some((pullRequest) => (
-    pullRequest.state === 'closed'
-    && typeof pullRequest.merged_at === 'string'
-    && pullRequest.base?.ref === 'main'
-  ));
-  requireValue(matches.length === 1 || !mainMerge, 'merged pull request identity does not match the Quality SHA');
-  return matches[0] || null;
+  requireValue(matches.length === 1, 'expected exactly one trusted merged pull request for this Quality SHA');
+  return matches[0];
 }
 
 function resolveQualityRun(api, workflow, values) {
@@ -120,10 +114,9 @@ export function authorizeReleaseEligibility({ api = githubApi, environment = pro
   const pullRequest = exactMergedPullRequest(api(`commits/${run.head_sha}/pulls`), run);
   const result = {
     quality_run_id: String(run.id), release_required: 'false', release_sha: run.head_sha,
-    release_tag: '', reason: 'no-merged-pull-request',
+    release_tag: '',
     run_url: `https://github.com/${repository}/actions/runs/${run.id}`
   };
-  if (!pullRequest) return result;
   requireValue(fullCommit.test(pullRequest.base?.sha || ''), 'merged pull request base SHA is invalid');
   requireValue(positiveId.test(String(pullRequest.number || '')), 'merged pull request number is invalid');
   const [baseVersion, releaseVersion, currentVersion] = [
