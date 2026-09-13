@@ -516,7 +516,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     renderCareerList();
     renderPreview();
     focusCareerDetail(careerIndex, detailIndex);
-    announceCareerDetail(`勤務先 ${careerIndex + 1} に詳細項目を追加しました。`);
+    announceCareerDetail(`勤務先 ${careerIndex + 1} に詳細項目 ${detailIndex + 1} を追加しました。`);
   }
 
   async function removeCareerDetailSection(button) {
@@ -549,7 +549,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       if (focusAddButton) document.querySelector(`.career-editor-item[data-index="${careerIndex}"] [data-add-detail-section]`)?.focus();
       else focusCareerDetail(careerIndex, nextDetailIndex);
     });
-    announceCareerDetail(`勤務先 ${careerIndex + 1} の詳細項目を削除しました。`);
+    announceCareerDetail(`勤務先 ${careerIndex + 1} の詳細項目 ${detailIndex + 1} を削除しました。`);
   }
 
   async function handlePhoto(file) {
