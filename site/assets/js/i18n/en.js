@@ -25,6 +25,8 @@ export default {
   draftSalvaged: 'Usable content from your saved draft was restored and updated to the current format.',
   draftTooOld: 'Your saved draft was too old and was safely replaced with a new draft.',
   localeSaveError: 'The display language changed, but it may not be remembered next time.',
+  draftStorageUnavailable: 'Autosave is unavailable.',
+  dismissNotice: 'Dismiss notification',
   draftStorageCompatibilityError: 'This page cannot save drafts securely. Reopen it with https://, http://localhost, or http://127.0.0.1. Saved data was not changed.',
   pendingTitle: 'Create an English resume',
   pendingBody: 'Build a single-column, ATS-friendly resume for A4 or US Letter paper.',

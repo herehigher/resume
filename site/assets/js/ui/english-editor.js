@@ -3,7 +3,7 @@ import { cloneData } from '../state/defaults.js';
 import { renderEnglishDocument } from '../templates/en.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
-import { messageForDraftStorageError } from './draft-storage-error.js';
+import { draftStatusMessageForError } from './draft-storage-error.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
 import { confirmAction } from './confirmation-dialog.js';
 
@@ -40,7 +40,7 @@ export function renderEnglishWorkspace() {
 
       <section class="draft-controls" aria-label="Draft status and actions">
         <div class="draft-primary-row">
-          <span class="draft-message" data-en-save-status role="status" aria-live="polite">Your input will be encrypted and saved on this device.</span>
+          <span class="draft-message" data-en-save-status>Your input will be encrypted and saved on this device.</span>
           <div class="draft-normal-actions" data-en-normal-actions>
             <button class="secondary-button" data-en-load-sample type="button">View example</button>
           </div>
@@ -216,7 +216,7 @@ function renderEditorItem(type, item, index) {
   return element;
 }
 
-export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.querySelector('[data-english-editor]') } = {}) {
+export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.querySelector('[data-english-editor]'), statusController } = {}) {
   if (!root) {
     return {
       available: false,
@@ -250,14 +250,20 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     return store.getState().documents.en.resume;
   }
 
-  function setStatus(message, tone = '') {
-    saveStatus.textContent = message;
+  function setStatus(message, tone = '', options) {
     const normalizedTone = tone === true ? 'error' : tone;
+    if (statusController) {
+      statusController.setDraftStatus('en', message, normalizedTone, options);
+      return;
+    }
+    saveStatus.textContent = message;
     saveStatus.classList.toggle('is-success', normalizedTone === 'success');
     saveStatus.classList.toggle('is-saving', normalizedTone === 'saving');
     saveStatus.classList.toggle('is-error', normalizedTone === 'error');
     root.querySelector('.draft-controls').classList.toggle('is-error', normalizedTone === 'error');
   }
+
+  statusController?.registerDraftStatus('en', saveStatus, root.querySelector('.draft-controls'));
 
   function scheduleSave() {
     window.clearTimeout(saveTimer);
@@ -273,7 +279,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
         await store.save();
         setStatus('Encrypted and saved on this device.', 'success');
       } catch (error) {
-        setStatus(messageForDraftStorageError(error, 'en', 'Your changes could not be saved on this device.'), true);
+        setStatus(draftStatusMessageForError(error, 'en', 'Your changes could not be saved on this device.'), true);
       }
     }, 300);
   }
@@ -440,7 +446,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     try {
       if (shouldPersistDraft) await store.save();
     } catch (error) {
-      setStatus(messageForDraftStorageError(error, 'en', 'The example cannot be shown because your current draft could not be protected.'), true);
+      setStatus(draftStatusMessageForError(error, 'en', 'The example cannot be shown because your current draft could not be protected.'), true);
       return;
     }
     draftBeforeSample = currentDraft;
@@ -481,7 +487,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
       setSampleUI(false);
       setStatus('The example was saved as your draft.', 'success');
     } catch (error) {
-      setStatus(messageForDraftStorageError(error, 'en', 'The example could not be saved as your draft.'), true);
+      setStatus(draftStatusMessageForError(error, 'en', 'The example could not be saved as your draft.'), true);
     }
   }
 
@@ -504,7 +510,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
       setSampleUI(false);
       setStatus('Draft cleared.');
     } catch (error) {
-      setStatus(messageForDraftStorageError(error, 'en', 'The draft could not be cleared.'), true);
+      setStatus(draftStatusMessageForError(error, 'en', 'The draft could not be cleared.'), true);
     }
   }
 
@@ -633,7 +639,11 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
       importPending = false;
       return;
     }
-    if (event.type === 'import') importPending = false;
+    if (event.type === 'import') {
+      importPending = false;
+      shouldPersistDraft = true;
+      setStatus('Encrypted and saved on this device.', 'success', { announce: false });
+    }
     if (event.type === 'import' && sampleMode) {
       sampleMode = false;
       draftBeforeSample = null;
@@ -651,7 +661,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   hydrate();
   setStatus(shouldPersistDraft
     ? 'Encrypted and saved on this device.'
-    : 'Your input will be encrypted and saved on this device.', shouldPersistDraft ? 'success' : '');
+    : 'Your input will be encrypted and saved on this device.', shouldPersistDraft ? 'success' : '', { announce: false });
 
   return {
     available: true,

@@ -4,6 +4,7 @@ import { DRAFT_KEY_DATABASE as KEY_DATABASE } from '../../site/assets/js/state/s
 
 const KEY_STORE = 'keys';
 const KEY_ID = 'draft-encryption-key';
+const nonSecureBaseURL = process.env.NON_SECURE_BASE_URL || 'http://0.0.0.0:4184';
 const encryptedDraft = JSON.stringify({
   format: 'resume-studio-local-encrypted-v1',
   algorithm: 'AES-GCM',
@@ -62,7 +63,7 @@ test('non-secure HTTP origin keeps encrypted drafts untouched and gives actionab
   });
 
   for (const scenario of cases) {
-    await page.goto(`http://0.0.0.0:4184/editor/?lang=${encodeURIComponent(scenario.locale)}`);
+    await page.goto(`${nonSecureBaseURL}/editor/?lang=${encodeURIComponent(scenario.locale)}`);
     await expect.poll(() => page.evaluate(() => ({
       secure: isSecureContext,
       subtle: Boolean(globalThis.crypto?.subtle)
@@ -90,9 +91,17 @@ test('non-secure HTTP origin keeps encrypted drafts untouched and gives actionab
     const keyBefore = await readKey(page);
 
     await page.locator(scenario.sample).click();
-    await expect(page.locator(scenario.status)).toHaveText(scenario.message);
+    await expect(page.locator(scenario.status)).toHaveText({
+      ja: '自動保存を利用できません。',
+      'zh-CN': '无法使用自动保存。',
+      en: 'Autosave is unavailable.'
+    }[scenario.locale]);
     await page.locator('#localeSelect').selectOption(scenario.nextLocale);
-    await expect(page.locator('#globalMessage')).toHaveText(scenario.message);
+    await expect(page.locator('#globalMessage')).toHaveText({
+      ja: '此页面无法安全保存草稿。请使用 https://、http://localhost 或 http://127.0.0.1 重新打开。已保存的数据未被修改。',
+      'zh-CN': 'This page cannot save drafts securely. Reopen it with https://, http://localhost, or http://127.0.0.1. Saved data was not changed.',
+      en: 'このページでは下書きを安全に保存できません。https://、http://localhost、または http://127.0.0.1 で開き直してください。保存済みデータは変更していません。'
+    }[scenario.locale]);
     await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(encryptedDraft);
     await expect.poll(() => readKey(page)).toEqual(keyBefore);
   }

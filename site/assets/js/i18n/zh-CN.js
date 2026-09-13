@@ -25,6 +25,8 @@ export default {
   draftSalvaged: '已安全读取保存草稿中的可用内容，并更新为当前格式。',
   draftTooOld: '保存的草稿版本过旧，已安全替换为新的草稿。',
   localeSaveError: '显示语言已切换，但下次打开时可能无法记住。',
+  draftStorageUnavailable: '无法使用自动保存。',
+  dismissNotice: '关闭通知',
   draftStorageCompatibilityError: '此页面无法安全保存草稿。请使用 https://、http://localhost 或 http://127.0.0.1 重新打开。已保存的数据未被修改。',
   pendingTitle: '中文简历编辑器',
   pendingBody: '填写经历与成果，右侧将实时生成适合 A4 打印的中文简历。',

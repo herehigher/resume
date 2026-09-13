@@ -12,6 +12,7 @@
   --blue-soft: #eef4ff;
   --green: #0f8a68;
   --danger: #c93c3c;
+  --app-notice-height: 0px;
   --shadow: 0 18px 50px rgba(23, 32, 51, .12);
   font-family: Inter, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
 }
@@ -181,17 +182,24 @@ button { cursor: pointer; }
 }
 .data-menu-panel .secondary-button { width: 100%; }
 
-.global-message {
-  color: var(--green);
-  font-size: 9px;
-  left: 50%;
-  position: absolute;
-  top: 54px;
-  transform: translateX(-50%);
-  white-space: nowrap;
+.app-notice {
+  align-items: flex-start;
+  background: #eaf8f3;
+  border-bottom: 1px solid #b9e2d4;
+  color: #08664d;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 10px;
+  line-height: 1.5;
+  padding: 10px 24px;
 }
-
-.global-message.is-error { color: var(--danger); }
+.app-notice::before { background: currentColor; border-radius: 50%; content: ''; flex: 0 0 auto; height: 8px; margin-top: 5px; width: 8px; }
+.app-notice-message { min-width: 0; overflow-wrap: anywhere; }
+.app-notice.is-saving { background: var(--blue-soft); border-color: #c8d8ff; color: var(--blue-dark); }
+.app-notice.is-error { background: #fff1f1; border-color: #f1c3c3; color: #a72d2d; }
+.app-notice-dismiss { background: transparent; border: 0; color: inherit; font: inherit; font-size: 11px; font-weight: 800; margin-left: auto; min-height: 28px; padding: 0 4px; text-decoration: underline; }
+.app-notice-dismiss:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
 
 .locale-pending {
   align-items: center;

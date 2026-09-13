@@ -1,7 +1,7 @@
 .workspace {
   display: grid;
   grid-template-columns: minmax(420px, 43%) 1fr;
-  height: calc(100vh - 72px);
+  height: calc(100vh - 72px - var(--app-notice-height));
 }
 
 .editor-panel {

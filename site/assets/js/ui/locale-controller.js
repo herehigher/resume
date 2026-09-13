@@ -10,17 +10,6 @@ const publicEntryPaths = Object.freeze({
   en: '../en/'
 });
 
-function showMessage(message, isError = false) {
-  const element = document.getElementById('globalMessage');
-  element.textContent = message;
-  element.classList.toggle('is-error', isError);
-  window.clearTimeout(showMessage.timer);
-  showMessage.timer = window.setTimeout(() => {
-    element.textContent = '';
-    element.classList.remove('is-error');
-  }, 4000);
-}
-
 function downloadState(store, locale) {
   const blob = new Blob([store.exportJson()], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -42,6 +31,7 @@ export function persistLocaleChange(store, storage, locale) {
 export function initLocaleController(store, {
   locale: initialLocale,
   preferenceStorage = window.localStorage,
+  statusController = null,
   onLocaleApplied = () => {},
   onClearDraft = () => {}
 } = {}) {
@@ -69,6 +59,10 @@ export function initLocaleController(store, {
   let renderedLocale = '';
   let dataMenuPointerDownInside = false;
 
+  function showMessage(message, { persistent = false, source = null, tone = 'success' } = {}) {
+    statusController?.showAppNotice(message, { persistent, source, tone });
+  }
+
   function applyLocale(force = false) {
     if (!force && renderedLocale === locale) return;
     renderedLocale = locale;
@@ -84,6 +78,7 @@ export function initLocaleController(store, {
     dataMenuSummary.setAttribute('aria-label', copy.backupMenuLabel);
     dataMenuLabel.textContent = copy.backupMenuLabel;
     dataMenuShortLabel.textContent = copy.backupMenuShortLabel;
+    document.getElementById('appNoticeDismiss').textContent = copy.dismissNotice;
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
     clearDraftButton.textContent = copy.clearDraft;
@@ -116,8 +111,9 @@ export function initLocaleController(store, {
     applyLocale(true);
     try {
       saveLocalePreference(preferenceStorage, nextLocale);
+      statusController?.resolveAppNotice('locale-preference');
     } catch (_error) {
-      showMessage(getMessages(nextLocale).localeSaveError, true);
+      showMessage(getMessages(nextLocale).localeSaveError, { persistent: true, source: 'locale-preference', tone: 'error' });
     }
   });
 
@@ -125,9 +121,11 @@ export function initLocaleController(store, {
     const copy = getMessages(locale);
     try {
       downloadState(store, locale);
-      showMessage(copy.exportSuccess);
+      dataMenu.open = false;
+      showMessage(copy.exportSuccess, { source: 'export' });
     } catch {
-      showMessage(copy.exportError, true);
+      dataMenu.open = false;
+      showMessage(copy.exportError, { persistent: true, source: 'export', tone: 'error' });
     }
   });
 
@@ -152,10 +150,12 @@ export function initLocaleController(store, {
       }
       await store.importPrepared(prepared);
       applyLocale(true);
-      showMessage(prepared.status === 'salvaged' ? currentCopy.importSalvaged : getMessages(locale).importSuccess);
+      dataMenu.open = false;
+      showMessage(prepared.status === 'salvaged' ? currentCopy.importSalvaged : getMessages(locale).importSuccess, { source: 'import' });
     } catch (error) {
       store.cancelImport();
-      showMessage(messageForDraftStorageError(error, locale, currentCopy.importError), true);
+      dataMenu.open = false;
+      showMessage(messageForDraftStorageError(error, locale, currentCopy.importError), { persistent: true, source: 'import', tone: 'error' });
     } finally {
       importInput.value = '';
     }

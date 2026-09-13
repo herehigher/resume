@@ -59,13 +59,18 @@
         </div>
       </details>
       <input id="importDataInput" type="file" accept="application/json,.json" hidden>
-      <span class="global-message" id="globalMessage" aria-live="polite"></span>
       <button class="primary-button" id="printButton" type="button">
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
         <span id="printButtonLabel">PDF出力</span>
       </button>
     </div>
   </header>
+
+  <section class="app-notice" id="appNotice" hidden>
+    <span class="app-notice-message" id="globalMessage"></span>
+    <button class="app-notice-dismiss" id="appNoticeDismiss" type="button" hidden>閉じる</button>
+  </section>
+  <p class="sr-only" id="statusAnnouncer" aria-atomic="true" aria-live="polite"></p>
 
   <section class="locale-pending" id="localePending" hidden>
     <div class="locale-pending-card">
@@ -92,7 +97,7 @@
       <div class="completion-track" aria-hidden="true"><span id="completionBar"></span></div>
       <section class="draft-controls" aria-label="下書きの状態と操作">
         <div class="draft-primary-row">
-          <span class="draft-message" id="saveStatus" role="status" aria-live="polite">入力すると暗号化してこの端末に保存されます</span>
+          <span class="draft-message" id="saveStatus">入力すると暗号化してこの端末に保存されます</span>
           <div class="draft-normal-actions" id="draftNormalActions">
             <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
           </div>
@@ -277,7 +282,6 @@
             <div class="section-content">
               <div class="list-heading"><strong>勤務先</strong><button class="small-add-button" type="button" data-add="career">＋ 追加</button></div>
               <div class="career-list" id="careerList"></div>
-              <p class="sr-only" id="careerDetailStatus" role="status" aria-live="polite"></p>
             </div>
           </details>
 

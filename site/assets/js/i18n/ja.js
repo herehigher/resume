@@ -25,6 +25,8 @@ export default {
   draftSalvaged: '保存済みの下書きの一部を安全に読み込み、現在の形式に更新しました。',
   draftTooOld: '保存済みの下書きが古すぎたため、新しい下書きに安全に置き換えました。',
   localeSaveError: '表示言語は切り替えましたが、次回は記憶されない可能性があります。',
+  draftStorageUnavailable: '自動保存を利用できません。',
+  dismissNotice: '通知を閉じる',
   draftStorageCompatibilityError: 'このページでは下書きを安全に保存できません。https://、http://localhost、または http://127.0.0.1 で開き直してください。保存済みデータは変更していません。',
   pendingTitle: 'この言語のテンプレートは準備中です',
   pendingBody: '言語別データ領域は利用できます。編集画面とPDFテンプレートは次の実装段階で追加します。',

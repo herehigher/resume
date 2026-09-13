@@ -46,10 +46,15 @@
   .mobile-view-switch { background: #fff; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; height: 44px; padding: 5px 14px; }
   .mobile-view-switch button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
   .mobile-view-switch button.is-active { border-color: var(--blue); color: var(--blue); }
-  .workspace { display: block; height: calc(100vh - 106px); }
+  .workspace { display: block; height: calc(100vh - 106px - var(--app-notice-height)); }
+  .english-workspace,
+  .zh-workspace {
+    height: calc(100vh - 62px - var(--app-notice-height));
+    height: calc(100dvh - 62px - var(--app-notice-height));
+  }
   #japaneseWorkspace {
-    height: calc(100vh - 164px);
-    height: calc(100dvh - 164px);
+    height: calc(100vh - 164px - var(--app-notice-height));
+    height: calc(100dvh - 164px - var(--app-notice-height));
   }
   .workspace[data-mobile-mode="editor"] .preview-panel { display: none; }
   .workspace[data-mobile-mode="preview"] .editor-panel { display: none; }
@@ -64,6 +69,7 @@
   .document-page { min-height: 842px; padding: 34px 37px; width: 595px; }
   .data-menu-panel .secondary-button,
   .data-menu-panel .danger-button { min-height: 44px; }
+  .app-notice { font-size: 11px; padding: 9px 14px; }
   .remove-career-button,
   .remove-career-detail-button,
   .career-detail-add-button { min-height: 44px; }
@@ -77,6 +83,8 @@
   .data-menu-chevron { display: none; }
   .data-menu-icon { display: block; }
   .primary-button { font-size: 10px; min-height: 34px; }
+  .app-notice { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .app-notice-dismiss { min-height: 36px; }
   .editor-heading { align-items: start; }
   .editor-heading h1 { font-size: 24px; }
   .section-content { padding-left: 0; }

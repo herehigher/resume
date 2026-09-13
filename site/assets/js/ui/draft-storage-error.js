@@ -36,3 +36,8 @@ export function messageForDraftStorageError(error, locale, fallback) {
     ? getMessages(locale).draftStorageCompatibilityError
     : fallback;
 }
+
+export function draftStatusMessageForError(error, locale, fallback) {
+  if (isDraftStorageCompatibilityError(error)) return getMessages(locale).draftStorageUnavailable;
+  return messageForDraftStorageError(error, locale, fallback);
+}

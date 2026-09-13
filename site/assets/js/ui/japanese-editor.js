@@ -2,9 +2,10 @@ import { createJapaneseCareer, createJapaneseSampleState, cloneData } from '../s
 import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
-import { messageForDraftStorageError } from './draft-storage-error.js';
+import { draftStatusMessageForError } from './draft-storage-error.js';
 import { confirmAction, confirmSampleAdoption } from './confirmation-dialog.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
+import { announceStatus } from './status-controller.js';
 
 const PROFILE_FIELD_NAMES = new Set([
   'fullName',
@@ -44,7 +45,7 @@ export async function protectDraftBeforeSample(store, shouldPersistDraft) {
   return currentDraft;
 }
 
-export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
+export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController } = {}) {
   if (!embeddedPhotoUrl) throw new TypeError('Embedded photo URL helper is required');
   const form = document.getElementById('resumeForm');
   const preview = document.getElementById('documentPreview');
@@ -70,7 +71,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     return store.getState().documents.ja;
   }
 
-  function setDraftStatus(message, tone = '') {
+  function setDraftStatus(message, tone = '', options) {
+    if (statusController) {
+      statusController.setDraftStatus('ja', message, tone, options);
+      return;
+    }
     window.clearTimeout(draftMessageTimer);
     saveStatus.textContent = message;
     saveStatus.classList.toggle('is-success', tone === 'success');
@@ -79,6 +84,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     document.querySelector('.draft-controls').classList.toggle('is-error', tone === 'error');
   }
 
+  statusController?.registerDraftStatus('ja', saveStatus, workspace.querySelector('.draft-controls'));
+
   function showDraftMessage(message, {
     fallback = '入力すると暗号化してこの端末に保存されます',
     fallbackTone = '',
@@ -86,7 +93,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   } = {}) {
     setDraftStatus(message, tone);
     draftMessageTimer = window.setTimeout(() => {
-      setDraftStatus(fallback, fallbackTone);
+      setDraftStatus(fallback, fallbackTone, { announce: false });
     }, 3000);
   }
 
@@ -100,7 +107,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
         await store.save();
         setDraftStatus('暗号化してこの端末に保存済み', 'success');
       } catch (error) {
-        setDraftStatus(messageForDraftStorageError(error, 'ja', '暗号化した下書きを保存できませんでした'), 'error');
+        setDraftStatus(draftStatusMessageForError(error, 'ja', '暗号化した下書きを保存できませんでした'), 'error');
       }
     }, 300);
   }
@@ -122,7 +129,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
     try {
       currentDraft = await protectDraftBeforeSample(store, shouldPersistDraft);
     } catch (error) {
-      setDraftStatus(messageForDraftStorageError(error, 'ja', '現在の下書きを保護できないため、入力例を表示できません'), 'error');
+      setDraftStatus(draftStatusMessageForError(error, 'ja', '現在の下書きを保護できないため、入力例を表示できません'), 'error');
       return;
     }
     draftBeforeSample = currentDraft;
@@ -171,7 +178,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
         fallbackTone: 'success'
       });
     } catch (error) {
-      setDraftStatus(messageForDraftStorageError(error, 'ja', '入力例を下書きとして保存できませんでした'), 'error');
+      setDraftStatus(draftStatusMessageForError(error, 'ja', '入力例を下書きとして保存できませんでした'), 'error');
     }
   }
 
@@ -487,7 +494,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   }
 
   function announceCareerDetail(message) {
-    document.getElementById('careerDetailStatus').textContent = message;
+    announceStatus(message);
   }
 
   function focusCareerDetail(careerIndex, detailIndex, selector = '[data-detail-key="title"]') {
@@ -690,7 +697,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
       importPending = false;
       return;
     }
-    if (event.type === 'import') importPending = false;
+    if (event.type === 'import') {
+      importPending = false;
+      shouldPersistDraft = true;
+      setDraftStatus('暗号化してこの端末に保存済み', 'success', { announce: false });
+    }
     if (event.type === 'import' && sampleMode) {
       sampleMode = false;
       draftBeforeSample = null;
@@ -704,7 +715,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl } = {}) {
   hydrateForm();
   setDraftStatus(shouldPersistDraft
     ? '暗号化してこの端末に保存済み'
-    : '入力すると暗号化してこの端末に保存されます', shouldPersistDraft ? 'success' : '');
+    : '入力すると暗号化してこの端末に保存されます', shouldPersistDraft ? 'success' : '', { announce: false });
   return {
     refresh: hydrateForm,
     clearDraft,

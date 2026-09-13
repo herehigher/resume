@@ -1,0 +1,73 @@
+import { createDefaultState } from '../../site/assets/js/state/defaults.js';
+import { expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
+
+const cases = [
+  ['ja', '#saveStatus', '[name="fullName"]', '暗号化してこの端末に保存済み'],
+  ['zh-CN', '[data-zh-draft-message]', '[data-profile="fullName"]', '已加密并保存到此设备'],
+  ['en', '[data-en-save-status]', '[data-profile-field="fullName"]', 'Encrypted and saved on this device.']
+];
+
+test('[mobile] App Notice wraps in document flow at 320–401px and export closes the backup menu', async ({ page }) => {
+  for (const width of [320, 360, 401]) {
+    await page.setViewportSize({ width, height: 844 });
+    await openLocale(page, 'ja');
+    await page.locator('#dataMenuSummary').click();
+    await page.locator('#exportDataButton').click();
+    await expect(page.locator('.data-menu')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#appNotice')).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const box = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+      const header = box('.app-header');
+      const notice = box('#appNotice');
+      const switcher = box('.mobile-view-switch');
+      const workspace = box('#japaneseWorkspace');
+      return { header, notice, switcher, workspace, viewport: document.documentElement.clientWidth, viewportHeight: window.innerHeight };
+    });
+    expect(layout.notice.left).toBeGreaterThanOrEqual(0);
+    expect(layout.notice.right).toBeLessThanOrEqual(layout.viewport);
+    expect(layout.notice.top).toBeGreaterThanOrEqual(layout.header.bottom);
+    expect(layout.notice.bottom).toBeLessThanOrEqual(layout.switcher.top);
+    expect(layout.workspace.bottom).toBeLessThanOrEqual(layout.viewportHeight);
+    await expectNoPageOverflow(page);
+  }
+});
+
+test('import updates the active Draft Status while App Notice announces the result once in every locale', async ({ page }) => {
+  for (const [locale, statusSelector, fieldSelector, savedStatus] of cases) {
+    await openLocale(page, locale);
+    const imported = createDefaultState(locale);
+    imported.profile.fields.fullName = `Fictional imported ${locale}`;
+    await page.locator('#importDataInput').setInputFiles({
+      name: `fictional-${locale}.json`,
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(imported))
+    });
+    await page.locator('#confirmSampleAdoptButton').click();
+    await expect(page.locator(fieldSelector)).toHaveValue(`Fictional imported ${locale}`);
+    await expect(page.locator(statusSelector)).toHaveText(savedStatus);
+    await expect(page.locator('#appNotice')).toBeVisible();
+    await expect(page.locator('[aria-live]')).toHaveCount(1);
+    await expect(page.locator('#statusAnnouncer')).toHaveAttribute('aria-atomic', 'true');
+    await expect(page.locator('#statusAnnouncer')).toHaveText(/.+/);
+  }
+});
+
+test('a successful import resolves its earlier App Notice error', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'invalid-fictional.json', mimeType: 'application/json', buffer: Buffer.from('{"version":999}')
+  });
+  await expect(page.locator('#globalMessage')).toHaveText('この下書きは新しい版で作成されています。更新後にもう一度開いてください。');
+  await expect(page.locator('#appNotice')).toHaveClass(/is-error/);
+
+  const imported = createDefaultState('ja');
+  imported.profile.fields.fullName = 'Fictional recovered import';
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'valid-fictional.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[name="fullName"]')).toHaveValue('Fictional recovered import');
+  await expect(page.locator('#saveStatus')).toHaveText('暗号化してこの端末に保存済み');
+  await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
+  await expect(page.locator('#appNotice')).not.toHaveClass(/is-error/);
+});
