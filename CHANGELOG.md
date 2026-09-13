@@ -6,6 +6,18 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-13
+
+### Changed / 変更
+
+- App Notice と下書き状態表示の責務を整理し、import・export・locale・復旧・移行の通知と autosave の継続状態を三言語で一貫して表示。通知の自動解決、明示的な error 解決、単一の live announcer による読み上げを追加。
+- 固定した候補 branch / SHA から公開 PR 作成前に展示 asset を生成・検証・取得するフローへ更新し、asset の出所と exact bytes の検証を Quality に統合。公開資格の判定と Release Pages を分離し、version を更新した merged PR のみが自動公開へ進むよう変更。
+
+### Fixed / 修正
+
+- 简体中文履歴書の timeline で長い勤務期間と node・縦線の間隔を確保し、狭い画面と PDF でも本文幅を維持。
+- 日本語の職務経歴書で複数の詳細項目を追加・削除したとき、状態通知に対象項目の番号を含めて識別できるよう修正。
+
 ## [0.3.1] - 2026-09-12
 
 ### Changed / 変更
