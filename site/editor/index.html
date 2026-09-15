@@ -419,7 +419,17 @@
 
   <template id="careerRowTemplate">
     <article class="career-editor-item">
-      <div class="career-item-header"><strong>勤務先 <span data-career-number></span></strong><button class="remove-career-button" type="button">削除</button></div>
+      <div class="career-item-header">
+        <strong>勤務先 <span data-career-number></span></strong>
+        <div class="career-item-actions">
+          <div class="career-layout-controls" role="group" data-career-layout-controls>
+            <span class="career-layout-label">組版</span>
+            <button class="career-layout-button" type="button" data-career-layout="standard">標準</button>
+            <button class="career-layout-button" type="button" data-career-layout="compact">コンパクト</button>
+          </div>
+          <button class="remove-career-button" type="button">削除</button>
+        </div>
+      </div>
       <div class="field-grid two-columns">
         <label class="input-field"><span>会社名</span><input type="text" data-key="company" placeholder="株式会社○○"></label>
         <label class="input-field"><span>部署・役職</span><input type="text" data-key="role" placeholder="○○部 / マネージャー"></label>
