@@ -347,7 +347,7 @@ test('PDF ja: 任意タイトルの複数詳細項目は順序・末尾内容を
   expect(normalizedText).toContain('長いカスタム詳細タイトル');
 });
 
-test('PDF long record: 四書類は95行を保持し、読みやすい文字サイズと続きの文脈を保つ', async ({ page }) => {
+test('PDF long record: 四書類は95行を保持し、読みやすい文字サイズを保つ', async ({ page }) => {
   const details = Array.from(
     { length: 95 },
     (_, index) => `SYNTHETIC-ENTRY-${String(index + 1).padStart(3, '0')} fictional document layout verification.`
