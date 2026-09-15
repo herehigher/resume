@@ -243,14 +243,12 @@ test('desktop: an English record page break follows its stable ID after rendered
     { id: 'record_target', company: 'Target fictional employer', role: 'Target role', startDate: '2021-01', endDate: '2023-01', details: 'Fictional target achievement.' },
     { id: 'record_other', company: 'Other fictional employer', role: 'Other role', startDate: '2020-01', endDate: '2022-01', details: 'Fictional other achievement.' }
   ];
+  state.settings.pageBreaks.en.LETTER.resume.records = ['record_target'];
   await openLocale(page, 'en');
   await page.locator('#importDataInput').setInputFiles({
     name: 'fictional-record-reorder.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
   });
   await page.locator('#confirmSampleAdoptButton').click();
-  await page.locator('#englishWorkspace .page-break-menu').click();
-  const targetControl = page.locator('.page-break-row[data-page-break-key="record:record_target"]');
-  await targetControl.evaluate((element) => element.click());
   await expect(page.locator('[data-record-id="record_target"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
   await page.locator('[data-en-list="experience"] [data-en-item]').nth(1).locator('[data-en-item-field="endDate"]').fill('2024-01');
