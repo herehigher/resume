@@ -15,7 +15,6 @@ function workflowJobBlock(workflow, name) {
   return nextJob === -1 ? workflow.slice(start) : workflow.slice(start, start + 1 + nextJob);
 }
 
-const releaseAssetsCurrentJob = workflowJobBlock(qualityWorkflow, 'release-assets-current');
 const qualityJob = workflowJobBlock(qualityWorkflow, 'quality');
 
 function workflowStep(job, name) {
@@ -76,12 +75,9 @@ test('release asset status treats missing assets as a real failure and skips dup
   assert.match(qualityWorkflow, /Report invalid committed provenance[\s\S]+failure provenance-invalid[\s\S]+Report unavailable candidate artifact evidence[\s\S]+failure promoted-evidence-unavailable[\s\S]+Report release asset integrity mismatch[\s\S]+failure asset-integrity-mismatch/);
 });
 
-test('legacy Release assets current check is a non-duplicating migration bridge', () => {
-  assert.match(releaseAssetsCurrentJob, /^ {4}if: \$\{\{ always\(\) && github\.event_name == 'pull_request' \}\}$/m);
-  assert.match(releaseAssetsCurrentJob, /Preserve legacy required check while Quality owns verification/);
-  assert.match(releaseAssetsCurrentJob, /Propagate Quality failure to the legacy required check[\s\S]+needs\.quality\.result != 'success'[\s\S]+exit 1/);
-  assert.doesNotMatch(releaseAssetsCurrentJob, /actions\/checkout@|setup-node|npm ci|download-artifact|git lfs/);
-
+test('quality is the only required workflow job and materializes release assets only when needed', () => {
+  assert.doesNotMatch(qualityWorkflow, /^ {2}release-assets-current:\s*$/m);
+  assert.doesNotMatch(qualityWorkflow, /Release assets current/);
   const lfsMaterialization = workflowStep(qualityJob, 'Materialize release asset LFS files');
   assert.match(workflowStepField(lfsMaterialization, 'if'), /classification == 'verification-required'/);
   for (const asset of [

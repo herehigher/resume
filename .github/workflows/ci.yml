@@ -235,21 +235,3 @@ jobs:
       - name: Reject pull request scope classification failure
         if: ${{ always() && github.event_name == 'pull_request' && steps.scope.outcome == 'failure' }}
         run: exit 1
-
-  release-assets-current:
-    name: Release assets current
-    needs: quality
-    if: ${{ always() && github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    steps:
-      # Temporary bridge until the repository ruleset no longer requires this legacy check name.
-      - name: Preserve legacy required check while Quality owns verification
-        if: ${{ needs.quality.result == 'success' }}
-        run: |
-          echo 'Release asset verification completed inside the required quality job.'
-          echo '## Release assets current compatibility' >> "$GITHUB_STEP_SUMMARY"
-          echo 'The quality job is authoritative during the required-check migration.' >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Propagate Quality failure to the legacy required check
-        if: ${{ needs.quality.result != 'success' }}
-        run: exit 1
