@@ -217,9 +217,19 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     careers.forEach((career, index) => {
       const item = document.getElementById('careerRowTemplate').content.firstElementChild.cloneNode(true);
       item.dataset.index = String(index);
+      item.dataset.careerId = career.id;
       item.querySelector('[data-career-number]').textContent = String(index + 1);
       item.querySelectorAll('[data-key]').forEach((field) => {
         field.value = career[field.dataset.key] || '';
+      });
+      const layoutControls = item.querySelector('[data-career-layout-controls]');
+      const layoutMode = career.layoutMode === 'compact' ? 'compact' : 'standard';
+      layoutControls.setAttribute('aria-label', `勤務先 ${index + 1} の組版`);
+      layoutControls.dataset.careerId = career.id;
+      layoutControls.querySelectorAll('[data-career-layout]').forEach((button) => {
+        const selected = button.dataset.careerLayout === layoutMode;
+        button.classList.toggle('is-active', selected);
+        button.setAttribute('aria-pressed', String(selected));
       });
       const detailContainer = item.querySelector('[data-career-detail-list]');
       career.detailSections.forEach((section, sectionIndex) => {
@@ -454,6 +464,27 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     renderPreview();
   }
 
+  function setCareerLayout(button) {
+    const layoutMode = button.dataset.careerLayout;
+    const careerId = button.closest('[data-career-layout-controls]')?.dataset.careerId;
+    if (!careerId || !['standard', 'compact'].includes(layoutMode)) return;
+    const career = japaneseDocument().careers.find((item) => item.id === careerId);
+    const currentLayout = career?.layoutMode === 'compact' ? 'compact' : 'standard';
+    if (currentLayout === layoutMode) return;
+    mutate((state) => {
+      const target = state.documents.ja.careers.find((item) => item.id === careerId);
+      if (!target) return;
+      if (layoutMode === 'compact') target.layoutMode = 'compact';
+      else delete target.layoutMode;
+    });
+    renderCareerList();
+    renderPreview();
+    window.requestAnimationFrame(() => {
+      document.querySelector(`.career-editor-item[data-career-id="${careerId}"] [data-career-layout="${layoutMode}"]`)?.focus();
+    });
+    announceCareerDetail(`勤務先の組版を${layoutMode === 'compact' ? 'コンパクト' : '標準'}にしました。`);
+  }
+
   async function removeItem(button) {
     const simpleRow = button.closest('.repeating-row');
     const careerItem = button.closest('.career-editor-item');
@@ -602,6 +633,11 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     const removeCareerDetailButton = event.target.closest('.remove-career-detail-button');
     const removeProfileLinkButton = event.target.closest('[data-remove-profile-link]');
     const mobileViewButton = event.target.closest('[data-mobile-view]');
+    const careerLayoutButton = event.target.closest('[data-career-layout]');
+    if (careerLayoutButton) {
+      setCareerLayout(careerLayoutButton);
+      return;
+    }
     if (documentTab) switchDocument(documentTab.dataset.document);
     if (addButton) addItem(addButton.dataset.add);
     if (removeButton) void removeItem(removeButton);

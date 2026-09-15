@@ -171,6 +171,20 @@ test('Japanese career detail sections render non-empty content in order, preserv
   }
 });
 
+test('Japanese career renderer exposes a record-local compact layout without reducing body font sizes', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.careers[0].company = '架空コンパクト株式会社';
+  state.documents.ja.careers[0].layoutMode = 'compact';
+  const html = renderJapaneseDocument(state);
+  const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
+
+  assert.match(html, /class="career-company" data-record-id="record_[^"]+" data-layout-mode="compact"/);
+  assert.match(japaneseCss, /\.career-company\[data-layout-mode="compact"\]\s*\{[^}]*margin-top:\s*10px;/s);
+  assert.match(japaneseCss, /\.career-company\[data-layout-mode="compact"\] \.career-company-grid > div\s*\{[^}]*line-height:\s*1\.55;[^}]*padding:\s*6px 9px;/s);
+  assert.doesNotMatch(japaneseCss, /data-layout-mode="compact"[^}]*font-size:/s);
+});
+
 test('Japanese career preview and PDF markup omit default detail sections without body content', () => {
   const state = createDefaultState('ja');
   state.documents.ja.activeDocument = 'career';
