@@ -266,6 +266,7 @@
   }
 
   .en-entry-heading { break-after: avoid-page; }
+  .en-entry-heading-block { break-after: avoid-page; }
 
   .en-certification-list li { display: block; }
   .en-certification-date { margin-left: 10px; }

@@ -164,7 +164,10 @@ test('English experience and projects keep more than twelve achievement bullets 
   }];
 
   const html = renderEnglishResume(state);
+  const css = readFileSync(new URL('../site/assets/css/templates/en.css', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /Continued|en-achievement-group|en-entry-continuation/);
+  assert.equal((html.match(/class="en-entry-heading-block"/g) || []).length, 2);
+  assert.match(css, /\.en-entry-heading-block\s*\{\s*break-after:\s*avoid-page;/);
   for (const line of [...experienceLines, ...projectLines]) {
     assert.equal((html.match(new RegExp(line, 'g')) || []).length, 1);
   }

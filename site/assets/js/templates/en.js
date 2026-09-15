@@ -129,13 +129,9 @@ function renderOptionalPersonalDetails(profile, photoUrl) {
 function renderExperience(entries) {
   const items = sortEnglishEntriesDescending(entries, 'experience').map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
+    const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.role || entry.company)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.company && entry.role ? `<p class="en-entry-organization">${text(entry.company)}</p>` : ''}</div>`;
     return `<article class="en-entry en-experience-entry">
-      <div class="en-entry-heading">
-        <h3>${text(entry.role || entry.company)}</h3>
-        ${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}
-      </div>
-      ${entry.company && entry.role ? `<p class="en-entry-organization">${text(entry.company)}</p>` : ''}
-      ${renderAchievements(entry.details)}
+      ${heading}${renderAchievements(entry.details)}
     </article>`;
   }).join('');
   return items ? `<section class="en-section" data-section-key="experience" aria-labelledby="en-experience-heading"><h2 id="en-experience-heading">Experience</h2>${items}</section>` : '';
@@ -144,13 +140,9 @@ function renderExperience(entries) {
 function renderProjects(entries) {
   const items = sortEnglishEntriesDescending(entries, 'projects').map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
+    const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.name || entry.role)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.role && entry.name ? `<p class="en-entry-organization">${text(entry.role)}</p>` : ''}</div>`;
     return `<article class="en-entry en-project-entry">
-      <div class="en-entry-heading">
-        <h3>${text(entry.name || entry.role)}</h3>
-        ${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}
-      </div>
-      ${entry.role && entry.name ? `<p class="en-entry-organization">${text(entry.role)}</p>` : ''}
-      ${renderAchievements(entry.details)}
+      ${heading}${renderAchievements(entry.details)}
       ${entry.url ? `<p class="en-entry-link"><span>Project:</span> ${renderUrl(entry.url)}</p>` : ''}
     </article>`;
   }).join('');

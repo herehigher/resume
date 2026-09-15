@@ -111,15 +111,15 @@ function renderTimeline(title, items, { kind, keys }) {
   const rows = entered.map((item) => {
     const heading = kind === 'education' ? item.school : item.company;
     const subheading = kind === 'education' ? item.degree : item.role;
+    const headingMarkup = `<div class="zh-entry-heading-block"><h3>${displayText(heading, kind === 'education' ? '学校名称' : '公司名称')}</h3>${hasText(subheading) ? `<div class="zh-timeline-role">${escapeHTML(subheading)}</div>` : ''}</div>`;
+    const details = kind === 'experience'
+      ? renderAchievements(item.details)
+      : hasText(item.details) ? `<div class="zh-timeline-details">${displayText(item.details)}</div>` : '';
     return `
       <article class="zh-timeline-item">
         <div class="zh-timeline-date">${escapeHTML(formatChineseRange(item.startDate, item.endDate))}</div>
         <div class="zh-timeline-content">
-          <h3>${displayText(heading, kind === 'education' ? '学校名称' : '公司名称')}</h3>
-          ${hasText(subheading) ? `<div class="zh-timeline-role">${escapeHTML(subheading)}</div>` : ''}
-          ${kind === 'experience'
-            ? renderAchievements(item.details)
-            : hasText(item.details) ? `<div class="zh-timeline-details">${displayText(item.details)}</div>` : ''}
+          ${headingMarkup}${details}
         </div>
       </article>`;
   }).join('');

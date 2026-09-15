@@ -347,7 +347,7 @@
   }
 
   .zh-section > h2,
-  .zh-timeline-content > h3,
+  .zh-entry-heading-block,
   .zh-project-heading { break-after: avoid-page; }
 
   .zh-certifications ul { display: block; }

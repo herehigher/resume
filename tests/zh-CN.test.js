@@ -184,7 +184,10 @@ test('Chinese experience and projects keep more than twelve achievement bullets 
   }];
 
   const html = renderChineseResume(state);
+  const css = readFileSync(new URL('../site/assets/css/templates/zh-CN.css', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /工作经历（续）|项目经历（续）|zh-achievement-group|zh-entry-continuation/);
+  assert.match(html, /class="zh-entry-heading-block">/);
+  assert.match(css, /\.zh-entry-heading-block,\s*\.zh-project-heading\s*\{\s*break-after:\s*avoid-page;/s);
   for (const line of [...experienceLines, ...projectLines]) {
     assert.equal((html.match(new RegExp(line, 'g')) || []).length, 1);
   }
