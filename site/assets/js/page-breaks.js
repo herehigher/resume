@@ -251,6 +251,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   document.body.append(rail);
   let modeOpen = false;
   let feedbackTimer = null;
+  let geometryFrame = null;
   let lastFocusKey = null;
   let renderedCandidates = [];
 
@@ -476,13 +477,21 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       renderPanel(renderedCandidates);
     }
   };
+  function scheduleGeometrySync() {
+    if (geometryFrame !== null) return;
+    geometryFrame = window.requestAnimationFrame(() => {
+      geometryFrame = null;
+      syncSurface();
+      positionRail();
+    });
+  }
   const contextObserver = workspace ? new MutationObserver(syncSurface) : null;
   contextObserver?.observe(workspace, { attributes: true, attributeFilter: ['data-mobile-mode', 'hidden'] });
   window.addEventListener('resize', syncSurface);
   preview.addEventListener('transitionend', (event) => {
-    if (event.propertyName === 'transform') positionRail();
+    if (event.propertyName === 'transform') scheduleGeometrySync();
   });
   preview.closest('.preview-scroll')?.addEventListener('scroll', positionRail, { passive: true });
   syncSurface();
-  return { render, position: positionRail };
+  return { render, position: scheduleGeometrySync };
 }

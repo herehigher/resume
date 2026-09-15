@@ -342,16 +342,18 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
       throw new Error(`Documentation screenshot must enter page-break edit mode: ${variant.locale}`);
     }
     const railId = `page-break-rail-${variant.locale}`;
-    const visiblePageBreaks = await page.locator(`#${railId} .page-break-boundary`).evaluateAll((controls) => (
+    const visiblePageBreaks = await page.locator(`#${railId} .page-break-boundary`).evaluateAll((controls, workspaceSelector) => (
       controls.filter((control) => {
         const bounds = control.getBoundingClientRect();
         const style = getComputedStyle(control);
+        const pages = document.querySelector(workspaceSelector)?.querySelectorAll('.document-page') || [];
         return style.display !== 'none' && style.visibility !== 'hidden'
           && bounds.width > 0 && bounds.height > 0
           && bounds.bottom > 0 && bounds.right > 0
-          && bounds.top < innerHeight && bounds.left < innerWidth;
+          && bounds.top < innerHeight && bounds.left < innerWidth
+          && [...pages].some((page) => bounds.left >= page.getBoundingClientRect().right);
       }).length
-    ));
+    ), variant.workspaceSelector);
     if (!visiblePageBreaks) throw new Error(`Documentation screenshot must show a page-break control: ${variant.locale}`);
 
     const screenshotAbsolute = path.join(outputRoot, variant.screenshotPath);

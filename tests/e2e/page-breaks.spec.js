@@ -384,6 +384,27 @@ test('desktop: rail realigns after Japanese zoom transitions', async ({ page }) 
   })).toBe(true);
 });
 
+test('desktop: zoom geometry moves edit mode between the rail and complete fallback panel', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  const trigger = await openDesktopPageBreakMode(page, '#japaneseWorkspace');
+  const rail = page.locator('#page-break-rail-ja');
+  const panel = page.locator('#page-break-panel-ja');
+  await expect(rail).toBeVisible();
+  await page.locator('#zoomInButton').click();
+  await page.locator('#zoomInButton').click();
+  await expect(panel).toBeVisible();
+  await expect(rail).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-panel-ja');
+  await expect(panel.locator('.page-break-row[data-page-break-key="qualifications"]')).toBeVisible();
+  await page.locator('#zoomOutButton').click();
+  await page.locator('#zoomOutButton').click();
+  await expect(panel).toBeHidden();
+  await expect(rail).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-ja');
+});
+
 test('responsive and locale changes close stale pagination surfaces and keep ARIA controls accurate', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openLocale(page, 'en');
