@@ -225,6 +225,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   // Below this threshold the fixed rail would either cover the paper or create a
   // tiny hit target, so edit mode deliberately uses the complete panel instead.
   const MIN_DESKTOP_RAIL_WIDTH = 140;
+  const RAIL_VERTICAL_GAP = 4;
   const labels = PAGE_BREAK_LABELS[locale];
   const panelId = `page-break-panel-${locale}`;
   const railId = `page-break-rail-${locale}`;
@@ -249,11 +250,16 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   rail.setAttribute('aria-label', labels.positions);
   rail.setAttribute('role', 'region');
   document.body.append(rail);
+  const railMeasure = document.createElement('div');
+  railMeasure.className = 'page-break-rail page-break-rail-measure';
+  railMeasure.setAttribute('aria-hidden', 'true');
+  document.body.append(railMeasure);
   let modeOpen = false;
   let feedbackTimer = null;
   let geometryFrame = null;
   let lastFocusKey = null;
   let renderedCandidates = [];
+  let surface = 'none';
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px)').matches; }
   function isSurfaceVisible() { return preview.getClientRects().length > 0 && !preview.closest('[hidden]'); }
@@ -265,9 +271,79 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     const scale = page.offsetWidth ? pageRect.width / page.offsetWidth : 1;
     return previewRect.right - (pageRect.right + Math.max(12, 16 * scale)) - 8;
   }
+  function railPositionFor(candidate) {
+    const page = candidate?.element.closest('.document-page');
+    if (!page) return null;
+    const pageRect = page.getBoundingClientRect();
+    const targetRect = candidate.element.getBoundingClientRect();
+    const scale = page.offsetWidth ? pageRect.width / page.offsetWidth : 1;
+    return {
+      left: pageRect.right + Math.max(12, 16 * scale),
+      maxWidth: railSpaceFor(candidate),
+      top: targetRect.top - (candidate.isRecord ? 1 : 11) * scale
+    };
+  }
+  function createRailControl(candidate, { measure = false } = {}) {
+    const control = document.createElement('button');
+    control.className = measure
+      ? `page-break-measure-boundary${candidate.isRecord ? ' page-break-measure-record-boundary' : ''}`
+      : `page-break-boundary${candidate.isRecord ? ' page-break-record-boundary' : ''}`;
+    control.dataset.pageBreakKey = candidate.key;
+    control.type = 'button';
+    control.setAttribute('aria-pressed', String(candidate.active));
+    control.setAttribute('aria-label', description(candidate.previous, candidate, candidate.active));
+    const fullDescription = description(candidate.previous, candidate, candidate.active);
+    if (candidate.isRecord) {
+      const tick = iconBadge('page-break-compact-tick', candidate.active); tick.setAttribute('aria-hidden', 'true');
+      const fullLabel = document.createElement('span'); fullLabel.className = 'page-break-full-label'; fullLabel.textContent = fullDescription;
+      control.append(tick, fullLabel);
+    } else {
+      const add = document.createElement('span'); add.className = 'page-break-add';
+      add.append(iconBadge('page-break-plus', candidate.active), document.createTextNode(fullDescription));
+      control.append(add);
+    }
+    if (!measure) {
+      control.addEventListener('click', () => toggle(candidate));
+      control.addEventListener('pointerenter', () => setHighlight(candidate, true));
+      control.addEventListener('pointerleave', () => setHighlight(candidate, false));
+      control.addEventListener('focus', () => setHighlight(candidate, true));
+      control.addEventListener('blur', () => setHighlight(candidate, false));
+      candidate.element.addEventListener('pointerenter', () => setHighlight(candidate, true));
+      candidate.element.addEventListener('pointerleave', () => setHighlight(candidate, false));
+    }
+    return control;
+  }
+  function railLayout() {
+    railMeasure.replaceChildren();
+    const controls = renderedCandidates.map((candidate) => {
+      const position = railPositionFor(candidate);
+      if (!position || position.maxWidth < MIN_DESKTOP_RAIL_WIDTH) return null;
+      const control = createRailControl(candidate, { measure: true });
+      control.style.left = `${position.left}px`;
+      control.style.maxWidth = `${position.maxWidth}px`;
+      control.style.top = `${position.top}px`;
+      railMeasure.append(control);
+      return { candidate, control, position };
+    });
+    if (controls.some((item) => item === null)) return null;
+    const visible = controls.map((item) => {
+      item.box = item.control.getBoundingClientRect();
+      return item;
+    })
+      .filter(({ box }) => box.bottom > 0 && box.top < window.innerHeight)
+      .sort((left, right) => left.position.top - right.position.top);
+    let nextTop = 0;
+    for (const item of visible) {
+      if (item.box.left < 0 || item.box.right > window.innerWidth) return null;
+      item.top = Math.max(item.position.top, nextTop);
+      if (item.top + item.box.height > window.innerHeight) return null;
+      nextTop = item.top + item.box.height + RAIL_VERTICAL_GAP;
+    }
+    return controls;
+  }
   function canUseRail() {
     return isDesktop() && isSurfaceVisible() && renderedCandidates.length > 0
-      && renderedCandidates.every((candidate) => railSpaceFor(candidate) >= MIN_DESKTOP_RAIL_WIDTH);
+      && railLayout() !== null;
   }
   function usesPanel() { return !isDesktop() || !canUseRail(); }
   function updateMenuControls() { menu.setAttribute('aria-controls', usesPanel() ? panelId : railId); }
@@ -305,6 +381,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     panel.hidden = true;
     menu.setAttribute('aria-pressed', 'false');
     menu.setAttribute('aria-expanded', 'false');
+    surface = 'none';
     clearFeedback();
   }
   function clearFeedback() {
@@ -341,18 +418,19 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     rail.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
   }
   function positionRail() {
+    const layout = railLayout();
+    if (!layout) return;
+    const positions = new Map(layout.map((item) => [item.candidate.key, item]));
     rail.querySelectorAll('button, .page-break-passive-marker').forEach((control) => {
       const candidate = renderedCandidates.find((item) => item.key === control.dataset.pageBreakKey);
       const page = candidate?.element.closest('.document-page');
       if (!candidate || !page) return;
-      const targetRect = candidate.element.getBoundingClientRect();
-      const pageRect = page.getBoundingClientRect();
-      const scale = page.offsetWidth ? pageRect.width / page.offsetWidth : 1;
-      const gutter = Math.max(12, 16 * scale);
-      const wantedLeft = pageRect.right + gutter;
-      control.style.maxWidth = `${railSpaceFor(candidate)}px`;
-      control.style.left = `${wantedLeft}px`;
-      control.style.top = `${targetRect.top - (candidate.isRecord ? 1 : 11) * scale}px`;
+      const position = positions.get(candidate.key)?.position;
+      if (!position) return;
+      const top = positions.get(candidate.key)?.top ?? position.top;
+      control.style.maxWidth = `${position.maxWidth}px`;
+      control.style.left = `${position.left}px`;
+      control.style.top = `${top}px`;
     });
   }
   function renderRail() {
@@ -360,36 +438,16 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     if (!canUseRail()) { rail.hidden = true; return; }
     const shown = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
     rail.hidden = shown.length === 0;
+    surface = 'rail';
     shown.forEach((candidate) => {
-      const control = document.createElement(modeOpen ? 'button' : 'span');
-      control.className = modeOpen
-        ? `page-break-boundary${candidate.isRecord ? ' page-break-record-boundary' : ''}`
-        : 'page-break-passive-marker';
-      control.dataset.pageBreakKey = candidate.key;
+        const control = modeOpen ? createRailControl(candidate) : document.createElement('span');
+        control.className = modeOpen
+          ? control.className
+          : 'page-break-passive-marker';
+        control.dataset.pageBreakKey = candidate.key;
       if (!modeOpen) {
         control.setAttribute('aria-hidden', 'true');
         control.textContent = '↵';
-      } else {
-        control.type = 'button';
-        control.setAttribute('aria-pressed', String(candidate.active));
-        control.setAttribute('aria-label', description(candidate.previous, candidate, candidate.active));
-        const fullDescription = description(candidate.previous, candidate, candidate.active);
-        if (candidate.isRecord) {
-          const tick = iconBadge('page-break-compact-tick', candidate.active); tick.setAttribute('aria-hidden', 'true');
-          const fullLabel = document.createElement('span'); fullLabel.className = 'page-break-full-label'; fullLabel.textContent = fullDescription;
-          control.append(tick, fullLabel);
-        } else {
-          const add = document.createElement('span'); add.className = 'page-break-add';
-          add.append(iconBadge('page-break-plus', candidate.active), document.createTextNode(fullDescription));
-          control.append(add);
-        }
-        control.addEventListener('click', () => toggle(candidate));
-        control.addEventListener('pointerenter', () => setHighlight(candidate, true));
-        control.addEventListener('pointerleave', () => setHighlight(candidate, false));
-        control.addEventListener('focus', () => setHighlight(candidate, true));
-        control.addEventListener('blur', () => setHighlight(candidate, false));
-        candidate.element.addEventListener('pointerenter', () => setHighlight(candidate, true));
-        candidate.element.addEventListener('pointerleave', () => setHighlight(candidate, false));
       }
       rail.append(control);
     });
@@ -404,6 +462,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       return;
     }
     panel.classList.toggle('page-break-panel--desktop-fallback', isDesktop());
+    surface = 'panel';
     const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
     candidates.forEach((candidate) => {
       const row = document.createElement('button');
@@ -477,17 +536,43 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       renderPanel(renderedCandidates);
     }
   };
+  function focusedBoundaryKey() {
+    return document.activeElement instanceof Element
+      ? document.activeElement.closest('[data-page-break-key]')?.dataset.pageBreakKey || null
+      : null;
+  }
+  function restoreSurfaceFocus(key) {
+    if (!key) return;
+    const container = surface === 'rail' ? rail : panel;
+    container.querySelector(`[data-page-break-key="${key}"]`)?.focus({ preventScroll: true });
+  }
   function scheduleGeometrySync() {
     if (geometryFrame !== null) return;
     geometryFrame = window.requestAnimationFrame(() => {
       geometryFrame = null;
+      if (!isDesktop()) {
+        if (surface === 'rail') {
+          const focusKey = focusedBoundaryKey();
+          syncSurface();
+          restoreSurfaceFocus(focusKey);
+        }
+        return;
+      }
+      const nextSurface = usesPanel() ? 'panel' : 'rail';
+      if (nextSurface === surface) {
+        if (nextSurface === 'rail') positionRail();
+        updateMenuControls();
+        return;
+      }
+      const focusKey = focusedBoundaryKey();
       syncSurface();
       positionRail();
+      restoreSurfaceFocus(focusKey);
     });
   }
   const contextObserver = workspace ? new MutationObserver(syncSurface) : null;
   contextObserver?.observe(workspace, { attributes: true, attributeFilter: ['data-mobile-mode', 'hidden'] });
-  window.addEventListener('resize', syncSurface);
+  window.addEventListener('resize', scheduleGeometrySync);
   preview.addEventListener('transitionend', (event) => {
     if (event.propertyName === 'transform') scheduleGeometrySync();
   });

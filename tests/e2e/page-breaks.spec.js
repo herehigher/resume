@@ -133,6 +133,36 @@ test('narrow desktop: Japanese and Chinese use a complete editor-side panel with
   await expect(page.locator('#chineseWorkspace [data-page-break-mode-toggle]')).toHaveAttribute('aria-controls', 'page-break-rail-zh-CN');
 });
 
+test('narrow desktop: English rail stacks every complete label into independent paper-exterior hit targets', async ({ page }) => {
+  for (const width of [900, 950]) {
+    await page.setViewportSize({ width, height: 900 });
+    await openLocale(page, 'en');
+    await page.locator('[data-en-load-sample]').click();
+    const trigger = await openDesktopPageBreakMode(page, '[data-english-editor]');
+    const rail = page.locator('#page-break-rail-en');
+    const boundaries = rail.locator('.page-break-boundary');
+    await expect(rail).toBeVisible();
+    await expect(page.locator('#page-break-panel-en')).toBeHidden();
+    await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-en');
+    const keys = await boundaries.evaluateAll((controls) => controls.map((control) => control.dataset.pageBreakKey));
+    expect(keys.length).toBeGreaterThan(1);
+    await expect.poll(() => boundaries.evaluateAll((controls) => controls.every((control) => {
+      const box = control.getBoundingClientRect();
+      const paper = document.querySelector('[data-en-preview] .document-page')?.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + (box.width / 2), box.top + (box.height / 2));
+      return Boolean(paper)
+        && box.left >= paper.right && box.right <= innerWidth
+        && box.top >= 0 && box.bottom <= innerHeight
+        && hit?.closest('.page-break-boundary') === control;
+    }))).toBe(true);
+    for (const key of keys) {
+      const boundary = rail.locator(`.page-break-boundary[data-page-break-key="${key}"]`);
+      await boundary.click();
+      await expect(boundary).toHaveAttribute('aria-pressed', 'true');
+    }
+  }
+});
+
 test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navigation and Escape returns focus to the trigger', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
@@ -148,6 +178,8 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await page.waitForTimeout(50);
   await expect(row).toBeFocused();
   await page.keyboard.press('Tab');
   const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
