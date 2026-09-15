@@ -210,9 +210,11 @@ test('Chinese editor exposes all state-backed sections and accessible controls',
 });
 
 test('Chinese repeating-item factories match the persisted state model', () => {
-  assert.deepEqual(createChineseItem('experience'), {
-    startDate: '', endDate: '', company: '', role: '', details: ''
+  const experience = createChineseItem('experience');
+  assert.deepEqual({ ...experience, id: '' }, {
+    id: '', startDate: '', endDate: '', company: '', role: '', details: ''
   });
+  assert.match(experience.id, /^record_/);
   assert.deepEqual(createChineseItem('projects'), {
     startDate: '', endDate: '', name: '', role: '', details: '', url: ''
   });

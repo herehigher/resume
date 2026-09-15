@@ -671,7 +671,7 @@ test('JSON の書き出し・読込が往復し、不正データは既存下書
   await page.locator('#exportDataButton').click();
   const download = await downloadPromise;
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
-  expect(exported.version).toBe(3);
+  expect(exported.version).toBe(4);
   expect(exported.profile.fields.fullName).toBe('書き出し前の氏名');
 
   exported.profile.fields.fullName = '読み込んだ氏名';

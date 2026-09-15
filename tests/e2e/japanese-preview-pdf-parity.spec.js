@@ -289,6 +289,7 @@ test('日本語PDF: 連続URLを全文保持し、履歴書・職務経歴書の
     baseline.documents.ja.fields.motivation = 'https://example.invalid/BASELINE-MOTIVATION';
     baseline.documents.ja.fields.careerSummary = 'https://example.invalid/BASELINE-SUMMARY';
     baseline.documents.ja.careers = [{
+      id: `record_pdf-ja-${activeDocument}`,
       company: '印刷検証株式会社',
       role: '検証担当',
       startDate: '2020-01',

@@ -10,6 +10,7 @@ import {
 } from '../site/assets/js/state/migrations.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
 import { COMPATIBLE_DRAFT_STORAGE_KEYS } from '../site/assets/js/config.js';
+import { createV3Fixture } from './fixtures/resume-studio-web-v3.js';
 
 function fakeValidator(currentVersion) {
   return (value) => ({
@@ -85,16 +86,16 @@ function createV2State(gender) {
   return state;
 }
 
-test('the production v3 format is current, migrates the explicit v2 namespace, and keeps v1 unsupported', () => {
+test('the production v4 format is current, migrates the explicit v3 namespace, and keeps v1 unsupported', () => {
   const current = createDefaultState('en');
 
-  assert.equal(current.version, 3);
+  assert.equal(current.version, 4);
   assert.equal(Object.hasOwn(current, 'schemaRevision'), false);
   assert.equal(migrateState(current).status, 'current');
   assert.deepEqual(migrateState({ ...current, schemaRevision: 1 }), { status: 'unsupported', reason: 'current-validation-failed' });
   assert.deepEqual(migrateState({ ...current, version: 1 }), { status: 'unsupported', reason: 'migration-step-missing' });
-  assert.deepEqual(COMPATIBLE_DRAFT_STORAGE_KEYS, ['resume-studio-web-v2']);
-  assert.deepEqual(MIGRATION_REGISTRY.map(({ from, to }) => ({ from, to })), [{ from: 2, to: 3 }]);
+  assert.deepEqual(COMPATIBLE_DRAFT_STORAGE_KEYS, ['resume-studio-web-v3']);
+  assert.deepEqual(MIGRATION_REGISTRY.map(({ from, to }) => ({ from, to })), [{ from: 2, to: 3 }, { from: 3, to: 4 }]);
 });
 
 test('the v2 to v3 migration normalizes all recognized gender values and adds fixed defaults', () => {
@@ -107,7 +108,7 @@ test('the v2 to v3 migration normalizes all recognized gender values and adds fi
     const before = structuredClone(source);
     const result = migrateState(source);
     assert.equal(result.status, 'migrated', legacyGender || 'empty gender');
-    assert.equal(result.state.version, 3);
+    assert.equal(result.state.version, 4);
     assert.equal(result.state.profile.fields.gender, gender);
     assert.equal(result.state.profile.fields.nationality, '');
     assert.equal(result.state.documents.en.resume.showOptionalPersonalDetails, false);
@@ -115,7 +116,7 @@ test('the v2 to v3 migration normalizes all recognized gender values and adds fi
   }
 });
 
-test('the v2 to v3 migration salvages unknown non-empty gender without discarding recognized data', () => {
+test('the v2 to v4 migration salvages unknown non-empty gender without discarding recognized data', () => {
   const source = createV2State('Unrecognized fictional gender');
   source.profile.fields.fullName = 'Fictional migration canary';
   source.documents.ja.fields.motivation = 'Recognized document content remains intact.';
@@ -127,6 +128,22 @@ test('the v2 to v3 migration salvages unknown non-empty gender without discardin
   assert.equal(result.state.documents.ja.fields.motivation, 'Recognized document content remains intact.');
 });
 
+test('the v3 to v4 migration deterministically adds unique record IDs and separates page-break targets', () => {
+  const source = createV3Fixture();
+  source.documents.ja.careers.push({ ...source.documents.ja.careers[0], company: 'Fictional v3 second company' });
+
+  const first = migrateState(source);
+  const second = migrateState(source);
+  assert.equal(first.status, 'migrated');
+  assert.deepEqual(first, second);
+  assert.deepEqual(first.state.settings.pageBreaks.ja.A4.resume, { sections: ['qualifications'], records: [] });
+  assert.deepEqual(first.state.settings.pageBreaks.en.A4.resume, { sections: ['projects'], records: [] });
+  for (const records of [first.state.documents.ja.careers, first.state.documents['zh-CN'].resume.experience, first.state.documents.en.resume.experience]) {
+    assert.equal(new Set(records.map((record) => record.id)).size, records.length);
+    assert.ok(records.every((record) => record.id.startsWith('record_')));
+  }
+});
+
 test('version classification rejects malformed, future, old, and incomplete paths distinctly', () => {
   const current = createDefaultState();
   for (const version of [undefined, null, '2', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
@@ -134,7 +151,7 @@ test('version classification rejects malformed, future, old, and incomplete path
     candidate.version = version;
     assert.deepEqual(migrateState(candidate), { status: 'unsupported', reason: 'invalid-version' });
   }
-  assert.deepEqual(migrateState({ ...current, version: 4 }), { status: 'future', reason: 'future-version' });
+  assert.deepEqual(migrateState({ ...current, version: 5 }), { status: 'future', reason: 'future-version' });
 
   const runnerAtSix = createMigrationRunner({ currentVersion: 6, registry: testRegistry, validateCurrent: fakeValidator(6) });
   assert.deepEqual(runnerAtSix({ version: 2 }), { status: 'too-old', reason: 'version-window-expired' });

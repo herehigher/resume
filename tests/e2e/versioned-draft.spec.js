@@ -1,8 +1,25 @@
 import { STORAGE_KEY } from '../../site/assets/js/config.js';
 import { expect, openLocale, test } from './fixtures.js';
+import { createV3Fixture } from '../fixtures/resume-studio-web-v3.js';
 
 const OUT_OF_RANGE_STORAGE_KEY = 'resume-studio-web-v1';
 const OUT_OF_RANGE_RAW = JSON.stringify({ marker: 'fictional-out-of-range-draft' });
+
+test('the application migrates a literal v3 draft from its only compatible key', async ({ page }) => {
+  const v3 = createV3Fixture();
+  await page.addInitScript(({ raw }) => {
+    localStorage.setItem('resume-studio-web-v3', raw);
+  }, { raw: JSON.stringify(v3) });
+
+  await openLocale(page, 'en');
+  await expect(page.locator('[data-profile-field="fullName"]')).toHaveValue('Fictional v3 Person');
+  const result = await page.evaluate((currentKey) => ({
+    v3Raw: localStorage.getItem('resume-studio-web-v3'),
+    current: JSON.parse(localStorage.getItem(currentKey))
+  }), STORAGE_KEY);
+  expect(result.v3Raw).toBeNull();
+  expect(result.current.format).toBe('resume-studio-local-encrypted-v1');
+});
 
 test('out-of-range draft namespaces never block, change, or disappear during current editing', async ({ page }) => {
   await page.addInitScript(({ storageKey, raw }) => {

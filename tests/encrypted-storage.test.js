@@ -116,7 +116,7 @@ test('draft ciphertext contains no fixture name or email and reload restores it'
   const saved = createDefaultState('en');
   saved.profile.fields.fullName = 'Ciphertext Fixture';
   saved.profile.fields.email = 'ciphertext.fixture@example.test';
-  saved.settings.pageBreaks.en.LETTER.resume = ['summary', 'experience'];
+  saved.settings.pageBreaks.en.LETTER.resume.sections = ['summary', 'experience'];
   const writer = persistence(storage, keyStore);
 
   await writer.save(saved);
@@ -126,7 +126,7 @@ test('draft ciphertext contains no fixture name or email and reload restores it'
   assert.deepEqual(JSON.parse(raw).algorithm, ENCRYPTED_DRAFT_ALGORITHM);
   const restored = await persistence(storage, keyStore).load();
   assert.equal(restored.profile.fields.fullName, 'Ciphertext Fixture');
-  assert.deepEqual(restored.settings.pageBreaks.en.LETTER.resume, ['summary', 'experience']);
+  assert.deepEqual(restored.settings.pageBreaks.en.LETTER.resume.sections, ['summary', 'experience']);
 });
 
 test('a plaintext current-version draft is encrypted only after persistence succeeds', async () => {
@@ -511,7 +511,7 @@ test('future drafts remain protected from save and clear, and missing Web Locks 
   await writer.save(createDefaultState());
   const key = keys.current();
   const future = createDefaultState();
-  future.version = 4;
+  future.version = 5;
   const raw = await encryptUnsupportedState(future, key);
   storage.setItem(STORAGE_KEY, raw);
 

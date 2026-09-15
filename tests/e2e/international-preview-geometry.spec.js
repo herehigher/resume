@@ -194,6 +194,7 @@ test('简体中文: A4 preview page-box and representative wrapping stay canonic
 test('简体中文: long experience dates stay inside the page and clear the timeline rail', async ({ page }) => {
   const state = createDefaultState('zh-CN');
   state.documents['zh-CN'].resume.experience = [{
+    id: 'record_geometry-zh-experience',
     startDate: '2019-01',
     endDate: '2026-12',
     company: 'Fictional Studio',

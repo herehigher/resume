@@ -1,4 +1,5 @@
 import { cloneData } from '../state/defaults.js';
+import { createRecordId } from '../state/record-ids.js';
 
 export function createEnglishSampleState(sourceState) {
   const state = cloneData(sourceState);
@@ -27,6 +28,7 @@ export function createEnglishSampleState(sourceState) {
       summary: 'Product leader with 8+ years of experience turning customer problems into measurable growth. Led cross-functional teams that improved activation by 24% and reduced time to value by 35%.',
       experience: [
         {
+          id: createRecordId(),
           startDate: '2021-06',
           endDate: '',
           company: 'Northstar Software',
@@ -34,6 +36,7 @@ export function createEnglishSampleState(sourceState) {
           details: 'Led a product squad across engineering, design, analytics, and go-to-market.\nImproved new-customer activation by 24% through onboarding experiments.\nReduced enterprise implementation time by 35% by redesigning the setup workflow.'
         },
         {
+          id: createRecordId(),
           startDate: '2017-03',
           endDate: '2021-05',
           company: 'Harbor Analytics',

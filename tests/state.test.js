@@ -60,7 +60,7 @@ test('default state contains independent locale documents', () => {
   assert.equal(state.documents.en.resume.showOptionalPersonalDetails, false);
 });
 
-test('v3 gender values are locale-independent and reject unrecognized values', () => {
+test('v4 gender values are locale-independent and reject unrecognized values', () => {
   const state = createDefaultState('ja');
   for (const gender of ['', 'male', 'female', 'other']) {
     state.profile.fields.gender = gender;
@@ -108,12 +108,12 @@ test('Japanese sample keeps the original responsibilities and achievements examp
 
 test('page break settings are isolated and reject unsupported keys and duplicates', () => {
   const state = createDefaultState('en');
-  state.settings.pageBreaks.en.A4.resume = ['projects'];
-  state.settings.pageBreaks.en.LETTER.resume = ['skills'];
+  state.settings.pageBreaks.en.A4.resume.sections = ['projects'];
+  state.settings.pageBreaks.en.LETTER.resume.sections = ['skills'];
   assert.equal(validateState(state).valid, true);
-  state.settings.pageBreaks.en.A4.resume = ['projects', 'projects'];
+  state.settings.pageBreaks.en.A4.resume.sections = ['projects', 'projects'];
   assert.equal(validateState(state).valid, false);
-  state.settings.pageBreaks.en.A4.resume = ['not-a-section'];
+  state.settings.pageBreaks.en.A4.resume.sections = ['not-a-section'];
   assert.equal(validateState(state).valid, false);
 });
 
@@ -192,10 +192,10 @@ test('page breaks survive export, import, reload, and locale, document, and pape
   const storage = createMemoryStorage();
   const source = createTestStore(storage, createDefaultState('en'));
   source.update((state) => {
-    state.settings.pageBreaks.ja.A4.resume = ['qualifications'];
-    state.settings.pageBreaks.ja.A4.career = ['career-history'];
-    state.settings.pageBreaks.en.A4.resume = ['projects'];
-    state.settings.pageBreaks.en.LETTER.resume = ['skills'];
+    state.settings.pageBreaks.ja.A4.resume.sections = ['qualifications'];
+    state.settings.pageBreaks.ja.A4.career.sections = ['career-history'];
+    state.settings.pageBreaks.en.A4.resume.sections = ['projects'];
+    state.settings.pageBreaks.en.LETTER.resume.sections = ['skills'];
   });
   await source.save();
   const targetStorage = createMemoryStorage();
@@ -203,6 +203,41 @@ test('page breaks survive export, import, reload, and locale, document, and pape
   await target.importJson(source.exportJson());
   await target.reload();
   assert.deepEqual(target.getState().settings.pageBreaks, source.getState().settings.pageBreaks);
+});
+
+test('record page breaks stay with their stable records through reorder, reload, export, and paper switching', async () => {
+  const storage = createMemoryStorage();
+  const source = createTestStore(storage, createDefaultState('en'));
+  source.update((state) => {
+    const [first] = state.documents.en.resume.experience;
+    const second = { ...first, id: 'record_fictional-second', company: 'Fictional second employer' };
+    first.id = 'record_fictional-first';
+    state.documents.en.resume.experience.push(second);
+    state.settings.pageBreaks.en.A4.resume.records = [second.id];
+    state.settings.pageBreaks.en.LETTER.resume.records = [first.id];
+    state.documents.en.resume.experience.reverse();
+  });
+  await source.save();
+
+  const exported = source.exportJson();
+  const target = createTestStore(createMemoryStorage(), createDefaultState());
+  await target.importJson(exported);
+  await target.reload();
+  assert.deepEqual(target.getState().settings.pageBreaks.en.A4.resume.records, ['record_fictional-second']);
+  assert.deepEqual(target.getState().settings.pageBreaks.en.LETTER.resume.records, ['record_fictional-first']);
+  assert.equal(target.getState().documents.en.resume.experience[0].id, 'record_fictional-second');
+});
+
+test('record IDs and record page-break targets reject duplicates and non-ID values', () => {
+  const state = createDefaultState('ja');
+  const duplicate = structuredClone(state.documents.ja.careers[0]);
+  state.documents.ja.careers.push(duplicate);
+  state.settings.pageBreaks.ja.A4.career.records = ['not-a-record-id', 'not-a-record-id'];
+  const result = validateState(state);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes('state.documents.ja.careers must have unique IDs'));
+  assert.ok(result.errors.includes('settings.pageBreaks.ja.A4.career.records must not contain duplicates'));
+  assert.ok(result.errors.includes('settings.pageBreaks.ja.A4.career.records contains an unsupported record ID'));
 });
 
 test('invalid import does not change current or persisted data', async () => {

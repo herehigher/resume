@@ -1,4 +1,5 @@
 import { cloneData } from './defaults.js';
+import { createRecordId } from './record-ids.js';
 
 export function createChineseSampleState(sourceState) {
   const state = cloneData(sourceState);
@@ -27,6 +28,7 @@ export function createChineseSampleState(sourceState) {
       summary: '8 年互联网产品经验，持续负责企业服务产品从需求研究、方案设计到上线增长的完整过程。擅长将复杂业务拆解为可执行的产品路径，并通过用户反馈和数据验证推动跨职能团队达成目标。',
       experience: [
         {
+          id: createRecordId(),
           startDate: '2018-07',
           endDate: '2022-03',
           company: '八经网络科技有限公司',
@@ -34,6 +36,7 @@ export function createChineseSampleState(sourceState) {
           details: '• 负责客户数据平台的需求分析、产品规划与版本迭代\n• 建立用户反馈闭环，使重点客户续约率提升 12 个百分点\n• 协同研发和实施团队交付 20 余个企业客户项目'
         },
         {
+          id: createRecordId(),
           startDate: '2022-04',
           endDate: '',
           company: '正儿数字科技有限公司',

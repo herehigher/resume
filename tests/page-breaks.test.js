@@ -12,9 +12,9 @@ test('section registry is the shared bounded source of saved page-break targets'
   assert.deepEqual(SECTION_REGISTRY.ja.resume.map((section) => section.key), ['identity', 'history', 'qualifications', 'motivation', 'requests']);
   assert.deepEqual(SECTION_REGISTRY.ja.career.map((section) => section.key), ['identity', 'summary', 'skills', 'career-history', 'self-promotion']);
   assert.deepEqual(getPageBreaks(state, 'en', 'A4', 'resume'), []);
-  state.settings.pageBreaks.en.A4.resume = ['projects', 'projects'];
+  state.settings.pageBreaks.en.A4.resume.sections = ['projects', 'projects'];
   assert.match(validatePageBreaks(state.settings.pageBreaks).join(' '), /duplicates/);
-  state.settings.pageBreaks.en.A4.resume = ['identity'];
+  state.settings.pageBreaks.en.A4.resume.sections = ['identity'];
   assert.match(validatePageBreaks(state.settings.pageBreaks).join(' '), /unsupported section key/);
 });
 

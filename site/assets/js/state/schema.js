@@ -1,6 +1,7 @@
 import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createDefaultState } from './defaults.js';
 import { validatePageBreaks } from '../page-breaks.js';
+import { hasUniqueRecordIds, isRecordId } from './record-ids.js';
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -65,22 +66,40 @@ function validateStateShape(value) {
     errors.push('documents.ja.activeDocument is not supported');
   }
 
-  const careerKeys = ['company', 'companyInfo', 'detailSections', 'endDate', 'role', 'startDate'];
+  const careerKeys = ['company', 'companyInfo', 'detailSections', 'endDate', 'id', 'role', 'startDate'];
   const careerDetailSectionKeys = ['content', 'title'];
   const careers = value.documents?.ja?.careers;
   if (Array.isArray(careers)) careers.forEach((career, index) => {
     if (!isPlainObject(career) || Object.keys(career).sort().join(',') !== careerKeys.join(',')) {
       errors.push(`state.documents.ja.careers[${index}] has an unsupported shape`);
     }
+    if (!isRecordId(career?.id)) errors.push(`state.documents.ja.careers[${index}].id is invalid`);
     if (Array.isArray(career?.detailSections)) career.detailSections.forEach((section, sectionIndex) => {
       if (!isPlainObject(section) || Object.keys(section).sort().join(',') !== careerDetailSectionKeys.join(',')) {
         errors.push(`state.documents.ja.careers[${index}].detailSections[${sectionIndex}] has an unsupported shape`);
       }
     });
   });
+  if (Array.isArray(careers) && !hasUniqueRecordIds(careers)) {
+    errors.push('state.documents.ja.careers must have unique IDs');
+  }
   for (const locale of ['zh-CN', 'en']) {
     if (value.documents?.[locale]?.activeDocument !== 'resume') {
       errors.push(`documents.${locale}.activeDocument is not supported`);
+    }
+  }
+  for (const locale of ['zh-CN', 'en']) {
+    const experience = value.documents?.[locale]?.resume?.experience;
+    if (!Array.isArray(experience)) continue;
+    experience.forEach((record, index) => {
+      const keys = ['company', 'details', 'endDate', 'id', 'role', 'startDate'];
+      if (!isPlainObject(record) || Object.keys(record).sort().join(',') !== keys.join(',')) {
+        errors.push(`state.documents.${locale}.resume.experience[${index}] has an unsupported shape`);
+      }
+      if (!isRecordId(record?.id)) errors.push(`state.documents.${locale}.resume.experience[${index}].id is invalid`);
+    });
+    if (!hasUniqueRecordIds(experience)) {
+      errors.push(`state.documents.${locale}.resume.experience must have unique IDs`);
     }
   }
 
