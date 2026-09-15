@@ -43,8 +43,18 @@ test('desktop: edit mode places a labeled rail outside the document and offers P
   await expect.poll(() => boundary.evaluate((element) => {
     const button = element.getBoundingClientRect();
     const paper = document.querySelector('[data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
-    return button.left > paper.right;
+    const preview = document.querySelector('[data-en-preview-scroll]').getBoundingClientRect();
+    return button.left > paper.right && button.left >= preview.left && button.right <= preview.right;
   })).toBe(true);
+  for (const width of [821, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect.poll(() => boundary.evaluate((element) => {
+      const button = element.getBoundingClientRect();
+      const paper = document.querySelector('[data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
+      const preview = document.querySelector('[data-en-preview-scroll]').getBoundingClientRect();
+      return button.left > paper.right && button.left >= preview.left && button.right <= preview.right;
+    })).toBe(true);
+  }
   const scrollLeftBeforeToggle = await previewScroll.evaluate((element) => element.scrollLeft);
   await boundary.hover();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/page-break-target-highlight/);
@@ -298,7 +308,7 @@ test('desktop: active classes follow English paper size and Japanese document ty
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
   await page.locator('#localeSelect').selectOption('ja');
-  await openDesktopPageBreakMode(page, '[data-japanese-editor]');
+  await openDesktopPageBreakMode(page, '#japaneseWorkspace');
   const qualifications = page.locator('.page-break-boundary[data-page-break-key="qualifications"]');
   await expect(qualifications).toContainText('解除');
   await expect(qualifications).toHaveAttribute('aria-label', '学歴・職歴の後、免許・資格の前に改ページを解除');
@@ -306,4 +316,47 @@ test('desktop: active classes follow English paper size and Japanese document ty
   await page.locator('#careerDocumentTab').click();
   await expect(page.locator('.page-break-boundary[data-page-break-key="career-history"]')).toContainText('解除');
   await expect(page.locator('[data-section-key="career-history"]')).toHaveClass(/has-manual-page-break/);
+});
+
+test('desktop: rail realigns after Japanese zoom transitions', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  await openDesktopPageBreakMode(page, '#japaneseWorkspace');
+  const boundary = page.locator('.page-break-boundary[data-page-break-key="qualifications"]');
+  await expect(boundary).toBeVisible();
+  await page.locator('#zoomOutButton').click();
+  await page.waitForTimeout(260);
+  await expect.poll(() => boundary.evaluate((element) => {
+    const target = document.querySelector('[data-section-key="qualifications"]');
+    const pageBox = target.closest('.document-page');
+    const scale = pageBox.getBoundingClientRect().width / pageBox.offsetWidth;
+    const button = element.getBoundingClientRect();
+    const targetBox = target.getBoundingClientRect();
+    const paper = pageBox.getBoundingClientRect();
+    return Math.abs(button.left - (paper.right + Math.max(12, 16 * scale))) < 3
+      && Math.abs(button.top - (targetBox.top - 11 * scale)) < 3;
+  })).toBe(true);
+});
+
+test('responsive and locale changes close stale pagination surfaces and keep ARIA controls accurate', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await openLocale(page, 'en');
+  await page.locator('[data-en-load-sample]').click();
+  await openDesktopPageBreakMode(page, '[data-english-editor]');
+  await expect(page.locator('#page-break-rail-en')).toBeVisible();
+  await page.locator('#localeSelect').selectOption('ja');
+  await expect(page.locator('#page-break-rail-en')).toBeHidden();
+  await page.locator('#loadSampleButton').click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('[data-mobile-view="preview"]').click();
+  const trigger = page.locator('#japaneseWorkspace [data-page-break-mode-toggle]');
+  const panel = page.locator('#page-break-panel-ja');
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-panel-ja');
+  await trigger.click();
+  await expect(panel).toBeVisible();
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(panel).toBeHidden();
+  await expect(page.locator('#page-break-rail-ja')).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-ja');
 });

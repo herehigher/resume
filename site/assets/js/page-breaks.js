@@ -19,8 +19,8 @@ export const PAGE_BREAK_LABELS = Object.freeze({
 });
 
 // The desktop rail is fixed over the preview rather than part of the document.
-// It therefore does not reserve space or alter the printable document geometry.
-export const PAGE_BREAK_PREVIEW_GUTTER = 0;
+// This reserves only outer preview space; the printable document geometry is unchanged.
+export const PAGE_BREAK_PREVIEW_GUTTER = 400;
 
 const RECORD_ID_PATTERN = /^record_[A-Za-z0-9_-]+(?:-[A-Za-z0-9_-]+)*$/;
 
@@ -228,7 +228,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   menu.type = 'button';
   menu.className = 'page-break-menu';
   menu.dataset.pageBreakModeToggle = '';
-  menu.setAttribute('aria-controls', railId);
   toolbar.append(menu);
   const feedback = document.createElement('div');
   feedback.className = 'page-break-feedback';
@@ -252,6 +251,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   let renderedCandidates = [];
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px)').matches; }
+  function isSurfaceVisible() { return preview.getClientRects().length > 0 && !preview.closest('[hidden]'); }
   function activeContext() {
     const state = store.getState();
     const type = getDocumentType();
@@ -269,6 +269,14 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     panel.hidden = !open;
     menu.setAttribute('aria-expanded', String(open));
     if (open) panel.querySelector('button')?.focus();
+  }
+  function closeSurface() {
+    modeOpen = false;
+    rail.hidden = true;
+    panel.hidden = true;
+    menu.setAttribute('aria-pressed', 'false');
+    menu.setAttribute('aria-expanded', 'false');
+    clearFeedback();
   }
   function clearFeedback() {
     window.clearTimeout(feedbackTimer);
@@ -310,14 +318,22 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       if (!candidate || !page) return;
       const targetRect = candidate.element.getBoundingClientRect();
       const pageRect = page.getBoundingClientRect();
+      const previewRect = preview.closest('.preview-scroll')?.getBoundingClientRect();
       const scale = page.offsetWidth ? pageRect.width / page.offsetWidth : 1;
-      control.style.left = `${pageRect.right + Math.max(12, 16 * scale)}px`;
+      const gutter = Math.max(12, 16 * scale);
+      const wantedLeft = pageRect.right + gutter;
+      const rightSpace = previewRect ? previewRect.right - wantedLeft - 8 : Number.POSITIVE_INFINITY;
+      const leftSpace = previewRect ? pageRect.left - previewRect.left - gutter - 8 : 0;
+      const useRightRail = rightSpace >= 44 || rightSpace >= leftSpace;
+      const available = useRightRail ? rightSpace : leftSpace;
+      control.style.maxWidth = `${Math.max(44, available)}px`;
+      control.style.left = `${useRightRail ? wantedLeft : Math.max(previewRect.left + 8, pageRect.left - gutter - control.getBoundingClientRect().width)}px`;
       control.style.top = `${targetRect.top - (candidate.isRecord ? 1 : 11) * scale}px`;
     });
   }
   function renderRail() {
     rail.replaceChildren();
-    if (!isDesktop() || !renderedCandidates.length || preview.closest('[hidden]')) { rail.hidden = true; return; }
+    if (!isDesktop() || !isSurfaceVisible() || !renderedCandidates.length) { rail.hidden = true; return; }
     const shown = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
     rail.hidden = shown.length === 0;
     shown.forEach((candidate) => {
@@ -357,7 +373,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function renderMobilePanel(candidates) {
     panel.replaceChildren();
-    if (isDesktop()) { panel.hidden = true; menu.removeAttribute('aria-expanded'); return; }
+    if (isDesktop() || !isSurfaceVisible()) { panel.hidden = true; menu.setAttribute('aria-expanded', 'false'); return; }
     const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
     candidates.forEach((candidate) => {
       const row = document.createElement('button');
@@ -385,6 +401,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     });
     menu.hidden = renderedCandidates.length === 0;
     if (menu.hidden) { modeOpen = false; clearFeedback(); }
+    menu.setAttribute('aria-controls', isDesktop() ? railId : panelId);
     menu.textContent = `${modeOpen ? labels.editing : labels.edit} · ${renderedCandidates.filter((candidate) => candidate.active).length}`;
     menu.setAttribute('aria-pressed', String(modeOpen));
     renderMobilePanel(renderedCandidates);
@@ -409,7 +426,28 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   document.addEventListener('pointerdown', (event) => {
     if (!isDesktop() && !panel.hidden && !toolbar.contains(event.target)) setMobilePanel(false);
   }, true);
-  window.addEventListener('resize', () => { renderRail(); });
+  const workspace = preview.closest('.workspace');
+  const syncSurface = () => {
+    menu.setAttribute('aria-controls', isDesktop() ? railId : panelId);
+    if (!isSurfaceVisible()) { closeSurface(); return; }
+    if (isDesktop()) {
+      panel.hidden = true;
+      menu.setAttribute('aria-expanded', 'false');
+      renderRail();
+    } else {
+      modeOpen = false;
+      rail.hidden = true;
+      menu.setAttribute('aria-pressed', 'false');
+      renderMobilePanel(renderedCandidates);
+    }
+  };
+  const contextObserver = workspace ? new MutationObserver(syncSurface) : null;
+  contextObserver?.observe(workspace, { attributes: true, attributeFilter: ['data-mobile-mode', 'hidden'] });
+  window.addEventListener('resize', syncSurface);
+  preview.addEventListener('transitionend', (event) => {
+    if (event.propertyName === 'transform') positionRail();
+  });
   preview.closest('.preview-scroll')?.addEventListener('scroll', positionRail, { passive: true });
+  syncSurface();
   return { render, position: positionRail };
 }

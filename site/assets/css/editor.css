@@ -177,14 +177,14 @@
 .page-break-rail { inset: 0; pointer-events: none; position: fixed; z-index: 9; }
 .page-break-rail[hidden] { display: none; }
 .page-break-boundary, .page-break-passive-marker { align-items: center; color: var(--blue); font: inherit; font-size: 10px; font-weight: 700; pointer-events: auto; position: fixed; white-space: nowrap; z-index: 9; }
-.page-break-boundary { background: #fff; border: 1px solid #b8caea; border-radius: 6px; cursor: pointer; display: inline-flex; gap: 5px; min-height: 32px; padding: 0 8px; text-align: left; }
+.page-break-boundary { background: #fff; border: 1px solid #b8caea; border-radius: 6px; cursor: pointer; display: inline-flex; gap: 5px; min-height: 32px; padding: 0 8px; text-align: left; white-space: normal; }
 .page-break-boundary:hover, .page-break-boundary.is-target-highlighted { background: #eaf1ff; border-color: #6f98e4; }
 .page-break-record-boundary { border-radius: 50%; min-height: 32px; padding: 0; width: 32px; }
 .page-break-record-boundary .page-break-compact-tick { align-items: center; display: inline-flex; height: 30px; justify-content: center; width: 30px; }
 .page-break-record-boundary .page-break-full-label { background: #fff; border: 1px solid #b8caea; border-radius: 6px; box-shadow: 0 5px 18px rgba(33, 53, 84, .16); display: none; left: 38px; max-width: min(300px, calc(100vw - 56px)); padding: 8px 9px; position: absolute; white-space: normal; }
 .page-break-record-boundary:hover .page-break-full-label, .page-break-record-boundary:focus-visible .page-break-full-label { display: block; }
 .page-break-passive-marker { color: #5479bf; font-size: 15px; opacity: .78; pointer-events: none; transform: translateY(-50%); }
-.page-break-add { align-items: center; display: inline-flex; gap: 5px; }
+.page-break-add { align-items: center; display: inline-flex; gap: 5px; min-width: 0; }
 .page-break-plus { align-items: center; background: var(--blue); border-radius: 50%; color: #fff; display: inline-flex; height: 20px; justify-content: center; width: 20px; }
 .page-break-plus svg { height: 13px; stroke: currentColor; stroke-width: 2.4; width: 13px; }
 .has-manual-page-break::before { border-top: 1px dashed var(--blue); content: ''; left: calc(-1 * var(--page-break-paper-left-offset, 0px)); pointer-events: none; position: absolute; right: calc(-1 * var(--page-break-paper-right-offset, 0px)); top: -5px; }
@@ -198,6 +198,7 @@
 .document-preview {
   margin: 0 auto;
   min-width: 100%;
+  padding-right: var(--page-break-preview-gutter, 400px);
   transform-origin: top left;
   transition: transform .2s ease;
   width: max-content;
