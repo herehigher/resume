@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { expect, openLocale, test } from './fixtures.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createEnglishSampleState } from '../../site/assets/js/data/en-sample.js';
@@ -256,6 +258,43 @@ test('desktop: an English record page break follows its stable ID after rendered
   await expect(page.locator('[data-record-id="record_target"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('.page-break-boundary[data-page-break-key="record:record_target"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
+});
+
+test('desktop: short English record markers have independent hit targets and save their own IDs', async ({ page }) => {
+  const state = createDefaultState('en');
+  state.documents.en.resume.experience = [
+    { id: 'record_first', company: 'First fictional employer', role: 'First role', startDate: '2022-01', endDate: '2023-01', details: 'First fictional achievement.' },
+    { id: 'record_second', company: 'Second fictional employer', role: 'Second role', startDate: '2020-01', endDate: '2021-01', details: 'Second fictional achievement.' }
+  ];
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'en');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'fictional-record-hit-targets.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  const first = page.locator('.page-break-boundary[data-page-break-key="record:record_first"]');
+  const second = page.locator('.page-break-boundary[data-page-break-key="record:record_second"]');
+  await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('.page-break-record-boundary')].map((element) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + (box.width / 2), box.top + (box.height / 2));
+    return { key: element.dataset.pageBreakKey, hit: hit?.closest('.page-break-boundary')?.dataset.pageBreakKey, top: box.top };
+  }))).toEqual([
+    { key: 'record:record_first', hit: 'record:record_first', top: expect.any(Number) },
+    { key: 'record:record_second', hit: 'record:record_second', top: expect.any(Number) }
+  ]);
+  expect(await first.boundingBox()).not.toEqual(await second.boundingBox());
+  await first.click();
+  await second.click();
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await expect(second).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#dataMenuSummary').click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  const exported = JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'));
+  expect(exported.settings.pageBreaks.en.LETTER.resume.records).toEqual(['record_first', 'record_second']);
+  await page.locator('[data-en-list="experience"] [data-en-item]').nth(1).locator('[data-en-item-field="endDate"]').fill('2024-01');
+  await expect(page.locator('[data-record-id="record_first"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('[data-record-id="record_second"]')).toHaveClass(/has-manual-page-break/);
 });
 
 test('desktop: active classes follow English paper size and Japanese document type', async ({ page }) => {
