@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v3.schema.json",
-  "title": "Resume Studio web v3 export",
+  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v4.schema.json",
+  "title": "Resume Studio web v4 export",
   "description": "The JSON backup format exported by Resume Studio. Resume data must not be uploaded, transmitted, or shared without the user's explicit authorization.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "settings", "profile", "documents"],
   "properties": {
-    "version": { "const": 3 },
+    "version": { "const": 4 },
     "settings": {
       "type": "object",
       "required": ["locale", "pageSizeByLocale", "pageBreaks"],
@@ -55,9 +55,14 @@
     }
   },
   "$defs": {
+    "recordId": { "type": "string", "pattern": "^record_[A-Za-z0-9_-]+(?:-[A-Za-z0-9_-]+)*$" },
     "japaneseResumeBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 4, "items": { "enum": ["history", "qualifications", "motivation", "requests"] } },
     "japaneseCareerBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 4, "items": { "enum": ["summary", "skills", "career-history", "self-promotion"] } },
     "internationalBreakTargets": { "type": "array", "uniqueItems": true, "maxItems": 6, "items": { "enum": ["summary", "experience", "projects", "education", "skills", "certifications"] } },
+    "recordBreakTargets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/recordId" } },
+    "japaneseResumeBreakSettings": { "type": "object", "additionalProperties": false, "required": ["sections", "records"], "properties": { "sections": { "$ref": "#/$defs/japaneseResumeBreakTargets" }, "records": { "$ref": "#/$defs/recordBreakTargets" } } },
+    "japaneseCareerBreakSettings": { "type": "object", "additionalProperties": false, "required": ["sections", "records"], "properties": { "sections": { "$ref": "#/$defs/japaneseCareerBreakTargets" }, "records": { "$ref": "#/$defs/recordBreakTargets" } } },
+    "internationalBreakSettings": { "type": "object", "additionalProperties": false, "required": ["sections", "records"], "properties": { "sections": { "$ref": "#/$defs/internationalBreakTargets" }, "records": { "$ref": "#/$defs/recordBreakTargets" } } },
     "japanesePageBreaks": {
       "type": "object", "additionalProperties": false, "required": ["A4", "LETTER"],
       "properties": {
@@ -67,7 +72,7 @@
     },
     "japanesePageBreakDocuments": {
       "type": "object", "additionalProperties": false, "required": ["resume", "career"],
-      "properties": { "resume": { "$ref": "#/$defs/japaneseResumeBreakTargets" }, "career": { "$ref": "#/$defs/japaneseCareerBreakTargets" } }
+      "properties": { "resume": { "$ref": "#/$defs/japaneseResumeBreakSettings" }, "career": { "$ref": "#/$defs/japaneseCareerBreakSettings" } }
     },
     "internationalPageBreaks": {
       "type": "object", "additionalProperties": false, "required": ["A4", "LETTER"],
@@ -78,7 +83,7 @@
     },
     "internationalPageBreakDocuments": {
       "type": "object", "additionalProperties": false, "required": ["resume"],
-      "properties": { "resume": { "$ref": "#/$defs/internationalBreakTargets" } }
+      "properties": { "resume": { "$ref": "#/$defs/internationalBreakSettings" } }
     },
     "string": { "type": "string" },
     "profileFields": {
@@ -128,8 +133,9 @@
     "japaneseCareer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["company", "role", "startDate", "endDate", "companyInfo", "detailSections"],
+      "required": ["id", "company", "role", "startDate", "endDate", "companyInfo", "detailSections"],
       "properties": {
+        "id": { "$ref": "#/$defs/recordId" },
         "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" },
         "companyInfo": { "$ref": "#/$defs/string" },
         "detailSections": { "type": "array", "items": { "$ref": "#/$defs/japaneseCareerDetailSection" } }
@@ -184,8 +190,9 @@
     },
     "experience": {
       "type": "object",
-      "required": ["startDate", "endDate", "company", "role", "details"],
-      "properties": { "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" }, "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "details": { "$ref": "#/$defs/string" } }
+      "additionalProperties": false,
+      "required": ["id", "startDate", "endDate", "company", "role", "details"],
+      "properties": { "id": { "$ref": "#/$defs/recordId" }, "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" }, "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "details": { "$ref": "#/$defs/string" } }
     },
     "project": {
       "type": "object",

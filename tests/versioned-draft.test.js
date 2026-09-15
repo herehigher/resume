@@ -49,7 +49,7 @@ test('startup touches only the current namespace when no compatible keys are con
 });
 
 test('a configured compatible namespace is copied forward and removed only after the new save succeeds', async () => {
-  const migratedState = { version: 3, marker: 'fictional-compatible-draft' };
+  const migratedState = { version: 4, marker: 'fictional-compatible-draft' };
   const events = [];
   const current = fakePersistence({ events });
   const compatible = fakePersistence({ state: migratedState, pendingMutation: 'migrate-draft', events });
@@ -57,8 +57,8 @@ test('a configured compatible namespace is copied forward and removed only after
 
   const result = await loadVersionedDraft(null, {
     currentPersistence: current,
-    currentStorageKey: 'resume-studio-web-v3',
-    compatibleStorageKeys: ['resume-studio-web-v2'],
+    currentStorageKey: 'resume-studio-web-v4',
+    compatibleStorageKeys: ['resume-studio-web-v3'],
     persistenceForKey(storageKey) {
       requests.push(storageKey);
       return compatible;
@@ -67,7 +67,7 @@ test('a configured compatible namespace is copied forward and removed only after
 
   assert.equal(result.state, migratedState);
   assert.deepEqual(result.loadResult, { status: 'migrated' });
-  assert.deepEqual(requests, ['resume-studio-web-v2']);
+  assert.deepEqual(requests, ['resume-studio-web-v3']);
   assert.deepEqual(current.saves, [migratedState]);
   assert.deepEqual(compatible.saves, []);
   assert.equal(compatible.removes, 1);
@@ -76,12 +76,12 @@ test('a configured compatible namespace is copied forward and removed only after
 
 test('a failed current save never removes the compatible source namespace', async () => {
   const current = fakePersistence({ saveError: new Error('save failed') });
-  const compatible = fakePersistence({ state: { version: 3 } });
+  const compatible = fakePersistence({ state: { version: 4 } });
 
   await assert.rejects(() => loadVersionedDraft(null, {
     currentPersistence: current,
-    currentStorageKey: 'resume-studio-web-v3',
-    compatibleStorageKeys: ['resume-studio-web-v2'],
+    currentStorageKey: 'resume-studio-web-v4',
+    compatibleStorageKeys: ['resume-studio-web-v3'],
     persistenceForKey: () => compatible
   }), /save failed/);
 
@@ -89,7 +89,7 @@ test('a failed current save never removes the compatible source namespace', asyn
 });
 
 test('a compatible source is retained and not reported as migrated when cleanup fails', async () => {
-  const migratedState = { version: 3, marker: 'fictional-compatible-draft' };
+  const migratedState = { version: 4, marker: 'fictional-compatible-draft' };
   const current = fakePersistence();
   const compatible = fakePersistence({
     state: migratedState,
@@ -98,8 +98,8 @@ test('a compatible source is retained and not reported as migrated when cleanup 
 
   const result = await loadVersionedDraft(null, {
     currentPersistence: current,
-    currentStorageKey: 'resume-studio-web-v3',
-    compatibleStorageKeys: ['resume-studio-web-v2'],
+    currentStorageKey: 'resume-studio-web-v4',
+    compatibleStorageKeys: ['resume-studio-web-v3'],
     persistenceForKey: () => compatible
   });
 

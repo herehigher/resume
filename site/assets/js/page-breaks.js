@@ -47,14 +47,20 @@ export function getVisibleSectionKeys(state, locale, documentType) { return getR
 
 export function createEmptyPageBreaks() {
   return {
-    ja: { A4: { resume: [], career: [] }, LETTER: { resume: [], career: [] } },
-    'zh-CN': { A4: { resume: [] }, LETTER: { resume: [] } },
-    en: { A4: { resume: [] }, LETTER: { resume: [] } }
+    ja: { A4: { resume: createEmptyBreakTargets(), career: createEmptyBreakTargets() }, LETTER: { resume: createEmptyBreakTargets(), career: createEmptyBreakTargets() } },
+    'zh-CN': { A4: { resume: createEmptyBreakTargets() }, LETTER: { resume: createEmptyBreakTargets() } },
+    en: { A4: { resume: createEmptyBreakTargets() }, LETTER: { resume: createEmptyBreakTargets() } }
   };
 }
 
+function createEmptyBreakTargets() { return { sections: [], records: [] }; }
+
 export function getPageBreaks(state, locale, paper, documentType) {
-  return state.settings.pageBreaks[locale][paper][documentType];
+  return state.settings.pageBreaks[locale][paper][documentType].sections;
+}
+
+export function getRecordPageBreaks(state, locale, paper, documentType) {
+  return state.settings.pageBreaks[locale][paper][documentType].records;
 }
 
 export function describePageBreak(locale, previous, target, active) {
@@ -83,10 +89,20 @@ export function validatePageBreaks(value) {
       for (const [documentType, sections] of Object.entries(documents)) {
         const targets = byDocument[documentType];
         const path = `settings.pageBreaks.${locale}.${paper}.${documentType}`;
-        if (!Array.isArray(targets)) { errors.push(`${path} must be an array`); continue; }
-        if (targets.length > sections.length - 1) errors.push(`${path} has too many entries`);
-        if (new Set(targets).size !== targets.length) errors.push(`${path} must not contain duplicates`);
-        if (!targets.every((key) => isValidPageBreakKey(locale, documentType, key))) errors.push(`${path} contains an unsupported section key`);
+        if (!targets || typeof targets !== 'object' || Array.isArray(targets)
+          || Object.keys(targets).sort().join(',') !== 'records,sections') {
+          errors.push(`${path} must contain sections and records`);
+          continue;
+        }
+        if (!Array.isArray(targets.sections) || !Array.isArray(targets.records)) {
+          errors.push(`${path}.sections and ${path}.records must be arrays`);
+          continue;
+        }
+        if (targets.sections.length > sections.length - 1) errors.push(`${path}.sections has too many entries`);
+        if (new Set(targets.sections).size !== targets.sections.length) errors.push(`${path}.sections must not contain duplicates`);
+        if (!targets.sections.every((key) => isValidPageBreakKey(locale, documentType, key))) errors.push(`${path}.sections contains an unsupported section key`);
+        if (new Set(targets.records).size !== targets.records.length) errors.push(`${path}.records must not contain duplicates`);
+        if (!targets.records.every((id) => typeof id === 'string' && /^record_[A-Za-z0-9_-]+(?:-[A-Za-z0-9_-]+)*$/.test(id))) errors.push(`${path}.records contains an unsupported record ID`);
       }
     }
   }
@@ -135,7 +151,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     const targets = getPageBreaks(state, locale, paper, type);
     const next = targets.includes(key) ? targets.filter((target) => target !== key) : [...targets, key];
     lastFocusKey = key;
-    store.update((nextState) => { nextState.settings.pageBreaks[locale][paper][type] = next; }, { persist: false });
+    store.update((nextState) => { nextState.settings.pageBreaks[locale][paper][type].sections = next; }, { persist: false });
     scheduleSave();
     render();
   }

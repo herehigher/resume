@@ -1,5 +1,6 @@
 import { DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createEmptyPageBreaks } from '../page-breaks.js';
+import { createRecordId } from './record-ids.js';
 
 function today() {
   const now = new Date();
@@ -36,6 +37,7 @@ export function createJapaneseCareerDetailSections() {
 
 export function createJapaneseCareer() {
   return {
+    id: createRecordId(),
     company: '',
     role: '',
     startDate: '',
@@ -72,7 +74,7 @@ export function createChineseDocument() {
       headline: '',
       summary: '',
       education: [{ startDate: '', endDate: '', school: '', degree: '', details: '' }],
-      experience: [{ startDate: '', endDate: '', company: '', role: '', details: '' }],
+      experience: [{ id: createRecordId(), startDate: '', endDate: '', company: '', role: '', details: '' }],
       projects: [{ startDate: '', endDate: '', name: '', role: '', details: '', url: '' }],
       skills: '',
       certifications: [{ date: '', name: '', url: '' }]
@@ -89,7 +91,7 @@ export function createEnglishDocument() {
       location: '',
       summary: '',
       education: [{ startDate: '', endDate: '', school: '', degree: '', details: '' }],
-      experience: [{ startDate: '', endDate: '', company: '', role: '', details: '' }],
+      experience: [{ id: createRecordId(), startDate: '', endDate: '', company: '', role: '', details: '' }],
       projects: [{ startDate: '', endDate: '', name: '', role: '', details: '', url: '' }],
       skills: '',
       certifications: [{ date: '', name: '', url: '' }]
@@ -161,6 +163,7 @@ export function createJapaneseSampleState(sourceState) {
       { date: '2020-12', detail: 'TOEIC Listening & Reading 850点 取得', url: '' }
     ],
     careers: [{
+      id: createRecordId(),
       company: '株式会社サンプル',
       role: 'プロダクト企画部 マネージャー',
       startDate: '2015-04',

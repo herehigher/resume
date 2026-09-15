@@ -239,10 +239,10 @@ test('desktop: a saved target stays applied when preceding optional sections bec
 
 test('desktop: active classes follow English paper size and Japanese document type', async ({ page }) => {
   const state = createEnglishSampleState(createDefaultState('en'));
-  state.settings.pageBreaks.en.LETTER.resume = ['summary'];
-  state.settings.pageBreaks.en.A4.resume = ['experience'];
-  state.settings.pageBreaks.ja.A4.resume = ['qualifications'];
-  state.settings.pageBreaks.ja.A4.career = ['career-history'];
+  state.settings.pageBreaks.en.LETTER.resume.sections = ['summary'];
+  state.settings.pageBreaks.en.A4.resume.sections = ['experience'];
+  state.settings.pageBreaks.ja.A4.resume.sections = ['qualifications'];
+  state.settings.pageBreaks.ja.A4.career.sections = ['career-history'];
   await openLocale(page, 'en');
   await page.locator('#importDataInput').setInputFiles({
     name: 'isolated-breaks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))

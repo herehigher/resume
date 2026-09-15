@@ -1,6 +1,7 @@
 import zhCN from '../i18n/zh-CN.js';
 import { createChineseSampleState } from '../state/zh-CN.js';
 import { cloneData } from '../state/defaults.js';
+import { createRecordId } from '../state/record-ids.js';
 import { getChineseFields, renderChineseDocument } from '../templates/zh-CN.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
@@ -22,7 +23,7 @@ const ITEM_FACTORIES = Object.freeze({
 export function createChineseItem(type) {
   const factory = ITEM_FACTORIES[type];
   if (!factory) throw new TypeError(`Unsupported Chinese resume item: ${type}`);
-  return factory();
+  return type === 'experience' ? { id: createRecordId(), ...factory() } : factory();
 }
 
 export function calculateChineseCompletion(state) {

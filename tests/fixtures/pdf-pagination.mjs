@@ -67,6 +67,7 @@ function fillJapanese(state, length, documentType, endMarker) {
   }));
 
   document.careers = Array.from({ length: itemCount(length) }, (_, index) => ({
+    id: `record_pdf-ja-${index}`,
     company: `検証株式会社 ${index + 1}`,
     role: '印刷品質担当',
     startDate: '2020-01',
@@ -84,6 +85,7 @@ function fillChinese(state, length, endMarker) {
   resume.headline = 'PDF 分页测试';
   resume.summary = lines('个人概述测试行', length, `${endMarker}-SUMMARY`);
   resume.experience = Array.from({ length: itemCount(length) }, (_, index) => ({
+    id: `record_pdf-zh-${index}`,
     startDate: '2020-01',
     endDate: '',
     company: `分页测试公司 ${index + 1}`,
@@ -115,6 +117,7 @@ function fillEnglish(state, length, endMarker) {
   resume.location = 'Tokyo, Japan';
   resume.summary = lines('Summary test line', length, `${endMarker}-SUMMARY`);
   resume.experience = Array.from({ length: itemCount(length) }, (_, index) => ({
+    id: `record_pdf-en-${index}`,
     startDate: '2020-01',
     endDate: '',
     company: `Pagination Test Company ${index + 1}`,

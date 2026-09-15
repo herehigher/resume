@@ -14,8 +14,8 @@ function createCurrentImport() {
   state.documents.ja.fields.motivation = 'Data version Japanese document canary';
   state.documents['zh-CN'].resume.headline = 'Data version Chinese document canary';
   state.documents.en.resume.headline = 'Data version English document canary';
-  state.settings.pageBreaks.ja.A4.resume = ['qualifications', 'motivation'];
-  state.settings.pageBreaks.en.LETTER.resume = ['skills', 'certifications'];
+  state.settings.pageBreaks.ja.A4.resume.sections = ['qualifications', 'motivation'];
+  state.settings.pageBreaks.en.LETTER.resume.sections = ['skills', 'certifications'];
   return state;
 }
 
@@ -104,7 +104,7 @@ test('v2 JSON import migrates shared profile data, three documents, page breaks,
   const download = await downloadPromise;
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
   expect(exported).toMatchObject({
-    version: 3,
+    version: 4,
     profile: { photo: PHOTO_DATA_URL, fields: { fullName: 'Data version integration canary', gender: 'male', nationality: '' } },
     documents: {
       ja: { fields: { motivation: 'Data version Japanese document canary' } },
@@ -113,8 +113,8 @@ test('v2 JSON import migrates shared profile data, three documents, page breaks,
     }
   });
   expect(Object.hasOwn(exported, 'schemaRevision')).toBe(false);
-  expect(exported.settings.pageBreaks.ja.A4.resume).toEqual(['qualifications', 'motivation']);
-  expect(exported.settings.pageBreaks.en.LETTER.resume).toEqual(['skills', 'certifications']);
+  expect(exported.settings.pageBreaks.ja.A4.resume.sections).toEqual(['qualifications', 'motivation']);
+  expect(exported.settings.pageBreaks.en.LETTER.resume.sections).toEqual(['skills', 'certifications']);
 
   const storage = await page.evaluate(() => window.__dataVersionAcceptanceStorage.read());
   expect(storage.draft).toContain('"format":"resume-studio-local-encrypted-v1"');
@@ -134,11 +134,11 @@ test('future and unsupported JSON versions leave the current draft and unrelated
   const rawBefore = await page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY);
 
   const future = createDefaultState('ja');
-  future.version = 4;
+  future.version = 5;
   const unsupported = createDefaultState('ja');
   unsupported.version = 1;
   for (const [fileName, payload] of [
-    ['future-v4.json', future],
+    ['future-v5.json', future],
     ['unsupported-v1.json', unsupported]
   ]) {
     await page.locator('#importDataInput').setInputFiles({

@@ -71,7 +71,7 @@ npx --yes http-server site --port 8000
 
 ## 数据和隐私
 
-- 当前草稿 key 为 `resume-studio-web-v3`，并与 JSON 导入/导出共用 `version: 3`。profile、照片和三种语言文档会一起保存；只将 `resume-studio-web-v2` 作为兼容旧 key 读取，超出兼容范围的旧 key 不会被读取、修改或删除。成功保存到新 key 后，应用会自动删除旧草稿和旧密钥。
+- 当前草稿 key 为 `resume-studio-web-v4`，并与 JSON 导入/导出共用 `version: 4`。profile、照片和三种语言文档会一起保存；只将 `resume-studio-web-v3` 作为兼容旧 key 以 read-only 方式读取。只有成功保存到新 key 后，应用才会删除旧草稿和旧密钥；保存失败、冲突或 read-only fallback 时会保留旧草稿。超出兼容范围的旧 key 不会被读取、修改或删除。
 - 草稿正文以 AES-GCM 加密后保存在 localStorage。导出的 JSON 和 PDF 不加密，并可能包含照片等个人信息，请安全保管。
 - 可以读取当前格式，以及最近三代中被明确列为支持的格式。未来版本、不支持或过旧的 JSON 不会导入，现有草稿会被保留。超出兼容范围的本机草稿也不会被读取、更新或删除。
 - 保存或迁移失败时会保留现有草稿和解密 key。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移。未参与 Web Locks 的已部署旧 client 或手动 storage 操作不在此跨标签页互斥保证范围内。请先导出 JSON，再使用受支持的 browser 打开。

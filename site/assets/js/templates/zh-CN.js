@@ -116,7 +116,7 @@ function renderTimeline(title, items, { kind, keys }) {
       ? renderAchievements(item.details)
       : hasText(item.details) ? `<div class="zh-timeline-details">${displayText(item.details)}</div>` : '';
     return `
-      <article class="zh-timeline-item">
+      <article class="zh-timeline-item"${kind === 'experience' ? ` data-record-id="${escapeHTML(item.id)}"` : ''}>
         <div class="zh-timeline-date">${escapeHTML(formatChineseRange(item.startDate, item.endDate))}</div>
         <div class="zh-timeline-content">
           ${headingMarkup}${details}

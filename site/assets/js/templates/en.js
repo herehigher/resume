@@ -130,7 +130,7 @@ function renderExperience(entries) {
   const items = sortEnglishEntriesDescending(entries, 'experience').map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
     const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.role || entry.company)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.company && entry.role ? `<p class="en-entry-organization">${text(entry.company)}</p>` : ''}</div>`;
-    return `<article class="en-entry en-experience-entry">
+    return `<article class="en-entry en-experience-entry" data-record-id="${escapeHTML(entry.id)}">
       ${heading}${renderAchievements(entry.details)}
     </article>`;
   }).join('');

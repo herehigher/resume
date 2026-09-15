@@ -1,5 +1,6 @@
 import { createEnglishSampleState } from '../data/en-sample.js';
 import { cloneData } from '../state/defaults.js';
+import { createRecordId } from '../state/record-ids.js';
 import { renderEnglishDocument } from '../templates/en.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
 import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
@@ -18,7 +19,7 @@ const ITEM_SHAPES = Object.freeze({
 });
 
 export function createEnglishItem(type) {
-  return ITEM_SHAPES[type] ? { ...ITEM_SHAPES[type] } : null;
+  return ITEM_SHAPES[type] ? { ...(type === 'experience' ? { id: createRecordId() } : {}), ...ITEM_SHAPES[type] } : null;
 }
 
 export function renderEnglishWorkspace() {

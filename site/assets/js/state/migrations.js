@@ -1,5 +1,6 @@
 import { STATE_VERSION } from '../config.js';
 import { validateCurrentState } from './schema.js';
+import { createLegacyRecordId } from './record-ids.js';
 
 function isObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -67,6 +68,62 @@ function migrateV2ToV3(source) {
   };
 }
 
+function migrateRecordIds(records, scope) {
+  if (!Array.isArray(records)) return records;
+  return records.map((record, index) => ({
+    ...record,
+    id: createLegacyRecordId(scope, index, record)
+  }));
+}
+
+function migratePageBreaks(pageBreaks) {
+  if (!isObject(pageBreaks)) return pageBreaks;
+  return Object.fromEntries(Object.entries(pageBreaks).map(([locale, papers]) => [locale,
+    !isObject(papers) ? papers : Object.fromEntries(Object.entries(papers).map(([paper, documents]) => [paper,
+      !isObject(documents) ? documents : Object.fromEntries(Object.entries(documents).map(([documentType, sections]) => [documentType,
+        isObject(sections) && Object.keys(sections).sort().join(',') === 'records,sections'
+          ? sections
+          : { sections, records: [] }
+      ]))
+    ]))
+  ]));
+}
+
+function migrateV3ToV4(source) {
+  const state = copy(source);
+  return {
+    state: {
+      ...state,
+      version: 4,
+      settings: {
+        ...state.settings,
+        pageBreaks: migratePageBreaks(state.settings?.pageBreaks)
+      },
+      documents: {
+        ...state.documents,
+        ja: {
+          ...state.documents?.ja,
+          careers: migrateRecordIds(state.documents?.ja?.careers, 'ja-career')
+        },
+        'zh-CN': {
+          ...state.documents?.['zh-CN'],
+          resume: {
+            ...state.documents?.['zh-CN']?.resume,
+            experience: migrateRecordIds(state.documents?.['zh-CN']?.resume?.experience, 'zh-experience')
+          }
+        },
+        en: {
+          ...state.documents?.en,
+          resume: {
+            ...state.documents?.en?.resume,
+            experience: migrateRecordIds(state.documents?.en?.resume?.experience, 'en-experience')
+          }
+        }
+      }
+    }
+  };
+}
+
 // Add only explicit, sequential version migrations. Version 1 is intentionally
 // unsupported because there are no production users whose drafts require it.
 export const MIGRATION_REGISTRY = Object.freeze([
@@ -75,6 +132,12 @@ export const MIGRATION_REGISTRY = Object.freeze([
     to: 3,
     summary: 'Normalize gender and add nationality and English optional-detail defaults.',
     migrate: migrateV2ToV3
+  }),
+  Object.freeze({
+    from: 3,
+    to: 4,
+    summary: 'Add stable record IDs and separate section and record page-break targets.',
+    migrate: migrateV3ToV4
   })
 ]);
 

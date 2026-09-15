@@ -167,7 +167,7 @@ test('PDF pagination: 三言語のページ境界データは末尾内容を保�
 
 test('manual page breaks start their target sections on new non-empty PDF pages without printing controls', async ({ page }) => {
   const state = createEnglishSampleState(createDefaultState('en'));
-  state.settings.pageBreaks.en.LETTER.resume = ['summary', 'experience'];
+  state.settings.pageBreaks.en.LETTER.resume.sections = ['summary', 'experience'];
   await openLocale(page, 'en');
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-page-breaks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
@@ -187,7 +187,7 @@ test('manual page breaks start their target sections on new non-empty PDF pages 
 
 test('manual page break after a naturally near-full section creates no blank PDF page', async ({ page }) => {
   const { state, endMarker } = createPdfFixture({ locale: 'en', length: 'near-boundary', pageSize: 'LETTER' });
-  state.settings.pageBreaks.en.LETTER.resume = ['experience'];
+  state.settings.pageBreaks.en.LETTER.resume.sections = ['experience'];
   await openLocale(page, 'en');
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-near-boundary.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
@@ -207,7 +207,7 @@ test('manual page break after a naturally near-full section creates no blank PDF
 test('manual page-break target may span multiple PDF pages without losing its end marker', async ({ page }) => {
   const { state, endMarker } = createPdfFixture({ locale: 'en', length: 'extra-long', pageSize: 'LETTER' });
   state.documents.en.resume.summary = 'Short summary before the manual boundary.';
-  state.settings.pageBreaks.en.LETTER.resume = ['experience'];
+  state.settings.pageBreaks.en.LETTER.resume.sections = ['experience'];
   await openLocale(page, 'en');
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-long-target.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
@@ -224,7 +224,7 @@ test('manual page-break target may span multiple PDF pages without losing its en
 
 test('Japanese manual page break starts the resume target on a later non-empty A4 page', async ({ page }) => {
   const { state, endMarker } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'resume', pageSize: 'A4' });
-  state.settings.pageBreaks.ja.A4.resume = ['qualifications'];
+  state.settings.pageBreaks.ja.A4.resume.sections = ['qualifications'];
   await openLocale(page, 'ja');
   await page.locator('#importDataInput').setInputFiles({
     name: 'manual-ja-resume.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
