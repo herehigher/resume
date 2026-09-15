@@ -102,6 +102,19 @@ test('print page: locale and English paper changes keep exactly one active anony
   await expect(page.locator('#activePrintPageStyle')).toHaveCount(1);
 });
 
+test('print: visible app notices stay visible on screen and are omitted from PDFs', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#dataMenuSummary').click();
+  await page.locator('#exportDataButton').click();
+  await expect(page.locator('#appNotice')).toBeVisible();
+  await expect(page.locator('#globalMessage')).toHaveText('データを書き出しました。');
+
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('#appNotice')).toBeHidden();
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages.flatMap((item) => item.text).join('')).not.toContain('データを書き出しました。');
+});
+
 test('diagnostic matrix: legacy named pages and common breaks do not reproduce the visible-Chrome blank page through CDP', async ({ page }) => {
   const cases = [
     { locale: 'ja', sampleButton: '#loadSampleButton', documentSelector: '#japaneseWorkspace .document-page', lastText: '貴社規定に従います。' },
