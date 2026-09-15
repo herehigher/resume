@@ -46,6 +46,7 @@ test('Japanese dates, age, and current employment use conventional labels', () =
   assert.equal(formatJapaneseDate('2026-09-01'), '2026年9月1日');
   assert.equal(calculateAge('2000-09-02', '2026-09-01'), '満25歳');
   assert.equal(calculateAge('2000-09-02', '2026-09-02'), '満26歳');
+  assert.equal(calculateAge('0001-02-28', '0002-02-28'), '満1歳');
   assert.equal(calculateAge('2000-09-02', ''), '');
   assert.equal(calculateAge('2000-02-29', '2026-02-29'), '');
   assert.equal(calculateAge('2000-09-02', '1999-09-02'), '');

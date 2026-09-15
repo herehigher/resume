@@ -14,13 +14,13 @@ function parseIsoDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim());
   if (!match) return null;
   const [, year, month, day] = match;
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  if (
-    date.getUTCFullYear() !== Number(year)
-    || date.getUTCMonth() !== Number(month) - 1
-    || date.getUTCDate() !== Number(day)
-  ) return null;
-  return { day: Number(day), month: Number(month), year: Number(year) };
+  const parsedYear = Number(year);
+  const parsedMonth = Number(month);
+  const parsedDay = Number(day);
+  const isLeapYear = parsedYear % 4 === 0 && (parsedYear % 100 !== 0 || parsedYear % 400 === 0);
+  const daysByMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (parsedYear < 1 || parsedMonth < 1 || parsedMonth > 12 || parsedDay < 1 || parsedDay > daysByMonth[parsedMonth - 1]) return null;
+  return { day: parsedDay, month: parsedMonth, year: parsedYear };
 }
 
 export function calculateAge(birthDate, referenceDate = '') {
