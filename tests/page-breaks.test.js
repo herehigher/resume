@@ -90,7 +90,7 @@ test('semantic boundary registry centralizes three-language record DOM mappings'
   assert.match(enRecord.dom.selector, /en-experience-entry/);
 });
 
-test('record boundaries follow rendered order, retain stable IDs, and normalize the first record with its section', () => {
+test('record boundaries follow rendered order and retain stable IDs independently from their section', () => {
   const state = createDefaultState('en');
   state.documents.en.resume.experience = [
     { id: 'record_old', company: 'Older fictional employer', role: '', startDate: '2020-01', endDate: '2021-01', details: '' },
@@ -111,5 +111,5 @@ test('record boundaries follow rendered order, retain stable IDs, and normalize 
   const candidates = getBoundaryCandidates({ state, locale: 'en', documentType: 'resume', preview });
   assert.equal(candidates.filter((candidate) => candidate.bindings.some((target) => target.key === 'record_new')).length, 1);
   assert.deepEqual(candidates.flatMap((candidate) => candidate.bindings.filter((target) => target.level === 'record').map((target) => target.key)), ['record_new', 'record_old']);
-  assert.equal(candidates.find((candidate) => candidate.bindings.some((target) => target.key === 'record_new')).bindings.some((target) => target.key === 'experience'), true);
+  assert.equal(candidates.find((candidate) => candidate.bindings.some((target) => target.key === 'record_new')).bindings.some((target) => target.key === 'experience'), false);
 });

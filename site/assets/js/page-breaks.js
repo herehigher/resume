@@ -157,7 +157,6 @@ function savedForBinding(targets, target) {
 
 export function getBoundaryCandidates({ state, locale, documentType, preview }) {
   const candidates = [];
-  const firstRecordBindings = [];
   for (const boundary of getRegisteredBoundaries(locale, documentType)) {
     if (!boundary.isVisible(state)) continue;
     if (boundary.level === 'section') {
@@ -165,37 +164,14 @@ export function getBoundaryCandidates({ state, locale, documentType, preview }) 
       if (isVisibleTarget(element)) candidates.push({ boundary, element, label: boundary.label, bindings: [binding('section', boundary.key)] });
       continue;
     }
-    const parent = getRegisteredSections(locale, documentType).find((section) => section.key === boundary.parent);
     const records = [...preview.querySelectorAll(boundary.dom.selector)]
       .filter((element) => RECORD_ID_PATTERN.test(element.dataset.recordId || '') && isVisibleTarget(element));
-    records.forEach((element, index) => {
-      // A first record begins at the parent section's physical boundary. Mapping
-      // it to that node makes section and record controls one normalized target.
-      const parentElement = parent ? (element.closest(parent.dom.selector) || preview.querySelector(parent.dom.selector)) : null;
-      if (index === 0 && parentElement) {
-        firstRecordBindings.push({ boundary, element: parentElement, id: element.dataset.recordId });
-        return;
-      }
-      const target = element;
-      candidates.push({ boundary, element: target, label: recordLabel(boundary, element), bindings: [binding('record', element.dataset.recordId)] });
+    records.forEach((element) => {
+      candidates.push({ boundary, element, label: recordLabel(boundary, element), bindings: [binding('record', element.dataset.recordId)] });
     });
   }
-  firstRecordBindings.forEach(({ boundary, element, id }) => {
-    const parent = candidates.find((candidate) => candidate.element === element && candidate.bindings.some((target) => target.level === 'section' && target.key === boundary.parent));
-    if (parent) parent.bindings.push(binding('record', id));
-  });
-  const deduplicatedCandidates = candidates.filter((candidate) => {
-    if (candidate.boundary.level !== 'record' || !candidate.element.matches(candidate.boundary.dom.selector)) return true;
-    const parent = getRegisteredSections(locale, documentType).find((section) => section.key === candidate.boundary.parent);
-    const parentElement = parent ? candidate.element.closest(parent.dom.selector) : null;
-    if (parentElement?.querySelector(candidate.boundary.dom.selector) !== candidate.element) return true;
-    const sectionCandidate = candidates.find((item) => item.element === parentElement && item.bindings.some((target) => target.level === 'section' && target.key === candidate.boundary.parent));
-    if (!sectionCandidate) return true;
-    sectionCandidate.bindings.push(...candidate.bindings);
-    return false;
-  });
   const normalized = new Map();
-  deduplicatedCandidates.sort((left, right) => compareDocumentOrder(left.element, right.element)).forEach((candidate) => {
+  candidates.sort((left, right) => compareDocumentOrder(left.element, right.element)).forEach((candidate) => {
     const existing = normalized.get(candidate.element);
     if (existing) {
       existing.bindings.push(...candidate.bindings);
@@ -217,9 +193,7 @@ function candidateIsActive(candidate, targets) {
 
 function updateCandidateTargets(nextState, locale, paper, documentType, candidate, active) {
   const targets = nextState.settings.pageBreaks[locale][paper][documentType];
-  const primary = candidate.bindings.find((target) => target.level === 'section') || candidate.bindings[0];
-  const bindings = active ? [primary] : candidate.bindings;
-  for (const target of bindings) {
+  for (const target of candidate.bindings) {
     const field = target.level === 'record' ? 'records' : 'sections';
     targets[field] = active
       ? [...new Set([...targets[field], target.key])]
@@ -289,8 +263,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       const enabled = candidateIsActive(candidate, targets);
       element.classList.toggle('has-manual-page-break', enabled);
       const control = document.createElement('button');
-      control.type = 'button'; control.className = 'page-break-boundary'; control.dataset.pageBreakKey = candidate.key;
-      if (candidate.bindings.some((target) => target.level === 'section')) control.style.zIndex = '4';
+      control.type = 'button'; control.className = `page-break-boundary${candidate.bindings.every((target) => target.level === 'record') ? ' page-break-record-boundary' : ''}`; control.dataset.pageBreakKey = candidate.key;
       control.setAttribute('aria-pressed', String(enabled)); control.setAttribute('aria-label', description(previous, candidate, enabled));
       control.innerHTML = `<span class="page-break-add"><span class="page-break-plus">${icon(enabled)}</span>${enabled ? labels.remove : labels.add}</span>`;
       control.addEventListener('click', () => toggle(candidate));

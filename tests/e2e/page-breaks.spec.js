@@ -237,6 +237,29 @@ test('desktop: a saved target stays applied when preceding optional sections bec
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
 });
 
+test('desktop: an English record page break follows its stable ID after rendered date reordering', async ({ page }) => {
+  const state = createDefaultState('en');
+  state.documents.en.resume.experience = [
+    { id: 'record_target', company: 'Target fictional employer', role: 'Target role', startDate: '2021-01', endDate: '2023-01', details: 'Fictional target achievement.' },
+    { id: 'record_other', company: 'Other fictional employer', role: 'Other role', startDate: '2020-01', endDate: '2022-01', details: 'Fictional other achievement.' }
+  ];
+  await openLocale(page, 'en');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'fictional-record-reorder.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await page.locator('#englishWorkspace .page-break-menu').click();
+  const targetControl = page.locator('.page-break-row[data-page-break-key="record:record_target"]');
+  await targetControl.evaluate((element) => element.click());
+  await expect(page.locator('[data-record-id="record_target"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
+  await page.locator('[data-en-list="experience"] [data-en-item]').nth(1).locator('[data-en-item-field="endDate"]').fill('2024-01');
+  await expect(page.locator('[data-record-id="record_other"]')).toHaveText(/Other fictional employer/);
+  await expect(page.locator('[data-record-id="record_target"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('.page-break-boundary[data-page-break-key="record:record_target"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
+});
+
 test('desktop: active classes follow English paper size and Japanese document type', async ({ page }) => {
   const state = createEnglishSampleState(createDefaultState('en'));
   state.settings.pageBreaks.en.LETTER.resume.sections = ['summary'];

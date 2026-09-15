@@ -165,6 +165,7 @@
 .page-break-live { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .document-page [data-section-key] { position: relative; }
 .page-break-boundary { align-items: center; background: transparent; border: 0; color: var(--blue); cursor: pointer; display: inline-flex; font: inherit; font-size: 10px; font-weight: 700; gap: 5px; left: calc(100% + var(--page-break-paper-right-offset, 0px) + 16px); min-height: 32px; padding: 0; position: absolute; top: -21px; white-space: nowrap; z-index: 3; }
+.page-break-record-boundary { top: 4px; }
 .page-break-add { align-items: center; display: inline-flex; gap: 5px; }
 .page-break-plus { align-items: center; background: var(--blue); border-radius: 50%; color: #fff; display: inline-flex; height: 20px; justify-content: center; width: 20px; }
 .page-break-plus svg { height: 13px; stroke: currentColor; stroke-width: 2.4; width: 13px; }
