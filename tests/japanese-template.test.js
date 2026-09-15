@@ -139,7 +139,7 @@ test('Japanese PDF output omits blank rows and empty career entries', () => {
   assert.doesNotMatch(html, /class="career-company"/);
 });
 
-test('Japanese career detail sections render non-empty content in order, preserve body-only values, and escape input', () => {
+test('Japanese career detail sections render non-empty content in order, preserve long body text, and escape input', () => {
   const state = createDefaultState('ja');
   state.documents.ja.activeDocument = 'career';
   state.documents.ja.careers = [{
@@ -154,7 +154,7 @@ test('Japanese career detail sections render non-empty content in order, preserv
       { title: '成果', content: '   ' },
       { title: '空項目', content: '' },
       { title: '<img src=x onerror=alert(1)>', content: '<script>alert(1)</script>' },
-      { title: '長文タイトル<script>', content: Array.from({ length: 13 }, (_, index) => `行 ${index + 1}`).join('\n') }
+      { title: '長文タイトル<script>', content: Array.from({ length: 13 }, (_, index) => `LONG-DETAIL-LINE-${String(index + 1).padStart(2, '0')}`).join('\n') }
     ]
   }];
 
@@ -165,7 +165,10 @@ test('Japanese career detail sections render non-empty content in order, preserv
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>|<img src=x/);
-  assert.match(html, /職務経歴（続き） · 架空株式会社 · 検証担当 · 長文タイトル&lt;script&gt;/);
+  assert.doesNotMatch(html, /職務経歴（続き）|career-detail-chunk|career-entry-continuation/);
+  for (let index = 1; index <= 13; index += 1) {
+    assert.equal((html.match(new RegExp(`LONG-DETAIL-LINE-${String(index).padStart(2, '0')}`, 'g')) || []).length, 1);
+  }
 });
 
 test('Japanese career preview and PDF markup omit default detail sections without body content', () => {

@@ -172,6 +172,27 @@ test('Chinese sample renders current experience first and valid PDF links', () =
   assert.doesNotMatch(html, /<li>•/);
 });
 
+test('Chinese experience and projects keep more than twelve achievement bullets without continuation labels', () => {
+  const state = createDefaultState('zh-CN');
+  const experienceLines = Array.from({ length: 13 }, (_, index) => `ZH-EXPERIENCE-LINE-${String(index + 1).padStart(2, '0')}`);
+  const projectLines = Array.from({ length: 13 }, (_, index) => `ZH-PROJECT-LINE-${String(index + 1).padStart(2, '0')}`);
+  state.documents['zh-CN'].resume.experience = [{
+    startDate: '2024-01', endDate: '', company: '示例公司', role: '负责人', details: experienceLines.join('\n')
+  }];
+  state.documents['zh-CN'].resume.projects = [{
+    startDate: '2024-01', endDate: '', name: '示例项目', role: '负责人', details: projectLines.join('\n'), url: ''
+  }];
+
+  const html = renderChineseResume(state);
+  const css = readFileSync(new URL('../site/assets/css/templates/zh-CN.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /工作经历（续）|项目经历（续）|zh-achievement-group|zh-entry-continuation/);
+  assert.match(html, /class="zh-entry-heading-block">/);
+  assert.match(css, /\.zh-entry-heading-block,\s*\.zh-project-heading\s*\{\s*break-after:\s*avoid-page;/s);
+  for (const line of [...experienceLines, ...projectLines]) {
+    assert.equal((html.match(new RegExp(line, 'g')) || []).length, 1);
+  }
+});
+
 test('Chinese editor exposes all state-backed sections and accessible controls', () => {
   const shell = renderChineseEditorShell();
 

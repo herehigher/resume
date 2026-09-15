@@ -152,6 +152,27 @@ test('English responsibilities render as semantic achievement bullets', () => {
   assert.doesNotMatch(html, /<li>[•-]/);
 });
 
+test('English experience and projects keep more than twelve achievement bullets without continuation labels', () => {
+  const state = createDefaultState('en');
+  const experienceLines = Array.from({ length: 13 }, (_, index) => `EN-EXPERIENCE-LINE-${String(index + 1).padStart(2, '0')}`);
+  const projectLines = Array.from({ length: 13 }, (_, index) => `EN-PROJECT-LINE-${String(index + 1).padStart(2, '0')}`);
+  state.documents.en.resume.experience = [{
+    startDate: '2024-01', endDate: '', company: 'Example Co', role: 'Lead', details: experienceLines.join('\n')
+  }];
+  state.documents.en.resume.projects = [{
+    startDate: '2024-01', endDate: '', name: 'Example Project', role: 'Lead', details: projectLines.join('\n'), url: ''
+  }];
+
+  const html = renderEnglishResume(state);
+  const css = readFileSync(new URL('../site/assets/css/templates/en.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /Continued|en-achievement-group|en-entry-continuation/);
+  assert.equal((html.match(/class="en-entry-heading-block"/g) || []).length, 2);
+  assert.match(css, /\.en-entry-heading-block\s*\{\s*break-after:\s*avoid-page;/);
+  for (const line of [...experienceLines, ...projectLines]) {
+    assert.equal((html.match(new RegExp(line, 'g')) || []).length, 1);
+  }
+});
+
 test('English print CSS leaves paper selection to the active anonymous page rule and wraps long content', () => {
   const css = readFileSync(new URL('../site/assets/css/templates/en.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /@page|[;{]\s*page\s*:/);
