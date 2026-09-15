@@ -314,7 +314,7 @@ test('PDF short: English の短いデータは 1 ページの Letter でテキ�
   expectPageSize(pages, LETTER);
 });
 
-test('PDF ja: 任意タイトルの複数詳細項目は順序・継続ラベル・末尾内容を保つ', async ({ page }) => {
+test('PDF ja: 任意タイトルの複数詳細項目は順序・末尾内容を保ち、続きラベルを追加しない', async ({ page }) => {
   const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'career', pageSize: 'A4' });
   const lines = Array.from({ length: 13 }, (_, index) => `CUSTOM-DETAIL-LINE-${String(index + 1).padStart(2, '0')}`).join('\n');
   state.documents.ja.careers[0].detailSections = [
@@ -343,7 +343,7 @@ test('PDF ja: 任意タイトルの複数詳細項目は順序・継続ラベル
   expect(normalizedText.indexOf('使用技術')).toBeLessThan(normalizedText.indexOf('チーム規模'));
   expect(normalizedText.indexOf('チーム規模')).toBeLessThan(normalizedText.indexOf('長いカスタム詳細タイトル'));
   expect(text).toContain('CUSTOM-DETAIL-LINE-13');
-  expectPdfContext(text, '職務経歴（続き）');
+  expect(text).not.toContain('職務経歴（続き）');
   expect(normalizedText).toContain('長いカスタム詳細タイトル');
 });
 
@@ -371,7 +371,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
         state.documents.ja.careers[0].detailSections[0].content = details;
         return state;
       },
-      continuation: '職務経歴（続き） · 検証株式会社 1 · 印刷品質担当 · 担当業務',
+      continuation: null,
       firstRecordContext: '検証株式会社 1'
     },
     {
@@ -417,8 +417,12 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
     const recordPages = pages.filter((item) => item.text.includes('SYNTHETIC-ENTRY-'));
     expect(recordPages.length).toBeGreaterThan(1);
     expectPdfContext(recordPages[0].text, fixture.firstRecordContext);
-    for (const continuationPage of recordPages.slice(1)) {
-      expectPdfContext(continuationPage.text, fixture.continuation);
+    if (fixture.continuation) {
+      for (const continuationPage of recordPages.slice(1)) {
+        expectPdfContext(continuationPage.text, fixture.continuation);
+      }
+    } else {
+      expect(text).not.toContain('職務経歴（続き）');
     }
     const sampleItem = pages.flatMap((item) => item.items).find((item) => item.str.includes('SYNTHETIC-ENTRY-'));
     expect(Math.abs(sampleItem?.transform?.[3] || 0)).toBeGreaterThanOrEqual(9.5);

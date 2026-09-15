@@ -45,6 +45,8 @@ test('print styles use physical page sizes without a clipping container', () => 
 
   for (const css of [japaneseCss, chineseCss, englishCss]) {
     assert.match(css, /break-after:\s*avoid-page/);
+  }
+  for (const css of [chineseCss, englishCss]) {
     assert.match(css, /break-inside:\s*avoid-page/);
   }
   assert.match(japaneseCss, /\.paper-text-section\s*\{\s*break-inside:\s*auto;/);

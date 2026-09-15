@@ -93,8 +93,6 @@
 .career-company-grid > div { border-bottom: 1px solid #cbd2da; font-size: 13.5px; line-height: 1.75; min-width: 0; overflow-wrap: anywhere; padding: 9px 11px; white-space: pre-wrap; }
 .career-company-grid > div:nth-child(odd) { background: #f8fafc; border-right: 1px solid #cbd2da; font-size: 12px; font-weight: 700; }
 .career-company-grid > div:nth-last-child(-n+2) { border-bottom: 0; }
-.career-detail-chunk { break-inside: avoid-page; }
-.career-entry-continuation { color: var(--ja-muted); font-size: 12px; font-weight: 700; margin-top: 7px; white-space: normal; }
 .empty-preview { color: #8a95a4; font-family: sans-serif; font-size: 10px; font-style: italic; }
 
 

@@ -82,21 +82,6 @@ function renderCareerPeriod(career) {
   return escapeHTML(end);
 }
 
-function renderCareerDetail(value, fallback, continuationLabel) {
-  const text = String(value ?? '');
-  if (!text.trim()) return displayText(text, fallback);
-  const lines = text.split(/\r?\n/);
-  if (lines.length <= 12) return escapeHTML(text);
-  return Array.from(
-    { length: Math.ceil(lines.length / 12) },
-    (_, index) => {
-      const chunk = lines.slice(index * 12, (index + 1) * 12).join('\n');
-      const label = index ? `<div class="career-entry-continuation">${escapeHTML(continuationLabel)}</div>` : '';
-      return `<div class="career-detail-chunk">${label}${escapeHTML(chunk)}</div>`;
-    }
-  ).join('');
-}
-
 export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
   const fields = getJapaneseFields(state);
   const document = state.documents.ja;
@@ -157,12 +142,11 @@ export function renderJapaneseCareer(state) {
     ]) || career.detailSections.some((section) => hasContent(section.content)))
     .map((career) => {
       const period = renderCareerPeriod(career);
-      const context = [career.company, career.role].map((value) => String(value ?? '').trim()).filter(Boolean).join(' · ') || '未入力';
       const detailSections = career.detailSections
         .filter((section) => hasContent(section.content))
         .map((section) => {
           const title = hasContent(section.title) ? String(section.title).trim() : '項目名未入力';
-          return `<div>${escapeHTML(title)}</div><div>${renderCareerDetail(section.content, '未入力', `職務経歴（続き） · ${context} · ${title}`)}</div>`;
+          return `<div>${escapeHTML(title)}</div><div>${escapeHTML(section.content)}</div>`;
         })
         .join('');
       return `
