@@ -331,6 +331,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   function applyZoom() {
     preview.style.transform = `scale(${zoom})`;
     preview.style.marginBottom = `${Math.min(0, preview.offsetHeight * (zoom - 1))}px`;
+    pageBreakControls.position();
   }
 
   function fitPreview() {

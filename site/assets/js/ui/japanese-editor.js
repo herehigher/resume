@@ -341,6 +341,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     const naturalHeight = Array.from(pages).reduce((sum, page) => sum + page.offsetHeight + 28, 0);
     preview.parentElement.style.setProperty('--scaled-height', `${naturalHeight * zoom}px`);
     preview.style.marginBottom = `${Math.min(0, naturalHeight * (zoom - 1))}px`;
+    pageBreakControls.position();
   }
 
   function fitPreviewForViewport() {
