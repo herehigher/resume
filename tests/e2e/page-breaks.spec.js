@@ -46,7 +46,9 @@ test('desktop: edit mode places a labeled rail outside the document and offers P
     const preview = document.querySelector('[data-en-preview-scroll]').getBoundingClientRect();
     return button.left > paper.right && button.left >= preview.left && button.right <= preview.right;
   })).toBe(true);
-  for (const width of [821, 1024, 1440]) {
+  // English keeps the rail as the primary desktop interaction whenever the
+  // preview can reserve a readable, paper-exterior gutter.
+  for (const width of [1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect.poll(() => boundary.evaluate((element) => {
       const button = element.getBoundingClientRect();
@@ -86,6 +88,49 @@ test('desktop: edit mode places a labeled rail outside the document and offers P
   await expect(page.locator('[data-en-save-status]')).toContainText('Encrypted and saved');
   await page.reload();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
+});
+
+test('narrow desktop: Japanese and Chinese use a complete editor-side panel without covering the paper', async ({ page }) => {
+  const locales = [
+    { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton', key: 'qualifications' },
+    { locale: 'zh-CN', workspace: '#chineseWorkspace', sample: '[data-zh-action="sample"]', key: 'summary' }
+  ];
+  for (const width of [821, 900]) {
+    for (const item of locales) {
+      await page.setViewportSize({ width, height: 900 });
+      await openLocale(page, item.locale);
+      await page.locator(item.sample).click();
+      const trigger = page.locator(`${item.workspace} [data-page-break-mode-toggle]`);
+      const panel = page.locator(`#page-break-panel-${item.locale}`);
+      const rail = page.locator(`#page-break-rail-${item.locale}`);
+      await trigger.click();
+      await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await expect(trigger).toHaveAttribute('aria-controls', `page-break-panel-${item.locale}`);
+      await expect(panel).toBeVisible();
+      await expect(rail).toBeHidden();
+      await expect(rail.locator('.page-break-boundary')).toHaveCount(0);
+      const row = panel.locator(`.page-break-row[data-page-break-key="${item.key}"]`);
+      await expect(row).toBeVisible();
+      await expect.poll(() => row.evaluate((element) => {
+        const rowBox = element.getBoundingClientRect();
+        const paperBox = document.querySelector('.workspace:not([hidden]) .document-page')?.getBoundingClientRect();
+        const hit = document.elementFromPoint(rowBox.left + (rowBox.width / 2), rowBox.top + (rowBox.height / 2));
+        return Boolean(paperBox)
+          && rowBox.right <= paperBox.left - 8
+          && hit?.closest('.page-break-row') === element;
+      })).toBe(true);
+      await row.click();
+      await expect(row).toHaveAttribute('aria-pressed', 'true');
+    }
+  }
+
+  // Restoring enough preview width returns this same desktop edit mode to its
+  // rail, rather than retaining the constrained-layout fallback.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator('#page-break-panel-zh-CN')).toBeHidden();
+  await expect(page.locator('#page-break-rail-zh-CN')).toBeVisible();
+  await expect(page.locator('#chineseWorkspace [data-page-break-mode-toggle]')).toHaveAttribute('aria-controls', 'page-break-rail-zh-CN');
 });
 
 test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navigation and Escape returns focus to the trigger', async ({ page }) => {
@@ -340,7 +385,7 @@ test('desktop: rail realigns after Japanese zoom transitions', async ({ page }) 
 });
 
 test('responsive and locale changes close stale pagination surfaces and keep ARIA controls accurate', async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await openLocale(page, 'en');
   await page.locator('[data-en-load-sample]').click();
   await openDesktopPageBreakMode(page, '[data-english-editor]');
@@ -355,7 +400,7 @@ test('responsive and locale changes close stale pagination surfaces and keep ARI
   await expect(trigger).toHaveAttribute('aria-controls', 'page-break-panel-ja');
   await trigger.click();
   await expect(panel).toBeVisible();
-  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(panel).toBeHidden();
   await expect(page.locator('#page-break-rail-ja')).toBeHidden();
   await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-ja');

@@ -39,6 +39,7 @@ const variants = Object.freeze([
     paper: 'A4',
     pdfPath: 'output/pdf/ja-a4.pdf',
     previewSelector: '#documentPreview',
+    workspaceSelector: '#japaneseWorkspace',
     sampleSelector: '#loadSampleButton',
     sampleIdentity: '山田 太郎',
     screenshotPath: 'docs/screenshots/ja.png'
@@ -50,6 +51,7 @@ const variants = Object.freeze([
     paper: 'A4',
     pdfPath: 'output/pdf/zh-CN-a4.pdf',
     previewSelector: '[data-zh-preview]',
+    workspaceSelector: '#chineseWorkspace',
     sampleSelector: '[data-zh-action="sample"]',
     sampleIdentity: '简立',
     screenshotPath: 'docs/screenshots/zh-CN.png'
@@ -61,6 +63,7 @@ const variants = Object.freeze([
     paper: 'LETTER',
     pdfPath: 'output/pdf/en-letter.pdf',
     previewSelector: '[data-en-preview]',
+    workspaceSelector: '[data-english-editor]',
     sampleSelector: '[data-en-load-sample]',
     sampleIdentity: 'Alex Morgan',
     screenshotPath: 'docs/screenshots/en.png'
@@ -333,7 +336,13 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
         element.scrollLeft = 0;
       }
     });
-    const visiblePageBreaks = await page.locator(`${variant.previewSelector} .page-break-boundary`).evaluateAll((controls) => (
+    const editMode = page.locator(`${variant.workspaceSelector} [data-page-break-mode-toggle]`);
+    await editMode.click();
+    if (await editMode.getAttribute('aria-pressed') !== 'true') {
+      throw new Error(`Documentation screenshot must enter page-break edit mode: ${variant.locale}`);
+    }
+    const railId = `page-break-rail-${variant.locale}`;
+    const visiblePageBreaks = await page.locator(`#${railId} .page-break-boundary`).evaluateAll((controls) => (
       controls.filter((control) => {
         const bounds = control.getBoundingClientRect();
         const style = getComputedStyle(control);
