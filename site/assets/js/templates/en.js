@@ -80,16 +80,10 @@ function achievementLines(value) {
     .filter(Boolean);
 }
 
-const CONTINUATION_CHUNK_SIZE = 12;
-
-function renderAchievements(value, continuationLabel = '', leading = '') {
+function renderAchievements(value) {
   const items = achievementLines(value);
   if (!items.length) return '';
-  const groups = Array.from(
-    { length: Math.ceil(items.length / CONTINUATION_CHUNK_SIZE) },
-    (_, index) => items.slice(index * CONTINUATION_CHUNK_SIZE, (index + 1) * CONTINUATION_CHUNK_SIZE)
-  );
-  return groups.map((group, index) => `<div class="en-achievement-group">${index ? `<div class="en-entry-continuation">${escapeHTML(continuationLabel)}</div>` : leading}<ul class="en-achievement-list">${group.map((item) => `<li>${escapeHTML(item)}</li>`).join('')}</ul></div>`).join('');
+  return `<ul class="en-achievement-list">${items.map((item) => `<li>${escapeHTML(item)}</li>`).join('')}</ul>`;
 }
 
 function renderUrl(value, className = 'en-url') {
@@ -135,9 +129,13 @@ function renderOptionalPersonalDetails(profile, photoUrl) {
 function renderExperience(entries) {
   const items = sortEnglishEntriesDescending(entries, 'experience').map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
-    const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.role || entry.company)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.company && entry.role ? `<p class="en-entry-organization">${text(entry.company)}</p>` : ''}</div>`;
     return `<article class="en-entry en-experience-entry">
-      ${renderAchievements(entry.details, `Continued · ${[entry.company, entry.role].filter(Boolean).join(' · ') || 'Experience'}`, heading) || heading}
+      <div class="en-entry-heading">
+        <h3>${text(entry.role || entry.company)}</h3>
+        ${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}
+      </div>
+      ${entry.company && entry.role ? `<p class="en-entry-organization">${text(entry.company)}</p>` : ''}
+      ${renderAchievements(entry.details)}
     </article>`;
   }).join('');
   return items ? `<section class="en-section" data-section-key="experience" aria-labelledby="en-experience-heading"><h2 id="en-experience-heading">Experience</h2>${items}</section>` : '';
@@ -146,9 +144,13 @@ function renderExperience(entries) {
 function renderProjects(entries) {
   const items = sortEnglishEntriesDescending(entries, 'projects').map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
-    const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.name || entry.role)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.role && entry.name ? `<p class="en-entry-organization">${text(entry.role)}</p>` : ''}</div>`;
     return `<article class="en-entry en-project-entry">
-      ${renderAchievements(entry.details, `Continued · ${[entry.name, entry.role].filter(Boolean).join(' · ') || 'Project'}`, heading) || heading}
+      <div class="en-entry-heading">
+        <h3>${text(entry.name || entry.role)}</h3>
+        ${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}
+      </div>
+      ${entry.role && entry.name ? `<p class="en-entry-organization">${text(entry.role)}</p>` : ''}
+      ${renderAchievements(entry.details)}
       ${entry.url ? `<p class="en-entry-link"><span>Project:</span> ${renderUrl(entry.url)}</p>` : ''}
     </article>`;
   }).join('');

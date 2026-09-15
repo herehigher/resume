@@ -140,9 +140,6 @@
   overflow-wrap: anywhere;
 }
 
-.en-achievement-group { break-inside: avoid-page; }
-.en-entry-continuation { color: #344866; font-size: 12px; font-weight: 700; margin-top: 7px; }
-
 .en-entry-link {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
@@ -269,7 +266,6 @@
   }
 
   .en-entry-heading { break-after: avoid-page; }
-  .en-entry-heading-block { break-after: avoid-page; }
 
   .en-certification-list li { display: block; }
   .en-certification-date { margin-left: 10px; }

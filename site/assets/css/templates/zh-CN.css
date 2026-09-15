@@ -191,9 +191,6 @@
   overflow-wrap: anywhere;
 }
 
-.zh-achievement-group { break-inside: avoid-page; }
-.zh-entry-continuation { color: #496079; font-size: 12px; font-weight: 600; margin-top: 8px; }
-
 .zh-project-list { display: grid; gap: 11px; }
 
 .zh-project {
@@ -350,7 +347,7 @@
   }
 
   .zh-section > h2,
-  .zh-entry-heading-block,
+  .zh-timeline-content > h3,
   .zh-project-heading { break-after: avoid-page; }
 
   .zh-certifications ul { display: block; }

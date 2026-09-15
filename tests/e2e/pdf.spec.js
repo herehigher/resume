@@ -361,7 +361,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
         state.documents.ja.employment = [];
         return state;
       },
-      continuation: '学歴',
+      automaticLabel: '職務経歴（続き）',
       firstRecordContext: '学歴'
     },
     {
@@ -371,7 +371,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
         state.documents.ja.careers[0].detailSections[0].content = details;
         return state;
       },
-      continuation: null,
+      automaticLabel: '職務経歴（続き）',
       firstRecordContext: '検証株式会社 1'
     },
     {
@@ -381,7 +381,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
         state.documents['zh-CN'].resume.experience[0].details = details;
         return state;
       },
-      continuation: /测试公司\s*1\s*·\s*打印质量负责\s*[人⼈]/,
+      automaticLabel: /工作经历（续）|项目经历（续）/,
       firstRecordContext: /测试公司\s*1/
     },
     {
@@ -391,7 +391,7 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
         state.documents.en.resume.experience[0].details = details;
         return state;
       },
-      continuation: 'Continued · Pagination Test Company 1 · Print Quality Lead',
+      automaticLabel: 'Continued ·',
       firstRecordContext: 'Pagination Test Company 1'
     }
   ];
@@ -413,17 +413,15 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
     const pages = await inspectPdf(await printPdf(page));
     const text = pages.map((item) => item.text).join(' ');
     expect(text.match(/SYNTHETIC-ENTRY-/g)).toHaveLength(95);
+    for (let index = 1; index <= 95; index += 1) {
+      const line = `SYNTHETIC-ENTRY-${String(index).padStart(3, '0')}`;
+      expect(text.match(new RegExp(line, 'g'))).toHaveLength(1);
+    }
     expect(pages.length).toBeGreaterThan(1);
     const recordPages = pages.filter((item) => item.text.includes('SYNTHETIC-ENTRY-'));
     expect(recordPages.length).toBeGreaterThan(1);
     expectPdfContext(recordPages[0].text, fixture.firstRecordContext);
-    if (fixture.continuation) {
-      for (const continuationPage of recordPages.slice(1)) {
-        expectPdfContext(continuationPage.text, fixture.continuation);
-      }
-    } else {
-      expect(text).not.toContain('職務経歴（続き）');
-    }
+    expect(text).not.toMatch(fixture.automaticLabel);
     const sampleItem = pages.flatMap((item) => item.items).find((item) => item.str.includes('SYNTHETIC-ENTRY-'));
     expect(Math.abs(sampleItem?.transform?.[3] || 0)).toBeGreaterThanOrEqual(9.5);
   }
