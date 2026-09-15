@@ -341,6 +341,7 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
     if (await editMode.getAttribute('aria-pressed') !== 'true') {
       throw new Error(`Documentation screenshot must enter page-break edit mode: ${variant.locale}`);
     }
+    await waitForStableRendering(page);
     const railId = `page-break-rail-${variant.locale}`;
     const visiblePageBreaks = await page.locator(`#${railId} .page-break-boundary`).evaluateAll((controls, workspaceSelector) => (
       controls.filter((control) => {
@@ -350,7 +351,7 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
         return style.display !== 'none' && style.visibility !== 'hidden'
           && bounds.width > 0 && bounds.height > 0
           && bounds.bottom > 0 && bounds.right > 0
-          && bounds.top < innerHeight && bounds.left < innerWidth
+          && bounds.top < innerHeight && bounds.left >= 0 && bounds.right <= innerWidth
           && [...pages].some((page) => bounds.left >= page.getBoundingClientRect().right);
       }).length
     ), variant.workspaceSelector);
