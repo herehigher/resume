@@ -1,7 +1,7 @@
 import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
 import { createDefaultState } from './defaults.js';
 import { validatePageBreaks } from '../page-breaks.js';
-import { isRecordId } from './record-ids.js';
+import { hasUniqueRecordIds, isRecordId } from './record-ids.js';
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -80,7 +80,7 @@ function validateStateShape(value) {
       }
     });
   });
-  if (Array.isArray(careers) && new Set(careers.map((career) => career?.id)).size !== careers.length) {
+  if (Array.isArray(careers) && !hasUniqueRecordIds(careers)) {
     errors.push('state.documents.ja.careers must have unique IDs');
   }
   for (const locale of ['zh-CN', 'en']) {
@@ -98,7 +98,7 @@ function validateStateShape(value) {
       }
       if (!isRecordId(record?.id)) errors.push(`state.documents.${locale}.resume.experience[${index}].id is invalid`);
     });
-    if (new Set(experience.map((record) => record?.id)).size !== experience.length) {
+    if (!hasUniqueRecordIds(experience)) {
       errors.push(`state.documents.${locale}.resume.experience must have unique IDs`);
     }
   }

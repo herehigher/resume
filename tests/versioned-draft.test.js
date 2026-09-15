@@ -1,7 +1,45 @@
 import assert from 'node:assert/strict';
+import { webcrypto } from 'node:crypto';
 import test from 'node:test';
 
 import { loadVersionedDraft } from '../site/assets/js/state/versioned-draft.js';
+import { createDraftStorage } from '../site/assets/js/state/storage.js';
+import { createV3Fixture } from './fixtures/resume-studio-web-v3.js';
+
+function memoryStorage({ failSetKey = '', onSet } = {}) {
+  const values = new Map();
+  return {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) {
+      if (key === failSetKey) throw new Error('fictional save failure');
+      values.set(key, String(value));
+      onSet?.(key, String(value));
+    },
+    removeItem(key) { values.delete(key); }
+  };
+}
+
+function memoryKeyStore() {
+  let key = null;
+  let removes = 0;
+  return {
+    async read() { return key; },
+    async write(next) { key = next; },
+    async remove() { key = null; removes += 1; },
+    get removes() { return removes; }
+  };
+}
+
+function persistence(storage, storageKey, { keyStore = memoryKeyStore(), locks } = {}) {
+  return createDraftStorage(storage, {
+    crypto: webcrypto,
+    keyStore,
+    locks: locks || { request: async (_name, _options, callback) => callback() },
+    storageKey,
+    keyDatabase: `${storageKey}-keys`,
+    lockName: `${storageKey}:draft`
+  });
+}
 
 function fakePersistence({ state = null, recovered = false, loadError = null, saveError = null, removeError = null, pendingMutation = null, events = [] } = {}) {
   const saves = [];
@@ -72,6 +110,99 @@ test('a configured compatible namespace is copied forward and removed only after
   assert.deepEqual(compatible.saves, []);
   assert.equal(compatible.removes, 1);
   assert.deepEqual(events, ['source-read', 'current-save', 'source-remove']);
+});
+
+test('a literal v3 draft migrates through the v3 key, then removes its raw and key only after v4 is durable', async () => {
+  const storage = memoryStorage();
+  const sourceKey = 'resume-studio-web-v3';
+  const currentKey = 'resume-studio-web-v4';
+  const sourceKeyStore = memoryKeyStore();
+  storage.setItem(sourceKey, JSON.stringify(createV3Fixture()));
+  const source = persistence(storage, sourceKey, { keyStore: sourceKeyStore });
+  const current = persistence(storage, currentKey);
+
+  const result = await loadVersionedDraft(storage, {
+    currentPersistence: current,
+    currentStorageKey: currentKey,
+    compatibleStorageKeys: [sourceKey],
+    persistenceForKey: () => source
+  });
+
+  assert.equal(result.state.version, 4);
+  assert.ok(result.state.documents.en.resume.experience[0].id.startsWith('record_'));
+  assert.deepEqual(result.state.settings.pageBreaks.en.A4.resume, { sections: ['projects'], records: [] });
+  assert.equal(storage.getItem(sourceKey), null);
+  assert.equal(sourceKeyStore.removes, 1);
+  assert.equal(JSON.parse(storage.getItem(currentKey)).format, 'resume-studio-local-encrypted-v1');
+});
+
+test('a v4 save failure after a real v3 read retains the v3 raw and key', async () => {
+  const sourceKey = 'resume-studio-web-v3';
+  const currentKey = 'resume-studio-web-v4';
+  const storage = memoryStorage({ failSetKey: currentKey });
+  const sourceKeyStore = memoryKeyStore();
+  const raw = JSON.stringify(createV3Fixture());
+  storage.setItem(sourceKey, raw);
+  const source = persistence(storage, sourceKey, { keyStore: sourceKeyStore });
+  const current = persistence(storage, currentKey);
+
+  await assert.rejects(() => loadVersionedDraft(storage, {
+    currentPersistence: current,
+    currentStorageKey: currentKey,
+    compatibleStorageKeys: [sourceKey],
+    persistenceForKey: () => source
+  }), (error) => error.code === 'storage-unavailable');
+
+  assert.equal(storage.getItem(sourceKey), raw);
+  assert.equal(sourceKeyStore.removes, 0);
+  assert.equal(storage.getItem(currentKey), null);
+});
+
+test('a changed v3 source is retained when cleanup detects a conflict after the v4 save', async () => {
+  const sourceKey = 'resume-studio-web-v3';
+  const currentKey = 'resume-studio-web-v4';
+  const raw = JSON.stringify(createV3Fixture());
+  const changedRaw = `${raw} `;
+  const storage = memoryStorage({ onSet(key) { if (key === currentKey) storage.setItem(sourceKey, changedRaw); } });
+  const sourceKeyStore = memoryKeyStore();
+  storage.setItem(sourceKey, raw);
+  const source = persistence(storage, sourceKey, { keyStore: sourceKeyStore });
+  const current = persistence(storage, currentKey);
+
+  const result = await loadVersionedDraft(storage, {
+    currentPersistence: current,
+    currentStorageKey: currentKey,
+    compatibleStorageKeys: [sourceKey],
+    persistenceForKey: () => source
+  });
+
+  assert.equal(result.loadResult.status, 'migration-incomplete');
+  assert.equal(result.sourceRemoved, false);
+  assert.equal(storage.getItem(sourceKey), changedRaw);
+  assert.equal(sourceKeyStore.removes, 0);
+  assert.notEqual(storage.getItem(currentKey), null);
+});
+
+test('a Web Locks read-only fallback cannot remove a real v3 source before v4 saves', async () => {
+  const sourceKey = 'resume-studio-web-v3';
+  const currentKey = 'resume-studio-web-v4';
+  const storage = memoryStorage();
+  const sourceKeyStore = memoryKeyStore();
+  const raw = JSON.stringify(createV3Fixture());
+  storage.setItem(sourceKey, raw);
+  const source = persistence(storage, sourceKey, { keyStore: sourceKeyStore });
+  const current = persistence(storage, currentKey, { locks: { async request() { throw new Error('fictional lock rejection'); } } });
+
+  await assert.rejects(() => loadVersionedDraft(storage, {
+    currentPersistence: current,
+    currentStorageKey: currentKey,
+    compatibleStorageKeys: [sourceKey],
+    persistenceForKey: () => source
+  }), (error) => error.code === 'web-lock-unavailable');
+
+  assert.equal(storage.getItem(sourceKey), raw);
+  assert.equal(sourceKeyStore.removes, 0);
+  assert.equal(storage.getItem(currentKey), null);
 });
 
 test('a failed current save never removes the compatible source namespace', async () => {

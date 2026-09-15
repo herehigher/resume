@@ -448,6 +448,7 @@ test('PDF long: English の超長文は複数 Letter ページになり末尾ま
     (_, index) => `Summary line ${index + 1}: measurable product outcome.`
   ).join('\n');
   state.documents.en.resume.experience = Array.from({ length: 14 }, (_, index) => ({
+    id: `record_long-pdf-en-${index}`,
     company: `Long Form Company ${index + 1}`,
     role: `Lead Role ${index + 1}`,
     startDate: '2020-01',

@@ -10,6 +10,7 @@ import {
 } from '../site/assets/js/state/migrations.js';
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
 import { COMPATIBLE_DRAFT_STORAGE_KEYS } from '../site/assets/js/config.js';
+import { createV3Fixture } from './fixtures/resume-studio-web-v3.js';
 
 function fakeValidator(currentVersion) {
   return (value) => ({
@@ -128,14 +129,8 @@ test('the v2 to v4 migration salvages unknown non-empty gender without discardin
 });
 
 test('the v3 to v4 migration deterministically adds unique record IDs and separates page-break targets', () => {
-  const source = createDefaultState('en');
-  source.version = 3;
-  source.settings.pageBreaks.ja.A4.resume = ['qualifications'];
-  source.settings.pageBreaks.en.A4.resume = ['projects'];
-  source.documents.ja.careers.push({ ...source.documents.ja.careers[0], company: 'Fictional second company', id: undefined });
-  source.documents.ja.careers.forEach((career) => { delete career.id; });
-  source.documents['zh-CN'].resume.experience.forEach((record) => { delete record.id; });
-  source.documents.en.resume.experience.forEach((record) => { delete record.id; });
+  const source = createV3Fixture();
+  source.documents.ja.careers.push({ ...source.documents.ja.careers[0], company: 'Fictional v3 second company' });
 
   const first = migrateState(source);
   const second = migrateState(source);

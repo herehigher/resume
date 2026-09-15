@@ -34,6 +34,8 @@ JSON payload の `version` は、端末内草稿を復号した state と JSON i
 
 data format を更新するときは `STATE_VERSION` を増やし、直前 version だけを受け取る純粋 step と変更概要を追加します。続けて対応範囲内の旧草稿 key を明示 list に追加し、入力・期待出力 fixture、対応下限と境界 test、公開 schema/example の version とファイル名を同じ PR で更新します。4世代以上前になった step / fixture / key は registry と明示 list から外しますが、すでに対応外となった端末内 data には触れません。最後に migration / storage / import の対象 test、同一 context の競合 test、privacy canary と必要な表示・PDF 確認を実施します。
 
+公開 Schema の `x-resume-studio-uniqueBy: "id"` は Resume Studio の必須 applicator です。対象 array の record `id` は一意でなければならず、runtime validator と Schema contract test は同じ規則で拒否します。汎用 JSON Schema validator を使う consumer は、この applicator を有効にして export を検証してください。
+
 ## Open Graph 共有画像
 
 日本語・简体中文・English の公開入口で使う 1200 × 630 の共有画像は、repository root から次の command で3言語分をまとめて再生成します。

@@ -122,6 +122,7 @@ function validateSchema(schema, value, pointer = '#', root = schema) {
   if (schema.type === 'array') return Array.isArray(value)
     && (!schema.maxItems || value.length <= schema.maxItems)
     && (!schema.uniqueItems || new Set(value.map((item) => JSON.stringify(item))).size === value.length)
+    && (!schema['x-resume-studio-uniqueBy'] || new Set(value.map((item) => item?.[schema['x-resume-studio-uniqueBy']])).size === value.length)
     && value.every((item) => validateSchema(schema.items, item, `${pointer}/items`, root));
   if (schema.type === 'string') return typeof value === 'string' && (!schema.pattern || new RegExp(schema.pattern).test(value));
   return true;
@@ -342,6 +343,14 @@ test('published JSON Schema accepts exports and rejects primary invalid values',
   const invalidVersion = structuredClone(example);
   invalidVersion.version = 3;
   assert.equal(validateSchema(schema, invalidVersion), false);
+
+  const duplicateRecordId = structuredClone(example);
+  duplicateRecordId.documents.en.resume.experience.push({
+    ...duplicateRecordId.documents.en.resume.experience[0],
+    company: 'Different fictional company'
+  });
+  assert.equal(validateSchema(schema, duplicateRecordId), false);
+  assert.equal(validateState(duplicateRecordId).valid, false);
 
   const missingVersion = structuredClone(example);
   delete missingVersion.version;
