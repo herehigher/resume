@@ -1,5 +1,6 @@
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { readFile } from 'node:fs/promises';
 import { expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
 
 async function importJapaneseState(page, state) {
@@ -10,6 +11,14 @@ async function importJapaneseState(page, state) {
   });
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
+}
+
+async function exportJapaneseState(page) {
+  await page.locator('#dataMenuSummary').click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  const download = await downloadPromise;
+  return JSON.parse(await readFile(await download.path(), 'utf8'));
 }
 
 function createCareerState() {
@@ -44,9 +53,12 @@ async function readPdfText(buffer) {
   }
 }
 
-test('Japanese career compact layout is record-local, persists after reload, and keeps record page-break markup compatible', async ({ page }) => {
+test('Japanese career compact layout and the same stable record page-break target survive JSON round-trip and reload', async ({ page }) => {
+  const recordWithCompactLayout = 'record_fictional-compact-first';
+  const state = createCareerState();
+  state.settings.pageBreaks.ja.A4.career.records = [recordWithCompactLayout];
   await openLocale(page, 'ja');
-  await importJapaneseState(page, createCareerState());
+  await importJapaneseState(page, state);
   await page.locator('#careerDocumentTab').click();
 
   const firstEditor = page.locator('.career-editor-item[data-career-id="record_fictional-standard-second"]');
@@ -63,17 +75,29 @@ test('Japanese career compact layout is record-local, persists after reload, and
   await expect(page.locator('#statusAnnouncer')).toHaveText('勤務先の組版をコンパクトにしました。');
   await expect(page.locator('#saveStatus')).toContainText('保存済み');
 
+  const exported = await exportJapaneseState(page);
+  expect(exported.version).toBe(4);
+  expect(exported.settings.pageBreaks.ja.A4.career.records).toEqual([recordWithCompactLayout]);
+  expect(exported.documents.ja.careers.find((career) => career.id === recordWithCompactLayout)?.layoutMode).toBe('compact');
+  expect(exported.documents.ja.careers.find((career) => career.id === 'record_fictional-standard-second')?.layoutMode).toBe('compact');
+
+  await importJapaneseState(page, exported);
   await page.reload();
   await page.locator('#careerDocumentTab').click();
   await expect(page.locator('.career-editor-item[data-career-id="record_fictional-standard-second"] [data-career-layout="compact"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.career-company[data-record-id="record_fictional-standard-second"]')).toHaveAttribute('data-layout-mode', 'compact');
+  const reloaded = await exportJapaneseState(page);
+  expect(reloaded.settings.pageBreaks.ja.A4.career.records).toEqual([recordWithCompactLayout]);
+  expect(reloaded.documents.ja.careers.find((career) => career.id === recordWithCompactLayout)?.layoutMode).toBe('compact');
+  expect(reloaded.documents.ja.careers.find((career) => career.id === 'record_fictional-standard-second')?.layoutMode).toBe('compact');
 });
 
 test('Japanese compact career layout keeps A4 PDF text complete without changing body font size', async ({ page }) => {
   await openLocale(page, 'ja');
   const state = createCareerState();
-  state.documents.ja.careers[0].detailSections[0].content = `・架空の長いURL https://example.invalid/${'compact-layout/'.repeat(30)}`;
-  state.documents.ja.careers[1].detailSections[0].content = '・架空のコンパクト勤務先でも本文サイズを維持します。';
+  const longUrl = `https://example.invalid/${'compact-layout/'.repeat(30)}`;
+  state.documents.ja.careers[0].detailSections[0].content = '・架空の標準勤務先です。';
+  state.documents.ja.careers[1].detailSections[0].content = `・架空の長いURL ${longUrl}\n・架空のコンパクト勤務先でも本文サイズを維持します。`;
   await importJapaneseState(page, state);
   await page.locator('#careerDocumentTab').click();
 
@@ -90,6 +114,9 @@ test('Japanese compact career layout keeps A4 PDF text complete without changing
   expect(text).toContain('架空標準株式会社');
   expect(text).toContain('架空コンパクト株式会社');
   expect(text).toContain('本文サイズを維持します。');
+  const normalizedUrl = longUrl.normalize('NFKC').replace(/\s/g, '');
+  expect(text).toContain(normalizedUrl);
+  expect(text.split(normalizedUrl)).toHaveLength(2);
 });
 
 test('[mobile][mobile-webkit] Japanese career layout controls remain reachable without horizontal overflow', async ({ page }) => {
