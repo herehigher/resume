@@ -66,14 +66,21 @@ function validateStateShape(value) {
     errors.push('documents.ja.activeDocument is not supported');
   }
 
-  const careerKeys = ['company', 'companyInfo', 'detailSections', 'endDate', 'id', 'role', 'startDate'];
+  const careerKeys = ['company', 'companyInfo', 'detailSections', 'endDate', 'id', 'layoutMode', 'role', 'startDate'];
   const careerDetailSectionKeys = ['content', 'title'];
   const careers = value.documents?.ja?.careers;
   if (Array.isArray(careers)) careers.forEach((career, index) => {
-    if (!isPlainObject(career) || Object.keys(career).sort().join(',') !== careerKeys.join(',')) {
+    const keys = isPlainObject(career) ? Object.keys(career).sort() : [];
+    const expectedKeys = Object.hasOwn(career || {}, 'layoutMode')
+      ? careerKeys
+      : careerKeys.filter((key) => key !== 'layoutMode');
+    if (!isPlainObject(career) || keys.join(',') !== expectedKeys.join(',')) {
       errors.push(`state.documents.ja.careers[${index}] has an unsupported shape`);
     }
     if (!isRecordId(career?.id)) errors.push(`state.documents.ja.careers[${index}].id is invalid`);
+    if (Object.hasOwn(career || {}, 'layoutMode') && career.layoutMode !== 'compact') {
+      errors.push(`state.documents.ja.careers[${index}].layoutMode is not supported`);
+    }
     if (Array.isArray(career?.detailSections)) career.detailSections.forEach((section, sectionIndex) => {
       if (!isPlainObject(section) || Object.keys(section).sort().join(',') !== careerDetailSectionKeys.join(',')) {
         errors.push(`state.documents.ja.careers[${index}].detailSections[${sectionIndex}] has an unsupported shape`);

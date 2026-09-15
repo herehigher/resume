@@ -142,6 +142,7 @@ export function renderJapaneseCareer(state) {
     ]) || career.detailSections.some((section) => hasContent(section.content)))
     .map((career) => {
       const period = renderCareerPeriod(career);
+      const layoutMode = career.layoutMode === 'compact' ? 'compact' : 'standard';
       const detailSections = career.detailSections
         .filter((section) => hasContent(section.content))
         .map((section) => {
@@ -150,7 +151,7 @@ export function renderJapaneseCareer(state) {
         })
         .join('');
       return `
-    <section class="career-company" data-record-id="${escapeHTML(career.id)}">
+    <section class="career-company" data-record-id="${escapeHTML(career.id)}" data-layout-mode="${layoutMode}">
       <div class="career-company-heading"><strong>${displayText(career.company, '会社名未入力')}</strong>${period ? `<span>${period}</span>` : ''}</div>
       <div class="career-company-info">${displayText(career.companyInfo, '事業内容・会社概要')}</div>
       <div class="career-company-grid">
