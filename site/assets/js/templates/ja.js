@@ -109,7 +109,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
     <article class="document-page resume-document">
       <header class="resume-document-header">
         <h2 class="resume-document-title">履 歴 書</h2>
-        <div class="resume-current-date">${displayText(japaneseDate(fields.createdDate), '作成日')} 現在</div>
+        <div class="resume-current-date">${displayText(japaneseDate(fields.createdDate), '提出日')} 現在</div>
       </header>
       <section class="resume-profile" data-section-key="identity">
         <div class="profile-text">
@@ -180,7 +180,7 @@ export function renderJapaneseCareer(state) {
     <article class="document-page career-document">
       <header class="career-doc-header" data-section-key="identity">
         <h2>職務経歴書</h2>
-        <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '作成日')}<br>${displayText(fields.fullName, '氏名未入力')}${hasContent(fields.nationality) ? `<br>国籍：${escapeHTML(fields.nationality)}` : ''}</div>
+        <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '提出日')}<br>${displayText(fields.fullName, '氏名未入力')}${hasContent(fields.nationality) ? `<br>国籍：${escapeHTML(fields.nationality)}` : ''}</div>
         ${renderCareerProfiles(fields)}
       </header>
       <section class="career-section" data-section-key="summary"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>

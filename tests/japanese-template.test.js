@@ -15,6 +15,8 @@ test('Japanese editor keeps nationality in basic information without required ba
   assert.ok(basicInformation < nationality);
   assert.ok(nationality < contactDetails);
   assert.doesNotMatch(editor, /<em>必須<\/em>/);
+  assert.match(editor, /<span>提出日<\/span>\s*<input name="createdDate" type="date">/);
+  assert.doesNotMatch(editor, /<span>作成日<\/span>\s*<input name="createdDate" type="date">/);
 });
 
 test('Japanese document renderer switches between resume and career templates', () => {
@@ -42,7 +44,11 @@ test('Japanese template renders photos only from an explicit display URL', () =>
 test('Japanese dates, age, and current employment use conventional labels', () => {
   assert.equal(formatJapaneseMonth('2026-09'), '2026年 9月');
   assert.equal(formatJapaneseDate('2026-09-01'), '2026年9月1日');
-  assert.equal(calculateAge('2000-09-02', '2026-09-01'), '25歳');
+  assert.equal(calculateAge('2000-09-02', '2026-09-01'), '満25歳');
+  assert.equal(calculateAge('2000-09-02', '2026-09-02'), '満26歳');
+  assert.equal(calculateAge('2000-09-02', ''), '');
+  assert.equal(calculateAge('2000-02-29', '2026-02-29'), '');
+  assert.equal(calculateAge('2000-09-02', '1999-09-02'), '');
 
   const state = createDefaultState('ja');
   state.documents.ja.activeDocument = 'career';
@@ -56,6 +62,30 @@ test('Japanese dates, age, and current employment use conventional labels', () =
   }];
 
   assert.match(renderJapaneseDocument(state), /2024年 4月 〜 現在/);
+});
+
+test('Japanese templates use 提出日 for missing dates and show only valid full ages', () => {
+  const state = createDefaultState('ja');
+  state.profile.fields.birthDate = '2000-09-02';
+  state.documents.ja.fields.createdDate = '';
+
+  let html = renderJapaneseDocument(state);
+  assert.match(html, /resume-current-date"><span class="empty-preview">提出日<\/span> 現在/);
+  assert.doesNotMatch(html, /満\d+歳/);
+
+  state.documents.ja.fields.createdDate = '2026-09-01';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /（満25歳）/);
+
+  state.profile.fields.birthDate = '2000-02-29';
+  state.documents.ja.fields.createdDate = '2026-02-29';
+  html = renderJapaneseDocument(state);
+  assert.doesNotMatch(html, /満\d+歳/);
+
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.fields.createdDate = '';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /<div class="career-doc-meta"><span class="empty-preview">提出日<\/span><br>/);
 });
 
 test('Japanese nationality is optional and locale-independent gender uses a Japanese label', () => {
