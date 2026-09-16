@@ -317,14 +317,17 @@ test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full tou
     const trigger = page.locator('#chineseWorkspace .page-break-menu');
     await trigger.click();
     const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
+    const trustCapsule = page.locator('#trustCapsule');
     await expect(marker).toBeVisible();
+    await expect(trustCapsule).toBeHidden();
     await expect.poll(() => marker.evaluate((element) => {
       const marker = element.getBoundingClientRect();
       const line = element.closest('.page-break-visual-boundary')?.querySelector('.page-break-boundary-line')?.getBoundingClientRect();
       return Boolean(line) && marker.width >= 44 && marker.height >= 44
         && marker.left >= 0 && marker.right <= innerWidth
         && marker.top >= 0 && marker.bottom <= innerHeight
-        && Math.abs((marker.top + marker.height / 2) - line.top) < 1;
+        && Math.abs((marker.top + marker.height / 2) - line.top) < 1
+        && document.elementFromPoint(marker.left + marker.width / 2, marker.top + marker.height / 2)?.closest('.page-break-boundary') === element;
     })).toBe(true);
     await marker.tap();
     const bar = page.locator('.page-break-action-bar:not([hidden])');
@@ -337,6 +340,7 @@ test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full tou
         && action.width >= 44 && action.height >= 44 && hit?.closest('.page-break-action') === element.querySelector('.page-break-action');
     })).toBe(true);
     await trigger.click();
+    await expect(trustCapsule).toBeVisible();
   }
 });
 
@@ -368,13 +372,26 @@ test('[mobile][mobile-webkit] selected mobile boundary survives geometry changes
   await trigger.click();
   const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
   await marker.click();
-  await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
+  const actionBar = page.locator('.page-break-action-bar:not([hidden])');
+  await expect(actionBar).toBeVisible();
+  await expect(actionBar).toContainText('个人概述之前');
+  await centerChinesePreviewTarget(page, 'summary');
+  const zoomLabel = workspace.locator('[data-zh-zoom-label]');
+  const zoomBefore = await zoomLabel.textContent();
+  await workspace.locator('[data-zh-action="zoom-in"]').click();
+  await expect(zoomLabel).not.toHaveText(zoomBefore || '');
+  await expect.poll(() => page.locator('#page-break-overlay-zh-CN .page-break-visual-boundary.is-selected').evaluate((boundary) => {
+    const action = document.querySelector('.page-break-action-bar:not([hidden])');
+    return boundary.dataset.pageBreakKey === 'summary' && action?.textContent?.includes('个人概述之前');
+  })).toBe(true);
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
   await page.locator('#localeSelect').selectOption('en');
   await expect(page.locator('.page-break-action-bar:not([hidden])')).toHaveCount(0);
+  await expect(page.locator('#trustCapsule')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveAttribute('data-page-break-editing-locale');
 });
 
 test('[mobile][mobile-webkit] a desktop breakpoint hides mobile pagination controls without discarding its selected boundary', async ({ page }) => {
@@ -390,14 +407,22 @@ test('[mobile][mobile-webkit] a desktop breakpoint hides mobile pagination contr
   await marker.click();
   await expect(panel).toBeHidden();
   await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
+  await expect(page.locator('#trustCapsule')).toBeHidden();
+  await expect(page.locator('body')).toHaveAttribute('data-page-break-editing-locale', 'zh-CN');
   await page.setViewportSize({ width: 1024, height: 768 });
   await expect(panel).toBeHidden();
   await expect(panelToggle).toBeHidden();
   await expect(page.locator('.page-break-action-bar:not([hidden])')).toHaveCount(0);
+  await expect(page.locator('#trustCapsule')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveAttribute('data-page-break-editing-locale');
   await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
   await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await expect(page.locator('#trustCapsule')).toBeHidden();
+  await trigger.click();
+  await expect(page.locator('#trustCapsule')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveAttribute('data-page-break-editing-locale');
 });
 
 test('[mobile] identity-only documents hide the page-break menu and retain no illegal controls', async ({ page }) => {
