@@ -109,7 +109,11 @@ test('record boundaries follow rendered order and retain stable IDs independentl
     fakeElement({ order: 5, selectors: [selectors.records], recordId: 'record_hidden', text: '' })
   ]);
   const candidates = getBoundaryCandidates({ state, locale: 'en', documentType: 'resume', preview });
-  assert.equal(candidates.filter((candidate) => candidate.bindings.some((target) => target.key === 'record_new')).length, 1);
-  assert.deepEqual(candidates.flatMap((candidate) => candidate.bindings.filter((target) => target.level === 'record').map((target) => target.key)), ['record_new', 'record_old']);
-  assert.equal(candidates.find((candidate) => candidate.bindings.some((target) => target.key === 'record_new')).bindings.some((target) => target.key === 'experience'), false);
+  const experience = candidates.find((candidate) => candidate.key === 'experience');
+  assert.deepEqual(candidates.map((candidate) => candidate.key), ['experience', 'record:record_old']);
+  assert.equal(experience.hasRedundantFirstRecordBinding, true);
+  assert.deepEqual(experience.bindings.map((target) => target.key), ['experience', 'record_new']);
+  assert.equal(candidates.some((candidate) => candidate.key === 'record:record_new'), false);
+  assert.equal(candidates.find((candidate) => candidate.key === 'record:record_old').previous.bindings.some((target) => target.key === experience.key), true);
+  assert.equal(candidates.find((candidate) => candidate.key === 'record:record_old').visualPrevious.element.dataset.recordId, 'record_new');
 });

@@ -302,6 +302,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     preview.style.transform = `scale(${zoom})`;
     rootElement.querySelector('[data-zh-zoom-label]').textContent = `${Math.round(zoom * 100)}%`;
     preview.style.marginBottom = `${Math.min(0, preview.offsetHeight * (zoom - 1))}px`;
+    pageBreakControls.position();
   }
 
   function fitPreview() {

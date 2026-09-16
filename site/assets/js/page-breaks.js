@@ -2,17 +2,25 @@ import { announceStatus } from './ui/status-controller.js';
 
 export const PAGE_BREAK_LABELS = Object.freeze({
   ja: {
-    add: '改頁', remove: '解除', menu: '改頁', positions: '改頁位置', after: 'の後'
+    add: '改頁', remove: '解除', menu: '改ページ位置', positions: '改ページ位置', after: 'の後',
+    edit: '改ページを編集', editing: '改ページ編集中', undo: '元に戻す',
+    added: 'PDF 出力時に新しい page から開始します。', removed: 'PDF 出力時の改ページを解除しました。'
   },
   'zh-CN': {
-    add: '分页', remove: '取消', menu: '分页', positions: '分页位置', after: '之后'
+    add: '分页', remove: '取消', menu: '分页位置', positions: '分页位置', after: '之后',
+    edit: '编辑分页', editing: '正在编辑分页', undo: '撤销',
+    added: '导出 PDF 时将从新页面开始。', removed: '已取消 PDF 导出时的分页。'
   },
   en: {
-    add: 'Add', remove: 'Remove', menu: 'Page breaks', positions: 'Page break positions', after: 'after'
+    add: 'Add', remove: 'Remove', menu: 'Page break positions', positions: 'Page break positions', after: 'after',
+    edit: 'Edit page breaks', editing: 'Editing page breaks', undo: 'Undo',
+    added: 'The PDF will start this content on a new page.', removed: 'The PDF page break has been removed.'
   }
 });
 
-export const PAGE_BREAK_PREVIEW_GUTTER = 112;
+// The boundary markers occupy a small, paper-exterior gutter. They never take
+// part in the document's layout or printable geometry.
+export const PAGE_BREAK_PREVIEW_GUTTER = 96;
 
 const RECORD_ID_PATTERN = /^record_[A-Za-z0-9_-]+(?:-[A-Za-z0-9_-]+)*$/;
 
@@ -179,11 +187,34 @@ export function getBoundaryCandidates({ state, locale, documentType, preview }) 
     }
     normalized.set(candidate.element, { ...candidate, bindings: [...candidate.bindings] });
   });
+  // A section boundary and its first child record identify the same physical
+  // place. Keep one section-level candidate there, while retaining the record
+  // binding solely so an existing saved record break remains removable.
+  const ordered = [];
+  let physicalPrevious = null;
+  [...normalized.values()].forEach((candidate) => {
+    const previous = ordered.at(-1);
+    const isFirstRecordAfterParent = candidate.bindings.every((target) => target.level === 'record')
+      && candidate.boundary.parent
+      && physicalPrevious?.bindings.some((target) => target.level === 'section' && target.key === candidate.boundary.parent);
+    if (isFirstRecordAfterParent) {
+      previous.bindings.push(...candidate.bindings);
+      previous.hasRedundantFirstRecordBinding = true;
+      physicalPrevious = candidate;
+      return;
+    }
+    ordered.push({ ...candidate, visualPrevious: physicalPrevious });
+    physicalPrevious = candidate;
+  });
   // The first visible physical node cannot create a meaningful page boundary.
-  const ordered = [...normalized.values()];
   return ordered.slice(1).map((candidate, index) => {
     const primary = candidate.bindings.find((target) => target.level === 'section') || candidate.bindings[0];
-    return Object.freeze({ ...candidate, previous: ordered[index], key: primary.level === 'section' ? primary.key : `record:${primary.key}` });
+    return Object.freeze({
+      ...candidate,
+      previous: ordered[index],
+      visualPrevious: candidate.visualPrevious || ordered[index],
+      key: primary.level === 'section' ? primary.key : `record:${primary.key}`
+    });
   });
 }
 
@@ -193,7 +224,10 @@ function candidateIsActive(candidate, targets) {
 
 function updateCandidateTargets(nextState, locale, paper, documentType, candidate, active) {
   const targets = nextState.settings.pageBreaks[locale][paper][documentType];
-  for (const target of candidate.bindings) {
+  const bindings = active && candidate.hasRedundantFirstRecordBinding
+    ? candidate.bindings.filter((target) => target.level === 'section')
+    : candidate.bindings;
+  for (const target of bindings) {
     const field = target.level === 'record' ? 'records' : 'sections';
     targets[field] = active
       ? [...new Set([...targets[field], target.key])]
@@ -203,105 +237,319 @@ function updateCandidateTargets(nextState, locale, paper, documentType, candidat
 
 function icon(active = false) { return `<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M${active ? '3 8h10' : '8 3v10M3 8h10'}"/></svg>`; }
 
+function iconBadge(className, active) {
+  const badge = document.createElement('span');
+  badge.className = className;
+  // This SVG is an application-owned constant. User-provided labels are always
+  // assigned through textContent below.
+  badge.innerHTML = icon(active);
+  return badge;
+}
+
 export function initPageBreakControls({ store, locale, preview, toolbar, getDocumentType, scheduleSave }) {
   const labels = PAGE_BREAK_LABELS[locale];
   const panelId = `page-break-panel-${locale}`;
   const menu = document.createElement('button');
   menu.type = 'button';
   menu.className = 'page-break-menu';
-  menu.setAttribute('aria-expanded', 'false');
-  menu.setAttribute('aria-controls', panelId);
+  menu.dataset.pageBreakModeToggle = '';
   toolbar.append(menu);
+  const feedback = document.createElement('div');
+  feedback.className = 'page-break-feedback';
+  feedback.hidden = true;
+  feedback.setAttribute('role', 'status');
+  document.body.append(feedback);
   const panel = document.createElement('div');
   panel.id = panelId;
   panel.className = 'page-break-panel';
   panel.hidden = true;
   toolbar.append(panel);
+  const overlay = document.createElement('div');
+  overlay.id = `page-break-overlay-${locale}`;
+  overlay.className = 'page-break-overlay';
+  overlay.setAttribute('aria-label', labels.positions);
+  overlay.setAttribute('role', 'region');
+  document.body.append(overlay);
+  let modeOpen = false;
+  let feedbackTimer = null;
+  let geometryFrame = null;
   let lastFocusKey = null;
+  let renderedCandidates = [];
 
+  function isDesktop() { return !window.matchMedia('(max-width: 820px)').matches; }
+  function isSurfaceVisible() { return preview.getClientRects().length > 0 && !preview.closest('[hidden]'); }
+  function description(previous, target, active) { return describePageBreak(locale, previous, target, active); }
+  function shortDescription(active) {
+    if (locale === 'ja') return active ? '改ページを解除' : 'ここで改ページ';
+    if (locale === 'zh-CN') return active ? '取消分页' : '在此分页';
+    return active ? 'Remove page break' : 'Start a new page here';
+  }
+  function createBoundary(candidate, interactive) {
+    const boundary = document.createElement('div');
+    boundary.className = `page-break-visual-boundary${candidate.active ? ' is-set' : ''}`;
+    boundary.dataset.pageBreakKey = candidate.key;
+    const line = document.createElement('span');
+    line.className = 'page-break-boundary-line';
+    line.setAttribute('aria-hidden', 'true');
+    boundary.append(line);
+    if (!interactive) {
+      const marker = document.createElement('span');
+      marker.className = 'page-break-passive-marker';
+      marker.dataset.pageBreakKey = candidate.key;
+      marker.setAttribute('aria-hidden', 'true');
+      marker.textContent = '−';
+      boundary.append(marker);
+      return boundary;
+    }
+    const control = document.createElement('button');
+    control.className = `page-break-boundary${candidate.isRecord ? ' page-break-record-boundary' : ''}`;
+    control.dataset.pageBreakKey = candidate.key;
+    control.type = 'button';
+    control.setAttribute('aria-pressed', String(candidate.active));
+    control.setAttribute('aria-label', description(candidate.previous, candidate, candidate.active));
+    const sign = iconBadge('page-break-sign', candidate.active);
+    sign.setAttribute('aria-hidden', 'true');
+    const tooltip = document.createElement('span');
+    tooltip.className = 'page-break-tooltip';
+    tooltip.id = `page-break-tooltip-${locale}-${candidate.key.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.textContent = shortDescription(candidate.active);
+    control.setAttribute('aria-describedby', tooltip.id);
+    control.append(sign, tooltip);
+    control.addEventListener('click', () => toggle(candidate));
+    control.addEventListener('pointerenter', () => setHighlight(candidate, true));
+    control.addEventListener('pointerleave', () => setHighlight(candidate, false));
+    control.addEventListener('focus', () => setHighlight(candidate, true));
+    control.addEventListener('blur', () => setHighlight(candidate, false));
+    candidate.element.addEventListener('pointerenter', () => setHighlight(candidate, true));
+    candidate.element.addEventListener('pointerleave', () => setHighlight(candidate, false));
+    boundary.append(control);
+    return boundary;
+  }
+  function updateMenuControls() { menu.setAttribute('aria-controls', isDesktop() ? overlay.id : panelId); }
   function activeContext() {
     const state = store.getState();
     const type = getDocumentType();
     return { state, type, paper: state.settings.pageSizeByLocale[locale] };
   }
-  function setOpen(open) {
-    if (menu.hidden) { panel.hidden = true; menu.setAttribute('aria-expanded', 'false'); return; }
+  function setMode(open, { focusFirst = false } = {}) {
+    modeOpen = open;
+    menu.setAttribute('aria-pressed', String(open));
+    menu.textContent = open ? labels.editing : labels.edit;
+    updateMenuControls();
+    if (!isDesktop()) {
+      panel.hidden = !open;
+      menu.setAttribute('aria-expanded', String(open));
+      renderPanel(renderedCandidates);
+      if (open && focusFirst) panel.querySelector('button')?.focus();
+    } else {
+      panel.hidden = true;
+      menu.setAttribute('aria-expanded', 'false');
+      renderOverlay();
+      if (open && focusFirst) overlay.querySelector('button')?.focus({ preventScroll: true });
+    }
+  }
+  function setMobilePanel(open) {
     panel.hidden = !open;
     menu.setAttribute('aria-expanded', String(open));
     if (open) panel.querySelector('button')?.focus();
   }
-  function toggle(candidate) {
+  function closeSurface() {
+    modeOpen = false;
+    overlay.hidden = true;
+    panel.hidden = true;
+    menu.setAttribute('aria-pressed', 'false');
+    menu.setAttribute('aria-expanded', 'false');
+    clearFeedback();
+  }
+  function clearFeedback() {
+    window.clearTimeout(feedbackTimer);
+    feedback.replaceChildren();
+    feedback.hidden = true;
+  }
+  function showFeedback(message, undo) {
+    clearFeedback();
+    const text = document.createElement('span'); text.textContent = message;
+    const undoButton = document.createElement('button');
+    undoButton.type = 'button'; undoButton.className = 'page-break-undo'; undoButton.textContent = labels.undo;
+    undoButton.addEventListener('click', () => { undo(); clearFeedback(); });
+    feedback.append(text, undoButton); feedback.hidden = false;
+    announceStatus(message);
+    feedbackTimer = window.setTimeout(clearFeedback, 6000);
+  }
+  function toggle(candidate, { announce = true } = {}) {
     const { state, type, paper } = activeContext();
     const targets = state.settings.pageBreaks[locale][paper][type];
+    const wasActive = candidateIsActive(candidate, targets);
+    const undoContext = Object.freeze({ paper, type });
     lastFocusKey = candidate.key;
-    store.update((nextState) => { updateCandidateTargets(nextState, locale, paper, type, candidate, !candidateIsActive(candidate, targets)); }, { persist: false });
+    store.update((nextState) => { updateCandidateTargets(nextState, locale, paper, type, candidate, !wasActive); }, { persist: false });
     scheduleSave();
     render();
+    if (announce) showFeedback(wasActive ? labels.removed : labels.added, () => {
+      store.update((nextState) => { updateCandidateTargets(nextState, locale, undoContext.paper, undoContext.type, candidate, wasActive); }, { persist: false });
+      scheduleSave(); render();
+    });
   }
-  function description(previous, target, active) {
-    return describePageBreak(locale, previous, target, active);
+  function setHighlight(candidate, active) {
+    candidate.element.classList.toggle('page-break-target-highlight', active);
+    overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
+  }
+  function renderOverlay() {
+    overlay.replaceChildren();
+    if (!isDesktop() || !isSurfaceVisible()) { overlay.hidden = true; return; }
+    const shown = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
+    overlay.hidden = shown.length === 0;
+    shown.forEach((candidate) => { overlay.append(createBoundary(candidate, modeOpen)); });
+    positionOverlay();
+  }
+  function positionOverlay() {
+    if (overlay.hidden) return;
+    const visible = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
+    const laneEnds = [];
+    const positions = [];
+    visible.forEach((candidate) => {
+      const boundary = overlay.querySelector(`.page-break-visual-boundary[data-page-break-key="${candidate.key}"]`);
+      const page = candidate.element.closest('.document-page');
+      if (!boundary || !page) return;
+      const pageBox = page.getBoundingClientRect();
+      const targetBox = candidate.element.getBoundingClientRect();
+      const previousBox = candidate.visualPrevious.element.getBoundingClientRect();
+      // The semantic boundary is before the next element, but its visual line
+      // belongs in the gap just after the previous one. Keep a four-pixel
+      // clearance from the next element's focus/highlight outline without
+      // changing document layout.
+      const boundaryTop = Math.min(previousBox.bottom + 4, (previousBox.bottom + targetBox.top) / 2, targetBox.top - 4);
+      let lane = 0;
+      while (laneEnds[lane] !== undefined && targetBox.top - laneEnds[lane] < 30) lane += 1;
+      laneEnds[lane] = targetBox.top;
+      const markerWidth = 30;
+      const desiredMarkerLeft = pageBox.width + 5 + (lane * 32);
+      // In a narrow viewport the control centre must remain reachable even
+      // when the paper itself extends beyond the right edge. The 8px tail of
+      // the transparent hit target may sit outside the viewport; the 16px
+      // visual marker stays visible and reaches no further than 15px over the
+      // visible paper edge.
+      const visibleMarkerLeft = Math.max(0, window.innerWidth - pageBox.left - (markerWidth - 8));
+      const markerLeft = Math.min(desiredMarkerLeft, visibleMarkerLeft);
+      boundary.style.left = `${pageBox.left}px`;
+      boundary.style.top = `${boundaryTop}px`;
+      boundary.style.width = `${pageBox.width}px`;
+      boundary.style.setProperty('--page-break-marker-lane', String(lane));
+      boundary.style.setProperty('--page-break-marker-left', `${markerLeft}px`);
+      boundary.classList.toggle('is-viewport-clamped', markerLeft < desiredMarkerLeft);
+      positions.push({ boundary, markerLeft, targetBox: { ...targetBox, top: boundaryTop } });
+    });
+    // Lanes are horizontally distinct until the viewport clamp brings them
+    // together. Split only their invisible hit rectangles at the midpoint
+    // between neighbouring markers. Their lines and visible signs retain the
+    // exact semantic boundary y position, while no overlap can steal a click.
+    positions.forEach((position) => {
+      const overlapping = positions.filter((other) => other !== position
+        && Math.abs(other.markerLeft - position.markerLeft) < 30
+        && Math.abs(other.targetBox.top - position.targetBox.top) < 30);
+      const before = overlapping.filter((other) => other.targetBox.top < position.targetBox.top)
+        .sort((left, right) => right.targetBox.top - left.targetBox.top)[0];
+      const after = overlapping.filter((other) => other.targetBox.top > position.targetBox.top)
+        .sort((left, right) => left.targetBox.top - right.targetBox.top)[0];
+      const buttonTop = position.targetBox.top - 15;
+      const topInset = before ? Math.max(0, ((before.targetBox.top + position.targetBox.top) / 2) - buttonTop) : 0;
+      const bottomInset = after ? Math.max(0, (buttonTop + 30) - ((after.targetBox.top + position.targetBox.top) / 2)) : 0;
+      position.boundary.style.setProperty('--page-break-hit-top', `${topInset}px`);
+      position.boundary.style.setProperty('--page-break-hit-bottom', `${bottomInset}px`);
+      position.boundary.classList.toggle('is-marker-crowded', topInset > 0 || bottomInset > 0);
+    });
+  }
+  function renderPanel(candidates) {
+    panel.replaceChildren();
+    if (isDesktop() || !isSurfaceVisible()) {
+      panel.hidden = true;
+      menu.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
+    candidates.forEach((candidate) => {
+      const row = document.createElement('button');
+      row.type = 'button'; row.className = 'page-break-row'; row.dataset.pageBreakKey = candidate.key;
+      row.setAttribute('aria-pressed', String(candidate.active)); row.setAttribute('aria-label', description(candidate.previous, candidate, candidate.active));
+      const rowText = document.createElement('span');
+      const rowLabel = document.createElement('b'); rowLabel.textContent = candidate.label;
+      const rowDetail = document.createElement('small'); rowDetail.textContent = candidate.active ? labels.remove : `${candidate.previous.label} ${labels.after}`;
+      const rowSwitch = document.createElement('span'); rowSwitch.className = 'page-break-switch'; rowSwitch.setAttribute('aria-hidden', 'true');
+      rowText.append(rowLabel, rowDetail); row.append(rowText, rowSwitch);
+      row.addEventListener('click', () => toggle(candidate)); panel.append(row);
+    });
   }
   function render() {
     const { state, type, paper } = activeContext();
+    preview.querySelectorAll('.has-manual-page-break, .page-break-target-highlight').forEach((target) => {
+      target.classList.remove('has-manual-page-break', 'page-break-target-highlight');
+    });
     const targets = state.settings.pageBreaks[locale][paper][type];
-    preview.querySelectorAll('.page-break-boundary').forEach((control) => { control.remove(); });
-    preview.querySelectorAll('.has-manual-page-break').forEach((target) => {
-      target.classList.remove('has-manual-page-break');
-      target.style.removeProperty('--page-break-paper-left-offset');
-      target.style.removeProperty('--page-break-paper-right-offset');
+    renderedCandidates = getBoundaryCandidates({ state, locale, documentType: type, preview }).map((candidate) => Object.freeze({
+      ...candidate, active: candidateIsActive(candidate, targets), isRecord: candidate.bindings.every((target) => target.level === 'record')
+    }));
+    renderedCandidates.forEach((candidate) => {
+      candidate.element.classList.toggle('has-manual-page-break', candidate.active);
     });
-    const candidates = getBoundaryCandidates({ state, locale, documentType: type, preview });
-    const active = candidates.filter((candidate) => candidateIsActive(candidate, targets));
-    menu.hidden = candidates.length === 0;
-    if (menu.hidden) { setOpen(false); panel.replaceChildren(); return; }
-    menu.textContent = `${labels.menu} ${active.length}`;
-    panel.replaceChildren();
-    const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
-    candidates.forEach((candidate) => {
-      const { element } = candidate;
-      const { previous } = candidate;
-      const enabled = candidateIsActive(candidate, targets);
-      element.classList.toggle('has-manual-page-break', enabled);
-      const control = document.createElement('button');
-      control.type = 'button'; control.className = `page-break-boundary${candidate.bindings.every((target) => target.level === 'record') ? ' page-break-record-boundary' : ''}`; control.dataset.pageBreakKey = candidate.key;
-      control.setAttribute('aria-pressed', String(enabled)); control.setAttribute('aria-label', description(previous, candidate, enabled));
-      control.innerHTML = `<span class="page-break-add"><span class="page-break-plus">${icon(enabled)}</span>${enabled ? labels.remove : labels.add}</span>`;
-      control.addEventListener('click', () => toggle(candidate));
-      element.prepend(control);
-      const documentPage = element.closest('.document-page');
-      const pageRect = documentPage?.getBoundingClientRect();
-      const sectionRect = element.getBoundingClientRect();
-      const scale = pageRect && documentPage.offsetWidth ? pageRect.width / documentPage.offsetWidth : 1;
-      const leftOffset = pageRect && scale ? Math.max(0, (sectionRect.left - pageRect.left) / scale) : 0;
-      const rightOffset = pageRect && scale ? Math.max(0, (pageRect.right - sectionRect.right) / scale) : 0;
-      element.style.setProperty('--page-break-paper-left-offset', `${leftOffset}px`);
-      element.style.setProperty('--page-break-paper-right-offset', `${rightOffset}px`);
-      const row = document.createElement('button');
-      row.type = 'button'; row.className = 'page-break-row'; row.dataset.pageBreakKey = candidate.key;
-      row.setAttribute('aria-pressed', String(enabled)); row.setAttribute('aria-label', description(previous, candidate, enabled));
-      row.innerHTML = `<span><b>${candidate.label}</b><small>${enabled ? labels.remove : `${previous.label} ${labels.after}`}</small></span><span class="page-break-switch" aria-hidden="true"></span>`;
-      row.addEventListener('click', () => toggle(candidate)); panel.append(row);
-    });
+    menu.hidden = renderedCandidates.length === 0;
+    if (menu.hidden) { modeOpen = false; clearFeedback(); }
+    updateMenuControls();
+    menu.textContent = modeOpen ? labels.editing : labels.edit;
+    menu.setAttribute('aria-pressed', String(modeOpen));
+    if (isDesktop()) renderOverlay();
+    else renderPanel(renderedCandidates);
     if (lastFocusKey) {
-      const target = candidates.find((candidate) => candidate.key === lastFocusKey);
-      const enabled = target && candidateIsActive(target, state.settings.pageBreaks[locale][paper][type]);
-      if (target && locale === 'ja') announceStatus(`${target.label}の前に改ページを${enabled ? '追加しました' : '解除しました'}`);
-      else if (target && locale === 'zh-CN') announceStatus(`${target.label}之前的分页已${enabled ? '添加' : '取消'}`);
-      else if (target) announceStatus(`Page break ${enabled ? 'added' : 'removed'} before ${target.label}`);
-    }
-    if (lastFocusKey) {
-      const findControl = (container) => [...container.querySelectorAll('[data-page-break-key]')].find((control) => control.dataset.pageBreakKey === lastFocusKey);
-      const focusTarget = window.matchMedia('(max-width: 820px)').matches ? findControl(panel) : findControl(preview);
-      focusTarget?.focus({ preventScroll: true }); lastFocusKey = null;
+      const target = (isDesktop() ? overlay : panel).querySelector(`[data-page-break-key="${lastFocusKey}"]`);
+      target?.focus({ preventScroll: true }); lastFocusKey = null;
     }
   }
-  menu.addEventListener('click', () => setOpen(panel.hidden));
-  toolbar.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !panel.hidden) { setOpen(false); menu.focus(); } });
+  menu.addEventListener('click', () => {
+    if (isDesktop()) setMode(!modeOpen, { focusFirst: !modeOpen });
+    else setMobilePanel(panel.hidden);
+  });
+  toolbar.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (isDesktop() && modeOpen) { setMode(false); menu.focus(); }
+    else if (!isDesktop() && !panel.hidden) { setMobilePanel(false); menu.focus(); }
+  });
   toolbar.addEventListener('focusout', (event) => {
-    if (!panel.hidden && event.relatedTarget instanceof Node && !toolbar.contains(event.relatedTarget)) setOpen(false);
+    if (!isDesktop() && !panel.hidden && event.relatedTarget instanceof Node && !toolbar.contains(event.relatedTarget)) setMobilePanel(false);
   });
   document.addEventListener('pointerdown', (event) => {
-    if (!panel.hidden && !toolbar.contains(event.target)) setOpen(false);
+    if (!isDesktop() && !panel.hidden && !toolbar.contains(event.target)) setMobilePanel(false);
   }, true);
-  return { render };
+  const workspace = preview.closest('.workspace');
+  const syncSurface = () => {
+    updateMenuControls();
+    if (!isSurfaceVisible()) { closeSurface(); return; }
+    if (isDesktop()) {
+      panel.hidden = true;
+      menu.setAttribute('aria-expanded', 'false');
+      renderOverlay();
+    } else {
+      overlay.hidden = true;
+      modeOpen = false;
+      menu.setAttribute('aria-pressed', 'false');
+      renderPanel(renderedCandidates);
+    }
+  };
+  function scheduleGeometrySync() {
+    if (geometryFrame !== null) return;
+    geometryFrame = window.requestAnimationFrame(() => {
+      geometryFrame = null;
+      if (isDesktop() && !panel.hidden) syncSurface();
+      else if (isDesktop()) positionOverlay();
+      updateMenuControls();
+    });
+  }
+  const contextObserver = workspace ? new MutationObserver(syncSurface) : null;
+  contextObserver?.observe(workspace, { attributes: true, attributeFilter: ['data-mobile-mode', 'hidden'] });
+  window.addEventListener('resize', scheduleGeometrySync);
+  preview.addEventListener('transitionend', (event) => {
+    if (event.propertyName === 'transform') scheduleGeometrySync();
+  });
+  preview.closest('.preview-scroll')?.addEventListener('scroll', scheduleGeometrySync, { passive: true });
+  syncSurface();
+  return { render, position: scheduleGeometrySync };
 }
