@@ -203,13 +203,18 @@ export function getBoundaryCandidates({ state, locale, documentType, preview }) 
       physicalPrevious = candidate;
       return;
     }
-    ordered.push(candidate);
+    ordered.push({ ...candidate, visualPrevious: physicalPrevious });
     physicalPrevious = candidate;
   });
   // The first visible physical node cannot create a meaningful page boundary.
   return ordered.slice(1).map((candidate, index) => {
     const primary = candidate.bindings.find((target) => target.level === 'section') || candidate.bindings[0];
-    return Object.freeze({ ...candidate, previous: ordered[index], key: primary.level === 'section' ? primary.key : `record:${primary.key}` });
+    return Object.freeze({
+      ...candidate,
+      previous: ordered[index],
+      visualPrevious: candidate.visualPrevious || ordered[index],
+      key: primary.level === 'section' ? primary.key : `record:${primary.key}`
+    });
   });
 }
 
@@ -409,12 +414,12 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       if (!boundary || !page) return;
       const pageBox = page.getBoundingClientRect();
       const targetBox = candidate.element.getBoundingClientRect();
-      const previousBox = candidate.previous.element.getBoundingClientRect();
+      const previousBox = candidate.visualPrevious.element.getBoundingClientRect();
       // The semantic boundary is before the next element, but its visual line
       // belongs in the gap just after the previous one. Keep a four-pixel
       // clearance from the next element's focus/highlight outline without
       // changing document layout.
-      const boundaryTop = Math.min(previousBox.bottom + 4, targetBox.top - 4);
+      const boundaryTop = Math.min(previousBox.bottom + 4, (previousBox.bottom + targetBox.top) / 2, targetBox.top - 4);
       let lane = 0;
       while (laneEnds[lane] !== undefined && targetBox.top - laneEnds[lane] < 30) lane += 1;
       laneEnds[lane] = targetBox.top;

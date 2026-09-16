@@ -115,4 +115,5 @@ test('record boundaries follow rendered order and retain stable IDs independentl
   assert.deepEqual(experience.bindings.map((target) => target.key), ['experience', 'record_new']);
   assert.equal(candidates.some((candidate) => candidate.key === 'record:record_new'), false);
   assert.equal(candidates.find((candidate) => candidate.key === 'record:record_old').previous.bindings.some((target) => target.key === experience.key), true);
+  assert.equal(candidates.find((candidate) => candidate.key === 'record:record_old').visualPrevious.element.dataset.recordId, 'record_new');
 });

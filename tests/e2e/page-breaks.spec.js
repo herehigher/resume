@@ -231,6 +231,37 @@ test('narrow desktop: Chinese adjacent boundary hit regions resolve to their own
   }
 });
 
+test('desktop: later Chinese and English records anchor their line to the physical previous record', async ({ page }) => {
+  const locales = [
+    { locale: 'zh-CN', workspace: '#chineseWorkspace', sample: '[data-zh-action="sample"]' },
+    { locale: 'en', workspace: '[data-english-editor]', sample: '[data-en-load-sample]' }
+  ];
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const item of locales) {
+    await openLocale(page, item.locale);
+    await page.locator(item.sample).click();
+    await openDesktopPageBreakMode(page, item.workspace);
+    const control = page.locator(`#page-break-overlay-${item.locale} .page-break-record-boundary`).first();
+    await expect(control).toBeVisible();
+    await expect.poll(() => control.evaluate((element) => {
+      const key = element.dataset.pageBreakKey?.replace('record:', '');
+      const target = document.querySelector(`[data-record-id="${key}"]`);
+      const records = [...target?.closest('[data-section-key]')?.querySelectorAll('[data-record-id]') || []];
+      const targetIndex = records.indexOf(target);
+      const previous = records[targetIndex - 1];
+      const line = element.closest('.page-break-visual-boundary')?.querySelector('.page-break-boundary-line')?.getBoundingClientRect();
+      const marker = element.getBoundingClientRect();
+      if (!target || !previous || !line) return false;
+      const targetBox = target.getBoundingClientRect();
+      const previousBox = previous.getBoundingClientRect();
+      const midpoint = (previousBox.bottom + targetBox.top) / 2;
+      return previousBox.bottom < line.top && line.top <= midpoint
+        && line.bottom <= targetBox.top - 2
+        && Math.abs((marker.top + marker.height / 2) - line.top) < 1;
+    })).toBe(true);
+  }
+});
+
 test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navigation and Escape returns focus to the trigger', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
