@@ -355,9 +355,14 @@ test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and
   await expect(panel.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
   await page.keyboard.press('Enter');
   const actionBar = page.locator('.page-break-action-bar:not([hidden])');
+  const action = actionBar.locator('.page-break-action');
+  const target = page.locator('[data-section-key="experience"]');
   await expect(actionBar).toBeVisible();
-  await actionBar.locator('.page-break-action').press('Enter');
+  await expect(action).toBeFocused();
+  await expect(target).toHaveClass(/page-break-target-highlight/);
+  await page.keyboard.press('Enter');
   await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
+  await expect(target).not.toHaveClass(/page-break-target-highlight/);
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();

@@ -317,6 +317,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   let allPositionsOpen = false;
   let selectedKey = null;
   let selectedContext = null;
+  let selectedElement = null;
   let surfaceWasDesktop = isDesktop();
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches; }
@@ -398,8 +399,11 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     return renderedCandidates.find((candidate) => candidate.key === selectedKey) || null;
   }
   function clearSelection() {
+    selectedElement?.classList.remove('page-break-target-highlight');
+    overlay.querySelector(`[data-page-break-key="${selectedKey}"]`)?.classList.remove('is-target-highlighted');
     selectedKey = null;
     selectedContext = null;
+    selectedElement = null;
     actionBar.hidden = true;
     actionTarget.textContent = '';
     actionButton.textContent = '';
@@ -427,14 +431,17 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     actionButton.textContent = candidate.active ? labels.clear : labels.start;
     actionBar.hidden = false;
   }
-  function selectCandidate(candidate) {
+  function selectCandidate(candidate, { focusAction = false } = {}) {
     if (isDesktop() || !modeOpen) return;
     selectedKey = candidate.key;
     selectedContext = contextKey(activeContext());
+    selectedElement = candidate.element;
     panel.hidden = true;
     panelToggle.setAttribute('aria-expanded', 'false');
+    setHighlight(candidate, true);
     renderOverlay();
     renderActionBar();
+    if (focusAction) actionButton.focus({ preventScroll: true });
   }
   function setMode(open, { focusFirst = false } = {}) {
     modeOpen = open;
@@ -515,8 +522,9 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     }, describePageBreakCandidate(locale, renderedCandidates.findIndex((item) => item.key === candidate.key) + 1, renderedCandidates.length, candidate, !wasActive));
   }
   function setHighlight(candidate, active) {
-    candidate.element.classList.toggle('page-break-target-highlight', active);
-    overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
+    const persistent = selectedCandidate()?.key === candidate.key;
+    candidate.element.classList.toggle('page-break-target-highlight', active || persistent);
+    overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active || persistent);
   }
   function normalizeRovingFocus() {
     if (!renderedCandidates.some((candidate) => candidate.key === rovingFocusKey)) {
@@ -676,7 +684,15 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
         if (isDesktop()) toggle(candidate);
         else selectCandidate(candidate);
       });
-      row.addEventListener('keydown', (event) => handleRovingKey(event, index, panel));
+      row.addEventListener('keydown', (event) => {
+        if (!isDesktop() && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          event.stopPropagation();
+          selectCandidate(candidate, { focusAction: true });
+          return;
+        }
+        handleRovingKey(event, index, panel);
+      });
       row.addEventListener('pointerenter', () => setHighlight(candidate, true));
       row.addEventListener('pointerleave', () => setHighlight(candidate, false));
       row.addEventListener('focus', () => { rovingFocusKey = candidate.key; setHighlight(candidate, true); });
