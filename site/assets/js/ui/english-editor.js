@@ -337,9 +337,10 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   function fitPreview() {
     const page = preview.querySelector('.english-document');
     if (!page || root.hidden || !previewScroll.clientWidth) return;
-    const padding = window.innerWidth > 820 ? 68 : 28;
+    const wide = !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches;
+    const padding = wide ? 68 : 28;
     const availableWidth = previewScroll.clientWidth - padding;
-    zoom = Math.min(1, availableWidth / ((page.offsetWidth || 816) + (window.innerWidth > 820 ? PAGE_BREAK_PREVIEW_GUTTER : 0)));
+    zoom = Math.min(1, availableWidth / ((page.offsetWidth || 816) + (wide ? PAGE_BREAK_PREVIEW_GUTTER : 0)));
     applyZoom();
   }
 

@@ -158,12 +158,14 @@
 .page-break-menu, .page-break-all-positions { background: #fff; border: 1px solid #d7dde5; border-radius: 6px; color: #2457d6; cursor: pointer; display: inline-flex; font: inherit; font-size: 10px; font-weight: 700; min-height: 32px; padding: 0 10px; }
 .page-break-menu[aria-pressed="true"] { background: #eaf1ff; border-color: #8ba9e8; }
 .page-break-all-positions { bottom: 16px; margin-left: 6px; pointer-events: auto; position: fixed; right: 16px; z-index: 41; }
-.page-break-menu:focus-visible, .page-break-all-positions:focus-visible, .page-break-boundary:focus-visible, .page-break-row:focus-visible, .page-break-undo:focus-visible { outline: 3px solid rgba(36, 87, 214, .3); outline-offset: 2px; }
+.page-break-menu:focus-visible, .page-break-all-positions:focus-visible, .page-break-panel-toggle:focus-visible, .page-break-boundary:focus-visible, .page-break-row:focus-visible, .page-break-undo:focus-visible, .page-break-action:focus-visible { outline: 3px solid rgba(36, 87, 214, .3); outline-offset: 2px; }
 .page-break-feedback { align-items: center; background: #172033; border-radius: 7px; box-shadow: 0 8px 22px rgba(23, 32, 51, .22); color: #fff; display: flex; font-size: 10px; gap: 7px; left: 50%; max-width: min(360px, calc(100vw - 28px)); padding: 8px 10px; position: fixed; top: 16px; transform: translateX(-50%); z-index: 100; }
 .page-break-undo { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-size: 10px; font-weight: 700; min-height: 28px; padding: 0 4px; text-decoration: underline; white-space: nowrap; }
 .page-break-panel { background: #fff; border: 1px solid #d7dde5; border-radius: 9px; box-shadow: 0 12px 32px rgba(23, 32, 51, .16); display: grid; gap: 2px; padding: 8px; position: absolute; right: 12px; top: 44px; width: min(330px, calc(100% - 24px)); z-index: 8; }
 .preview-toolbar > .page-break-panel { display: grid; }
 .page-break-panel[hidden] { display: none !important; }
+.page-break-panel-toggle { background: #fff; border: 1px solid #d7dde5; border-radius: 6px; color: #2457d6; cursor: pointer; font: inherit; font-size: 10px; font-weight: 700; min-height: 32px; padding: 0 10px; }
+.page-break-panel-toggle[hidden] { display: none !important; }
 .page-break-panel strong { font-size: 10px; padding: 6px 8px; }
 .page-break-row { align-items: center; background: transparent; border: 0; border-radius: 7px; cursor: pointer; display: grid; gap: 8px; grid-template-columns: 1fr auto; min-height: 44px; padding: 7px 8px; text-align: left; width: 100%; }
 .page-break-row:hover { background: #eef4ff; }
@@ -197,6 +199,9 @@
 .page-break-tooltip { background: #172033; border-radius: 4px; bottom: calc(100% + 5px); color: #fff; font-size: 9px; font-weight: 650; left: 50%; opacity: 0; padding: 5px 6px; pointer-events: none; position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .page-break-boundary:hover .page-break-tooltip, .page-break-boundary:focus-visible .page-break-tooltip { opacity: 1; }
 .page-break-target-highlight { outline: 2px solid rgba(36, 87, 214, .55); outline-offset: 1px; }
+.page-break-visual-boundary.is-selected .page-break-boundary-line { border-top-color: #173f6f; border-top-style: solid; border-top-width: 2px; }
+.page-break-visual-boundary.is-selected .page-break-sign { box-shadow: 0 0 0 3px rgba(36, 87, 214, .25); }
+.page-break-action-bar { display: none; }
 .has-manual-page-break { break-before: page; page-break-before: always; }
 .preview-dot { background: var(--green); border-radius: 50%; height: 6px; margin-right: 7px !important; width: 6px; }
 .zoom-controls { background: #fff; border: 1px solid #d7dde5; border-radius: 6px; overflow: hidden; }
