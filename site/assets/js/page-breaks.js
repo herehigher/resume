@@ -290,6 +290,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   actionButton.className = 'page-break-action';
   actionBar.append(actionTarget, actionButton);
   document.body.append(actionBar);
+  const trustCapsule = document.getElementById('trustCapsule');
   let modeOpen = false;
   let feedbackTimer = null;
   let geometryFrame = null;
@@ -371,6 +372,18 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     actionTarget.textContent = '';
     actionButton.textContent = '';
   }
+  function syncTrustCapsule() {
+    if (!trustCapsule) return;
+    const owner = document.body.dataset.pageBreakEditingLocale;
+    const ownsEditingSurface = !isDesktop() && modeOpen && isSurfaceVisible();
+    if (ownsEditingSurface) {
+      document.body.dataset.pageBreakEditingLocale = locale;
+      trustCapsule.hidden = true;
+    } else if (owner === locale) {
+      delete document.body.dataset.pageBreakEditingLocale;
+      trustCapsule.hidden = false;
+    }
+  }
   function renderActionBar() {
     const candidate = selectedCandidate();
     if (!candidate || isDesktop() || !modeOpen || !isSurfaceVisible()) {
@@ -413,6 +426,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       renderOverlay();
       if (open && focusFirst) overlay.querySelector('button')?.focus({ preventScroll: true });
     }
+    syncTrustCapsule();
   }
   function setMobilePanel(open, { focusFirst = false } = {}) {
     if (!modeOpen) return;
@@ -431,6 +445,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     menu.setAttribute('aria-expanded', 'false');
     clearSelection();
     clearFeedback();
+    syncTrustCapsule();
   }
   function clearFeedback() {
     window.clearTimeout(feedbackTimer);
@@ -576,6 +591,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       if (!panel.hidden) renderPanel(renderedCandidates);
       renderActionBar();
     }
+    syncTrustCapsule();
     if (lastFocusKey) {
       const target = (isDesktop() ? overlay : panel).querySelector(`[data-page-break-key="${lastFocusKey}"]`);
       target?.focus({ preventScroll: true }); lastFocusKey = null;
@@ -622,6 +638,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       if (!panel.hidden) renderPanel(renderedCandidates);
       renderActionBar();
     }
+    syncTrustCapsule();
   };
   function scheduleGeometrySync() {
     if (geometryFrame !== null) return;
