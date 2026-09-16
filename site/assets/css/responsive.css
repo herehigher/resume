@@ -9,7 +9,7 @@
   .draft-sample-actions { justify-content: flex-start; }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 820px), (max-width: 900px) and (max-height: 500px) {
   body { overflow: hidden; }
   .app-header { height: 62px; padding: 0 14px; }
   .brand small, .desktop-only { display: none; }
@@ -61,8 +61,22 @@
   .editor-panel { border: 0; height: 100%; padding: 26px 18px 48px; }
   .preview-panel { height: 100%; }
   .preview-toolbar { position: relative; }
-  .page-break-menu { display: inline-flex; align-items: center; }
-  .page-break-overlay { display: none !important; }
+  .page-break-menu { align-items: center; display: inline-flex; min-height: 44px; }
+  .page-break-panel-toggle { min-height: 44px; }
+  .preview-toolbar { gap: 6px; justify-content: flex-end; padding: 0 10px; }
+  .preview-toolbar > div:first-child { display: none; }
+  .preview-toolbar > .page-break-panel { right: 8px; top: 48px; width: min(330px, calc(100% - 16px)); }
+  .page-break-overlay { display: block; z-index: 9; }
+  .page-break-boundary { border-radius: 10px; height: 44px; left: var(--page-break-marker-left); top: -22px; width: 44px; }
+  .page-break-sign { height: 22px; width: 22px; }
+  .page-break-visual-boundary.is-marker-crowded .page-break-sign, .page-break-visual-boundary.is-viewport-clamped .page-break-sign { height: 22px; width: 22px; }
+  .page-break-visual-boundary.is-marker-crowded .page-break-sign svg, .page-break-visual-boundary.is-viewport-clamped .page-break-sign svg { height: 13px; width: 13px; }
+  .page-break-passive-marker { left: calc(var(--page-break-marker-left) + 13px); top: -9px; }
+  .page-break-visual-boundary.is-marker-crowded .page-break-passive-marker, .page-break-visual-boundary.is-viewport-clamped .page-break-passive-marker { font-size: 16px; height: 18px; left: calc(var(--page-break-marker-left) + 13px); top: -9px; width: 18px; }
+  .page-break-action-bar { align-items: center; background: #172033; border-radius: 12px 12px 0 0; bottom: 0; box-shadow: 0 -8px 24px rgba(23, 32, 51, .2); box-sizing: border-box; color: #fff; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; left: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); position: fixed; right: 0; z-index: 20; }
+  .page-break-action-bar[hidden] { display: none; }
+  .page-break-action-bar strong { font-size: 11px; line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
+  .page-break-action { background: #fff; border: 0; border-radius: 8px; color: #173f6f; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; min-height: 44px; padding: 0 12px; }
   .preview-scroll { padding: 20px 14px 50px; }
   .document-preview { transform-origin: top left; }
   .document-preview { padding-right: 0; }

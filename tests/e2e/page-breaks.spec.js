@@ -9,14 +9,6 @@ async function clickVisible(_page, locator) {
   await locator.click();
 }
 
-async function blurFocusedControlOnNextPointerUp(locator) {
-  await locator.evaluate((element) => {
-    element.addEventListener('pointerup', () => {
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    }, { once: true });
-  });
-}
-
 async function openDesktopPageBreakMode(page, rootSelector) {
   const trigger = page.locator(`${rootSelector} [data-page-break-mode-toggle]`);
   await trigger.click();
@@ -262,120 +254,103 @@ test('desktop: later Chinese and English records anchor their line to the physic
   }
 });
 
-test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navigation and Escape returns focus to the trigger', async ({ page }) => {
-  await openLocale(page, 'zh-CN');
-  await page.locator('[data-zh-action="sample"]').click();
-  await page.locator('[data-zh-mobile-view="preview"]').click();
-  const workspace = page.locator('#chineseWorkspace');
-  await expect(workspace.locator('.page-break-boundary').first()).toBeHidden();
-  const trigger = workspace.locator('.page-break-menu');
-  await expect(trigger).toBeVisible();
-  await trigger.press('Enter');
-  const row = workspace.locator('.page-break-row[data-page-break-key="summary"]');
-  await expect(row).toBeFocused();
-  await expect(row).toHaveAttribute('aria-label', '基本信息之后、个人概述之前添加分页');
-  await row.press('Space');
-  await expect(row).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
-  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-  await page.waitForTimeout(50);
-  await expect(row).toBeFocused();
-  await page.keyboard.press('Tab');
-  const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
-  await expect(experience).toBeFocused();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await experience.press('Enter');
-  await expect(experience).toHaveAttribute('aria-pressed', 'true');
-  await expect(experience).toBeFocused();
-  await expect(experience).toHaveCount(1);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
-  const lastRow = workspace.locator('.page-break-row').last();
-  await lastRow.focus();
-  await page.keyboard.press('Tab');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.focus();
-  await trigger.press('Enter');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await page.keyboard.press('Escape');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await expect(trigger).toBeFocused();
-});
-
-test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss and rerender in Chromium and WebKit', async ({ page }) => {
+test('[mobile][mobile-webkit] smartphone markers select a boundary before the bottom action confirms it', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
   const workspace = page.locator('#chineseWorkspace');
   const trigger = workspace.locator('.page-break-menu');
-  const summary = workspace.locator('.page-break-row[data-page-break-key="summary"]');
-  const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
-  const projects = workspace.locator('.page-break-row[data-page-break-key="projects"]');
-
-  await trigger.tap();
-  await expect(summary).toBeFocused();
-  await blurFocusedControlOnNextPointerUp(summary);
-  await summary.tap();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(summary).toHaveCount(1);
-  await expect(summary).toHaveAttribute('aria-pressed', 'true');
+  await trigger.press('Enter');
+  const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
+  await expect(marker).toBeVisible();
+  await expect(marker).toHaveAttribute('aria-pressed', 'false');
+  await marker.press('Space');
+  await expect(marker).toHaveAttribute('aria-pressed', 'false');
+  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  const actionBar = page.locator('.page-break-action-bar:not([hidden])');
+  await expect(actionBar).toBeVisible();
+  await expect(actionBar).toContainText('个人概述之前');
+  await expect(actionBar.locator('.page-break-action')).toHaveText('从新页面开始');
+  await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
+  await actionBar.locator('.page-break-action').click();
+  await expect(actionBar).toBeHidden();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
-
-  await blurFocusedControlOnNextPointerUp(experience);
-  await experience.tap();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(experience).toHaveCount(1);
-  await expect(experience).toHaveAttribute('aria-pressed', 'true');
-  await expect(experience).toBeFocused();
-  await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
-
-  await blurFocusedControlOnNextPointerUp(experience);
-  await experience.tap();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(experience).toHaveCount(1);
-  await expect(experience).toHaveAttribute('aria-pressed', 'false');
-  await expect(experience).toBeFocused();
-  await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
+  await marker.press('Space');
+  await expect(actionBar.locator('.page-break-action')).toHaveText('取消分页');
+  await actionBar.locator('.page-break-action').click();
+  await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
   await expect(page.locator('#statusAnnouncer')).toHaveText('已取消 PDF 导出时的分页。');
-
-  await blurFocusedControlOnNextPointerUp(projects);
-  await projects.tap();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(projects).toHaveCount(1);
-  await expect(projects).toHaveAttribute('aria-pressed', 'true');
-  await expect(projects).toBeFocused();
-  await expect(page.locator('[data-section-key="projects"]')).toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
-
-  await blurFocusedControlOnNextPointerUp(trigger);
-  await trigger.tap();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await page.locator('.page-break-undo').click();
+  await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
 });
 
-test('[mobile][mobile-webkit] page-break list closes when focus or a click moves outside it', async ({ page }) => {
+test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full touch target and action bar on screen', async ({ page }) => {
+  for (const viewport of [{ width: 320, height: 650 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport);
+    await openLocale(page, 'zh-CN');
+    await page.locator('[data-zh-action="sample"]').click();
+    await page.locator('[data-zh-mobile-view="preview"]').click();
+    const trigger = page.locator('#chineseWorkspace .page-break-menu');
+    await trigger.click();
+    const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
+    await expect(marker).toBeVisible();
+    await expect.poll(() => marker.evaluate((element) => {
+      const marker = element.getBoundingClientRect();
+      const line = element.closest('.page-break-visual-boundary')?.querySelector('.page-break-boundary-line')?.getBoundingClientRect();
+      return Boolean(line) && marker.width >= 44 && marker.height >= 44
+        && marker.left >= 0 && marker.right <= innerWidth
+        && marker.top >= 0 && marker.bottom <= innerHeight
+        && Math.abs((marker.top + marker.height / 2) - line.top) < 1;
+    })).toBe(true);
+    await marker.tap();
+    const bar = page.locator('.page-break-action-bar:not([hidden])');
+    await expect(bar).toBeVisible();
+    await expect.poll(() => bar.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const action = element.querySelector('.page-break-action')?.getBoundingClientRect();
+      return Boolean(action) && box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight
+        && action.width >= 44 && action.height >= 44;
+    })).toBe(true);
+    await trigger.click();
+  }
+});
+
+test('[mobile][mobile-webkit] supplemental panel hands a selection to the bottom action bar without changing state', async ({ page }) => {
+  await openLocale(page, 'zh-CN');
+  await page.locator('[data-zh-action="sample"]').click();
+  await page.locator('[data-zh-mobile-view="preview"]').click();
+  const workspace = page.locator('#chineseWorkspace');
+  const trigger = workspace.locator('.page-break-menu');
+  const panelToggle = workspace.locator('.page-break-panel-toggle');
+  const summary = workspace.locator('.page-break-row[data-page-break-key="summary"]');
+  await trigger.tap();
+  await expect(panelToggle).toBeVisible();
+  await panelToggle.tap();
+  await expect(summary).toBeVisible();
+  await summary.tap();
+  await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
+  await page.locator('.page-break-action-bar:not([hidden]) .page-break-action').tap();
+  await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
+});
+
+test('[mobile][mobile-webkit] selected mobile boundary survives geometry changes and closes safely when its locale becomes inactive', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
   const workspace = page.locator('#chineseWorkspace');
   const trigger = workspace.locator('.page-break-menu');
   await trigger.click();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await page.locator('#localeSelect').focus();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.click();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await workspace.locator('[data-zh-preview-scroll]').click({ position: { x: 4, y: 4 } });
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.click();
-  await page.locator('#localeSelect').focus();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.click();
-  await page.keyboard.press('Escape');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.press('Enter');
-  await page.locator('#localeSelect').focus();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
+  await marker.click();
+  await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await page.locator('#localeSelect').selectOption('en');
+  await expect(page.locator('.page-break-action-bar:not([hidden])')).toHaveCount(0);
 });
 
 test('[mobile] identity-only documents hide the page-break menu and retain no illegal controls', async ({ page }) => {
@@ -546,11 +521,14 @@ test('responsive and locale changes close stale pagination surfaces and keep ARI
   await page.locator('[data-mobile-view="preview"]').click();
   const trigger = page.locator('#japaneseWorkspace [data-page-break-mode-toggle]');
   const panel = page.locator('#page-break-panel-ja');
-  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-panel-ja');
+  const panelToggle = page.locator('#japaneseWorkspace .page-break-panel-toggle');
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-ja');
   await trigger.click();
+  await expect(page.locator('#page-break-overlay-ja')).toBeVisible();
+  await panelToggle.click();
   await expect(panel).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(panel).toBeHidden();
-  await expect(page.locator('#page-break-overlay-ja')).toBeHidden();
+  await expect(page.locator('#page-break-overlay-ja')).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-ja');
 });
