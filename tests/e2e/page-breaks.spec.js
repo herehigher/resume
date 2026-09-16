@@ -138,6 +138,25 @@ test('desktop: pagination rail uses one Tab stop, arrow navigation, detailed sta
   await expect(panelRow).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('desktop: a context switch resets the roving entry when its focused candidate no longer exists', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  const trigger = page.locator('#japaneseWorkspace [data-page-break-mode-toggle]');
+  await page.locator('#careerDocumentTab').click();
+  await trigger.click();
+  const careerCandidate = page.locator('#page-break-overlay-ja .page-break-boundary[data-page-break-key="self-promotion"]');
+  await careerCandidate.focus();
+  await expect(careerCandidate).toBeFocused();
+  await page.locator('#resumeDocumentTab').click();
+  if (await trigger.getAttribute('aria-pressed') !== 'true') await trigger.click();
+  const rail = page.locator('#page-break-overlay-ja [role="toolbar"]');
+  await expect(rail.locator('.page-break-boundary[tabindex="0"]')).toHaveCount(1);
+  const allPositions = page.locator('.page-break-all-positions');
+  await allPositions.click();
+  await expect(page.locator('#page-break-panel-ja .page-break-row[tabindex="0"]')).toHaveCount(1);
+});
+
 test('narrow desktop: Japanese and Chinese retain every paper-exterior boundary icon', async ({ page }) => {
   const locales = [
     { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton', key: 'qualifications' },
@@ -306,9 +325,16 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   const workspace = page.locator('#chineseWorkspace');
   await expect(workspace.locator('.page-break-boundary').first()).toBeHidden();
   const trigger = workspace.locator('.page-break-menu');
+  const panel = workspace.locator('#page-break-panel-zh-CN');
   await expect(trigger).toBeVisible();
+  await expect(panel).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(trigger).toHaveAttribute('aria-pressed', 'false');
   await trigger.press('Enter');
   const row = workspace.locator('.page-break-row[data-page-break-key="summary"]');
+  await expect(panel).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(workspace.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
   await expect(row).toBeFocused();
   await expect(row).toHaveAttribute('aria-label', /位置 1 \/ \d+、个人概述之前、未设置/);
   await row.press('Space');
@@ -317,24 +343,47 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await page.evaluate(() => window.dispatchEvent(new Event('resize')));
   await page.waitForTimeout(50);
   await expect(row).toBeFocused();
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('ArrowDown');
   const experience = workspace.locator('.page-break-row[data-page-break-key="experience"]');
   await expect(experience).toBeFocused();
+  await expect(workspace.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await experience.press('Enter');
   await expect(experience).toHaveAttribute('aria-pressed', 'true');
   await expect(experience).toBeFocused();
   await expect(experience).toHaveCount(1);
   await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
-  const lastRow = workspace.locator('.page-break-row').last();
-  await lastRow.focus();
-  await page.keyboard.press('Tab');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.focus();
-  await trigger.press('Enter');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('[mobile] Japanese mobile pagination panel stays closed until its toggle opens a single roving Tab stop', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  await page.locator('[data-mobile-view="preview"]').click();
+  const workspace = page.locator('#japaneseWorkspace');
+  const trigger = workspace.locator('[data-page-break-mode-toggle]');
+  const panel = workspace.locator('#page-break-panel-ja');
+  await expect(panel).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(trigger).toHaveAttribute('aria-pressed', 'false');
+  await expect(trigger).toHaveText('改ページを編集');
+  await trigger.press('Enter');
+  await expect(panel).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+  await expect(trigger).toHaveText('改ページ編集中');
+  const rows = panel.locator('.page-break-row');
+  expect(await rows.count()).toBeGreaterThan(1);
+  await expect(panel.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(rows.last()).toBeFocused();
+  await expect(panel.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
   await expect(trigger).toBeFocused();
 });
 

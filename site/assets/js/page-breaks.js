@@ -397,6 +397,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     panel.hidden = true;
     menu.setAttribute('aria-pressed', 'false');
     menu.setAttribute('aria-expanded', 'false');
+    menu.textContent = labels.edit;
     allPositions.hidden = true;
     allPositions.setAttribute('aria-expanded', 'false');
     clearFeedback();
@@ -433,6 +434,11 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   function setHighlight(candidate, active) {
     candidate.element.classList.toggle('page-break-target-highlight', active);
     overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
+  }
+  function normalizeRovingFocus() {
+    if (!renderedCandidates.some((candidate) => candidate.key === rovingFocusKey)) {
+      rovingFocusKey = renderedCandidates[0]?.key || null;
+    }
   }
   function rovingControls(surface) {
     return [...surface.querySelectorAll('[data-page-break-key]')].filter((control) => control instanceof HTMLButtonElement);
@@ -556,7 +562,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function renderPanel(candidates) {
     panel.replaceChildren();
-    if ((!isDesktop() && !isSurfaceVisible()) || (isDesktop() && !allPositionsOpen)) {
+    if (!modeOpen || !isSurfaceVisible() || (isDesktop() && !allPositionsOpen)) {
       panel.hidden = true;
       return;
     }
@@ -565,7 +571,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     candidates.forEach((candidate, index) => {
       const row = document.createElement('button');
       row.type = 'button'; row.className = 'page-break-row'; row.dataset.pageBreakKey = candidate.key;
-      row.tabIndex = isDesktop() ? (candidate.key === rovingFocusKey || (!rovingFocusKey && index === 0) ? 0 : -1) : 0;
+      row.tabIndex = candidate.key === rovingFocusKey || (!rovingFocusKey && index === 0) ? 0 : -1;
       row.setAttribute('aria-posinset', String(index + 1)); row.setAttribute('aria-setsize', String(candidates.length));
       row.setAttribute('aria-pressed', String(candidate.active)); row.setAttribute('aria-label', description(candidate, index));
       const rowText = document.createElement('span');
@@ -574,7 +580,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       const rowSwitch = document.createElement('span'); rowSwitch.className = 'page-break-switch'; rowSwitch.setAttribute('aria-hidden', 'true');
       rowText.append(rowLabel, rowDetail); row.append(rowText, rowSwitch);
       row.addEventListener('click', () => toggle(candidate));
-      row.addEventListener('keydown', (event) => { if (isDesktop()) handleRovingKey(event, index, panel); });
+      row.addEventListener('keydown', (event) => handleRovingKey(event, index, panel));
       row.addEventListener('pointerenter', () => setHighlight(candidate, true));
       row.addEventListener('pointerleave', () => setHighlight(candidate, false));
       row.addEventListener('focus', () => { rovingFocusKey = candidate.key; setHighlight(candidate, true); });
@@ -591,6 +597,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     renderedCandidates = getBoundaryCandidates({ state, locale, documentType: type, preview }).map((candidate) => Object.freeze({
       ...candidate, active: candidateIsActive(candidate, targets), isRecord: candidate.bindings.every((target) => target.level === 'record')
     }));
+    normalizeRovingFocus();
     renderedCandidates.forEach((candidate) => {
       candidate.element.classList.toggle('has-manual-page-break', candidate.active);
     });
@@ -655,7 +662,10 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     } else {
       overlay.hidden = true;
       modeOpen = false;
+      allPositionsOpen = false;
       menu.setAttribute('aria-pressed', 'false');
+      menu.setAttribute('aria-expanded', 'false');
+      menu.textContent = labels.edit;
       renderPanel(renderedCandidates);
     }
   };
