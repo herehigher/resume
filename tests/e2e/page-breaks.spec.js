@@ -76,7 +76,7 @@ test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons 
   await clickVisible(page, boundary);
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
-  await expect(boundary).toHaveAttribute('aria-label', 'Remove page break between Contact information and Summary');
+  await expect(boundary).toHaveAttribute('aria-label', /Position 1 of \d+, before Summary, Set/);
   await expect(page.locator('.page-break-feedback:not([hidden])')).toContainText('The PDF will start this content on a new page.');
   const undo = page.locator('.page-break-undo');
   await expect(undo).toBeVisible();
@@ -101,6 +101,43 @@ test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons 
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
 });
 
+test('desktop: pagination rail uses one Tab stop, arrow navigation, detailed status, and the all-positions panel', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'en');
+  await page.locator('[data-en-load-sample]').click();
+  const trigger = page.locator('[data-english-editor] [data-page-break-mode-toggle]');
+  await expect(trigger).toHaveAttribute('aria-label', /Edit page breaks, \d+ candidates/);
+  await trigger.press('Enter');
+  const overlay = page.locator('#page-break-overlay-en');
+  const rail = overlay.getByRole('toolbar', { name: 'Page break position candidates' });
+  const candidates = rail.locator('.page-break-boundary');
+  await expect(overlay).toHaveAttribute('aria-hidden', 'false');
+  expect(await candidates.count()).toBeGreaterThan(1);
+  await expect(rail.locator('.page-break-boundary[tabindex="0"]')).toHaveCount(1);
+  await expect(candidates.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  const selected = candidates.nth(1);
+  await expect(selected).toBeFocused();
+  await expect(selected).toHaveAttribute('aria-label', /Position 2 of \d+, before .+, Not set/);
+  await page.keyboard.press('Enter');
+  await expect(selected).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/Position 2 of \d+, before .+, Set/);
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-pressed', 'false');
+  await trigger.press('Enter');
+  const allPositions = page.locator('.page-break-all-positions');
+  await expect(allPositions).toBeVisible();
+  await allPositions.click();
+  const panel = page.locator('#page-break-panel-en');
+  await expect(panel).toBeVisible();
+  const panelRow = panel.locator('.page-break-row').nth(1);
+  await panelRow.focus();
+  await expect(page.locator('[data-en-preview] [data-section-key="experience"]')).toHaveClass(/page-break-target-highlight/);
+  await panelRow.press('Space');
+  await expect(panelRow).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('narrow desktop: Japanese and Chinese retain every paper-exterior boundary icon', async ({ page }) => {
   const locales = [
     { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton', key: 'qualifications' },
@@ -120,7 +157,7 @@ test('narrow desktop: Japanese and Chinese retain every paper-exterior boundary 
       const overlay = page.locator(`#page-break-overlay-${item.locale}`);
       await trigger.click();
       await expect(trigger).toHaveAttribute('aria-pressed', 'true');
-      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
       await expect(trigger).toHaveAttribute('aria-controls', `page-break-overlay-${item.locale}`);
       await expect(panel).toBeHidden();
       expect(await page.locator(`${item.workspace} .document-page`).evaluate((paper) => (
@@ -273,10 +310,10 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await trigger.press('Enter');
   const row = workspace.locator('.page-break-row[data-page-break-key="summary"]');
   await expect(row).toBeFocused();
-  await expect(row).toHaveAttribute('aria-label', '基本信息之后、个人概述之前添加分页');
+  await expect(row).toHaveAttribute('aria-label', /位置 1 \/ \d+、个人概述之前、未设置/);
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
   await page.evaluate(() => window.dispatchEvent(new Event('resize')));
   await page.waitForTimeout(50);
   await expect(row).toBeFocused();
@@ -288,7 +325,7 @@ test('[mobile][mobile-webkit] smartphone: page-break rows support keyboard navig
   await expect(experience).toHaveAttribute('aria-pressed', 'true');
   await expect(experience).toBeFocused();
   await expect(experience).toHaveCount(1);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
   const lastRow = workspace.locator('.page-break-row').last();
   await lastRow.focus();
   await page.keyboard.press('Tab');
@@ -319,7 +356,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(summary).toHaveCount(1);
   await expect(summary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
 
   await blurFocusedControlOnNextPointerUp(experience);
   await experience.tap();
@@ -328,7 +365,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(experience).toHaveAttribute('aria-pressed', 'true');
   await expect(experience).toBeFocused();
   await expect(page.locator('[data-section-key="experience"]')).toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
 
   await blurFocusedControlOnNextPointerUp(experience);
   await experience.tap();
@@ -337,7 +374,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(experience).toHaveAttribute('aria-pressed', 'false');
   await expect(experience).toBeFocused();
   await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('已取消 PDF 导出时的分页。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、未设置/);
 
   await blurFocusedControlOnNextPointerUp(projects);
   await projects.tap();
@@ -346,7 +383,7 @@ test('[mobile][mobile-webkit] page-break rows survive delayed touch focus loss a
   await expect(projects).toHaveAttribute('aria-pressed', 'true');
   await expect(projects).toBeFocused();
   await expect(page.locator('[data-section-key="projects"]')).toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('#statusAnnouncer')).toHaveText('导出 PDF 时将从新页面开始。');
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
 
   await blurFocusedControlOnNextPointerUp(trigger);
   await trigger.tap();
@@ -448,6 +485,13 @@ test('desktop: short English record markers have independent hit targets and sav
   const second = page.locator('.page-break-boundary[data-page-break-key="record:record_second"]');
   const third = page.locator('.page-break-boundary[data-page-break-key="record:record_third"]');
   await expect(page.locator('.page-break-boundary[data-page-break-key="record:record_first"]')).toHaveCount(0);
+  const candidateCount = await page.locator('#page-break-overlay-en .page-break-boundary').count();
+  await page.locator('[data-en-preview] [data-record-id]').evaluateAll((records) => {
+    records.forEach((record) => { record.style.cssText = 'height: 10px; margin: 0; min-height: 0; overflow: hidden; padding: 0;'; });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await expect.poll(() => page.locator('#page-break-overlay-en [data-page-break-cluster-count]').count()).toBeGreaterThan(0);
+  await expect(page.locator('#page-break-overlay-en .page-break-boundary')).toHaveCount(candidateCount);
   await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('.page-break-record-boundary')].map((element) => {
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.left + (box.width / 2), box.top + (box.height / 2));
@@ -487,7 +531,7 @@ test('desktop: active classes follow English paper size and Japanese document ty
   await openDesktopPageBreakMode(page, '#japaneseWorkspace');
   const qualifications = page.locator('.page-break-boundary[data-page-break-key="qualifications"]');
   await expect(qualifications).toContainText('解除');
-  await expect(qualifications).toHaveAttribute('aria-label', '学歴・職歴の後、免許・資格の前に改ページを解除');
+  await expect(qualifications).toHaveAttribute('aria-label', /位置 \d+ \/ \d+、免許・資格の前、設定済み/);
   await expect(page.locator('[data-section-key="qualifications"]')).toHaveClass(/has-manual-page-break/);
   await page.locator('#careerDocumentTab').click();
   await expect(page.locator('.page-break-boundary[data-page-break-key="career-history"]')).toContainText('解除');

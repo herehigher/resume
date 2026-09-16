@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createDefaultState } from '../site/assets/js/state/defaults.js';
-import { PAGE_BREAK_LABELS, SECTION_REGISTRY, SEMANTIC_BOUNDARY_REGISTRY, describePageBreak, getBoundaryCandidates, getPageBreaks, getVisibleSectionKeys, validatePageBreaks } from '../site/assets/js/page-breaks.js';
+import { PAGE_BREAK_LABELS, SECTION_REGISTRY, SEMANTIC_BOUNDARY_REGISTRY, describePageBreak, describePageBreakCandidate, getBoundaryCandidates, getPageBreaks, getVisibleSectionKeys, validatePageBreaks } from '../site/assets/js/page-breaks.js';
 import { renderEnglishDocument } from '../site/assets/js/templates/en.js';
 import { renderChineseDocument } from '../site/assets/js/templates/zh-CN.js';
 import { renderJapaneseDocument } from '../site/assets/js/templates/ja.js';
@@ -40,6 +40,12 @@ test('accessible names describe both adjacent sections and the page-break action
   assert.equal(describePageBreak('ja', previous, target, true), '基本情報の後、学歴・職歴の前に改ページを解除');
   assert.equal(describePageBreak('zh-CN', { label: '基本信息' }, { label: '个人概述' }, false), '基本信息之后、个人概述之前添加分页');
   assert.equal(describePageBreak('en', { label: 'Contact information' }, { label: 'Summary' }, true), 'Remove page break between Contact information and Summary');
+});
+
+test('pagination rail candidates expose position, target, state, and total in every locale', () => {
+  assert.equal(describePageBreakCandidate('ja', 4, 12, { label: 'B社' }, false), '位置 4 / 12、B社の前、未設定');
+  assert.equal(describePageBreakCandidate('zh-CN', 4, 12, { label: 'B 公司' }, true), '位置 4 / 12、B 公司之前、已设置');
+  assert.equal(describePageBreakCandidate('en', 4, 12, { label: 'Company B' }, false), 'Position 4 of 12, before Company B, Not set');
 });
 
 test('renderers expose semantic sections for legal visible-boundary controls', () => {
