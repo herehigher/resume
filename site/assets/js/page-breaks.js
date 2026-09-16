@@ -187,8 +187,26 @@ export function getBoundaryCandidates({ state, locale, documentType, preview }) 
     }
     normalized.set(candidate.element, { ...candidate, bindings: [...candidate.bindings] });
   });
+  // A section boundary and its first child record identify the same physical
+  // place. Keep one section-level candidate there, while retaining the record
+  // binding solely so an existing saved record break remains removable.
+  const ordered = [];
+  let physicalPrevious = null;
+  [...normalized.values()].forEach((candidate) => {
+    const previous = ordered.at(-1);
+    const isFirstRecordAfterParent = candidate.bindings.every((target) => target.level === 'record')
+      && candidate.boundary.parent
+      && physicalPrevious?.bindings.some((target) => target.level === 'section' && target.key === candidate.boundary.parent);
+    if (isFirstRecordAfterParent) {
+      previous.bindings.push(...candidate.bindings);
+      previous.hasRedundantFirstRecordBinding = true;
+      physicalPrevious = candidate;
+      return;
+    }
+    ordered.push(candidate);
+    physicalPrevious = candidate;
+  });
   // The first visible physical node cannot create a meaningful page boundary.
-  const ordered = [...normalized.values()];
   return ordered.slice(1).map((candidate, index) => {
     const primary = candidate.bindings.find((target) => target.level === 'section') || candidate.bindings[0];
     return Object.freeze({ ...candidate, previous: ordered[index], key: primary.level === 'section' ? primary.key : `record:${primary.key}` });
@@ -201,7 +219,10 @@ function candidateIsActive(candidate, targets) {
 
 function updateCandidateTargets(nextState, locale, paper, documentType, candidate, active) {
   const targets = nextState.settings.pageBreaks[locale][paper][documentType];
-  for (const target of candidate.bindings) {
+  const bindings = active && candidate.hasRedundantFirstRecordBinding
+    ? candidate.bindings.filter((target) => target.level === 'section')
+    : candidate.bindings;
+  for (const target of bindings) {
     const field = target.level === 'record' ? 'records' : 'sections';
     targets[field] = active
       ? [...new Set([...targets[field], target.key])]
@@ -381,25 +402,57 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     if (overlay.hidden) return;
     const visible = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
     const laneEnds = [];
+    const positions = [];
     visible.forEach((candidate) => {
       const boundary = overlay.querySelector(`.page-break-visual-boundary[data-page-break-key="${candidate.key}"]`);
       const page = candidate.element.closest('.document-page');
       if (!boundary || !page) return;
       const pageBox = page.getBoundingClientRect();
       const targetBox = candidate.element.getBoundingClientRect();
+      const previousBox = candidate.previous.element.getBoundingClientRect();
+      // The semantic boundary is before the next element, but its visual line
+      // belongs in the gap just after the previous one. Keep a four-pixel
+      // clearance from the next element's focus/highlight outline without
+      // changing document layout.
+      const boundaryTop = Math.min(previousBox.bottom + 4, targetBox.top - 4);
       let lane = 0;
       while (laneEnds[lane] !== undefined && targetBox.top - laneEnds[lane] < 30) lane += 1;
       laneEnds[lane] = targetBox.top;
       const markerWidth = 30;
       const desiredMarkerLeft = pageBox.width + 5 + (lane * 32);
-      const visibleMarkerLeft = Math.max(0, window.innerWidth - pageBox.left - markerWidth - 1);
+      // In a narrow viewport the control centre must remain reachable even
+      // when the paper itself extends beyond the right edge. The 8px tail of
+      // the transparent hit target may sit outside the viewport; the 16px
+      // visual marker stays visible and reaches no further than 15px over the
+      // visible paper edge.
+      const visibleMarkerLeft = Math.max(0, window.innerWidth - pageBox.left - (markerWidth - 8));
       const markerLeft = Math.min(desiredMarkerLeft, visibleMarkerLeft);
       boundary.style.left = `${pageBox.left}px`;
-      boundary.style.top = `${targetBox.top}px`;
+      boundary.style.top = `${boundaryTop}px`;
       boundary.style.width = `${pageBox.width}px`;
       boundary.style.setProperty('--page-break-marker-lane', String(lane));
       boundary.style.setProperty('--page-break-marker-left', `${markerLeft}px`);
       boundary.classList.toggle('is-viewport-clamped', markerLeft < desiredMarkerLeft);
+      positions.push({ boundary, markerLeft, targetBox: { ...targetBox, top: boundaryTop } });
+    });
+    // Lanes are horizontally distinct until the viewport clamp brings them
+    // together. Split only their invisible hit rectangles at the midpoint
+    // between neighbouring markers. Their lines and visible signs retain the
+    // exact semantic boundary y position, while no overlap can steal a click.
+    positions.forEach((position) => {
+      const overlapping = positions.filter((other) => other !== position
+        && Math.abs(other.markerLeft - position.markerLeft) < 30
+        && Math.abs(other.targetBox.top - position.targetBox.top) < 30);
+      const before = overlapping.filter((other) => other.targetBox.top < position.targetBox.top)
+        .sort((left, right) => right.targetBox.top - left.targetBox.top)[0];
+      const after = overlapping.filter((other) => other.targetBox.top > position.targetBox.top)
+        .sort((left, right) => left.targetBox.top - right.targetBox.top)[0];
+      const buttonTop = position.targetBox.top - 15;
+      const topInset = before ? Math.max(0, ((before.targetBox.top + position.targetBox.top) / 2) - buttonTop) : 0;
+      const bottomInset = after ? Math.max(0, (buttonTop + 30) - ((after.targetBox.top + position.targetBox.top) / 2)) : 0;
+      position.boundary.style.setProperty('--page-break-hit-top', `${topInset}px`);
+      position.boundary.style.setProperty('--page-break-hit-bottom', `${bottomInset}px`);
+      position.boundary.classList.toggle('is-marker-crowded', topInset > 0 || bottomInset > 0);
     });
   }
   function renderPanel(candidates) {

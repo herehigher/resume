@@ -43,10 +43,11 @@ test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons 
     const button = element.getBoundingClientRect();
     const paper = document.querySelector('[data-en-preview] [data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
     const target = document.querySelector('[data-en-preview] [data-section-key="summary"]').getBoundingClientRect();
+    const previous = document.querySelector('[data-en-preview] [data-section-key="identity"]').getBoundingClientRect();
     const boundary = element.closest('.page-break-visual-boundary').getBoundingClientRect();
-    return button.left >= paper.right + 4 && button.right <= innerWidth
+    return button.left >= paper.right + 4 && (button.left + button.width / 2) < innerWidth
       && Math.abs(boundary.left - paper.left) < 2 && Math.abs(boundary.width - paper.width) < 2
-      && Math.abs(boundary.top - target.top) < 2;
+      && boundary.top >= previous.bottom && boundary.bottom <= target.top - 3;
   })).toBe(true);
   for (const width of [821, 900, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -58,13 +59,20 @@ test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons 
       const hit = document.elementFromPoint(button.left + button.width / 2, button.top + button.height / 2);
       const sign = element.querySelector('.page-break-sign').getBoundingClientRect();
       const exterior = innerWidth >= 1024 ? button.left >= paper.right + 4 : sign.left >= Math.min(paper.right, innerWidth) - 15;
-      return exterior && button.right <= innerWidth
-        && Math.abs(boundary.top - target.top) < 2 && hit?.closest('.page-break-boundary') === element;
+      const previous = document.querySelector('[data-en-preview] [data-section-key="identity"]').getBoundingClientRect();
+      return exterior && (button.left + button.width / 2) < innerWidth
+        && boundary.top >= previous.bottom && boundary.bottom <= target.top - 3
+        && hit?.closest('.page-break-boundary') === element;
     })).toBe(true);
   }
   await boundary.hover();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/page-break-target-highlight/);
   await expect(boundary.locator('.page-break-tooltip')).toHaveCSS('opacity', '1');
+  await expect.poll(() => boundary.evaluate((element) => {
+    const line = element.closest('.page-break-visual-boundary').querySelector('.page-break-boundary-line').getBoundingClientRect();
+    const target = document.querySelector('[data-en-preview] [data-section-key="summary"]').getBoundingClientRect();
+    return line.bottom <= target.top - 3;
+  })).toBe(true);
   await clickVisible(page, boundary);
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
@@ -126,12 +134,24 @@ test('narrow desktop: Japanese and Chinese retain every paper-exterior boundary 
         const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
         const sign = element.querySelector('.page-break-sign')?.getBoundingClientRect();
         const visiblePaperRight = Math.min(paper?.right || 0, innerWidth);
-        return Boolean(paper) && Boolean(sign) && box.right <= innerWidth
+        return Boolean(paper) && Boolean(sign) && (box.left + box.width / 2) < innerWidth
           && sign.left >= visiblePaperRight - 15
           && hit?.closest('.page-break-boundary') === element;
       })).toBe(true);
       await boundary.click();
       await expect(boundary).toHaveAttribute('aria-pressed', 'true');
+      await trigger.click();
+      await expect(trigger).toHaveAttribute('aria-pressed', 'false');
+      const passive = overlay.locator(`.page-break-passive-marker[data-page-break-key="${item.key}"]`);
+      await expect(passive).toBeVisible();
+      await expect.poll(() => passive.evaluate((element) => {
+        const marker = element.getBoundingClientRect();
+        const paper = document.querySelector('.workspace:not([hidden]) .document-page, .workspace:not([hidden]) .zh-resume-document')?.getBoundingClientRect();
+        const visiblePaperRight = Math.min(paper?.right || 0, innerWidth);
+        const line = element.closest('.page-break-visual-boundary')?.querySelector('.page-break-boundary-line')?.getBoundingClientRect();
+        return Boolean(line) && marker.left < innerWidth && marker.right > 0
+          && marker.left >= visiblePaperRight - 15;
+      })).toBe(true);
     }
   }
 
@@ -161,7 +181,7 @@ test('narrow desktop: English icons have independent hit targets without a text 
       const sign = control.querySelector('.page-break-sign')?.getBoundingClientRect();
       const visiblePaperRight = Math.min(paper?.right || 0, innerWidth);
       return Boolean(paper) && Boolean(sign)
-        && box.right <= innerWidth && sign.left >= visiblePaperRight - 15
+        && (box.left + box.width / 2) < innerWidth && sign.left >= visiblePaperRight - 15
         && box.top >= 0 && box.bottom <= innerHeight
         && hit?.closest('.page-break-boundary') === control;
     }))).toBe(true);
@@ -170,6 +190,44 @@ test('narrow desktop: English icons have independent hit targets without a text 
       await boundary.click();
       await expect(boundary).toHaveAttribute('aria-pressed', 'true');
     }
+  }
+});
+
+test('narrow desktop: Chinese adjacent boundary hit regions resolve to their own marker', async ({ page }) => {
+  for (const width of [821, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await openLocale(page, 'zh-CN');
+    await page.locator('[data-zh-action="sample"]').click();
+    await openDesktopPageBreakMode(page, '#chineseWorkspace');
+    const controls = page.locator('#page-break-overlay-zh-CN .page-break-boundary');
+    await expect.poll(() => controls.evaluateAll((elements) => {
+      const controls = elements.map((element) => ({
+        element,
+        box: element.getBoundingClientRect(),
+        sign: element.querySelector('.page-break-sign')?.getBoundingClientRect()
+      }));
+      if (controls.length < 2 || controls.some((control) => !control.sign)) return false;
+      const ownVisualHit = controls.every(({ element, sign }) => (
+        document.elementFromPoint(sign.left + sign.width / 2, sign.top + sign.height / 2)?.closest('.page-break-boundary') === element
+      ));
+      const overlappingPairsResolve = controls.every((current, index) => controls.slice(index + 1).every((other) => {
+        const left = Math.max(current.box.left, other.box.left);
+        const right = Math.min(current.box.right, other.box.right);
+        const top = Math.max(current.box.top, other.box.top);
+        const bottom = Math.min(current.box.bottom, other.box.bottom);
+        if (left >= right || top >= bottom) return true;
+        const x = (left + right) / 2;
+        const upper = current.box.top < other.box.top ? current : other;
+        const lower = upper === current ? other : current;
+        const midpoint = (upper.box.top + 15 + lower.box.top + 15) / 2;
+        const upperHit = document.elementFromPoint(x, Math.max(top + .5, midpoint - 1))?.closest('.page-break-boundary');
+        const lowerHit = document.elementFromPoint(x, Math.min(bottom - .5, midpoint + 1))?.closest('.page-break-boundary');
+        const upperClip = getComputedStyle(upper.element).clipPath;
+        const lowerClip = getComputedStyle(lower.element).clipPath;
+        return upperHit === upper.element && lowerHit === lower.element && upperClip !== 'none' && lowerClip !== 'none';
+      }));
+      return ownVisualHit && overlappingPairsResolve;
+    })).toBe(true);
   }
 });
 
@@ -322,6 +380,7 @@ test('desktop: a saved target stays applied when preceding optional sections bec
 test('desktop: an English record page break follows its stable ID after rendered date reordering', async ({ page }) => {
   const state = createDefaultState('en');
   state.documents.en.resume.experience = [
+    { id: 'record_lead', company: 'Lead fictional employer', role: 'Lead role', startDate: '2023-01', endDate: '2024-01', details: 'Fictional lead achievement.' },
     { id: 'record_target', company: 'Target fictional employer', role: 'Target role', startDate: '2021-01', endDate: '2023-01', details: 'Fictional target achievement.' },
     { id: 'record_other', company: 'Other fictional employer', role: 'Other role', startDate: '2020-01', endDate: '2022-01', details: 'Fictional other achievement.' }
   ];
@@ -334,7 +393,7 @@ test('desktop: an English record page break follows its stable ID after rendered
   await openDesktopPageBreakMode(page, '[data-english-editor]');
   await expect(page.locator('[data-record-id="record_target"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('[data-section-key="experience"]')).not.toHaveClass(/has-manual-page-break/);
-  await page.locator('[data-en-list="experience"] [data-en-item]').nth(1).locator('[data-en-item-field="endDate"]').fill('2024-01');
+  await page.locator('[data-en-list="experience"] [data-en-item]').nth(2).locator('[data-en-item-field="endDate"]').fill('2024-01');
   await expect(page.locator('[data-record-id="record_other"]')).toHaveText(/Other fictional employer/);
   await expect(page.locator('[data-record-id="record_target"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('.page-break-boundary[data-page-break-key="record:record_target"]')).toHaveAttribute('aria-pressed', 'true');
@@ -344,8 +403,9 @@ test('desktop: an English record page break follows its stable ID after rendered
 test('desktop: short English record markers have independent hit targets and save their own IDs', async ({ page }) => {
   const state = createDefaultState('en');
   state.documents.en.resume.experience = [
-    { id: 'record_first', company: 'First fictional employer', role: 'First role', startDate: '2022-01', endDate: '2023-01', details: 'First fictional achievement.' },
-    { id: 'record_second', company: 'Second fictional employer', role: 'Second role', startDate: '2020-01', endDate: '2021-01', details: 'Second fictional achievement.' }
+    { id: 'record_first', company: 'First fictional employer', role: 'First role', startDate: '2023-01', endDate: '2024-01', details: 'First fictional achievement.' },
+    { id: 'record_second', company: 'Second fictional employer', role: 'Second role', startDate: '2021-01', endDate: '2022-01', details: 'Second fictional achievement.' },
+    { id: 'record_third', company: 'Third fictional employer', role: 'Third role', startDate: '2020-01', endDate: '2021-01', details: 'Third fictional achievement.' }
   ];
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openLocale(page, 'en');
@@ -354,29 +414,27 @@ test('desktop: short English record markers have independent hit targets and sav
   });
   await page.locator('#confirmSampleAdoptButton').click();
   await openDesktopPageBreakMode(page, '[data-english-editor]');
-  const first = page.locator('.page-break-boundary[data-page-break-key="record:record_first"]');
   const second = page.locator('.page-break-boundary[data-page-break-key="record:record_second"]');
+  const third = page.locator('.page-break-boundary[data-page-break-key="record:record_third"]');
+  await expect(page.locator('.page-break-boundary[data-page-break-key="record:record_first"]')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('.page-break-record-boundary')].map((element) => {
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.left + (box.width / 2), box.top + (box.height / 2));
     return { key: element.dataset.pageBreakKey, hit: hit?.closest('.page-break-boundary')?.dataset.pageBreakKey, top: box.top };
   }))).toEqual([
-    { key: 'record:record_first', hit: 'record:record_first', top: expect.any(Number) },
-    { key: 'record:record_second', hit: 'record:record_second', top: expect.any(Number) }
+    { key: 'record:record_second', hit: 'record:record_second', top: expect.any(Number) },
+    { key: 'record:record_third', hit: 'record:record_third', top: expect.any(Number) }
   ]);
-  expect(await first.boundingBox()).not.toEqual(await second.boundingBox());
-  await first.click();
+  expect(await second.boundingBox()).not.toEqual(await third.boundingBox());
   await second.click();
-  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await third.click();
   await expect(second).toHaveAttribute('aria-pressed', 'true');
+  await expect(third).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#dataMenuSummary').click();
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#exportDataButton').click();
   const exported = JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'));
-  expect(exported.settings.pageBreaks.en.LETTER.resume.records).toEqual(['record_first', 'record_second']);
-  await page.locator('[data-en-list="experience"] [data-en-item]').nth(1).locator('[data-en-item-field="endDate"]').fill('2024-01');
-  await expect(page.locator('[data-record-id="record_first"]')).toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('[data-record-id="record_second"]')).toHaveClass(/has-manual-page-break/);
+  expect(exported.settings.pageBreaks.en.LETTER.resume.records).toEqual(['record_second', 'record_third']);
 });
 
 test('desktop: active classes follow English paper size and Japanese document type', async ({ page }) => {
@@ -419,7 +477,8 @@ test('desktop: boundary geometry realigns after Japanese zoom transitions', asyn
     const button = element.getBoundingClientRect();
     const targetBox = target.getBoundingClientRect();
     const boundary = element.closest('.page-break-visual-boundary').getBoundingClientRect();
-    return Math.abs(boundary.top - targetBox.top) < 3 && button.left >= boundary.right + 4;
+    const previousBox = document.querySelector('[data-section-key="history"]').getBoundingClientRect();
+    return boundary.top >= previousBox.bottom && boundary.bottom <= targetBox.top - 3 && button.left >= boundary.right + 4;
   })).toBe(true);
 });
 
