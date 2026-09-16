@@ -308,9 +308,10 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   function fitPreview() {
     const page = preview.querySelector('.zh-resume-document');
     if (!page || rootElement.hidden) return;
-    const available = previewScroll.clientWidth - (window.innerWidth > 820 ? 68 : 28);
-    const gutter = window.innerWidth > 820 ? PAGE_BREAK_PREVIEW_GUTTER : 0;
-    zoom = Math.min(1, Math.max(window.innerWidth > 820 ? .55 : .45, available / ((page.offsetWidth || 760) + gutter)));
+    const wide = !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches;
+    const available = previewScroll.clientWidth - (wide ? 68 : 28);
+    const gutter = wide ? PAGE_BREAK_PREVIEW_GUTTER : 0;
+    zoom = Math.min(1, Math.max(wide ? .55 : .45, available / ((page.offsetWidth || 760) + gutter)));
     applyZoom();
   }
 

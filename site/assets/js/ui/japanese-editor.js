@@ -346,7 +346,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
 
   function fitPreviewForViewport() {
     if (!preview.querySelector('.document-page')) return;
-    const wide = window.innerWidth > 820;
+    const wide = !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches;
     const padding = wide ? 68 : 28;
     const fallbackWidth = wide ? 760 : 595;
     const availableWidth = document.getElementById('previewScroll').clientWidth - padding;
