@@ -16,6 +16,15 @@ async function openDesktopPageBreakMode(page, rootSelector) {
   return trigger;
 }
 
+async function ensureChineseMobilePreview(page) {
+  const workspace = page.locator('#chineseWorkspace');
+  if (await workspace.getAttribute('data-mobile-mode') === 'preview') return;
+  const previewButton = workspace.locator('[data-zh-mobile-view="preview"]');
+  await expect(previewButton).toBeVisible();
+  await previewButton.click();
+  await expect(workspace).toHaveAttribute('data-mobile-mode', 'preview');
+}
+
 test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons and short tooltips', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openLocale(page, 'en');
@@ -286,11 +295,12 @@ test('[mobile][mobile-webkit] smartphone markers select a boundary before the bo
 });
 
 test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full touch target and action bar on screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLocale(page, 'zh-CN');
+  await page.locator('[data-zh-action="sample"]').click();
+  await ensureChineseMobilePreview(page);
   for (const viewport of [{ width: 320, height: 650 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
-    await openLocale(page, 'zh-CN');
-    await page.locator('[data-zh-action="sample"]').click();
-    await page.locator('[data-zh-mobile-view="preview"]').click();
     const trigger = page.locator('#chineseWorkspace .page-break-menu');
     await trigger.click();
     const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
@@ -309,8 +319,9 @@ test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full tou
     await expect.poll(() => bar.evaluate((element) => {
       const box = element.getBoundingClientRect();
       const action = element.querySelector('.page-break-action')?.getBoundingClientRect();
+      const hit = action && document.elementFromPoint(action.left + action.width / 2, action.top + action.height / 2);
       return Boolean(action) && box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight
-        && action.width >= 44 && action.height >= 44;
+        && action.width >= 44 && action.height >= 44 && hit?.closest('.page-break-action') === element.querySelector('.page-break-action');
     })).toBe(true);
     await trigger.click();
   }

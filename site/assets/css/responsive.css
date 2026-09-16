@@ -73,7 +73,7 @@
   .page-break-visual-boundary.is-marker-crowded .page-break-sign svg, .page-break-visual-boundary.is-viewport-clamped .page-break-sign svg { height: 13px; width: 13px; }
   .page-break-passive-marker { left: calc(var(--page-break-marker-left) + 13px); top: -9px; }
   .page-break-visual-boundary.is-marker-crowded .page-break-passive-marker, .page-break-visual-boundary.is-viewport-clamped .page-break-passive-marker { font-size: 16px; height: 18px; left: calc(var(--page-break-marker-left) + 13px); top: -9px; width: 18px; }
-  .page-break-action-bar { align-items: center; background: #172033; border-radius: 12px 12px 0 0; bottom: 0; box-shadow: 0 -8px 24px rgba(23, 32, 51, .2); box-sizing: border-box; color: #fff; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; left: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); position: fixed; right: 0; z-index: 20; }
+  .page-break-action-bar { align-items: center; background: #172033; border-radius: 12px 12px 0 0; bottom: 0; box-shadow: 0 -8px 24px rgba(23, 32, 51, .2); box-sizing: border-box; color: #fff; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; left: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); position: fixed; right: 0; z-index: 50; }
   .page-break-action-bar[hidden] { display: none; }
   .page-break-action-bar strong { font-size: 11px; line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
   .page-break-action { background: #fff; border: 0; border-radius: 8px; color: #173f6f; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; min-height: 44px; padding: 0 12px; }
