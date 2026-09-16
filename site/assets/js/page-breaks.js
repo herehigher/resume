@@ -18,9 +18,9 @@ export const PAGE_BREAK_LABELS = Object.freeze({
   }
 });
 
-// The desktop rail is fixed over the preview rather than part of the document.
-// This reserves only outer preview space; the printable document geometry is unchanged.
-export const PAGE_BREAK_PREVIEW_GUTTER = 400;
+// The boundary markers occupy a small, paper-exterior gutter. They never take
+// part in the document's layout or printable geometry.
+export const PAGE_BREAK_PREVIEW_GUTTER = 96;
 
 const RECORD_ID_PATTERN = /^record_[A-Za-z0-9_-]+(?:-[A-Za-z0-9_-]+)*$/;
 
@@ -221,14 +221,8 @@ function iconBadge(className, active) {
 }
 
 export function initPageBreakControls({ store, locale, preview, toolbar, getDocumentType, scheduleSave }) {
-  // A rail must be wide enough for a complete, readable position description.
-  // Below this threshold the fixed rail would either cover the paper or create a
-  // tiny hit target, so edit mode deliberately uses the complete panel instead.
-  const MIN_DESKTOP_RAIL_WIDTH = 140;
-  const RAIL_VERTICAL_GAP = 4;
   const labels = PAGE_BREAK_LABELS[locale];
   const panelId = `page-break-panel-${locale}`;
-  const railId = `page-break-rail-${locale}`;
   const menu = document.createElement('button');
   menu.type = 'button';
   menu.className = 'page-break-menu';
@@ -238,127 +232,86 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   feedback.className = 'page-break-feedback';
   feedback.hidden = true;
   feedback.setAttribute('role', 'status');
-  toolbar.append(feedback);
+  document.body.append(feedback);
   const panel = document.createElement('div');
   panel.id = panelId;
   panel.className = 'page-break-panel';
   panel.hidden = true;
   toolbar.append(panel);
-  const rail = document.createElement('div');
-  rail.id = railId;
-  rail.className = 'page-break-rail';
-  rail.setAttribute('aria-label', labels.positions);
-  rail.setAttribute('role', 'region');
-  document.body.append(rail);
-  const railMeasure = document.createElement('div');
-  railMeasure.className = 'page-break-rail page-break-rail-measure';
-  railMeasure.setAttribute('aria-hidden', 'true');
-  document.body.append(railMeasure);
+  const overlay = document.createElement('div');
+  overlay.id = `page-break-overlay-${locale}`;
+  overlay.className = 'page-break-overlay';
+  overlay.setAttribute('aria-label', labels.positions);
+  overlay.setAttribute('role', 'region');
+  document.body.append(overlay);
   let modeOpen = false;
   let feedbackTimer = null;
   let geometryFrame = null;
   let lastFocusKey = null;
   let renderedCandidates = [];
-  let surface = 'none';
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px)').matches; }
   function isSurfaceVisible() { return preview.getClientRects().length > 0 && !preview.closest('[hidden]'); }
-  function railSpaceFor(candidate) {
-    const page = candidate?.element.closest('.document-page');
-    const previewRect = preview.closest('.preview-scroll')?.getBoundingClientRect();
-    if (!page || !previewRect) return Number.NEGATIVE_INFINITY;
-    const pageRect = page.getBoundingClientRect();
-    const scale = page.offsetWidth ? pageRect.width / page.offsetWidth : 1;
-    return previewRect.right - (pageRect.right + Math.max(12, 16 * scale)) - 8;
+  function description(previous, target, active) { return describePageBreak(locale, previous, target, active); }
+  function shortDescription(active) {
+    if (locale === 'ja') return active ? '改ページを解除' : 'ここで改ページ';
+    if (locale === 'zh-CN') return active ? '取消分页' : '在此分页';
+    return active ? 'Remove page break' : 'Start a new page here';
   }
-  function railPositionFor(candidate) {
-    const page = candidate?.element.closest('.document-page');
-    if (!page) return null;
-    const pageRect = page.getBoundingClientRect();
-    const targetRect = candidate.element.getBoundingClientRect();
-    const scale = page.offsetWidth ? pageRect.width / page.offsetWidth : 1;
-    return {
-      left: pageRect.right + Math.max(12, 16 * scale),
-      maxWidth: railSpaceFor(candidate),
-      top: targetRect.top - (candidate.isRecord ? 1 : 11) * scale
-    };
-  }
-  function createRailControl(candidate, { measure = false } = {}) {
+  function createBoundary(candidate, interactive) {
+    const boundary = document.createElement('div');
+    boundary.className = `page-break-visual-boundary${candidate.active ? ' is-set' : ''}`;
+    boundary.dataset.pageBreakKey = candidate.key;
+    const line = document.createElement('span');
+    line.className = 'page-break-boundary-line';
+    line.setAttribute('aria-hidden', 'true');
+    boundary.append(line);
+    if (!interactive) {
+      const marker = document.createElement('span');
+      marker.className = 'page-break-passive-marker';
+      marker.dataset.pageBreakKey = candidate.key;
+      marker.setAttribute('aria-hidden', 'true');
+      marker.textContent = '−';
+      boundary.append(marker);
+      return boundary;
+    }
     const control = document.createElement('button');
-    control.className = measure
-      ? `page-break-measure-boundary${candidate.isRecord ? ' page-break-measure-record-boundary' : ''}`
-      : `page-break-boundary${candidate.isRecord ? ' page-break-record-boundary' : ''}`;
+    control.className = `page-break-boundary${candidate.isRecord ? ' page-break-record-boundary' : ''}`;
     control.dataset.pageBreakKey = candidate.key;
     control.type = 'button';
     control.setAttribute('aria-pressed', String(candidate.active));
     control.setAttribute('aria-label', description(candidate.previous, candidate, candidate.active));
-    const fullDescription = description(candidate.previous, candidate, candidate.active);
-    if (candidate.isRecord) {
-      const tick = iconBadge('page-break-compact-tick', candidate.active); tick.setAttribute('aria-hidden', 'true');
-      const fullLabel = document.createElement('span'); fullLabel.className = 'page-break-full-label'; fullLabel.textContent = fullDescription;
-      control.append(tick, fullLabel);
-    } else {
-      const add = document.createElement('span'); add.className = 'page-break-add';
-      add.append(iconBadge('page-break-plus', candidate.active), document.createTextNode(fullDescription));
-      control.append(add);
-    }
-    if (!measure) {
-      control.addEventListener('click', () => toggle(candidate));
-      control.addEventListener('pointerenter', () => setHighlight(candidate, true));
-      control.addEventListener('pointerleave', () => setHighlight(candidate, false));
-      control.addEventListener('focus', () => setHighlight(candidate, true));
-      control.addEventListener('blur', () => setHighlight(candidate, false));
-      candidate.element.addEventListener('pointerenter', () => setHighlight(candidate, true));
-      candidate.element.addEventListener('pointerleave', () => setHighlight(candidate, false));
-    }
-    return control;
+    const sign = iconBadge('page-break-sign', candidate.active);
+    sign.setAttribute('aria-hidden', 'true');
+    const tooltip = document.createElement('span');
+    tooltip.className = 'page-break-tooltip';
+    tooltip.id = `page-break-tooltip-${locale}-${candidate.key.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.textContent = shortDescription(candidate.active);
+    control.setAttribute('aria-describedby', tooltip.id);
+    control.append(sign, tooltip);
+    control.addEventListener('click', () => toggle(candidate));
+    control.addEventListener('pointerenter', () => setHighlight(candidate, true));
+    control.addEventListener('pointerleave', () => setHighlight(candidate, false));
+    control.addEventListener('focus', () => setHighlight(candidate, true));
+    control.addEventListener('blur', () => setHighlight(candidate, false));
+    candidate.element.addEventListener('pointerenter', () => setHighlight(candidate, true));
+    candidate.element.addEventListener('pointerleave', () => setHighlight(candidate, false));
+    boundary.append(control);
+    return boundary;
   }
-  function railLayout() {
-    railMeasure.replaceChildren();
-    const controls = renderedCandidates.map((candidate) => {
-      const position = railPositionFor(candidate);
-      if (!position || position.maxWidth < MIN_DESKTOP_RAIL_WIDTH) return null;
-      const control = createRailControl(candidate, { measure: true });
-      control.style.left = `${position.left}px`;
-      control.style.maxWidth = `${position.maxWidth}px`;
-      control.style.top = `${position.top}px`;
-      railMeasure.append(control);
-      return { candidate, control, position };
-    });
-    if (controls.some((item) => item === null)) return null;
-    const visible = controls.map((item) => {
-      item.box = item.control.getBoundingClientRect();
-      return item;
-    })
-      .filter(({ box }) => box.bottom > 0 && box.top < window.innerHeight)
-      .sort((left, right) => left.position.top - right.position.top);
-    let nextTop = 0;
-    for (const item of visible) {
-      if (item.box.left < 0 || item.box.right > window.innerWidth) return null;
-      item.top = Math.max(item.position.top, nextTop);
-      if (item.top + item.box.height > window.innerHeight) return null;
-      nextTop = item.top + item.box.height + RAIL_VERTICAL_GAP;
-    }
-    return controls;
-  }
-  function canUseRail() {
-    return isDesktop() && isSurfaceVisible() && renderedCandidates.length > 0
-      && railLayout() !== null;
-  }
-  function usesPanel() { return !isDesktop() || !canUseRail(); }
-  function updateMenuControls() { menu.setAttribute('aria-controls', usesPanel() ? panelId : railId); }
+  function updateMenuControls() { menu.setAttribute('aria-controls', isDesktop() ? overlay.id : panelId); }
   function activeContext() {
     const state = store.getState();
     const type = getDocumentType();
     return { state, type, paper: state.settings.pageSizeByLocale[locale] };
   }
-  function description(previous, target, active) { return describePageBreak(locale, previous, target, active); }
   function setMode(open, { focusFirst = false } = {}) {
     modeOpen = open;
     menu.setAttribute('aria-pressed', String(open));
-    menu.textContent = `${open ? labels.editing : labels.edit} · ${renderedCandidates.filter((candidate) => candidate.active).length}`;
+    menu.textContent = open ? labels.editing : labels.edit;
     updateMenuControls();
-    if (usesPanel()) {
+    if (!isDesktop()) {
       panel.hidden = !open;
       menu.setAttribute('aria-expanded', String(open));
       renderPanel(renderedCandidates);
@@ -366,8 +319,8 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     } else {
       panel.hidden = true;
       menu.setAttribute('aria-expanded', 'false');
-      renderRail();
-      if (open && focusFirst) rail.querySelector('button')?.focus({ preventScroll: true });
+      renderOverlay();
+      if (open && focusFirst) overlay.querySelector('button')?.focus({ preventScroll: true });
     }
   }
   function setMobilePanel(open) {
@@ -377,11 +330,10 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function closeSurface() {
     modeOpen = false;
-    rail.hidden = true;
+    overlay.hidden = true;
     panel.hidden = true;
     menu.setAttribute('aria-pressed', 'false');
     menu.setAttribute('aria-expanded', 'false');
-    surface = 'none';
     clearFeedback();
   }
   function clearFeedback() {
@@ -415,54 +367,48 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function setHighlight(candidate, active) {
     candidate.element.classList.toggle('page-break-target-highlight', active);
-    rail.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
+    overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
   }
-  function positionRail() {
-    const layout = railLayout();
-    if (!layout) return;
-    const positions = new Map(layout.map((item) => [item.candidate.key, item]));
-    rail.querySelectorAll('button, .page-break-passive-marker').forEach((control) => {
-      const candidate = renderedCandidates.find((item) => item.key === control.dataset.pageBreakKey);
-      const page = candidate?.element.closest('.document-page');
-      if (!candidate || !page) return;
-      const position = positions.get(candidate.key)?.position;
-      if (!position) return;
-      const top = positions.get(candidate.key)?.top ?? position.top;
-      control.style.maxWidth = `${position.maxWidth}px`;
-      control.style.left = `${position.left}px`;
-      control.style.top = `${top}px`;
-    });
-  }
-  function renderRail() {
-    rail.replaceChildren();
-    if (!canUseRail()) { rail.hidden = true; return; }
+  function renderOverlay() {
+    overlay.replaceChildren();
+    if (!isDesktop() || !isSurfaceVisible()) { overlay.hidden = true; return; }
     const shown = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
-    rail.hidden = shown.length === 0;
-    surface = 'rail';
-    shown.forEach((candidate) => {
-        const control = modeOpen ? createRailControl(candidate) : document.createElement('span');
-        control.className = modeOpen
-          ? control.className
-          : 'page-break-passive-marker';
-        control.dataset.pageBreakKey = candidate.key;
-      if (!modeOpen) {
-        control.setAttribute('aria-hidden', 'true');
-        control.textContent = '↵';
-      }
-      rail.append(control);
+    overlay.hidden = shown.length === 0;
+    shown.forEach((candidate) => { overlay.append(createBoundary(candidate, modeOpen)); });
+    positionOverlay();
+  }
+  function positionOverlay() {
+    if (overlay.hidden) return;
+    const visible = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
+    const laneEnds = [];
+    visible.forEach((candidate) => {
+      const boundary = overlay.querySelector(`.page-break-visual-boundary[data-page-break-key="${candidate.key}"]`);
+      const page = candidate.element.closest('.document-page');
+      if (!boundary || !page) return;
+      const pageBox = page.getBoundingClientRect();
+      const targetBox = candidate.element.getBoundingClientRect();
+      let lane = 0;
+      while (laneEnds[lane] !== undefined && targetBox.top - laneEnds[lane] < 30) lane += 1;
+      laneEnds[lane] = targetBox.top;
+      const markerWidth = 30;
+      const desiredMarkerLeft = pageBox.width + 5 + (lane * 32);
+      const visibleMarkerLeft = Math.max(0, window.innerWidth - pageBox.left - markerWidth - 1);
+      const markerLeft = Math.min(desiredMarkerLeft, visibleMarkerLeft);
+      boundary.style.left = `${pageBox.left}px`;
+      boundary.style.top = `${targetBox.top}px`;
+      boundary.style.width = `${pageBox.width}px`;
+      boundary.style.setProperty('--page-break-marker-lane', String(lane));
+      boundary.style.setProperty('--page-break-marker-left', `${markerLeft}px`);
+      boundary.classList.toggle('is-viewport-clamped', markerLeft < desiredMarkerLeft);
     });
-    window.requestAnimationFrame(positionRail);
   }
   function renderPanel(candidates) {
     panel.replaceChildren();
-    if (!usesPanel() || !isSurfaceVisible()) {
+    if (isDesktop() || !isSurfaceVisible()) {
       panel.hidden = true;
-      panel.classList.remove('page-break-panel--desktop-fallback');
       menu.setAttribute('aria-expanded', 'false');
       return;
     }
-    panel.classList.toggle('page-break-panel--desktop-fallback', isDesktop());
-    surface = 'panel';
     const title = document.createElement('strong'); title.textContent = labels.positions; panel.append(title);
     candidates.forEach((candidate) => {
       const row = document.createElement('button');
@@ -491,12 +437,12 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     menu.hidden = renderedCandidates.length === 0;
     if (menu.hidden) { modeOpen = false; clearFeedback(); }
     updateMenuControls();
-    menu.textContent = `${modeOpen ? labels.editing : labels.edit} · ${renderedCandidates.filter((candidate) => candidate.active).length}`;
+    menu.textContent = modeOpen ? labels.editing : labels.edit;
     menu.setAttribute('aria-pressed', String(modeOpen));
-    renderPanel(renderedCandidates);
-    renderRail();
+    if (isDesktop()) renderOverlay();
+    else renderPanel(renderedCandidates);
     if (lastFocusKey) {
-      const target = (usesPanel() ? panel : rail).querySelector(`[data-page-break-key="${lastFocusKey}"]`);
+      const target = (isDesktop() ? overlay : panel).querySelector(`[data-page-break-key="${lastFocusKey}"]`);
       target?.focus({ preventScroll: true }); lastFocusKey = null;
     }
   }
@@ -519,55 +465,24 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   const syncSurface = () => {
     updateMenuControls();
     if (!isSurfaceVisible()) { closeSurface(); return; }
-    if (isDesktop() && canUseRail()) {
+    if (isDesktop()) {
       panel.hidden = true;
-      panel.classList.remove('page-break-panel--desktop-fallback');
       menu.setAttribute('aria-expanded', 'false');
-      renderRail();
+      renderOverlay();
     } else {
-      rail.hidden = true;
-      if (isDesktop()) {
-        panel.hidden = !modeOpen;
-        menu.setAttribute('aria-expanded', String(modeOpen));
-      } else {
-        modeOpen = false;
-        menu.setAttribute('aria-pressed', 'false');
-      }
+      overlay.hidden = true;
+      modeOpen = false;
+      menu.setAttribute('aria-pressed', 'false');
       renderPanel(renderedCandidates);
     }
   };
-  function focusedBoundaryKey() {
-    return document.activeElement instanceof Element
-      ? document.activeElement.closest('[data-page-break-key]')?.dataset.pageBreakKey || null
-      : null;
-  }
-  function restoreSurfaceFocus(key) {
-    if (!key) return;
-    const container = surface === 'rail' ? rail : panel;
-    container.querySelector(`[data-page-break-key="${key}"]`)?.focus({ preventScroll: true });
-  }
   function scheduleGeometrySync() {
     if (geometryFrame !== null) return;
     geometryFrame = window.requestAnimationFrame(() => {
       geometryFrame = null;
-      if (!isDesktop()) {
-        if (surface === 'rail') {
-          const focusKey = focusedBoundaryKey();
-          syncSurface();
-          restoreSurfaceFocus(focusKey);
-        }
-        return;
-      }
-      const nextSurface = usesPanel() ? 'panel' : 'rail';
-      if (nextSurface === surface) {
-        if (nextSurface === 'rail') positionRail();
-        updateMenuControls();
-        return;
-      }
-      const focusKey = focusedBoundaryKey();
-      syncSurface();
-      positionRail();
-      restoreSurfaceFocus(focusKey);
+      if (isDesktop() && !panel.hidden) syncSurface();
+      else if (isDesktop()) positionOverlay();
+      updateMenuControls();
     });
   }
   const contextObserver = workspace ? new MutationObserver(syncSurface) : null;
@@ -576,7 +491,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   preview.addEventListener('transitionend', (event) => {
     if (event.propertyName === 'transform') scheduleGeometrySync();
   });
-  preview.closest('.preview-scroll')?.addEventListener('scroll', positionRail, { passive: true });
+  preview.closest('.preview-scroll')?.addEventListener('scroll', scheduleGeometrySync, { passive: true });
   syncSurface();
   return { render, position: scheduleGeometrySync };
 }

@@ -342,8 +342,8 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
       throw new Error(`Documentation screenshot must enter page-break edit mode: ${variant.locale}`);
     }
     await waitForStableRendering(page);
-    const railId = `page-break-rail-${variant.locale}`;
-    const visiblePageBreaks = await page.locator(`#${railId} .page-break-boundary`).evaluateAll((controls, workspaceSelector) => (
+    const overlayId = `page-break-overlay-${variant.locale}`;
+    const visiblePageBreaks = await page.locator(`#${overlayId} .page-break-boundary`).evaluateAll((controls, workspaceSelector) => (
       controls.filter((control) => {
         const bounds = control.getBoundingClientRect();
         const style = getComputedStyle(control);

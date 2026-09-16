@@ -62,7 +62,7 @@
   .preview-panel { height: 100%; }
   .preview-toolbar { position: relative; }
   .page-break-menu { display: inline-flex; align-items: center; }
-  .page-break-boundary { display: none !important; }
+  .page-break-overlay { display: none !important; }
   .preview-scroll { padding: 20px 14px 50px; }
   .document-preview { transform-origin: top left; }
   .document-preview { padding-right: 0; }

@@ -24,7 +24,7 @@ async function openDesktopPageBreakMode(page, rootSelector) {
   return trigger;
 }
 
-test('desktop: edit mode places a labeled rail outside the document and offers PDF-status undo', async ({ page }) => {
+test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons and short tooltips', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openLocale(page, 'en');
   const state = createEnglishSampleState(createDefaultState('en'));
@@ -34,7 +34,6 @@ test('desktop: edit mode places a labeled rail outside the document and offers P
   await page.locator('#confirmSampleAdoptButton').click();
   const trigger = page.locator('[data-english-editor] [data-page-break-mode-toggle]');
   const boundary = page.locator('.page-break-boundary[data-page-break-key="summary"]');
-  const previewScroll = page.locator('[data-en-preview-scroll]');
   await expect(trigger).toHaveAttribute('aria-pressed', 'false');
   await expect(boundary).toHaveCount(0);
   await openDesktopPageBreakMode(page, '[data-english-editor]');
@@ -42,41 +41,45 @@ test('desktop: edit mode places a labeled rail outside the document and offers P
   await expect(boundary).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => boundary.evaluate((element) => {
     const button = element.getBoundingClientRect();
-    const paper = document.querySelector('[data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
-    const preview = document.querySelector('[data-en-preview-scroll]').getBoundingClientRect();
-    return button.left > paper.right && button.left >= preview.left && button.right <= preview.right;
+    const paper = document.querySelector('[data-en-preview] [data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
+    const target = document.querySelector('[data-en-preview] [data-section-key="summary"]').getBoundingClientRect();
+    const boundary = element.closest('.page-break-visual-boundary').getBoundingClientRect();
+    return button.left >= paper.right + 4 && button.right <= innerWidth
+      && Math.abs(boundary.left - paper.left) < 2 && Math.abs(boundary.width - paper.width) < 2
+      && Math.abs(boundary.top - target.top) < 2;
   })).toBe(true);
-  // English keeps the rail as the primary desktop interaction whenever the
-  // preview can reserve a readable, paper-exterior gutter.
-  for (const width of [1024, 1440]) {
+  for (const width of [821, 900, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect.poll(() => boundary.evaluate((element) => {
       const button = element.getBoundingClientRect();
-      const paper = document.querySelector('[data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
-      const preview = document.querySelector('[data-en-preview-scroll]').getBoundingClientRect();
-      return button.left > paper.right && button.left >= preview.left && button.right <= preview.right;
+      const paper = document.querySelector('[data-en-preview] [data-section-key="summary"]').closest('.document-page').getBoundingClientRect();
+      const target = document.querySelector('[data-en-preview] [data-section-key="summary"]').getBoundingClientRect();
+      const boundary = element.closest('.page-break-visual-boundary').getBoundingClientRect();
+      const hit = document.elementFromPoint(button.left + button.width / 2, button.top + button.height / 2);
+      const sign = element.querySelector('.page-break-sign').getBoundingClientRect();
+      const exterior = innerWidth >= 1024 ? button.left >= paper.right + 4 : sign.left >= Math.min(paper.right, innerWidth) - 15;
+      return exterior && button.right <= innerWidth
+        && Math.abs(boundary.top - target.top) < 2 && hit?.closest('.page-break-boundary') === element;
     })).toBe(true);
   }
-  const scrollLeftBeforeToggle = await previewScroll.evaluate((element) => element.scrollLeft);
   await boundary.hover();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/page-break-target-highlight/);
+  await expect(boundary.locator('.page-break-tooltip')).toHaveCSS('opacity', '1');
   await clickVisible(page, boundary);
   await expect(boundary).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
-  await expect(boundary).toContainText('Remove page break between Contact information and Summary');
-  await expect(page.locator('[data-english-editor] .page-break-feedback')).toContainText('The PDF will start this content on a new page.');
-  const undo = page.locator('[data-english-editor] .page-break-undo');
+  await expect(boundary).toHaveAttribute('aria-label', 'Remove page break between Contact information and Summary');
+  await expect(page.locator('.page-break-feedback:not([hidden])')).toContainText('The PDF will start this content on a new page.');
+  const undo = page.locator('.page-break-undo');
   await expect(undo).toBeVisible();
   await undo.click();
   await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
   await clickVisible(page, boundary);
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
-  expect(await page.locator('[data-section-key="summary"]').evaluate((element) => getComputedStyle(element, '::before').borderTopStyle)).toBe('dashed');
-  expect(await previewScroll.evaluate((element) => element.scrollLeft)).toBe(scrollLeftBeforeToggle);
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-pressed', 'false');
   await expect(boundary).toHaveCount(0);
-  await expect(page.locator('.page-break-passive-marker[data-page-break-key="summary"]')).toBeVisible();
+  await expect(page.locator('#page-break-overlay-en .page-break-passive-marker[data-page-break-key="summary"]')).toBeVisible();
   await openDesktopPageBreakMode(page, '[data-english-editor]');
   const summaryInput = page.locator('[data-resume-field="summary"]');
   await summaryInput.fill('');
@@ -90,7 +93,7 @@ test('desktop: edit mode places a labeled rail outside the document and offers P
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
 });
 
-test('narrow desktop: Japanese and Chinese use a complete editor-side panel without covering the paper', async ({ page }) => {
+test('narrow desktop: Japanese and Chinese retain every paper-exterior boundary icon', async ({ page }) => {
   const locales = [
     { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton', key: 'qualifications' },
     { locale: 'zh-CN', workspace: '#chineseWorkspace', sample: '[data-zh-action="sample"]', key: 'summary' }
@@ -100,63 +103,70 @@ test('narrow desktop: Japanese and Chinese use a complete editor-side panel with
       await page.setViewportSize({ width, height: 900 });
       await openLocale(page, item.locale);
       await page.locator(item.sample).click();
+      await page.waitForTimeout(260);
+      const scaleBeforeEdit = await page.locator(`${item.workspace} .document-page`).evaluate((paper) => (
+        paper.getBoundingClientRect().width / paper.offsetWidth
+      ));
       const trigger = page.locator(`${item.workspace} [data-page-break-mode-toggle]`);
       const panel = page.locator(`#page-break-panel-${item.locale}`);
-      const rail = page.locator(`#page-break-rail-${item.locale}`);
+      const overlay = page.locator(`#page-break-overlay-${item.locale}`);
       await trigger.click();
       await expect(trigger).toHaveAttribute('aria-pressed', 'true');
-      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-      await expect(trigger).toHaveAttribute('aria-controls', `page-break-panel-${item.locale}`);
-      await expect(panel).toBeVisible();
-      await expect(rail).toBeHidden();
-      await expect(rail.locator('.page-break-boundary')).toHaveCount(0);
-      const row = panel.locator(`.page-break-row[data-page-break-key="${item.key}"]`);
-      await expect(row).toBeVisible();
-      await expect.poll(() => row.evaluate((element) => {
-        const rowBox = element.getBoundingClientRect();
-        const paperBox = document.querySelector('.workspace:not([hidden]) .document-page')?.getBoundingClientRect();
-        const hit = document.elementFromPoint(rowBox.left + (rowBox.width / 2), rowBox.top + (rowBox.height / 2));
-        return Boolean(paperBox)
-          && rowBox.right <= paperBox.left - 8
-          && hit?.closest('.page-break-row') === element;
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      await expect(trigger).toHaveAttribute('aria-controls', `page-break-overlay-${item.locale}`);
+      await expect(panel).toBeHidden();
+      expect(await page.locator(`${item.workspace} .document-page`).evaluate((paper) => (
+        paper.getBoundingClientRect().width / paper.offsetWidth
+      ))).toBeCloseTo(scaleBeforeEdit, 3);
+      const boundary = overlay.locator(`.page-break-boundary[data-page-break-key="${item.key}"]`);
+      await expect(boundary).toBeVisible();
+      await expect.poll(() => boundary.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const paper = document.querySelector('.workspace:not([hidden]) .document-page, .workspace:not([hidden]) .zh-resume-document')?.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        const sign = element.querySelector('.page-break-sign')?.getBoundingClientRect();
+        const visiblePaperRight = Math.min(paper?.right || 0, innerWidth);
+        return Boolean(paper) && Boolean(sign) && box.right <= innerWidth
+          && sign.left >= visiblePaperRight - 15
+          && hit?.closest('.page-break-boundary') === element;
       })).toBe(true);
-      await row.click();
-      await expect(row).toHaveAttribute('aria-pressed', 'true');
+      await boundary.click();
+      await expect(boundary).toHaveAttribute('aria-pressed', 'true');
     }
   }
 
-  // Restoring enough preview width returns this same desktop edit mode to its
-  // rail, rather than retaining the constrained-layout fallback.
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.locator('#page-break-panel-zh-CN')).toBeHidden();
-  await expect(page.locator('#page-break-rail-zh-CN')).toBeVisible();
-  await expect(page.locator('#chineseWorkspace [data-page-break-mode-toggle]')).toHaveAttribute('aria-controls', 'page-break-rail-zh-CN');
+  await expect(page.locator('#page-break-overlay-zh-CN')).toBeVisible();
+  await expect(page.locator('#chineseWorkspace [data-page-break-mode-toggle]')).toHaveAttribute('aria-controls', 'page-break-overlay-zh-CN');
 });
 
-test('narrow desktop: English rail stacks every complete label into independent paper-exterior hit targets', async ({ page }) => {
+test('narrow desktop: English icons have independent hit targets without a text rail', async ({ page }) => {
   for (const width of [900, 950]) {
     await page.setViewportSize({ width, height: 900 });
     await openLocale(page, 'en');
     await page.locator('[data-en-load-sample]').click();
     const trigger = await openDesktopPageBreakMode(page, '[data-english-editor]');
-    const rail = page.locator('#page-break-rail-en');
-    const boundaries = rail.locator('.page-break-boundary');
-    await expect(rail).toBeVisible();
+    const overlay = page.locator('#page-break-overlay-en');
+    const boundaries = overlay.locator('.page-break-boundary');
+    await expect(overlay).toBeVisible();
     await expect(page.locator('#page-break-panel-en')).toBeHidden();
-    await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-en');
+    await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-en');
     const keys = await boundaries.evaluateAll((controls) => controls.map((control) => control.dataset.pageBreakKey));
     expect(keys.length).toBeGreaterThan(1);
     await expect.poll(() => boundaries.evaluateAll((controls) => controls.every((control) => {
       const box = control.getBoundingClientRect();
       const paper = document.querySelector('[data-en-preview] .document-page')?.getBoundingClientRect();
       const hit = document.elementFromPoint(box.left + (box.width / 2), box.top + (box.height / 2));
-      return Boolean(paper)
-        && box.left >= paper.right && box.right <= innerWidth
+      const sign = control.querySelector('.page-break-sign')?.getBoundingClientRect();
+      const visiblePaperRight = Math.min(paper?.right || 0, innerWidth);
+      return Boolean(paper) && Boolean(sign)
+        && box.right <= innerWidth && sign.left >= visiblePaperRight - 15
         && box.top >= 0 && box.bottom <= innerHeight
         && hit?.closest('.page-break-boundary') === control;
     }))).toBe(true);
     for (const key of keys) {
-      const boundary = rail.locator(`.page-break-boundary[data-page-break-key="${key}"]`);
+      const boundary = overlay.locator(`.page-break-boundary[data-page-break-key="${key}"]`);
       await boundary.click();
       await expect(boundary).toHaveAttribute('aria-pressed', 'true');
     }
@@ -395,7 +405,7 @@ test('desktop: active classes follow English paper size and Japanese document ty
   await expect(page.locator('[data-section-key="career-history"]')).toHaveClass(/has-manual-page-break/);
 });
 
-test('desktop: rail realigns after Japanese zoom transitions', async ({ page }) => {
+test('desktop: boundary geometry realigns after Japanese zoom transitions', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openLocale(page, 'ja');
   await page.locator('#loadSampleButton').click();
@@ -406,35 +416,31 @@ test('desktop: rail realigns after Japanese zoom transitions', async ({ page }) 
   await page.waitForTimeout(260);
   await expect.poll(() => boundary.evaluate((element) => {
     const target = document.querySelector('[data-section-key="qualifications"]');
-    const pageBox = target.closest('.document-page');
-    const scale = pageBox.getBoundingClientRect().width / pageBox.offsetWidth;
     const button = element.getBoundingClientRect();
     const targetBox = target.getBoundingClientRect();
-    const paper = pageBox.getBoundingClientRect();
-    return Math.abs(button.left - (paper.right + Math.max(12, 16 * scale))) < 3
-      && Math.abs(button.top - (targetBox.top - 11 * scale)) < 3;
+    const boundary = element.closest('.page-break-visual-boundary').getBoundingClientRect();
+    return Math.abs(boundary.top - targetBox.top) < 3 && button.left >= boundary.right + 4;
   })).toBe(true);
 });
 
-test('desktop: zoom geometry moves edit mode between the rail and complete fallback panel', async ({ page }) => {
+test('desktop: zoom keeps the same icon surface instead of falling back to a desktop panel', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openLocale(page, 'ja');
   await page.locator('#loadSampleButton').click();
   const trigger = await openDesktopPageBreakMode(page, '#japaneseWorkspace');
-  const rail = page.locator('#page-break-rail-ja');
+  const overlay = page.locator('#page-break-overlay-ja');
   const panel = page.locator('#page-break-panel-ja');
-  await expect(rail).toBeVisible();
+  await expect(overlay).toBeVisible();
   await page.locator('#zoomInButton').click();
   await page.locator('#zoomInButton').click();
-  await expect(panel).toBeVisible();
-  await expect(rail).toBeHidden();
-  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-panel-ja');
-  await expect(panel.locator('.page-break-row[data-page-break-key="qualifications"]')).toBeVisible();
+  await expect(panel).toBeHidden();
+  await expect(overlay.locator('.page-break-boundary[data-page-break-key="qualifications"]')).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-ja');
   await page.locator('#zoomOutButton').click();
   await page.locator('#zoomOutButton').click();
   await expect(panel).toBeHidden();
-  await expect(rail).toBeVisible();
-  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-ja');
+  await expect(overlay).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-ja');
 });
 
 test('responsive and locale changes close stale pagination surfaces and keep ARIA controls accurate', async ({ page }) => {
@@ -442,9 +448,9 @@ test('responsive and locale changes close stale pagination surfaces and keep ARI
   await openLocale(page, 'en');
   await page.locator('[data-en-load-sample]').click();
   await openDesktopPageBreakMode(page, '[data-english-editor]');
-  await expect(page.locator('#page-break-rail-en')).toBeVisible();
+  await expect(page.locator('#page-break-overlay-en')).toBeVisible();
   await page.locator('#localeSelect').selectOption('ja');
-  await expect(page.locator('#page-break-rail-en')).toBeHidden();
+  await expect(page.locator('#page-break-overlay-en')).toBeHidden();
   await page.locator('#loadSampleButton').click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('[data-mobile-view="preview"]').click();
@@ -455,6 +461,6 @@ test('responsive and locale changes close stale pagination surfaces and keep ARI
   await expect(panel).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(panel).toBeHidden();
-  await expect(page.locator('#page-break-rail-ja')).toBeHidden();
-  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-rail-ja');
+  await expect(page.locator('#page-break-overlay-ja')).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-ja');
 });

@@ -158,12 +158,11 @@
 .page-break-menu { background: #fff; border: 1px solid #d7dde5; border-radius: 6px; color: #2457d6; cursor: pointer; display: inline-flex; font: inherit; font-size: 10px; font-weight: 700; min-height: 32px; padding: 0 10px; }
 .page-break-menu[aria-pressed="true"] { background: #eaf1ff; border-color: #8ba9e8; }
 .page-break-menu:focus-visible, .page-break-boundary:focus-visible, .page-break-row:focus-visible, .page-break-undo:focus-visible { outline: 3px solid rgba(36, 87, 214, .3); outline-offset: 2px; }
-.page-break-feedback { align-items: center; color: #3e4b60; display: flex; font-size: 9px; gap: 7px; margin-left: auto; max-width: 310px; }
-.page-break-undo { background: transparent; border: 0; color: var(--blue); cursor: pointer; font: inherit; font-size: 9px; font-weight: 700; min-height: 32px; padding: 0 4px; text-decoration: underline; white-space: nowrap; }
+.page-break-feedback { align-items: center; background: #172033; border-radius: 7px; box-shadow: 0 8px 22px rgba(23, 32, 51, .22); color: #fff; display: flex; font-size: 10px; gap: 7px; left: 50%; max-width: min(360px, calc(100vw - 28px)); padding: 8px 10px; position: fixed; top: 16px; transform: translateX(-50%); z-index: 100; }
+.page-break-undo { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-size: 10px; font-weight: 700; min-height: 28px; padding: 0 4px; text-decoration: underline; white-space: nowrap; }
 .page-break-panel { background: #fff; border: 1px solid #d7dde5; border-radius: 9px; box-shadow: 0 12px 32px rgba(23, 32, 51, .16); display: grid; gap: 2px; padding: 8px; position: absolute; right: 12px; top: 44px; width: min(330px, calc(100% - 24px)); z-index: 8; }
 .preview-toolbar > .page-break-panel { display: grid; }
 .page-break-panel[hidden] { display: none !important; }
-.page-break-panel--desktop-fallback { left: 16px; max-height: calc(100vh - 78px); overflow-y: auto; position: fixed; right: auto; top: 62px; width: min(360px, calc(48vw - 32px)); }
 .page-break-panel strong { font-size: 10px; padding: 6px 8px; }
 .page-break-row { align-items: center; background: transparent; border: 0; border-radius: 7px; cursor: pointer; display: grid; gap: 8px; grid-template-columns: 1fr auto; min-height: 44px; padding: 7px 8px; text-align: left; width: 100%; }
 .page-break-row:hover { background: #eef4ff; }
@@ -175,21 +174,21 @@
 .page-break-row[aria-pressed="true"] .page-break-switch::after { transform: translateX(16px); }
 .page-break-live { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .document-page [data-section-key], .document-page [data-record-id] { position: relative; }
-.page-break-rail { inset: 0; pointer-events: none; position: fixed; z-index: 9; }
-.page-break-rail[hidden] { display: none; }
-.page-break-rail-measure { visibility: hidden; }
-.page-break-boundary, .page-break-measure-boundary, .page-break-passive-marker { align-items: center; color: var(--blue); font: inherit; font-size: 10px; font-weight: 700; pointer-events: auto; position: fixed; white-space: nowrap; z-index: 9; }
-.page-break-boundary, .page-break-measure-boundary { background: #fff; border: 1px solid #b8caea; border-radius: 6px; cursor: pointer; display: inline-flex; gap: 5px; min-height: 32px; padding: 0 8px; text-align: left; white-space: normal; }
-.page-break-boundary:hover, .page-break-boundary.is-target-highlighted { background: #eaf1ff; border-color: #6f98e4; }
-.page-break-record-boundary, .page-break-measure-record-boundary { border-radius: 50%; min-height: 32px; padding: 0; width: 32px; }
-.page-break-record-boundary .page-break-compact-tick, .page-break-measure-record-boundary .page-break-compact-tick { align-items: center; display: inline-flex; height: 30px; justify-content: center; width: 30px; }
-.page-break-record-boundary .page-break-full-label, .page-break-measure-record-boundary .page-break-full-label { background: #fff; border: 1px solid #b8caea; border-radius: 6px; box-shadow: 0 5px 18px rgba(33, 53, 84, .16); display: none; left: 38px; max-width: min(300px, calc(100vw - 56px)); padding: 8px 9px; position: absolute; white-space: normal; }
-.page-break-record-boundary:hover .page-break-full-label, .page-break-record-boundary:focus-visible .page-break-full-label { display: block; }
-.page-break-passive-marker { color: #5479bf; font-size: 15px; opacity: .78; pointer-events: none; transform: translateY(-50%); }
-.page-break-add { align-items: center; display: inline-flex; gap: 5px; min-width: 0; }
-.page-break-plus { align-items: center; background: var(--blue); border-radius: 50%; color: #fff; display: inline-flex; height: 20px; justify-content: center; width: 20px; }
-.page-break-plus svg { height: 13px; stroke: currentColor; stroke-width: 2.4; width: 13px; }
-.has-manual-page-break::before { border-top: 1px dashed var(--blue); content: ''; left: calc(-1 * var(--page-break-paper-left-offset, 0px)); pointer-events: none; position: absolute; right: calc(-1 * var(--page-break-paper-right-offset, 0px)); top: -5px; }
+.page-break-overlay { inset: 0; pointer-events: none; position: fixed; z-index: 9; }
+.page-break-overlay[hidden] { display: none; }
+.page-break-visual-boundary { height: 1px; pointer-events: none; position: fixed; }
+.page-break-boundary-line { border-top: 1px dotted rgba(36, 87, 214, .55); display: block; inset: 0; position: absolute; }
+.page-break-visual-boundary.is-set .page-break-boundary-line { border-top-color: var(--blue); border-top-style: dashed; }
+.page-break-boundary, .page-break-passive-marker { align-items: center; box-sizing: border-box; font: inherit; pointer-events: auto; position: absolute; }
+.page-break-boundary { background: transparent; border: 0; border-radius: 7px; color: var(--blue); cursor: pointer; display: inline-flex; height: 30px; justify-content: center; left: var(--page-break-marker-left); padding: 4px; top: -15px; width: 30px; }
+.page-break-boundary:hover, .page-break-boundary:focus-visible { background: rgba(234, 241, 255, .92); }
+.page-break-sign { align-items: center; background: #fff; border: 1px solid currentColor; border-radius: 50%; display: inline-flex; height: 22px; justify-content: center; width: 22px; }
+.page-break-visual-boundary.is-set .page-break-sign { background: var(--blue); color: #fff; }
+.page-break-sign svg { height: 13px; stroke: currentColor; stroke-width: 2.4; width: 13px; }
+.page-break-visual-boundary.is-viewport-clamped .page-break-sign { transform: translateX(13px); }
+.page-break-passive-marker { background: #fff; border: 1px solid #5479bf; border-radius: 50%; color: #5479bf; display: inline-flex; font-size: 16px; height: 18px; justify-content: center; left: calc(100% + 12px); line-height: 1; opacity: .8; top: -9px; width: 18px; }
+.page-break-tooltip { background: #172033; border-radius: 4px; bottom: calc(100% + 5px); color: #fff; font-size: 9px; font-weight: 650; left: 50%; opacity: 0; padding: 5px 6px; pointer-events: none; position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.page-break-boundary:hover .page-break-tooltip, .page-break-boundary:focus-visible .page-break-tooltip { opacity: 1; }
 .page-break-target-highlight { outline: 2px solid rgba(36, 87, 214, .55); outline-offset: 4px; }
 .has-manual-page-break { break-before: page; page-break-before: always; }
 .preview-dot { background: var(--green); border-radius: 50%; height: 6px; margin-right: 7px !important; width: 6px; }
@@ -200,7 +199,7 @@
 .document-preview {
   margin: 0 auto;
   min-width: 100%;
-  padding-right: var(--page-break-preview-gutter, 400px);
+  padding-right: var(--page-break-preview-gutter, 96px);
   transform-origin: top left;
   transition: transform .2s ease;
   width: max-content;
