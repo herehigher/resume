@@ -399,14 +399,17 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     return renderedCandidates.find((candidate) => candidate.key === selectedKey) || null;
   }
   function clearSelection() {
-    selectedElement?.classList.remove('page-break-target-highlight');
-    overlay.querySelector(`[data-page-break-key="${selectedKey}"]`)?.classList.remove('is-target-highlighted');
+    clearSelectedHighlight();
     selectedKey = null;
     selectedContext = null;
     selectedElement = null;
     actionBar.hidden = true;
     actionTarget.textContent = '';
     actionButton.textContent = '';
+  }
+  function clearSelectedHighlight() {
+    selectedElement?.classList.remove('page-break-target-highlight');
+    overlay.querySelector(`[data-page-break-key="${selectedKey}"]`)?.classList.remove('is-target-highlighted');
   }
   function syncTrustCapsule() {
     if (!trustCapsule) return;
@@ -433,6 +436,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function selectCandidate(candidate, { focusAction = false } = {}) {
     if (isDesktop() || !modeOpen) return;
+    if (selectedKey !== candidate.key || selectedElement !== candidate.element) clearSelectedHighlight();
     selectedKey = candidate.key;
     selectedContext = contextKey(activeContext());
     selectedElement = candidate.element;
@@ -474,7 +478,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     panel.hidden = !open;
     panelToggle.setAttribute('aria-expanded', String(open));
     if (open) renderPanel(renderedCandidates);
-    if (open && focusFirst) panel.querySelector('button')?.focus();
+    if (open && focusFirst) panel.querySelector('button[tabindex="0"]')?.focus();
   }
   function closeSurface() {
     modeOpen = false;

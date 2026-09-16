@@ -360,9 +360,27 @@ test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and
   await expect(actionBar).toBeVisible();
   await expect(action).toBeFocused();
   await expect(target).toHaveClass(/page-break-target-highlight/);
+  await panelToggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(panel).toBeVisible();
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  const replacement = rows.nth(2);
+  const replacementKey = await replacement.getAttribute('data-page-break-key');
+  await expect(replacement).toBeFocused();
+  await page.keyboard.press('Enter');
+  const replacementTarget = replacementKey?.startsWith('record:')
+    ? page.locator(`[data-record-id="${replacementKey.slice('record:'.length)}"]`)
+    : page.locator(`[data-section-key="${replacementKey}"]`);
+  const selectedMarkers = page.locator('#page-break-overlay-zh-CN .page-break-visual-boundary.is-selected');
+  await expect(target).not.toHaveClass(/page-break-target-highlight/);
+  await expect(replacementTarget).toHaveClass(/page-break-target-highlight/);
+  await expect(selectedMarkers).toHaveCount(1);
+  await expect(selectedMarkers).toHaveAttribute('data-page-break-key', replacementKey || '');
+  await expect(action).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
-  await expect(target).not.toHaveClass(/page-break-target-highlight/);
+  await expect(replacementTarget).not.toHaveClass(/page-break-target-highlight/);
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();
