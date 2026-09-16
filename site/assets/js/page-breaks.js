@@ -297,6 +297,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   let renderedCandidates = [];
   let selectedKey = null;
   let selectedContext = null;
+  let surfaceWasDesktop = isDesktop();
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches; }
   function isSurfaceVisible() { return preview.getClientRects().length > 0 && !preview.closest('[hidden]'); }
@@ -606,6 +607,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }, true);
   const workspace = preview.closest('.workspace');
   const syncSurface = () => {
+    surfaceWasDesktop = isDesktop();
     updateMenuControls();
     if (!isSurfaceVisible()) { closeSurface(); return; }
     if (isDesktop()) {
@@ -613,6 +615,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       panelToggle.hidden = true;
       menu.setAttribute('aria-expanded', 'false');
       renderOverlay();
+      renderActionBar();
     } else {
       panelToggle.hidden = !modeOpen;
       renderOverlay();
@@ -625,9 +628,10 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     geometryFrame = window.requestAnimationFrame(() => {
       geometryFrame = null;
       if (!isSurfaceVisible()) { closeSurface(); return; }
-      if (isDesktop() && !panel.hidden) syncSurface();
+      const desktop = isDesktop();
+      if (desktop !== surfaceWasDesktop || (desktop && !panel.hidden)) syncSurface();
       else positionOverlay();
-      if (!isDesktop()) renderActionBar();
+      if (!desktop) renderActionBar();
       updateMenuControls();
     });
   }
