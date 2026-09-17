@@ -217,7 +217,7 @@ test('Japanese resume prints local link icons and concise semantic history headi
 
   assert.match(html, /class="resume-links" aria-label="Links"/);
   assert.match(html, /profile-link-icon--github/);
-  assert.match(html, /Website · jianli-resume\.example/);
+  assert.match(html, /Website · fictional-resume-profile\.example/);
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
   assert.match(japaneseCss, /\.resume-links \{[^}]*margin:\s*0 0 16px/s);
   assert.match(html, /<table class="paper-history-table"><thead><tr class="paper-table-header"><th>年月<\/th><th>学歴<\/th>/);

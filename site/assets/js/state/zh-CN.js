@@ -17,7 +17,7 @@ export function createChineseSampleState(sourceState) {
       links: [
         'https://github.com/fictional-resume-profile',
         'https://www.linkedin.com/in/fictional-resume-profile',
-        'https://jianli-resume.example'
+        'https://fictional-resume-profile.example'
       ]
     }
   };

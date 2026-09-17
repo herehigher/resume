@@ -122,7 +122,7 @@ test('Chinese sample is schema-valid and covers every major resume section', () 
     [
       'https://github.com/fictional-resume-profile',
       'https://www.linkedin.com/in/fictional-resume-profile',
-      'https://jianli-resume.example'
+      'https://fictional-resume-profile.example'
     ]
   );
   assert.ok(resume.headline);
@@ -162,7 +162,7 @@ test('Chinese sample renders current experience first and valid PDF links', () =
   assert.match(html, /GitHub · github\.com\/fictional-resume-profile/);
   assert.match(html, /profile-link-icon--linkedin/);
   assert.match(html, /LinkedIn · www\.linkedin\.com\/in\/fictional-resume-profile/);
-  assert.match(html, /Website · jianli-resume\.example/);
+  assert.match(html, /Website · fictional-resume-profile\.example/);
   assert.ok(html.indexOf('正儿数字科技有限公司') < html.indexOf('八经网络科技有限公司'));
   assert.match(html, /2022\.04 — 至今/);
   assert.match(html, /href="https:\/\/example\.com\/projects\/analytics"/);
