@@ -18,7 +18,7 @@ test('all localized samples use the same fictional profile links in the same ord
   const expectedLinks = [
     'https://github.com/fictional-resume-profile',
     'https://www.linkedin.com/in/fictional-resume-profile',
-    'https://jianli-resume.example'
+    'https://fictional-resume-profile.example'
   ];
   const sampleLinks = [
     createJapaneseSampleState(createDefaultState('ja')).profile.fields.links,
