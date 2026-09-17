@@ -229,6 +229,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   let importPending = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
+  let sampleRequestVersion = 0;
   const pageBreakControls = initPageBreakControls({
     store, locale: 'zh-CN', preview, toolbar: rootElement.querySelector('.preview-toolbar'),
     getDocumentType: () => 'resume', scheduleSave
@@ -379,8 +380,11 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
 
   async function enterSampleMode() {
     window.clearTimeout(saveTimer);
+    const requestVersion = ++sampleRequestVersion;
     try {
-      draftBeforeSample = await protectChineseDraftBeforeSample(store, shouldPersistDraft);
+      const currentDraft = await protectChineseDraftBeforeSample(store, shouldPersistDraft);
+      if (requestVersion !== sampleRequestVersion || store.getState().settings.locale !== 'zh-CN') return;
+      draftBeforeSample = currentDraft;
     } catch (error) {
       setStatus(draftStatusMessageForError(error, 'zh-CN', '无法保护当前草稿，示例未打开。'), 'error');
       return;
@@ -434,6 +438,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     });
     if (!confirmed) return;
     window.clearTimeout(saveTimer);
+    sampleRequestVersion += 1;
     try {
       await store.clearPersisted();
       store.reset(store.getState().settings.locale);
@@ -591,6 +596,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   window.addEventListener('pagehide', onPageHide);
   const unsubscribe = store.subscribe((_state, event) => {
     if (event.type === 'import-pending') {
+      sampleRequestVersion += 1;
       importPending = true;
       window.clearTimeout(saveTimer);
       return;
@@ -619,7 +625,11 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   return {
     refresh: hydrate,
     clearDraft,
-    restoreDraftBeforePersistence: restoreDraftFromSample,
+    restoreDraftBeforePersistence() {
+      sampleRequestVersion += 1;
+      if (sampleMode) window.clearTimeout(saveTimer);
+      return restoreDraftFromSample();
+    },
     destroy() {
       window.clearTimeout(saveTimer);
       unsubscribe();

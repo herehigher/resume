@@ -240,6 +240,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   let importPending = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
+  let sampleRequestVersion = 0;
   let shouldPersistDraft = store.hasStoredState();
   let zoom = 1;
   const pageBreakControls = initPageBreakControls({
@@ -445,6 +446,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
 
   async function enterSampleMode() {
     window.clearTimeout(saveTimer);
+    const requestVersion = ++sampleRequestVersion;
     const currentDraft = cloneData(store.getState());
     try {
       if (shouldPersistDraft) await store.save();
@@ -452,6 +454,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
       setStatus(draftStatusMessageForError(error, 'en', 'The example cannot be shown because your current draft could not be protected.'), true);
       return;
     }
+    if (requestVersion !== sampleRequestVersion || store.getState().settings.locale !== 'en') return;
     draftBeforeSample = currentDraft;
     draftBeforeSampleWasStored = shouldPersistDraft;
     sampleMode = true;
@@ -503,6 +506,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     });
     if (!confirmed) return;
     window.clearTimeout(saveTimer);
+    sampleRequestVersion += 1;
     try {
       await store.clearPersisted();
       store.reset(store.getState().settings.locale);
@@ -634,6 +638,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
 
   const unsubscribe = store.subscribe((_state, event) => {
     if (event.type === 'import-pending') {
+      sampleRequestVersion += 1;
       importPending = true;
       window.clearTimeout(saveTimer);
       return;
@@ -671,6 +676,8 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     render: hydrate,
     clearDraft,
     restoreDraftBeforePersistence() {
+      sampleRequestVersion += 1;
+      if (sampleMode) window.clearTimeout(saveTimer);
       return restoreDraftFromSample({ announce: false });
     },
     destroy() {

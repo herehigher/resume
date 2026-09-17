@@ -32,6 +32,7 @@ export function initLocaleController(store, {
   locale: initialLocale,
   preferenceStorage = window.localStorage,
   statusController = null,
+  onBeforeLocaleChange = () => {},
   onLocaleApplied = () => {},
   onClearDraft = () => {}
 } = {}) {
@@ -101,6 +102,8 @@ export function initLocaleController(store, {
   select.addEventListener('change', async () => {
     if (!SUPPORTED_LOCALES.includes(select.value)) return;
     const nextLocale = select.value;
+    if (nextLocale === locale) return;
+    onBeforeLocaleChange(locale, nextLocale);
     locale = nextLocale;
     store.update((state) => {
       state.settings.locale = nextLocale;
