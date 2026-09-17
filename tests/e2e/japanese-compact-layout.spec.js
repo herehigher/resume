@@ -95,11 +95,13 @@ test('Japanese career compact layout and the same stable record page-break targe
 test('Japanese compact career layout keeps A4 PDF text complete without changing body font size', async ({ page }) => {
   await openLocale(page, 'ja');
   const state = createCareerState();
+  state.settings.pageBreaks.ja.A4.career.records = ['record_fictional-compact-first'];
   const longUrl = `https://example.invalid/${'compact-layout/'.repeat(30)}`;
   state.documents.ja.careers[0].detailSections[0].content = '・架空の標準勤務先です。';
   state.documents.ja.careers[1].detailSections[0].content = `・架空の長いURL ${longUrl}\n・架空のコンパクト勤務先でも本文サイズを維持します。`;
   await importJapaneseState(page, state);
   await page.locator('#careerDocumentTab').click();
+  await expect(page.locator('[data-record-id="record_fictional-compact-first"]')).toHaveClass(/has-manual-page-break/);
 
   const fontSizes = await page.locator('.career-company-grid > div:nth-child(even)').evaluateAll((items) => (
     items.map((item) => getComputedStyle(item).fontSize)
@@ -111,6 +113,7 @@ test('Japanese compact career layout keeps A4 PDF text complete without changing
   const text = pages.join('').normalize('NFKC').replace(/\s/g, '');
   expect(pages).not.toHaveLength(0);
   expect(pages.every((item) => item.trim())).toBe(true);
+  expect(pages.findIndex((item) => item.includes('架空コンパクト株式会社'))).toBeGreaterThan(0);
   expect(text).toContain('架空標準株式会社');
   expect(text).toContain('架空コンパクト株式会社');
   expect(text).toContain('本文サイズを維持します。');
