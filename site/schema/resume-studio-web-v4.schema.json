@@ -138,7 +138,6 @@
         "id": { "$ref": "#/$defs/recordId" },
         "company": { "$ref": "#/$defs/string" }, "role": { "$ref": "#/$defs/string" }, "startDate": { "$ref": "#/$defs/string" }, "endDate": { "$ref": "#/$defs/string" },
         "companyInfo": { "$ref": "#/$defs/string" },
-        "layoutMode": { "const": "compact" },
         "detailSections": { "type": "array", "items": { "$ref": "#/$defs/japaneseCareerDetailSection" } }
       }
     },
