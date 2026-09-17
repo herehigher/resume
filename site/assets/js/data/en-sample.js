@@ -16,7 +16,11 @@ export function createEnglishSampleState(sourceState) {
       address: '',
       phone: '+1 206 555 0142',
       email: 'alex.morgan@example.com',
-      links: ['https://github.com/alexmorgan', 'https://www.linkedin.com/in/alexmorgan', 'https://alexmorgan.example.com']
+      links: [
+        'https://github.com/fictional-resume-profile',
+        'https://www.linkedin.com/in/fictional-resume-profile',
+        'https://jianli-resume.example'
+      ]
     }
   };
   state.documents.en = {

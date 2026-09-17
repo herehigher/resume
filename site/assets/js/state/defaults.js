@@ -134,7 +134,11 @@ export function createJapaneseSampleState(sourceState) {
       address: '東京都千代田区千代田1-1',
       phone: '090-1234-5678',
       email: 'taro.yamada@example.jp',
-      links: ['https://github.com/taro-yamada', 'https://www.linkedin.com/in/taro-yamada', 'https://example.com']
+      links: [
+        'https://github.com/fictional-resume-profile',
+        'https://www.linkedin.com/in/fictional-resume-profile',
+        'https://jianli-resume.example'
+      ]
     }
   };
   state.documents.ja = {
