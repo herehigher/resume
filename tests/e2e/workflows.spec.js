@@ -452,6 +452,66 @@ test('三言語の入力例モードはstickyな下書きコンポーネント�
   }
 });
 
+for (const scenario of [
+  {
+    source: 'ja', next: 'zh-CN', workspace: '#japaneseWorkspace', profile: '[name="fullName"]', document: '[name="motivation"]',
+    sample: '#loadSampleButton', targetProfile: '[data-profile="fullName"]', targetDocument: '[data-resume="headline"]',
+    targetSaveStatus: '[data-zh-draft-message]', savedMessage: '已加密并保存到此设备'
+  },
+  {
+    source: 'zh-CN', next: 'en', workspace: '#chineseWorkspace', profile: '[data-profile="fullName"]', document: '[data-resume="summary"]',
+    sample: '[data-zh-action="sample"]', targetProfile: '[data-profile-field="fullName"]', targetDocument: '[data-resume-field="headline"]',
+    targetSaveStatus: '[data-en-save-status]', savedMessage: 'Encrypted and saved on this device.'
+  },
+  {
+    source: 'en', next: 'ja', workspace: '[data-english-editor]', profile: '[data-profile-field="fullName"]', document: '[data-resume-field="summary"]',
+    sample: '[data-en-load-sample]', targetProfile: '[name="fullName"]', targetDocument: '[name="motivation"]',
+    targetSaveStatus: '#saveStatus', savedMessage: '暗号化してこの端末に保存済み'
+  }
+]) {
+  for (const persisted of [false, true]) {
+    test(`${scenario.source}の入力例から${scenario.next}へ切り替えて編集しても、${persisted ? '保存済み' : '未保存'}の下書きだけを再読込する`, async ({ page }) => {
+      const sourceName = persisted ? `Fictional ${scenario.source} draft` : '';
+      const sourceDocument = persisted ? `Fictional ${scenario.source} source document` : '';
+      const targetDocument = `Fictional ${scenario.next} edited document`;
+      await openLocale(page, scenario.source);
+
+      const sourceWorkspace = page.locator(scenario.workspace);
+      const sourceProfile = sourceWorkspace.locator(scenario.profile);
+      const sourceDocumentField = sourceWorkspace.locator(scenario.document);
+      if (persisted) {
+        await sourceProfile.fill(sourceName);
+        await revealField(sourceDocumentField);
+        await sourceDocumentField.fill(sourceDocument);
+        await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+      } else {
+        await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
+      }
+
+      await sourceWorkspace.locator(scenario.sample).click();
+      await expect(sourceWorkspace.locator('.draft-controls')).toHaveClass(/is-sample-mode/);
+      await page.locator('#localeSelect').selectOption(scenario.next);
+      await expect(page.locator(scenario.targetProfile)).toHaveValue(sourceName);
+
+      const targetDocumentField = page.locator(scenario.targetDocument);
+      await revealField(targetDocumentField);
+      await targetDocumentField.fill(targetDocument);
+      await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+      await expect(page.locator(scenario.targetSaveStatus)).toHaveText(scenario.savedMessage);
+
+      await page.reload();
+      await expect(page.locator(scenario.targetProfile)).toHaveValue(sourceName);
+      await revealField(page.locator(scenario.targetDocument));
+      await expect(page.locator(scenario.targetDocument)).toHaveValue(targetDocument);
+
+      await page.locator('#localeSelect').selectOption(scenario.source);
+      const reloadedSourceDocument = page.locator(scenario.workspace).locator(scenario.document);
+      await revealField(reloadedSourceDocument);
+      await expect(reloadedSourceDocument).toHaveValue(sourceDocument);
+    });
+  }
+}
+
 test('三言語エディターは Analytics 表示の下に著作権、MIT License、X 連絡先を常設する', async ({ page }) => {
   for (const [locale, workspace] of [
     ['ja', '#japaneseWorkspace'],

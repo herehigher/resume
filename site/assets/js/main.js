@@ -101,6 +101,10 @@ initLocaleController(store, {
   locale,
   statusController,
   preferenceStorage: window.localStorage,
+  onBeforeLocaleChange(currentLocale) {
+    const editor = { ja: japaneseEditor, 'zh-CN': chineseEditor, en: englishEditor }[currentLocale];
+    editor?.restoreDraftBeforePersistence();
+  },
   onLocaleApplied(locale) {
     if (storageError) {
       const message = messageForDraftStorageError(storageError, locale, {

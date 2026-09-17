@@ -62,6 +62,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   let importPending = false;
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
+  let sampleRequestVersion = 0;
   const pageBreakControls = initPageBreakControls({
     store, locale: 'ja', preview, toolbar: document.querySelector('#japaneseWorkspace .preview-toolbar'),
     getDocumentType: () => japaneseDocument().activeDocument, scheduleSave
@@ -125,6 +126,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
 
   async function enterSampleMode() {
     window.clearTimeout(saveTimer);
+    const requestVersion = ++sampleRequestVersion;
     let currentDraft;
     try {
       currentDraft = await protectDraftBeforeSample(store, shouldPersistDraft);
@@ -132,6 +134,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       setDraftStatus(draftStatusMessageForError(error, 'ja', '現在の下書きを保護できないため、入力例を表示できません'), 'error');
       return;
     }
+    if (requestVersion !== sampleRequestVersion || store.getState().settings.locale !== 'ja') return;
     draftBeforeSample = currentDraft;
     draftBeforeSampleWasStored = shouldPersistDraft;
     sampleMode = true;
@@ -690,6 +693,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   }
   document.getElementById('confirmClearButton').addEventListener('click', async () => {
     window.clearTimeout(saveTimer);
+    sampleRequestVersion += 1;
     try {
       await store.clearPersisted();
       store.reset(store.getState().settings.locale);
@@ -726,6 +730,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
 
   store.subscribe((_state, event) => {
     if (event.type === 'import-pending') {
+      sampleRequestVersion += 1;
       importPending = true;
       window.clearTimeout(saveTimer);
       return;
@@ -757,7 +762,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     refresh: hydrateForm,
     clearDraft,
     restoreDraftBeforePersistence() {
-      window.clearTimeout(saveTimer);
+      sampleRequestVersion += 1;
+      if (sampleMode) window.clearTimeout(saveTimer);
       return restoreDraftFromSample({ announce: false });
     }
   };
