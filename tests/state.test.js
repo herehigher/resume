@@ -92,19 +92,18 @@ test('Japanese career detail sections are validated and survive JSON export/impo
   assert.ok(result.errors.includes('state.documents.ja.careers[0].detailSections[0] has an unsupported shape'));
 });
 
-test('Japanese career compact layout stays with its stable record through reorder, deletion, reload, and JSON import/export', async () => {
+test('Japanese career record page breaks stay with stable records through reorder, reload, and JSON import/export', async () => {
   const storage = createMemoryStorage();
   const source = createTestStore(storage, createDefaultState('ja'));
   source.update((state) => {
     const [first] = state.documents.ja.careers;
     first.id = 'record_fictional-first';
-    first.layoutMode = 'compact';
     state.documents.ja.careers.push({
       ...structuredClone(first),
       id: 'record_fictional-second',
       company: '架空の二社目'
     });
-    delete state.documents.ja.careers[1].layoutMode;
+    state.settings.pageBreaks.ja.A4.career.records = ['record_fictional-second'];
     state.documents.ja.careers.reverse();
   });
   await source.save();
@@ -115,19 +114,8 @@ test('Japanese career compact layout stays with its stable record through reorde
 
   const careers = target.getState().documents.ja.careers;
   assert.equal(careers[0].id, 'record_fictional-second');
-  assert.equal(careers[0].layoutMode, undefined);
   assert.equal(careers[1].id, 'record_fictional-first');
-  assert.equal(careers[1].layoutMode, 'compact');
-  target.update((state) => state.documents.ja.careers.splice(1, 1));
-  assert.equal(target.getState().documents.ja.careers[0].layoutMode, undefined);
-});
-
-test('Japanese career layout rejects unsupported saved modes', () => {
-  const state = createDefaultState('ja');
-  state.documents.ja.careers[0].layoutMode = 'standard';
-  const result = validateState(state);
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.includes('state.documents.ja.careers[0].layoutMode is not supported'));
+  assert.deepEqual(target.getState().settings.pageBreaks.ja.A4.career.records, ['record_fictional-second']);
 });
 
 test('Japanese sample keeps the original responsibilities and achievements examples', () => {

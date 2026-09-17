@@ -44,7 +44,7 @@ function createMigratableV3Fixture() {
     role: 'Second fixture role',
     startDate: '2018-01',
     endDate: '2019-12',
-    companyInfo: 'Fictional compact-layout acceptance employer',
+    companyInfo: 'Fictional acceptance employer',
     detailSections: [{ title: '担当業務', content: '架空の職務内容' }, { title: '実績・成果', content: '架空の成果' }]
   });
   state.documents['zh-CN'].resume.summary = '虚构 v3 中文概述';

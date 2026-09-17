@@ -379,15 +379,10 @@ test('published JSON Schema accepts exports and rejects primary invalid values',
   assert.equal(validateSchema(schema, invalidGender), false);
   assert.equal(validateState(invalidGender).valid, false);
 
-  const compactCareer = structuredClone(example);
-  compactCareer.documents.ja.careers[0].layoutMode = 'compact';
-  assert.equal(validateSchema(schema, compactCareer), true);
-  assert.equal(validateState(compactCareer).valid, true);
-
-  const invalidCareerLayout = structuredClone(example);
-  invalidCareerLayout.documents.ja.careers[0].layoutMode = 'standard';
-  assert.equal(validateSchema(schema, invalidCareerLayout), false);
-  assert.equal(validateState(invalidCareerLayout).valid, false);
+  const unsupportedCareerLayout = structuredClone(example);
+  unsupportedCareerLayout.documents.ja.careers[0].layoutMode = 'compact';
+  assert.equal(validateSchema(schema, unsupportedCareerLayout), false);
+  assert.equal(validateState(unsupportedCareerLayout).valid, false);
 
   const missingOptionalPersonalDetails = structuredClone(example);
   delete missingOptionalPersonalDetails.documents.en.resume.showOptionalPersonalDetails;

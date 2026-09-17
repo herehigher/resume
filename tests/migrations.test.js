@@ -128,7 +128,7 @@ test('the v2 to v4 migration salvages unknown non-empty gender without discardin
   assert.equal(result.state.documents.ja.fields.motivation, 'Recognized document content remains intact.');
 });
 
-test('the v3 to v4 migration deterministically adds unique record IDs, standard career layout defaults, and separate page-break targets', () => {
+test('the v3 to v4 migration deterministically adds unique record IDs and separate page-break targets', () => {
   const source = createV3Fixture();
   source.documents.ja.careers.push({ ...source.documents.ja.careers[0], company: 'Fictional v3 second company' });
 
@@ -142,7 +142,6 @@ test('the v3 to v4 migration deterministically adds unique record IDs, standard 
     assert.equal(new Set(records.map((record) => record.id)).size, records.length);
     assert.ok(records.every((record) => record.id.startsWith('record_')));
   }
-  assert.ok(first.state.documents.ja.careers.every((record) => record.layoutMode === undefined));
 });
 
 test('version classification rejects malformed, future, old, and incomplete paths distinctly', () => {
