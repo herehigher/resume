@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createDefaultState } from '../site/assets/js/state/defaults.js';
+import { createEnglishSampleState } from '../site/assets/js/data/en-sample.js';
+import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { validateState } from '../site/assets/js/state/schema.js';
+import { createChineseSampleState } from '../site/assets/js/state/zh-CN.js';
 import {
   MAX_PROFILE_LINKS,
   addProfileLink,
@@ -11,6 +13,21 @@ import {
   profileLinkMeta,
   removeProfileLink
 } from '../site/assets/js/utils/profile-links.js';
+
+test('all localized samples use the same fictional profile links in the same order', () => {
+  const expectedLinks = [
+    'https://github.com/fictional-resume-profile',
+    'https://www.linkedin.com/in/fictional-resume-profile',
+    'https://jianli-resume.example'
+  ];
+  const sampleLinks = [
+    createJapaneseSampleState(createDefaultState('ja')).profile.fields.links,
+    createChineseSampleState(createDefaultState('zh-CN')).profile.fields.links,
+    createEnglishSampleState(createDefaultState('en')).profile.fields.links
+  ];
+
+  for (const links of sampleLinks) assert.deepEqual(links, expectedLinks);
+});
 
 test('profile links recognize known hostnames only through complete domains or their subdomains', () => {
   const summary = ({ name, icon }) => ({ name, icon });
