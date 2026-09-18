@@ -37,6 +37,40 @@ async function centerChinesePreviewTarget(page, key) {
   }, key);
 }
 
+async function expectPanelToCoverPaginationMarkers(panel) {
+  const coverage = await panel.evaluate((element) => {
+    const panelBox = element.getBoundingClientRect();
+    const boundary = [...document.querySelectorAll('.page-break-overlay:not([hidden]) .page-break-boundary')]
+      .find((candidate) => {
+        const sign = candidate.querySelector('.page-break-sign');
+        if (!sign) return false;
+        const box = sign.getBoundingClientRect();
+        return box.left < panelBox.right && box.right > panelBox.left
+          && box.top < panelBox.bottom && box.bottom > panelBox.top;
+      });
+    const marker = boundary?.querySelector('.page-break-sign');
+    if (!marker) return {
+      covered: false,
+      markerBoxes: [...document.querySelectorAll('.page-break-overlay:not([hidden]) .page-break-sign')]
+        .map((sign) => sign.getBoundingClientRect().toJSON()),
+      panelBox: panelBox.toJSON(),
+      reason: 'No marker overlaps the panel.'
+    };
+    const markerBox = marker.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      (Math.max(markerBox.left, panelBox.left) + Math.min(markerBox.right, panelBox.right)) / 2,
+      (Math.max(markerBox.top, panelBox.top) + Math.min(markerBox.bottom, panelBox.bottom)) / 2
+    );
+    return {
+      covered: hit?.closest('.page-break-panel') === element,
+      hit: hit?.className || null,
+      panelZIndex: getComputedStyle(element).zIndex,
+      overlayZIndex: getComputedStyle(boundary.closest('.page-break-overlay')).zIndex
+    };
+  });
+  expect(coverage.covered, JSON.stringify(coverage)).toBe(true);
+}
+
 test('desktop: edit mode aligns paper-wide boundaries with paper-exterior icons and short tooltips', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openLocale(page, 'en');
@@ -149,6 +183,25 @@ test('desktop: pagination rail uses one Tab stop, arrow navigation, detailed sta
   await expect(page.locator('[data-en-preview] [data-section-key="experience"]')).toHaveClass(/page-break-target-highlight/);
   await panelRow.press('Space');
   await expect(panelRow).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('desktop: all locale panels paint over pagination markers while retaining their rows', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 1000 });
+  const locales = [
+    { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton' },
+    { locale: 'zh-CN', workspace: '#chineseWorkspace', sample: '[data-zh-action="sample"]' },
+    { locale: 'en', workspace: '[data-english-editor]', sample: '[data-en-load-sample]' }
+  ];
+  for (const item of locales) {
+    await openLocale(page, item.locale);
+    await page.locator(item.sample).click();
+    await openDesktopPageBreakMode(page, item.workspace);
+    await page.locator('.page-break-all-positions').click();
+    const panel = page.locator(`#page-break-panel-${item.locale}`);
+    await expect(panel).toBeVisible();
+    await expectPanelToCoverPaginationMarkers(panel);
+    await expect(panel.locator('.page-break-row').first()).toBeEnabled();
+  }
 });
 
 test('desktop: a context switch resets the roving entry when its focused candidate no longer exists', async ({ page }) => {
@@ -413,6 +466,26 @@ test('[mobile] Japanese mobile panel is closed by default and uses a single rovi
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
   await expect(panelToggle).toBeFocused();
+});
+
+test('[mobile][mobile-webkit] smartphone panels cover pagination markers in every locale', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const locales = [
+    { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton', preview: '[data-mobile-view="preview"]' },
+    { locale: 'zh-CN', workspace: '#chineseWorkspace', sample: '[data-zh-action="sample"]', preview: '[data-zh-mobile-view="preview"]' },
+    { locale: 'en', workspace: '[data-english-editor]', sample: '[data-en-load-sample]', preview: '[data-en-mobile-view="preview"]' }
+  ];
+  for (const item of locales) {
+    await openLocale(page, item.locale);
+    await page.locator(item.sample).click();
+    await page.locator(item.preview).click();
+    await page.locator(`${item.workspace} [data-page-break-mode-toggle]`).click();
+    await page.locator(`${item.workspace} .page-break-panel-toggle`).click();
+    const panel = page.locator(`#page-break-panel-${item.locale}`);
+    await expect(panel).toBeVisible();
+    await expectPanelToCoverPaginationMarkers(panel);
+    await expect(panel.locator('.page-break-row').first()).toBeEnabled();
+  }
 });
 
 test('[mobile][mobile-webkit] smartphone markers toggle a boundary with one activation', async ({ page }) => {

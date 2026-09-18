@@ -733,7 +733,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       geometryFrame = null;
       if (!isSurfaceVisible()) { closeSurface(); return; }
       const desktop = isDesktop();
-      if (desktop !== surfaceWasDesktop || (desktop && !panel.hidden)) syncSurface();
+      if (desktop !== surfaceWasDesktop) syncSurface();
       else positionOverlay();
       updateMenuControls();
     });
