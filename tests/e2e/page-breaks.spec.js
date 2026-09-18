@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, openLocale, test } from './fixtures.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createEnglishSampleState } from '../../site/assets/js/data/en-sample.js';
+import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
 
 async function clickVisible(_page, locator) {
   await expect(locator).toBeVisible();
@@ -68,6 +69,31 @@ async function expectPanelToCoverPaginationMarkers(panel) {
       overlayZIndex: getComputedStyle(boundary.closest('.page-break-overlay')).zIndex
     };
   });
+  expect(coverage.covered, JSON.stringify(coverage)).toBe(true);
+}
+
+async function expectMarkerBehindChrome(page, { chromeSelector, markerSelector, scrollSelector }) {
+  const coverage = await page.locator(markerSelector).evaluate(async (marker, selectors) => {
+    const chrome = document.querySelector(selectors.chromeSelector);
+    const scroll = document.querySelector(selectors.scrollSelector);
+    if (!chrome || !scroll) return { covered: false, reason: 'Missing chrome or preview scroll.' };
+    const chromeBox = chrome.getBoundingClientRect();
+    const markerBox = marker.getBoundingClientRect();
+    const targetY = chromeBox.top + (chromeBox.height / 2);
+    scroll.scrollTop += (markerBox.top + (markerBox.height / 2)) - targetY;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const movedMarkerBox = marker.getBoundingClientRect();
+    const hit = document.elementFromPoint(movedMarkerBox.left + (movedMarkerBox.width / 2), targetY);
+    return {
+      chromeBox: chromeBox.toJSON(),
+      covered: chrome.contains(hit),
+      hit: hit?.className || hit?.tagName || null,
+      markerBox: movedMarkerBox.toJSON(),
+      overlaps: movedMarkerBox.top <= targetY && movedMarkerBox.bottom >= targetY,
+      scrollTop: scroll.scrollTop
+    };
+  }, { chromeSelector, scrollSelector });
+  expect(coverage.overlaps, JSON.stringify(coverage)).toBe(true);
   expect(coverage.covered, JSON.stringify(coverage)).toBe(true);
 }
 
@@ -485,6 +511,29 @@ test('[mobile][mobile-webkit] smartphone panels cover pagination markers in ever
     await expect(panel).toBeVisible();
     await expectPanelToCoverPaginationMarkers(panel);
     await expect(panel.locator('.page-break-row').first()).toBeEnabled();
+  }
+});
+
+test('[mobile][mobile-webkit] smartphone chrome covers markers scrolled above the preview', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLocale(page, 'zh-CN');
+  const { state } = createPdfFixture({ locale: 'zh-CN', length: 'extra-long', pageSize: 'A4' });
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'long-page-break-chrome.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await page.locator('[data-zh-mobile-view="preview"]').click();
+  const workspace = page.locator('#chineseWorkspace');
+  await workspace.locator('[data-page-break-mode-toggle]').click();
+  await workspace.locator('.page-break-panel-toggle').click();
+  const markerSelector = '#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]';
+  const scrollSelector = '[data-zh-preview-scroll]';
+  for (const chromeSelector of [
+    '#chineseWorkspace .preview-toolbar',
+    '#chineseWorkspace .zh-mobile-view-switch',
+    '.app-header'
+  ]) {
+    await expectMarkerBehindChrome(page, { chromeSelector, markerSelector, scrollSelector });
   }
 });
 

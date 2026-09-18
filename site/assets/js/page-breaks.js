@@ -532,6 +532,16 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function positionOverlay() {
     if (overlay.hidden) return;
+    const scrollBox = preview.closest('.preview-scroll')?.getBoundingClientRect();
+    if (scrollBox) {
+      const top = Math.max(0, scrollBox.top);
+      const right = Math.max(0, window.innerWidth - scrollBox.right);
+      const bottom = Math.max(0, window.innerHeight - scrollBox.bottom);
+      const left = Math.max(0, scrollBox.left);
+      overlay.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`;
+    } else {
+      overlay.style.removeProperty('clip-path');
+    }
     const visible = modeOpen ? renderedCandidates : renderedCandidates.filter((candidate) => candidate.active);
     const laneEnds = [];
     const positions = [];
