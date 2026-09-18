@@ -350,10 +350,18 @@ test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and
   await expect(panelToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(panel.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
   await expect(rows.first()).toBeFocused();
+  const firstKey = await rows.first().getAttribute('data-page-break-key');
+  await page.keyboard.press('Enter');
+  const firstTarget = firstKey?.startsWith('record:')
+    ? page.locator(`[data-record-id="${firstKey.slice('record:'.length)}"]`)
+    : page.locator(`[data-section-key="${firstKey}"]`);
+  await expect(firstTarget).toHaveClass(/has-manual-page-break/);
+  await expect(rows.first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(rows.first()).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(rows.nth(1)).toBeFocused();
   await expect(panel.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('Space');
   const target = page.locator('[data-section-key="experience"]');
   await expect(target).toHaveClass(/has-manual-page-break/);
   await expect(rows.nth(1)).toHaveAttribute('aria-pressed', 'true');
