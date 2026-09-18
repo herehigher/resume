@@ -5,21 +5,18 @@ export const PAGE_BREAK_LABELS = Object.freeze({
     add: '改頁', remove: '解除', menu: '改ページ位置', positions: '改ページ位置', after: 'の後',
     edit: '改ページを編集', editing: '改ページ編集中', undo: '元に戻す', allPositions: 'すべての改ページ位置',
     rail: '改ページ位置の候補', set: '設定済み', unset: '未設定',
-    start: '新しいページから開始', clear: '改ページを解除', before: 'の前',
     added: 'PDF 出力時に新しい page から開始します。', removed: 'PDF 出力時の改ページを解除しました。'
   },
   'zh-CN': {
     add: '分页', remove: '取消', menu: '分页位置', positions: '分页位置', after: '之后',
     edit: '编辑分页', editing: '正在编辑分页', undo: '撤销', allPositions: '所有分页位置',
     rail: '分页位置候选', set: '已设置', unset: '未设置',
-    start: '从新页面开始', clear: '取消分页', before: '之前',
     added: '导出 PDF 时将从新页面开始。', removed: '已取消 PDF 导出时的分页。'
   },
   en: {
     add: 'Add', remove: 'Remove', menu: 'Page break positions', positions: 'Page break positions', after: 'after',
     edit: 'Edit page breaks', editing: 'Editing page breaks', undo: 'Undo', allPositions: 'All page break positions',
     rail: 'Page break position candidates', set: 'Set', unset: 'Not set',
-    start: 'Start on a new page', clear: 'Remove page break', before: 'before',
     added: 'The PDF will start this content on a new page.', removed: 'The PDF page break has been removed.'
   }
 });
@@ -298,15 +295,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   overlay.setAttribute('aria-label', labels.rail);
   overlay.setAttribute('role', 'region');
   document.body.append(overlay);
-  const actionBar = document.createElement('div');
-  actionBar.className = 'page-break-action-bar';
-  actionBar.hidden = true;
-  const actionTarget = document.createElement('strong');
-  const actionButton = document.createElement('button');
-  actionButton.type = 'button';
-  actionButton.className = 'page-break-action';
-  actionBar.append(actionTarget, actionButton);
-  document.body.append(actionBar);
   const trustCapsule = document.getElementById('trustCapsule');
   let modeOpen = false;
   let feedbackTimer = null;
@@ -315,9 +303,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   let rovingFocusKey = null;
   let renderedCandidates = [];
   let allPositionsOpen = false;
-  let selectedKey = null;
-  let selectedContext = null;
-  let selectedElement = null;
   let surfaceWasDesktop = isDesktop();
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches; }
@@ -332,7 +317,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   }
   function createBoundary(candidate, interactive, index) {
     const boundary = document.createElement('div');
-    boundary.className = `page-break-visual-boundary${candidate.active ? ' is-set' : ''}${candidate.key === selectedKey ? ' is-selected' : ''}`;
+    boundary.className = `page-break-visual-boundary${candidate.active ? ' is-set' : ''}`;
     boundary.dataset.pageBreakKey = candidate.key;
     const line = document.createElement('span');
     line.className = 'page-break-boundary-line';
@@ -365,8 +350,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     tooltip.textContent = shortDescription(candidate.active);
     control.append(sign, tooltip);
     control.addEventListener('click', () => {
-      if (isDesktop()) toggle(candidate);
-      else selectCandidate(candidate);
+      toggle(candidate);
     });
     control.addEventListener('keydown', (event) => {
       if (isDesktop()) handleRovingKey(event, index, overlay);
@@ -392,25 +376,8 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     const type = getDocumentType();
     return { state, type, paper: state.settings.pageSizeByLocale[locale] };
   }
-  function contextKey({ type, paper }) { return `${locale}:${paper}:${type}`; }
-  function selectedCandidate() {
-    const context = activeContext();
-    if (selectedContext !== contextKey(context)) return null;
-    return renderedCandidates.find((candidate) => candidate.key === selectedKey) || null;
-  }
-  function clearSelection() {
-    clearSelectedHighlight();
-    selectedKey = null;
-    selectedContext = null;
-    selectedElement = null;
-    actionBar.hidden = true;
-    actionTarget.textContent = '';
-    actionButton.textContent = '';
-  }
-  function clearSelectedHighlight() {
-    selectedElement?.classList.remove('page-break-target-highlight');
-    overlay.querySelector(`[data-page-break-key="${selectedKey}"]`)?.classList.remove('is-target-highlighted');
-  }
+  // The fixed trust capsule otherwise covers a marker in narrow landscape
+  // viewports. This is independent of the now-removed action confirmation.
   function syncTrustCapsule() {
     if (!trustCapsule) return;
     const owner = document.body.dataset.pageBreakEditingLocale;
@@ -423,33 +390,9 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       trustCapsule.hidden = false;
     }
   }
-  function renderActionBar() {
-    const candidate = selectedCandidate();
-    if (!candidate || isDesktop() || !modeOpen || !isSurfaceVisible()) {
-      actionBar.hidden = true;
-      return;
-    }
-    const target = locale === 'en' ? `Before ${candidate.label}` : `${candidate.label}${labels.before}`;
-    actionTarget.textContent = target;
-    actionButton.textContent = candidate.active ? labels.clear : labels.start;
-    actionBar.hidden = false;
-  }
-  function selectCandidate(candidate, { focusAction = false } = {}) {
-    if (isDesktop() || !modeOpen) return;
-    if (selectedKey !== candidate.key || selectedElement !== candidate.element) clearSelectedHighlight();
-    selectedKey = candidate.key;
-    selectedContext = contextKey(activeContext());
-    selectedElement = candidate.element;
-    panel.hidden = true;
-    panelToggle.setAttribute('aria-expanded', 'false');
-    setHighlight(candidate, true);
-    renderOverlay();
-    renderActionBar();
-    if (focusAction) actionButton.focus({ preventScroll: true });
-  }
   function setMode(open, { focusFirst = false } = {}) {
     modeOpen = open;
-    if (!open) { allPositionsOpen = false; clearSelection(); }
+    if (!open) allPositionsOpen = false;
     menu.setAttribute('aria-pressed', String(open));
     menu.setAttribute('aria-expanded', String(open));
     menu.textContent = open ? labels.editing : labels.edit;
@@ -459,7 +402,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       panelToggle.hidden = !open;
       panelToggle.setAttribute('aria-expanded', 'false');
       renderOverlay();
-      renderActionBar();
       if (open && focusFirst) panelToggle.focus({ preventScroll: true });
     } else {
       panel.hidden = true;
@@ -492,7 +434,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     menu.textContent = labels.edit;
     allPositions.hidden = true;
     allPositions.setAttribute('aria-expanded', 'false');
-    clearSelection();
     clearFeedback();
     syncTrustCapsule();
   }
@@ -526,9 +467,8 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     }, describePageBreakCandidate(locale, renderedCandidates.findIndex((item) => item.key === candidate.key) + 1, renderedCandidates.length, candidate, !wasActive));
   }
   function setHighlight(candidate, active) {
-    const persistent = selectedCandidate()?.key === candidate.key;
-    candidate.element.classList.toggle('page-break-target-highlight', active || persistent);
-    overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active || persistent);
+    candidate.element.classList.toggle('page-break-target-highlight', active);
+    overlay.querySelector(`[data-page-break-key="${candidate.key}"]`)?.classList.toggle('is-target-highlighted', active);
   }
   function normalizeRovingFocus() {
     if (!renderedCandidates.some((candidate) => candidate.key === rovingFocusKey)) {
@@ -685,16 +625,9 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       const rowSwitch = document.createElement('span'); rowSwitch.className = 'page-break-switch'; rowSwitch.setAttribute('aria-hidden', 'true');
       rowText.append(rowLabel, rowDetail); row.append(rowText, rowSwitch);
       row.addEventListener('click', () => {
-        if (isDesktop()) toggle(candidate);
-        else selectCandidate(candidate);
+        toggle(candidate);
       });
       row.addEventListener('keydown', (event) => {
-        if (!isDesktop() && (event.key === 'Enter' || event.key === ' ')) {
-          event.preventDefault();
-          event.stopPropagation();
-          selectCandidate(candidate, { focusAction: true });
-          return;
-        }
         handleRovingKey(event, index, panel);
       });
       row.addEventListener('pointerenter', () => setHighlight(candidate, true));
@@ -717,7 +650,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     renderedCandidates.forEach((candidate) => {
       candidate.element.classList.toggle('has-manual-page-break', candidate.active);
     });
-    if (!selectedCandidate()) clearSelection();
     menu.hidden = renderedCandidates.length === 0;
     if (menu.hidden) { modeOpen = false; allPositionsOpen = false; clearFeedback(); }
     updateMenuControls();
@@ -735,7 +667,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     } else {
       renderOverlay();
       if (!panel.hidden) renderPanel(renderedCandidates);
-      renderActionBar();
     }
     syncTrustCapsule();
     if (lastFocusKey) {
@@ -754,12 +685,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   });
   panelToggle.addEventListener('click', () => {
     setMobilePanel(panel.hidden, { focusFirst: panel.hidden });
-  });
-  actionButton.addEventListener('click', () => {
-    const candidate = selectedCandidate();
-    if (!candidate) { clearSelection(); return; }
-    clearSelection();
-    toggle(candidate);
   });
   toolbar.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
@@ -793,14 +718,12 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       allPositionsOpen = false;
       allPositions.setAttribute('aria-expanded', 'false');
       renderOverlay();
-      renderActionBar();
     } else {
       allPositions.hidden = true;
       allPositionsOpen = false;
       panelToggle.hidden = !modeOpen;
       renderOverlay();
       if (!panel.hidden) renderPanel(renderedCandidates);
-      renderActionBar();
     }
     syncTrustCapsule();
   };
@@ -812,7 +735,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       const desktop = isDesktop();
       if (desktop !== surfaceWasDesktop || (desktop && !panel.hidden)) syncSurface();
       else positionOverlay();
-      if (!desktop) renderActionBar();
       updateMenuControls();
     });
   }

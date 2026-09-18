@@ -331,7 +331,7 @@ test('desktop: later Chinese and English records anchor their line to the physic
   }
 });
 
-test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and hand the selection to the action bar', async ({ page }) => {
+test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and toggle immediately', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
@@ -354,15 +354,11 @@ test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and
   await expect(rows.nth(1)).toBeFocused();
   await expect(panel.locator('.page-break-row[tabindex="0"]')).toHaveCount(1);
   await page.keyboard.press('Enter');
-  const actionBar = page.locator('.page-break-action-bar:not([hidden])');
-  const action = actionBar.locator('.page-break-action');
   const target = page.locator('[data-section-key="experience"]');
-  await expect(actionBar).toBeVisible();
-  await expect(action).toBeFocused();
-  await expect(target).toHaveClass(/page-break-target-highlight/);
-  await panelToggle.focus();
-  await page.keyboard.press('Enter');
-  await expect(panel).toBeVisible();
+  await expect(target).toHaveClass(/has-manual-page-break/);
+  await expect(rows.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
   await expect(rows.nth(1)).toBeFocused();
   await page.keyboard.press('ArrowDown');
   const replacement = rows.nth(2);
@@ -372,15 +368,11 @@ test('[mobile][mobile-webkit] smartphone: supplemental rows use one Tab stop and
   const replacementTarget = replacementKey?.startsWith('record:')
     ? page.locator(`[data-record-id="${replacementKey.slice('record:'.length)}"]`)
     : page.locator(`[data-section-key="${replacementKey}"]`);
-  const selectedMarkers = page.locator('#page-break-overlay-zh-CN .page-break-visual-boundary.is-selected');
-  await expect(target).not.toHaveClass(/page-break-target-highlight/);
-  await expect(replacementTarget).toHaveClass(/page-break-target-highlight/);
-  await expect(selectedMarkers).toHaveCount(1);
-  await expect(selectedMarkers).toHaveAttribute('data-page-break-key', replacementKey || '');
-  await expect(action).toBeFocused();
-  await page.keyboard.press('Enter');
+  await expect(replacementTarget).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
-  await expect(replacementTarget).not.toHaveClass(/page-break-target-highlight/);
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(panelToggle).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();
@@ -415,7 +407,7 @@ test('[mobile] Japanese mobile panel is closed by default and uses a single rovi
   await expect(panelToggle).toBeFocused();
 });
 
-test('[mobile][mobile-webkit] smartphone markers select a boundary before the bottom action confirms it', async ({ page }) => {
+test('[mobile][mobile-webkit] smartphone markers toggle a boundary with one activation', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
@@ -426,27 +418,19 @@ test('[mobile][mobile-webkit] smartphone markers select a boundary before the bo
   await expect(marker).toBeVisible();
   await expect(marker).toHaveAttribute('aria-pressed', 'false');
   await marker.press('Space');
-  await expect(marker).toHaveAttribute('aria-pressed', 'false');
-  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
-  const actionBar = page.locator('.page-break-action-bar:not([hidden])');
-  await expect(actionBar).toBeVisible();
-  await expect(actionBar).toContainText('个人概述之前');
-  await expect(actionBar.locator('.page-break-action')).toHaveText('从新页面开始');
-  await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
-  await actionBar.locator('.page-break-action').click();
-  await expect(actionBar).toBeHidden();
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、已设置/);
+  await expect(page.locator('.page-break-action-bar')).toHaveCount(0);
   await marker.press('Space');
-  await expect(actionBar.locator('.page-break-action')).toHaveText('取消分页');
-  await actionBar.locator('.page-break-action').click();
+  await expect(marker).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
   await expect(page.locator('#statusAnnouncer')).toHaveText(/位置 \d+ \/ \d+、.+之前、未设置/);
   await page.locator('.page-break-undo').click();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
 });
 
-test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full touch target and action bar on screen', async ({ page }) => {
+test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full touch target on screen', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
@@ -469,22 +453,16 @@ test('[mobile][mobile-webkit] 320–390px portrait and landscape keep a full tou
         && Math.abs((marker.top + marker.height / 2) - line.top) < 1
         && document.elementFromPoint(marker.left + marker.width / 2, marker.top + marker.height / 2)?.closest('.page-break-boundary') === element;
     })).toBe(true);
+    const wasPressed = await marker.getAttribute('aria-pressed');
     await marker.tap();
-    const bar = page.locator('.page-break-action-bar:not([hidden])');
-    await expect(bar).toBeVisible();
-    await expect.poll(() => bar.evaluate((element) => {
-      const box = element.getBoundingClientRect();
-      const action = element.querySelector('.page-break-action')?.getBoundingClientRect();
-      const hit = action && document.elementFromPoint(action.left + action.width / 2, action.top + action.height / 2);
-      return Boolean(action) && box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight
-        && action.width >= 44 && action.height >= 44 && hit?.closest('.page-break-action') === element.querySelector('.page-break-action');
-    })).toBe(true);
+    await expect(marker).toHaveAttribute('aria-pressed', wasPressed === 'true' ? 'false' : 'true');
+    await expect(page.locator('.page-break-action-bar')).toHaveCount(0);
     await trigger.click();
     await expect(trustCapsule).toBeVisible();
   }
 });
 
-test('[mobile][mobile-webkit] supplemental panel hands a selection to the bottom action bar without changing state', async ({ page }) => {
+test('[mobile][mobile-webkit] supplemental panel toggles a page break without an extra confirmation', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
@@ -497,13 +475,12 @@ test('[mobile][mobile-webkit] supplemental panel hands a selection to the bottom
   await panelToggle.tap();
   await expect(summary).toBeVisible();
   await summary.tap();
-  await expect(page.locator('[data-section-key="summary"]')).not.toHaveClass(/has-manual-page-break/);
-  await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
-  await page.locator('.page-break-action-bar:not([hidden]) .page-break-action').tap();
   await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
+  await expect(summary).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.page-break-action-bar')).toHaveCount(0);
 });
 
-test('[mobile][mobile-webkit] selected mobile boundary survives geometry changes and closes safely when its locale becomes inactive', async ({ page }) => {
+test('[mobile][mobile-webkit] active mobile page breaks stay synced across geometry and locale changes', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await page.locator('[data-zh-mobile-view="preview"]').click();
@@ -512,29 +489,24 @@ test('[mobile][mobile-webkit] selected mobile boundary survives geometry changes
   await trigger.click();
   const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
   await marker.click();
-  const actionBar = page.locator('.page-break-action-bar:not([hidden])');
-  await expect(actionBar).toBeVisible();
-  await expect(actionBar).toContainText('个人概述之前');
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-section-key="summary"]')).toHaveClass(/has-manual-page-break/);
   await centerChinesePreviewTarget(page, 'summary');
   const zoomLabel = workspace.locator('[data-zh-zoom-label]');
   const zoomBefore = await zoomLabel.textContent();
   await workspace.locator('[data-zh-action="zoom-in"]').click();
   await expect(zoomLabel).not.toHaveText(zoomBefore || '');
-  await expect.poll(() => page.locator('#page-break-overlay-zh-CN .page-break-visual-boundary.is-selected').evaluate((boundary) => {
-    const action = document.querySelector('.page-break-action-bar:not([hidden])');
-    return boundary.dataset.pageBreakKey === 'summary' && action?.textContent?.includes('个人概述之前');
-  })).toBe(true);
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await page.setViewportSize({ width: 844, height: 390 });
-  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#localeSelect').selectOption('en');
-  await expect(page.locator('.page-break-action-bar:not([hidden])')).toHaveCount(0);
   await expect(page.locator('#trustCapsule')).toBeVisible();
   await expect(page.locator('body')).not.toHaveAttribute('data-page-break-editing-locale');
 });
 
-test('[mobile][mobile-webkit] a desktop breakpoint hides mobile pagination controls without discarding its selected boundary', async ({ page }) => {
+test('[mobile][mobile-webkit] a desktop breakpoint keeps an active mobile page break', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();
   await ensureChineseMobilePreview(page);
@@ -546,19 +518,17 @@ test('[mobile][mobile-webkit] a desktop breakpoint hides mobile pagination contr
   const marker = page.locator('#page-break-overlay-zh-CN .page-break-boundary[data-page-break-key="summary"]');
   await marker.click();
   await expect(panel).toBeHidden();
-  await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#trustCapsule')).toBeHidden();
   await expect(page.locator('body')).toHaveAttribute('data-page-break-editing-locale', 'zh-CN');
   await page.setViewportSize({ width: 1024, height: 768 });
   await expect(panel).toBeHidden();
   await expect(panelToggle).toBeHidden();
-  await expect(page.locator('.page-break-action-bar:not([hidden])')).toHaveCount(0);
   await expect(page.locator('#trustCapsule')).toBeVisible();
   await expect(page.locator('body')).not.toHaveAttribute('data-page-break-editing-locale');
-  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator('.page-break-action-bar:not([hidden])')).toBeVisible();
-  await expect(marker.locator('xpath=..')).toHaveClass(/is-selected/);
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#trustCapsule')).toBeHidden();
   await trigger.click();
   await expect(page.locator('#trustCapsule')).toBeVisible();
