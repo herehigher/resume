@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { DRAFT_KEY_DATABASE } from '../../site/assets/js/state/storage.js';
+import { FICTITIOUS_TRANSPARENT_PROFILE_PHOTO_BASE64 } from '../fixtures/fictitious-transparent-profile-photo.mjs';
 import { DRAFT_STORAGE_KEY as STORAGE_KEY, expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
 
 const PHOTO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const PHOTO_DATA_URL = `data:image/png;base64,${PHOTO_BASE64}`;
+const FICTITIOUS_TRANSPARENT_PROFILE_PHOTO = Buffer.from(FICTITIOUS_TRANSPARENT_PROFILE_PHOTO_BASE64, 'base64');
 const PROFILE_URL_CASES = [
   ['http://example.test/profile', true],
   ['https://example.test/profile', true],
@@ -14,6 +16,24 @@ const PROFILE_URL_CASES = [
   ['mailto:profile@example.test', false],
   ['ftp://example.test/profile', false]
 ];
+
+async function inspectTransparentPhoto(image) {
+  return image.evaluate(async (element) => {
+    await element.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = element.naturalWidth;
+    canvas.height = element.naturalHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(element, 0, 0);
+    const response = await fetch(element.src);
+    return {
+      alpha: context.getImageData(0, 0, 1, 1).data[3],
+      height: element.naturalHeight,
+      type: response.headers.get('content-type'),
+      width: element.naturalWidth
+    };
+  });
+}
 
 test('日本語: 自動保存・例示保護・削除・安全なプレビュー', async ({ page }) => {
   await openLocale(page, 'ja');
@@ -648,6 +668,89 @@ test('embedded photos stay as data URLs in storage but render only through revoc
       return false;
     }
   }, replacementBlobUrl)).toBe(false);
+});
+
+test('透明の架空 PNG は三言語の入力、preview、保存と JSON 往復で alpha を保持する', async ({ page }) => {
+  const upload = {
+    buffer: FICTITIOUS_TRANSPARENT_PROFILE_PHOTO,
+    mimeType: 'image/png',
+    name: 'fictitious-transparent-profile.png'
+  };
+  const localeCases = [
+    {
+      input: '#photoInput',
+      locale: 'ja',
+      images: '#photoThumbnail img, #documentPreview .profile-photo img'
+    },
+    {
+      input: '[data-zh-photo-input]',
+      locale: 'zh-CN',
+      images: '[data-zh-photo-thumbnail] img, [data-zh-preview] .zh-profile-photo'
+    },
+    {
+      input: '[data-en-photo-input]',
+      locale: 'en',
+      images: '[data-en-photo-thumbnail] img, [data-en-preview] .en-profile-photo',
+      prepare: async () => page.locator('[data-en-optional-details-switch]').check()
+    }
+  ];
+
+  await openLocale(page, 'ja');
+  for (const item of localeCases) {
+    if (item.locale !== 'ja') await page.locator('#localeSelect').selectOption(item.locale);
+    await item.prepare?.();
+    await page.locator(item.input).setInputFiles(upload);
+    const images = page.locator(item.images);
+    await expect(images).toHaveCount(2);
+    for (const image of await images.all()) {
+      await expect(image).toHaveAttribute('src', /^blob:/);
+      expect(await inspectTransparentPhoto(image)).toEqual({ alpha: 0, height: 600, type: 'image/png', width: 480 });
+    }
+  }
+
+  await expect.poll(() => page.evaluate((key) => Boolean(localStorage.getItem(key)), STORAGE_KEY)).toBe(true);
+  await page.reload();
+  await expect(page.locator('[data-en-photo-thumbnail] img')).toHaveCount(1);
+  expect(await inspectTransparentPhoto(page.locator('[data-en-photo-thumbnail] img'))).toEqual({
+    alpha: 0, height: 600, type: 'image/png', width: 480
+  });
+
+  await page.locator('#dataMenuSummary').click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  const exported = JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'));
+  expect(exported.profile.photo).toMatch(/^data:image\/png;base64,/);
+
+  await page.locator('[data-en-remove-photo]').click();
+  await expect(page.locator('[data-en-photo-thumbnail] img')).toHaveCount(0);
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'fictitious-transparent-profile.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(exported))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[data-en-photo-thumbnail] img')).toHaveCount(1);
+  expect(await inspectTransparentPhoto(page.locator('[data-en-photo-thumbnail] img'))).toEqual({
+    alpha: 0, height: 600, type: 'image/png', width: 480
+  });
+});
+
+test('[mobile] 透明の架空 PNG は日本語 editor thumbnail と preview で alpha を保持する', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#photoInput').setInputFiles({
+    buffer: FICTITIOUS_TRANSPARENT_PROFILE_PHOTO,
+    mimeType: 'image/png',
+    name: 'fictitious-transparent-profile.png'
+  });
+  const thumbnail = page.locator('#photoThumbnail img');
+  await expect(thumbnail).toBeVisible();
+  expect(await inspectTransparentPhoto(thumbnail)).toEqual({ alpha: 0, height: 600, type: 'image/png', width: 480 });
+
+  await page.locator('[data-mobile-view="preview"]').click();
+  const previewPhoto = page.locator('#documentPreview .profile-photo img');
+  await expect(previewPhoto).toBeVisible();
+  expect(await inspectTransparentPhoto(previewPhoto)).toEqual({ alpha: 0, height: 600, type: 'image/png', width: 480 });
+  await expectNoPageOverflow(page);
 });
 
 test('English: complete editing flow auto-saves, restores, protects samples, and removes entries', async ({ page }) => {
