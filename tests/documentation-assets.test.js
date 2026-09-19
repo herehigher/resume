@@ -7,11 +7,16 @@ import test from 'node:test';
 
 import {
   computeGeneratorInputHash,
+  createDocumentationState,
+  loadDocumentationProfilePhoto,
   normalizePdfMetadata,
   parseArguments as parseGenerationArguments,
   prepareDocumentationOutputDirectory,
   resolveSourceCommit
 } from '../scripts/generate-doc-assets.mjs';
+import { createEnglishSampleState } from '../site/assets/js/data/en-sample.js';
+import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
+import { createChineseSampleState } from '../site/assets/js/state/zh-CN.js';
 import { parseArguments as parseVerificationArguments } from '../scripts/verify-doc-assets.mjs';
 
 test('documentation asset commands require explicit temporary output and source provenance', () => {
@@ -41,17 +46,48 @@ test('documentation asset commands require explicit temporary output and source 
   assert.throws(() => parseVerificationArguments(['--asset-root', '/private/tmp/doc-assets']), /Provide/);
 });
 
-test('documentation generator input hash covers code and the dependency lockfile', async (t) => {
+test('documentation generator input hash covers code, dependency lockfile, and profile photo', async (t) => {
   const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'resume-doc-assets-generator-test-'));
   t.after(() => rm(sourceRoot, { force: true, recursive: true }));
   await mkdir(path.join(sourceRoot, 'scripts'));
+  await mkdir(path.join(sourceRoot, 'site/assets/favicon'), { recursive: true });
   await writeFile(path.join(sourceRoot, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(path.join(sourceRoot, 'scripts/generate-doc-assets.mjs'), '// generator one\n');
   await writeFile(path.join(sourceRoot, 'scripts/verify-doc-assets.mjs'), '// verifier one\n');
+  await writeFile(path.join(sourceRoot, 'site/assets/favicon/resume-studio-marmot-512.png'), 'icon one\n');
   const original = await computeGeneratorInputHash(sourceRoot);
 
   await writeFile(path.join(sourceRoot, 'scripts/verify-doc-assets.mjs'), '// verifier two\n');
   assert.notEqual(await computeGeneratorInputHash(sourceRoot), original);
+  await writeFile(path.join(sourceRoot, 'scripts/verify-doc-assets.mjs'), '// verifier one\n');
+  await writeFile(path.join(sourceRoot, 'site/assets/favicon/resume-studio-marmot-512.png'), 'icon two\n');
+  assert.notEqual(await computeGeneratorInputHash(sourceRoot), original);
+});
+
+test('documentation states use the local icon photo without changing ordinary samples', async () => {
+  const sourceState = createDefaultState('ja');
+  const factories = { createChineseSampleState, createDefaultState, createEnglishSampleState, createJapaneseSampleState };
+  const photo = await loadDocumentationProfilePhoto();
+
+  assert.match(photo, /^data:image\/png;base64,/);
+  for (const locale of ['ja', 'zh-CN', 'en']) {
+    const state = createDocumentationState(locale, 'MARKER', 'first', factories, photo);
+    assert.equal(state.profile.photo, photo);
+    if (locale === 'en') {
+      assert.equal(state.documents.en.resume.showOptionalPersonalDetails, true);
+      assert.deepEqual(
+        state.profile.fields,
+        {
+          ...state.profile.fields,
+          address: '', birthDate: '', gender: '', nationality: '', phone: '', postalCode: ''
+        }
+      );
+    }
+  }
+  assert.equal(createJapaneseSampleState(sourceState).profile.photo, '');
+  assert.equal(createChineseSampleState(sourceState).profile.photo, '');
+  assert.equal(createEnglishSampleState(sourceState).profile.photo, '');
+  assert.equal(createEnglishSampleState(sourceState).documents.en.resume.showOptionalPersonalDetails, false);
 });
 
 test('documentation PDF metadata uses fixed-length deterministic dates', () => {
