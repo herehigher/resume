@@ -65,7 +65,7 @@
   .page-break-panel-toggle { min-height: 44px; }
   .preview-toolbar { gap: 6px; justify-content: flex-end; padding: 0 10px; }
   .preview-toolbar > div:first-child { display: none; }
-  .preview-toolbar > .page-break-panel { right: 8px; top: 48px; width: min(330px, calc(100% - 16px)); }
+  .preview-panel > .page-break-panel { margin: 0; max-height: calc(100% - 57px); position: absolute; right: 8px; top: 48px; width: min(330px, calc(100% - 16px)); }
   .page-break-overlay { display: block; z-index: 9; }
   .page-break-boundary { border-radius: 10px; height: 44px; left: var(--page-break-marker-left); top: -22px; width: 44px; }
   .page-break-sign { height: 22px; width: 22px; }
