@@ -72,6 +72,65 @@ async function expectPanelToCoverPaginationMarkers(panel) {
   expect(coverage.covered, JSON.stringify(coverage)).toBe(true);
 }
 
+async function expectDesktopPanelToAvoidPersistentSurfaces(panel) {
+  const geometry = await panel.evaluate((element) => {
+    const intersects = (first, second) => first.left < second.right && first.right > second.left
+      && first.top < second.bottom && first.bottom > second.top;
+    const panelBox = element.getBoundingClientRect();
+    const toggleBox = element.parentElement?.querySelector('.page-break-all-positions')?.getBoundingClientRect();
+    const trustBox = document.querySelector('#trustCapsule')?.getBoundingClientRect();
+    const versionBox = document.querySelector('#trustCapsule .trust-version')?.getBoundingClientRect();
+    const previewScroll = element.parentElement?.querySelector('.preview-scroll');
+    const previewScrollBox = previewScroll?.getBoundingClientRect();
+    const pageBoxes = [...document.querySelectorAll('.workspace:not([hidden]) .document-page, .workspace:not([hidden]) .zh-resume-document')]
+      .map((documentPage) => documentPage.getBoundingClientRect());
+    const boundariesTrackDocument = [...document.querySelectorAll('.page-break-overlay:not([hidden]) .page-break-visual-boundary')]
+      .every((boundary) => {
+        const key = boundary.dataset.pageBreakKey;
+        const target = key?.startsWith('record:')
+          ? document.querySelector(`[data-record-id="${CSS.escape(key.slice('record:'.length))}"]`)
+          : document.querySelector(`[data-section-key="${CSS.escape(key || '')}"]`);
+        const documentPage = target?.closest('.document-page, .zh-resume-document');
+        const boundaryBox = boundary.getBoundingClientRect();
+        const targetBox = target?.getBoundingClientRect();
+        const pageBox = documentPage?.getBoundingClientRect();
+        return Boolean(targetBox && pageBox)
+          && Math.abs(boundaryBox.left - pageBox.left) < 2
+          && Math.abs(boundaryBox.width - pageBox.width) < 2
+          && boundaryBox.top >= pageBox.top
+          && boundaryBox.bottom <= targetBox.top - 3;
+      });
+    const markerBoxes = [...document.querySelectorAll('.page-break-overlay:not([hidden]) .page-break-boundary')]
+      .map((marker) => marker.getBoundingClientRect());
+    return {
+      anchored: Boolean(toggleBox) && panelBox.top >= toggleBox.bottom - 1 && Math.abs(panelBox.right - toggleBox.right) <= 1,
+      inViewport: panelBox.left >= 0 && panelBox.right <= innerWidth && panelBox.top >= 0 && panelBox.bottom <= innerHeight,
+      avoidsTrust: Boolean(trustBox) && !intersects(panelBox, trustBox),
+      avoidsVersion: Boolean(versionBox) && !intersects(panelBox, versionBox),
+      avoidsDocument: pageBoxes.every((pageBox) => !intersects(panelBox, pageBox)),
+      avoidsMarkers: markerBoxes.every((markerBox) => !intersects(panelBox, markerBox)),
+      boundariesTrackDocument,
+      previewRemainsUsable: Boolean(previewScrollBox) && previewScroll.clientHeight > 0
+        && previewScrollBox.top >= panelBox.bottom && previewScrollBox.bottom <= innerHeight,
+      panelBox: panelBox.toJSON(),
+      toggleBox: toggleBox?.toJSON(),
+      trustBox: trustBox?.toJSON(),
+      versionBox: versionBox?.toJSON(),
+      previewScrollBox: previewScrollBox?.toJSON(),
+      pageBoxes: pageBoxes.map((pageBox) => pageBox.toJSON()),
+      markerBoxes: markerBoxes.map((markerBox) => markerBox.toJSON())
+    };
+  });
+  expect(geometry.anchored, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.inViewport, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.avoidsTrust, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.avoidsVersion, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.avoidsDocument, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.avoidsMarkers, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.boundariesTrackDocument, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.previewRemainsUsable, JSON.stringify(geometry)).toBe(true);
+}
+
 async function expectMarkerBehindChrome(page, { chromeSelector, markerSelector, scrollSelector }) {
   const coverage = await page.locator(markerSelector).evaluate(async (marker, selectors) => {
     const chrome = document.querySelector(selectors.chromeSelector);
@@ -199,7 +258,7 @@ test('desktop: pagination rail uses one Tab stop, arrow navigation, detailed sta
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute('aria-pressed', 'false');
   await trigger.press('Enter');
-  const allPositions = page.locator('.page-break-all-positions');
+  const allPositions = page.locator('[data-english-editor] .page-break-all-positions');
   await expect(allPositions).toBeVisible();
   await allPositions.click();
   const panel = page.locator('#page-break-panel-en');
@@ -209,10 +268,14 @@ test('desktop: pagination rail uses one Tab stop, arrow navigation, detailed sta
   await expect(page.locator('[data-en-preview] [data-section-key="experience"]')).toHaveClass(/page-break-target-highlight/);
   await panelRow.press('Space');
   await expect(panelRow).toHaveAttribute('aria-pressed', 'false');
+  await panelRow.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(allPositions).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('desktop: all locale panels paint over pagination markers while retaining their rows', async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 1000 });
+test('desktop: all locale panels stay beside their toolbar control without covering persistent surfaces', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   const locales = [
     { locale: 'ja', workspace: '#japaneseWorkspace', sample: '#loadSampleButton' },
     { locale: 'zh-CN', workspace: '#chineseWorkspace', sample: '[data-zh-action="sample"]' },
@@ -222,11 +285,13 @@ test('desktop: all locale panels paint over pagination markers while retaining t
     await openLocale(page, item.locale);
     await page.locator(item.sample).click();
     await openDesktopPageBreakMode(page, item.workspace);
-    await page.locator('.page-break-all-positions').click();
+    const allPositions = page.locator(`${item.workspace} .page-break-all-positions`);
+    await allPositions.click();
     const panel = page.locator(`#page-break-panel-${item.locale}`);
     await expect(panel).toBeVisible();
-    await expectPanelToCoverPaginationMarkers(panel);
+    await expectDesktopPanelToAvoidPersistentSurfaces(panel);
     await expect(panel.locator('.page-break-row').first()).toBeEnabled();
+    await expect(panel.locator('.page-break-row')).toHaveCount(await page.locator(`#page-break-overlay-${item.locale} .page-break-boundary`).count());
   }
 });
 
@@ -244,7 +309,7 @@ test('desktop: a context switch resets the roving entry when its focused candida
   if (await trigger.getAttribute('aria-pressed') !== 'true') await trigger.click();
   const rail = page.locator('#page-break-overlay-ja [role="toolbar"]');
   await expect(rail.locator('.page-break-boundary[tabindex="0"]')).toHaveCount(1);
-  const allPositions = page.locator('.page-break-all-positions');
+  const allPositions = page.locator('#japaneseWorkspace .page-break-all-positions');
   await allPositions.click();
   await expect(page.locator('#page-break-panel-ja .page-break-row[tabindex="0"]')).toHaveCount(1);
 });
@@ -850,4 +915,28 @@ test('responsive and locale changes close stale pagination surfaces and keep ARI
   await expect(panel).toBeHidden();
   await expect(page.locator('#page-break-overlay-ja')).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-controls', 'page-break-overlay-ja');
+});
+
+test('responsive: a desktop supplemental panel releases its preview row before the mobile preview opens', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openLocale(page, 'en');
+  await page.locator('[data-en-load-sample]').click();
+  await openDesktopPageBreakMode(page, '[data-english-editor]');
+  const workspace = page.locator('[data-english-editor]');
+  const previewPanel = workspace.locator('.preview-panel');
+  const panel = workspace.locator('#page-break-panel-en');
+  await workspace.locator('.page-break-all-positions').click();
+  await expect(panel).toBeVisible();
+  await expect(previewPanel).toHaveClass(/has-page-break-panel/);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await workspace.locator('[data-en-mobile-view="preview"]').click();
+  const previewScroll = workspace.locator('[data-en-preview-scroll]');
+  await expect(panel).toBeHidden();
+  await expect(previewPanel).not.toHaveClass(/has-page-break-panel/);
+  await expect.poll(() => previewScroll.evaluate((element) => {
+    const toolbar = element.parentElement?.querySelector('.preview-toolbar')?.getBoundingClientRect();
+    const scroll = element.getBoundingClientRect();
+    return element.clientHeight > 0 && Boolean(toolbar) && scroll.top >= toolbar.bottom;
+  })).toBe(true);
 });

@@ -260,11 +260,14 @@ function iconBadge(className, active) {
 export function initPageBreakControls({ store, locale, preview, toolbar, getDocumentType, scheduleSave }) {
   const labels = PAGE_BREAK_LABELS[locale];
   const panelId = `page-break-panel-${locale}`;
+  const previewPanel = toolbar.parentElement;
   const menu = document.createElement('button');
   menu.type = 'button';
   menu.className = 'page-break-menu';
   menu.dataset.pageBreakModeToggle = '';
-  toolbar.append(menu);
+  const toolbarActions = document.createElement('div');
+  toolbarActions.className = 'page-break-toolbar-actions';
+  toolbar.append(toolbarActions);
   const allPositions = document.createElement('button');
   allPositions.type = 'button';
   allPositions.className = 'page-break-all-positions';
@@ -276,7 +279,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   panelToggle.hidden = true;
   panelToggle.setAttribute('aria-controls', panelId);
   panelToggle.setAttribute('aria-expanded', 'false');
-  toolbar.append(panelToggle);
+  toolbarActions.append(menu, allPositions, panelToggle);
   const feedback = document.createElement('div');
   feedback.className = 'page-break-feedback';
   feedback.hidden = true;
@@ -288,7 +291,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   panel.setAttribute('role', 'region');
   panel.setAttribute('aria-label', labels.allPositions);
   panel.hidden = true;
-  toolbar.append(panel);
+  toolbar.insertAdjacentElement('afterend', panel);
   const overlay = document.createElement('div');
   overlay.id = `page-break-overlay-${locale}`;
   overlay.className = 'page-break-overlay';
@@ -307,6 +310,12 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
 
   function isDesktop() { return !window.matchMedia('(max-width: 820px), (max-width: 900px) and (max-height: 500px)').matches; }
   function isSurfaceVisible() { return preview.getClientRects().length > 0 && !preview.closest('[hidden]'); }
+  function syncPanelLayout() {
+    const expanded = isDesktop() && !panel.hidden;
+    const changed = previewPanel?.classList.contains('has-page-break-panel') !== expanded;
+    previewPanel?.classList.toggle('has-page-break-panel', expanded);
+    if (changed) window.requestAnimationFrame(positionOverlay);
+  }
   function description(candidate, index) {
     return describePageBreakCandidate(locale, index + 1, renderedCandidates.length, candidate, candidate.active);
   }
@@ -413,11 +422,13 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       renderPanel(renderedCandidates);
       if (open && focusFirst) overlay.querySelector('button')?.focus({ preventScroll: true });
     }
+    syncPanelLayout();
     syncTrustCapsule();
   }
   function setMobilePanel(open, { focusFirst = false } = {}) {
     if (!modeOpen) return;
     panel.hidden = !open;
+    syncPanelLayout();
     panelToggle.setAttribute('aria-expanded', String(open));
     if (open) renderPanel(renderedCandidates);
     if (open && focusFirst) panel.querySelector('button[tabindex="0"]')?.focus();
@@ -427,6 +438,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     allPositionsOpen = false;
     overlay.hidden = true;
     panel.hidden = true;
+    syncPanelLayout();
     panelToggle.hidden = true;
     panelToggle.setAttribute('aria-expanded', 'false');
     menu.setAttribute('aria-pressed', 'false');
@@ -527,7 +539,6 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     rail.setAttribute('aria-label', labels.rail);
     shown.forEach((candidate, index) => { rail.append(createBoundary(candidate, modeOpen, index)); });
     overlay.append(rail);
-    if (modeOpen && isDesktop()) overlay.append(allPositions);
     positionOverlay();
   }
   function positionOverlay() {
@@ -619,9 +630,11 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     panel.replaceChildren();
     if (!modeOpen || !isSurfaceVisible() || (isDesktop() && !allPositionsOpen)) {
       panel.hidden = true;
+      syncPanelLayout();
       return;
     }
     panel.hidden = false;
+    syncPanelLayout();
     const title = document.createElement('strong'); title.textContent = labels.allPositions; panel.append(title);
     candidates.forEach((candidate, index) => {
       const row = document.createElement('button');
@@ -711,10 +724,11 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     menu.focus();
   }, true);
   toolbar.addEventListener('focusout', (event) => {
-    if (!isDesktop() && !panel.hidden && event.relatedTarget instanceof Node && !toolbar.contains(event.relatedTarget)) setMobilePanel(false);
+    if (!isDesktop() && !panel.hidden && event.relatedTarget instanceof Node
+      && !toolbar.contains(event.relatedTarget) && !panel.contains(event.relatedTarget)) setMobilePanel(false);
   });
   document.addEventListener('pointerdown', (event) => {
-    if (!isDesktop() && !panel.hidden && !toolbar.contains(event.target)) setMobilePanel(false);
+    if (!isDesktop() && !panel.hidden && !toolbar.contains(event.target) && !panel.contains(event.target)) setMobilePanel(false);
   }, true);
   const workspace = preview.closest('.workspace');
   const syncSurface = () => {
@@ -723,6 +737,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     if (!isSurfaceVisible()) { closeSurface(); return; }
     if (isDesktop()) {
       panel.hidden = true;
+      syncPanelLayout();
       panelToggle.hidden = true;
       allPositions.hidden = !modeOpen;
       allPositionsOpen = false;
@@ -735,6 +750,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       renderOverlay();
       if (!panel.hidden) renderPanel(renderedCandidates);
     }
+    syncPanelLayout();
     syncTrustCapsule();
   };
   function scheduleGeometrySync() {
