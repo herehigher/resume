@@ -11,8 +11,9 @@ const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const siteRoot = path.join(root, 'site');
 const viewport = Object.freeze({ width: 1440, height: 1000 });
 const fixedDate = '2026-09-01';
-const generatorVersion = '1.4.0';
+const generatorVersion = '1.5.0';
 const fullCommitPattern = /^[0-9a-f]{40}$/;
+const documentationProfilePhotoPath = 'site/assets/favicon/resume-studio-marmot-512.png';
 const producerWorkflows = Object.freeze({
   quality: '.github/workflows/ci.yml',
   'release-candidate': '.github/workflows/release-candidate-assets.yml'
@@ -21,7 +22,8 @@ const fixedPdfDate = `D:${fixedDate.replaceAll('-', '')}000000+00'00'`;
 const generatorInputPaths = Object.freeze([
   'package-lock.json',
   'scripts/generate-doc-assets.mjs',
-  'scripts/verify-doc-assets.mjs'
+  'scripts/verify-doc-assets.mjs',
+  documentationProfilePhotoPath
 ]);
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -38,6 +40,7 @@ const variants = Object.freeze([
     locale: 'ja',
     paper: 'A4',
     pdfPath: 'output/pdf/ja-a4.pdf',
+    profileImageSelector: '#documentPreview .profile-photo img',
     previewSelector: '#documentPreview',
     workspaceSelector: '#japaneseWorkspace',
     sampleSelector: '#loadSampleButton',
@@ -50,6 +53,7 @@ const variants = Object.freeze([
     locale: 'zh-CN',
     paper: 'A4',
     pdfPath: 'output/pdf/zh-CN-a4.pdf',
+    profileImageSelector: '[data-zh-preview] .zh-profile-photo',
     previewSelector: '[data-zh-preview]',
     workspaceSelector: '#chineseWorkspace',
     sampleSelector: '[data-zh-action="sample"]',
@@ -62,6 +66,7 @@ const variants = Object.freeze([
     locale: 'en',
     paper: 'LETTER',
     pdfPath: 'output/pdf/en-letter.pdf',
+    profileImageSelector: '[data-en-preview] .en-profile-photo',
     previewSelector: '[data-en-preview]',
     workspaceSelector: '[data-english-editor]',
     sampleSelector: '[data-en-load-sample]',
@@ -101,6 +106,12 @@ export async function computeGeneratorInputHash(sourceRoot = root) {
     hash.update('\0');
   }
   return hash.digest('hex');
+}
+
+export async function loadDocumentationProfilePhoto(sourceRoot = root) {
+  const bytes = await readFile(path.join(sourceRoot, documentationProfilePhotoPath));
+  if (!bytes.length) throw new Error('Documentation profile photo must not be empty.');
+  return `data:image/png;base64,${bytes.toString('base64')}`;
 }
 
 async function fileHash(file) {
@@ -265,7 +276,7 @@ async function waitForStableRendering(page) {
   });
 }
 
-function documentationState(locale, marker, firstText, factories) {
+export function createDocumentationState(locale, marker, firstText, factories, profilePhoto) {
   const state = createPdfState(locale, marker, firstText, factories);
   const labels = {
     ja: ['架空 履歴書例', '架空企業（検証用）', '架空大学（検証用）'],
@@ -277,7 +288,9 @@ function documentationState(locale, marker, firstText, factories) {
   state.profile.fields.postalCode = '';
   state.profile.fields.phone = '';
   state.profile.fields.links = ['https://example.invalid/profile'];
+  state.profile.photo = profilePhoto;
   const resume = state.documents[locale].resume;
+  if (locale === 'en') resume.showOptionalPersonalDetails = true;
   if (resume) {
     for (const item of resume.experience) item.company = labels[1];
     for (const item of resume.education) item.school = labels[2];
@@ -288,7 +301,19 @@ function documentationState(locale, marker, firstText, factories) {
   return state;
 }
 
-async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot, factories }) {
+async function assertProfileImageReady(page, variant) {
+  const image = page.locator(variant.profileImageSelector);
+  await image.waitFor({ state: 'visible' });
+  const isReady = await image.evaluate((element) => (
+    element.complete
+      && element.naturalWidth > 0
+      && element.naturalHeight > 0
+      && element.currentSrc.startsWith('blob:')
+  ));
+  if (!isReady) throw new Error(`Documentation profile image did not load: ${variant.locale}`);
+}
+
+async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot, factories, profilePhoto }) {
   const marker = `RESUME-STUDIO-SAMPLE-${variant.locale.toUpperCase()}-${siteHash.slice(0, 12).toUpperCase()}`;
   const context = await browser.newContext({
     colorScheme: 'light',
@@ -318,7 +343,9 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
     if (await page.locator('#localeSelect').inputValue() !== variant.locale) {
       throw new Error(`Locale did not resolve to ${variant.locale}`);
     }
-    const pdfState = documentationState(variant.locale, marker, variant.firstText, factories);
+    const pdfState = createDocumentationState(
+      variant.locale, marker, variant.firstText, factories, profilePhoto
+    );
     await page.locator('#importDataInput').setInputFiles({
       buffer: Buffer.from(JSON.stringify(pdfState)),
       mimeType: 'application/json',
@@ -329,6 +356,7 @@ async function generateVariant(browser, baseURL, siteHash, variant, { outputRoot
       ({ previewSelector, markerText }) => document.querySelector(previewSelector)?.textContent.includes(markerText),
       { markerText: marker, previewSelector: variant.previewSelector }
     );
+    await assertProfileImageReady(page, variant);
     await page.evaluate(() => {
       document.documentElement.scrollLeft = 0;
       document.body.scrollLeft = 0;
@@ -430,6 +458,7 @@ export async function generateDocumentationAssets({
   const manifestPath = path.join(verifiedOutputRoot, 'docs/assets-manifest.json');
   const siteHash = await computeSiteHash(sourceSiteRoot);
   const factories = await loadSampleFactories(sourceRoot);
+  const profilePhoto = await loadDocumentationProfilePhoto(sourceRoot);
   const server = createServerForSite(sourceSiteRoot);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -443,7 +472,11 @@ export async function generateDocumentationAssets({
     browser = await chromium.launch({ headless: true });
     const outputs = [];
     for (const variant of variants) {
-      outputs.push(await generateVariant(browser, baseURL, siteHash, variant, { factories, outputRoot: verifiedOutputRoot }));
+      outputs.push(await generateVariant(browser, baseURL, siteHash, variant, {
+        factories,
+        outputRoot: verifiedOutputRoot,
+        profilePhoto
+      }));
     }
     const manifest = {
       schemaVersion: 4,

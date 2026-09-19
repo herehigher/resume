@@ -148,8 +148,8 @@ async function writeArtifact({
       command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>',
       inputHash: await computeGeneratorInputHash(sourceRoot),
       inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
-      inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs'],
-      path: 'scripts/generate-doc-assets.mjs', version: '1.4.0'
+      inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs', 'site/assets/favicon/resume-studio-marmot-512.png'],
+      path: 'scripts/generate-doc-assets.mjs', version: '1.5.0'
     },
     outputs: manifestOutputs,
     schemaVersion: 4,
@@ -172,13 +172,14 @@ async function createPromotionFixture({ manifestQualityRunId = '12345' } = {}) {
   const candidateRoot = path.join(root, 'candidate');
   const artifactRoot = path.join(root, 'artifact');
   const temporaryRoot = path.join(root, 'temporary');
-  await mkdir(path.join(candidateRoot, 'site'), { recursive: true });
+  await mkdir(path.join(candidateRoot, 'site/assets/favicon'), { recursive: true });
   await mkdir(path.join(candidateRoot, 'scripts'), { recursive: true });
   await writeFile(path.join(candidateRoot, 'site/index.html'), '<title>fixture</title>\n');
   await writeFile(path.join(candidateRoot, 'package.json'), '{"version":"0.3.0"}\n');
   await writeFile(path.join(candidateRoot, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(path.join(candidateRoot, 'scripts/generate-doc-assets.mjs'), '// generator fixture\n');
   await writeFile(path.join(candidateRoot, 'scripts/verify-doc-assets.mjs'), '// verifier fixture\n');
+  await writeFile(path.join(candidateRoot, 'site/assets/favicon/resume-studio-marmot-512.png'), 'fixture icon\n');
   for (const relativePath of releaseDocumentationAssetPaths) {
     await mkdir(path.dirname(path.join(candidateRoot, relativePath)), { recursive: true });
     await writeFile(path.join(candidateRoot, relativePath), `old ${relativePath}\n`);

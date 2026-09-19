@@ -95,11 +95,12 @@ async function writeAssetFixture(root, {
   await mkdir(path.join(root, 'docs/screenshots'), { recursive: true });
   await mkdir(path.join(root, 'output/pdf'), { recursive: true });
   await mkdir(path.join(root, 'scripts'), { recursive: true });
-  await mkdir(path.join(root, 'site'), { recursive: true });
+  await mkdir(path.join(root, 'site/assets/favicon'), { recursive: true });
   await writeFile(path.join(root, 'package.json'), `${JSON.stringify({ version })}\n`);
   await writeFile(path.join(root, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(path.join(root, 'scripts/generate-doc-assets.mjs'), '// generator fixture\n');
   await writeFile(path.join(root, 'scripts/verify-doc-assets.mjs'), '// verifier fixture\n');
+  await writeFile(path.join(root, 'site/assets/favicon/resume-studio-marmot-512.png'), 'fixture icon\n');
   await writeFile(path.join(root, 'site/index.html'), '<title>fixture site</title>\n');
   const generatorInputHash = await computeGeneratorInputHash(root);
   const siteHash = await computeSiteHash(path.join(root, 'site'));
@@ -134,9 +135,9 @@ async function writeAssetFixture(root, {
       command: 'node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>',
       inputHash: generatorInputHash,
       inputHashAlgorithm: 'sha256(relative-path + NUL + content + NUL)',
-      inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs'],
+      inputs: ['package-lock.json', 'scripts/generate-doc-assets.mjs', 'scripts/verify-doc-assets.mjs', 'site/assets/favicon/resume-studio-marmot-512.png'],
       path: 'scripts/generate-doc-assets.mjs',
-      version: '1.4.0'
+      version: '1.5.0'
     },
     source: {
       appVersion: version,
