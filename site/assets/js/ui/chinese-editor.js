@@ -8,6 +8,7 @@ import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecogniti
 import { draftStatusMessageForError } from './draft-storage-error.js';
 import { confirmAction } from './confirmation-dialog.js';
 import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
+import { createProfilePhotoDataUrl } from '../utils/profile-photo.js';
 
 const PROFILE_FIELDS = new Set([
   'fullName', 'birthDate', 'gender', 'nationality', 'postalCode', 'address', 'phone', 'email'
@@ -454,40 +455,13 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   }
 
   async function handlePhoto(file) {
-    if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return;
-    const sourceUrl = URL.createObjectURL(file);
-    try {
-      const image = await new Promise((resolve, reject) => {
-        const candidate = new Image();
-        candidate.onload = () => resolve(candidate);
-        candidate.onerror = reject;
-        candidate.src = sourceUrl;
-      });
-      const targetRatio = 4 / 5;
-      const sourceRatio = image.width / image.height;
-      let sx = 0;
-      let sy = 0;
-      let sw = image.width;
-      let sh = image.height;
-      if (sourceRatio > targetRatio) {
-        sw = image.height * targetRatio;
-        sx = (image.width - sw) / 2;
-      } else {
-        sh = image.width / targetRatio;
-        sy = (image.height - sh) / 2;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = 480;
-      canvas.height = 600;
-      canvas.getContext('2d').drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-      mutate((state) => {
-        state.profile.photo = canvas.toDataURL('image/jpeg', .84);
-      });
-      updatePhoto();
-      renderPreview();
-    } finally {
-      URL.revokeObjectURL(sourceUrl);
-    }
+    const photo = await createProfilePhotoDataUrl(file);
+    if (!photo) return;
+    mutate((state) => {
+      state.profile.photo = photo;
+    });
+    updatePhoto();
+    renderPreview();
   }
 
   function onInput(event) {
