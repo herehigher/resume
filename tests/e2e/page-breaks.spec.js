@@ -17,6 +17,17 @@ async function openDesktopPageBreakMode(page, rootSelector) {
   return trigger;
 }
 
+function japaneseHistoryMarkerFollowsContact(boundary) {
+  return boundary.evaluate((control) => {
+    const line = control.closest('.page-break-visual-boundary').getBoundingClientRect();
+    const contact = document.querySelector('#documentPreview .resume-contact').getBoundingClientRect();
+    const links = document.querySelector('#documentPreview .resume-links')?.getBoundingClientRect();
+    const history = document.querySelector('#documentPreview [data-section-key="history"]').getBoundingClientRect();
+    return line.top >= contact.bottom - 5 && (!links || line.top >= links.bottom - 5)
+      && line.top <= history.top - 3;
+  });
+}
+
 async function ensureChineseMobilePreview(page) {
   const workspace = page.locator('#chineseWorkspace');
   if (await workspace.getAttribute('data-mobile-mode') === 'preview') return;
@@ -333,6 +344,28 @@ test('desktop: a context switch resets the roving entry when its focused candida
   const allPositions = page.locator('#japaneseWorkspace .page-break-all-positions');
   await allPositions.click();
   await expect(page.locator('#page-break-panel-ja .page-break-row[tabindex="0"]')).toHaveCount(1);
+});
+
+test('Japanese resume places the history break after contact details and links', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  await openDesktopPageBreakMode(page, '#japaneseWorkspace');
+  const boundary = page.locator('#page-break-overlay-ja .page-break-boundary[data-page-break-key="history"]');
+  await expect(boundary).toHaveAttribute('aria-label', /学歴・職歴の前/);
+  await expect.poll(() => japaneseHistoryMarkerFollowsContact(boundary)).toBe(true);
+  await boundary.click();
+  await expect(page.locator('#documentPreview [data-section-key="history"]')).toHaveClass(/has-manual-page-break/);
+  await expect(page.locator('#documentPreview .resume-contact')).not.toHaveClass(/has-manual-page-break/);
+});
+
+test('[mobile][mobile-webkit] Japanese history marker follows contact details in the preview', async ({ page }) => {
+  await openLocale(page, 'ja');
+  await page.locator('#loadSampleButton').click();
+  await page.locator('[data-mobile-view="preview"]').click();
+  await page.locator('#japaneseWorkspace [data-page-break-mode-toggle]').click();
+  const boundary = page.locator('#page-break-overlay-ja .page-break-boundary[data-page-break-key="history"]');
+  await expect.poll(() => japaneseHistoryMarkerFollowsContact(boundary)).toBe(true);
 });
 
 test('narrow desktop: Japanese and Chinese retain every paper-exterior boundary icon', async ({ page }) => {

@@ -238,6 +238,21 @@ test('Japanese manual page break starts the resume target on a later non-empty A
   expect(pdfPageIndex(pages, endMarker)).toBeGreaterThanOrEqual(0);
 });
 
+test('Japanese history break keeps contact details on the preceding PDF page', async ({ page }) => {
+  const { state } = createPdfFixture({ locale: 'ja', length: 'short', documentType: 'resume', pageSize: 'A4' });
+  state.settings.pageBreaks.ja.A4.resume.sections = ['history'];
+  await openLocale(page, 'ja');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'manual-ja-history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[data-section-key="history"]')).toHaveClass(/has-manual-page-break/);
+  const pages = await inspectPdf(await printPdf(page));
+  expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
+  expect(pdfPageIndex(pages, 'pdf-fixture@example.com')).toBe(0);
+  expect(pdfPageIndex(pages, '学歴・職歴')).toBeGreaterThan(0);
+});
+
 test('PDF standard: 简体中文の組み込み例は証書の順序を保ち、空白末尾ページを作らない', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   await page.locator('[data-zh-action="sample"]').click();

@@ -2,30 +2,31 @@
   "schemaVersion": 4,
   "generator": {
     "command": "node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>",
-    "inputHash": "b871676a5ecef04919d029e06d1cd52dd65aaa20343419236e7810be6d2e9dea",
+    "inputHash": "03a92ca017f40c2cb7f88e9738f1ca46a45ed6d07ee19e9680eab9bcd27d2a34",
     "inputHashAlgorithm": "sha256(relative-path + NUL + content + NUL)",
     "inputs": [
       "package-lock.json",
       "scripts/generate-doc-assets.mjs",
-      "scripts/verify-doc-assets.mjs"
+      "scripts/verify-doc-assets.mjs",
+      "site/assets/favicon/resume-studio-marmot-512.png"
     ],
     "path": "scripts/generate-doc-assets.mjs",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "source": {
-    "appVersion": "0.3.2",
-    "checkoutCommit": "ff66fcea64a92c2b9cad23450dabf88c44002d83",
+    "appVersion": "0.4.0",
+    "checkoutCommit": "5e9dfa4cb8653a1b5875aa648a7406e019ac0f3c",
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
     "producer": {
-      "controlSha": "58bc0fa9427163cdf57c5f71a3de3e60aa6b754e",
+      "controlSha": "4c35fbc208fb4ecce47164335c206c31d56ec40d",
       "kind": "release-candidate",
       "runAttempt": "1",
-      "runId": "34751415345",
+      "runId": "35503052302",
       "workflow": ".github/workflows/release-candidate-assets.yml"
     },
-    "siteHash": "f73e8b109f7591573fe9155f1e47ff312a3b3d0c11b7a6e9bfd1b2f85c8e2d0b",
+    "siteHash": "ac12126ce1f8fdca42996d010f4828d276159991c9560e81f307cfd3a02b3cae",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -40,60 +41,60 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-F73E8B109F75",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-AC12126CE1F8",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-F73E8B109F75",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-AC12126CE1F8",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "372fda3362304623be5fd25738084dc9e0ae5f6d0e1e527ec4ab86a94b431c3a"
+        "sha256": "6150449071cf43be14c2ed2abe41d4b3698570de2c09d18e3214923159ca92cd"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/ja.png",
-        "sha256": "e8b149a3df3a160c6765506d0a34f99d10c728992b1e85c82f1211f2959e54d3",
+        "sha256": "76cba0f272a47c39c7cfbda047fdef74e013d55b0c9be91cefcc33a5d358be18",
         "width": 1440
       }
     },
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-F73E8B109F75",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-AC12126CE1F8",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-F73E8B109F75",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-AC12126CE1F8",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "a7c5b92b39a936645fea00abe21a4611f9f2ac9cce1f3ee9e407028fb413d652"
+        "sha256": "9c5a29e09637adf46e0b68937ccac52cca7310bc2934ea2feed3b5d5ce1a23b7"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/zh-CN.png",
-        "sha256": "57abf6d6c0c31f3a025bf99bba0d022abd5f0b99aff8476d761b137046cb66a2",
+        "sha256": "9d22a6d03e91c99dc947a024f47d2e87d3310920ecfca819e81e7514c965383f",
         "width": 1440
       }
     },
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-F73E8B109F75",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-AC12126CE1F8",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-F73E8B109F75",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-AC12126CE1F8",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "56eebf5e158c0ca3a2cc08e8d41fe2401596454b91a22568428ddf3cd1c5229f"
+        "sha256": "7d4dd078cb55ccf6955140aaa49a855783f77d8da67d708239ff03e6778c5294"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/en.png",
-        "sha256": "4ba6f4737f53f1179cecbf4a115207d2d9c97d6f934a69598513767941fa7537",
+        "sha256": "c127645906c9148ece4b8fafbd5791e17bd5b4f12ff3954b51b2379223761a91",
         "width": 1440
       }
     }

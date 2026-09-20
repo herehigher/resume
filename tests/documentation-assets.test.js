@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
   computeGeneratorInputHash,
+  cleanDocumentationSiteMetadata,
   createDocumentationState,
   loadDocumentationProfilePhoto,
   normalizePdfMetadata,
@@ -18,6 +19,30 @@ import { createEnglishSampleState } from '../site/assets/js/data/en-sample.js';
 import { createDefaultState, createJapaneseSampleState } from '../site/assets/js/state/defaults.js';
 import { createChineseSampleState } from '../site/assets/js/state/zh-CN.js';
 import { parseArguments as parseVerificationArguments } from '../scripts/verify-doc-assets.mjs';
+
+async function siteHygieneFixture(t) {
+  const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'resume-doc-assets-site-hygiene-'));
+  t.after(() => rm(sourceRoot, { force: true, recursive: true }));
+  await mkdir(path.join(sourceRoot, 'site'));
+  await writeFile(path.join(sourceRoot, '.gitignore'), '.DS_Store\nignored-unknown.txt\n');
+  await writeFile(path.join(sourceRoot, 'site', 'index.html'), '<title>sample</title>');
+  execFileSync('git', ['init', '--initial-branch=main'], { cwd: sourceRoot, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Documentation Assets Test'], { cwd: sourceRoot });
+  execFileSync('git', ['config', 'user.email', 'documentation-assets@example.invalid'], { cwd: sourceRoot });
+  execFileSync('git', ['add', '.gitignore', 'site/index.html'], { cwd: sourceRoot });
+  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '-m', 'add sample site'], { cwd: sourceRoot, stdio: 'ignore' });
+  return sourceRoot;
+}
+
+async function fileExists(file) {
+  try {
+    await lstat(file);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
 
 test('documentation asset commands require explicit temporary output and source provenance', () => {
   const sourceSha = 'a'.repeat(40);
@@ -44,6 +69,61 @@ test('documentation asset commands require explicit temporary output and source 
     sourceSha
   });
   assert.throws(() => parseVerificationArguments(['--asset-root', '/private/tmp/doc-assets']), /Provide/);
+});
+
+test('documentation asset source hygiene removes only untracked regular Finder metadata', async (t) => {
+  const sourceRoot = await siteHygieneFixture(t);
+  await mkdir(path.join(sourceRoot, 'site', 'assets', 'tracked'), { recursive: true });
+  await writeFile(path.join(sourceRoot, 'site', 'assets', 'tracked', '.DS_Store'), 'tracked metadata');
+  execFileSync('git', ['add', '-f', 'site/assets/tracked/.DS_Store'], { cwd: sourceRoot });
+  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '-m', 'track fixture metadata'], {
+    cwd: sourceRoot, stdio: 'ignore'
+  });
+  await writeFile(path.join(sourceRoot, 'site', '.DS_Store'), 'root metadata');
+  await writeFile(path.join(sourceRoot, 'site', 'assets', '.DS_Store'), 'nested metadata');
+
+  assert.deepEqual(await cleanDocumentationSiteMetadata(sourceRoot), [
+    'site/.DS_Store', 'site/assets/.DS_Store'
+  ]);
+  assert.equal(await fileExists(path.join(sourceRoot, 'site', '.DS_Store')), false);
+  assert.equal(await fileExists(path.join(sourceRoot, 'site', 'assets', '.DS_Store')), false);
+  assert.equal(await fileExists(path.join(sourceRoot, 'site', 'assets', 'tracked', '.DS_Store')), true);
+});
+
+test('documentation asset source hygiene reports unknown files before removing any metadata', async (t) => {
+  const sourceRoot = await siteHygieneFixture(t);
+  const metadata = path.join(sourceRoot, 'site', '.DS_Store');
+  const unknown = path.join(sourceRoot, 'site', 'unexpected.txt');
+  await writeFile(metadata, 'metadata');
+  await writeFile(unknown, 'requires confirmation');
+
+  await assert.rejects(cleanDocumentationSiteMetadata(sourceRoot), /site\/unexpected\.txt/);
+  assert.equal(await fileExists(metadata), true);
+  assert.equal(await fileExists(unknown), true);
+});
+
+test('documentation asset source hygiene stops for ignored unknown files without removing metadata', async (t) => {
+  const sourceRoot = await siteHygieneFixture(t);
+  const metadata = path.join(sourceRoot, 'site', '.DS_Store');
+  const unknown = path.join(sourceRoot, 'site', 'ignored-unknown.txt');
+  await writeFile(metadata, 'metadata');
+  await writeFile(unknown, 'requires confirmation');
+
+  await assert.rejects(cleanDocumentationSiteMetadata(sourceRoot), /site\/ignored-unknown\.txt/);
+  assert.equal(await fileExists(metadata), true);
+  assert.equal(await fileExists(unknown), true);
+});
+
+test('documentation asset source hygiene never removes a .DS_Store symbolic link', async (t) => {
+  const sourceRoot = await siteHygieneFixture(t);
+  const target = path.join(sourceRoot, 'metadata-target');
+  const metadata = path.join(sourceRoot, 'site', '.DS_Store');
+  await writeFile(target, 'do not follow');
+  await symlink('../metadata-target', metadata);
+
+  await assert.rejects(cleanDocumentationSiteMetadata(sourceRoot), /site\/\.DS_Store/);
+  assert.equal((await lstat(metadata)).isSymbolicLink(), true);
+  assert.equal(await readFile(target, 'utf8'), 'do not follow');
 });
 
 test('documentation generator input hash covers code, dependency lockfile, and profile photo', async (t) => {
@@ -138,6 +218,9 @@ test('documentation asset provenance rejects dirty site, package, or generator i
   assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site, package, or generator changes/);
 
   execFileSync('git', ['checkout', '--', 'site/index.html'], { cwd: sourceRoot });
+  await writeFile(path.join(sourceRoot, 'site', 'unexpected.txt'), 'untracked');
+  assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site, package, or generator changes/);
+  await rm(path.join(sourceRoot, 'site', 'unexpected.txt'));
   await writeFile(path.join(sourceRoot, 'package.json'), '{"version":"0.3.0"}\n');
   assert.throws(() => resolveSourceCommit(sourceRoot, sourceSha), /uncommitted site, package, or generator changes/);
 });
