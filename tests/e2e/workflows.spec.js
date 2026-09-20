@@ -985,29 +985,34 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
 
     for (const row of rows) {
       const layout = await row.evaluate((element) => {
-        const rect = (selector) => element.querySelector(selector).closest('label').getBoundingClientRect().toJSON();
+        const fieldRect = (selector) => element.querySelector(selector).closest('label').getBoundingClientRect().toJSON();
+        const inputRect = (selector) => element.querySelector(selector).getBoundingClientRect().toJSON();
         const remove = element.querySelector('.remove-row-button').getBoundingClientRect().toJSON();
         return {
-          date: rect('[data-key="date"]'),
-          detail: rect('[data-key="detail"]'),
+          date: fieldRect('[data-key="date"]'),
+          dateInput: inputRect('[data-key="date"]'),
+          detail: fieldRect('[data-key="detail"]'),
+          detailInput: inputRect('[data-key="detail"]'),
           remove,
-          url: element.querySelector('[data-key="url"]') ? rect('[data-key="url"]') : null
+          url: element.querySelector('[data-key="url"]') ? fieldRect('[data-key="url"]') : null,
+          urlInput: element.querySelector('[data-key="url"]') ? inputRect('[data-key="url"]') : null
         };
       });
 
+      expect(layout.dateInput.height).toBeGreaterThanOrEqual(48);
       expect(layout.remove.width).toBeGreaterThanOrEqual(44);
       expect(layout.remove.height).toBeGreaterThanOrEqual(44);
       if (width <= 360) {
-        expect(layout.date.bottom).toBeLessThanOrEqual(layout.detail.top);
+        expect(layout.dateInput.bottom).toBeLessThanOrEqual(layout.detail.top);
         expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
         expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
-        expect(layout.remove.left - layout.detail.right).toBeCloseTo(8, 1);
-        if (layout.url) expect(layout.url.top).toBeGreaterThanOrEqual(layout.detail.bottom);
+        expect(layout.remove.left - layout.detailInput.right).toBeCloseTo(8, 1);
+        if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(layout.detailInput.bottom);
       } else {
         expect(layout.date.top).toBe(layout.detail.top);
-        expect(layout.date.right).toBeLessThanOrEqual(layout.detail.left);
-        expect(layout.detail.right).toBeLessThanOrEqual(layout.remove.left);
-        if (layout.url) expect(layout.url.top).toBeGreaterThanOrEqual(Math.max(layout.date.bottom, layout.detail.bottom));
+        expect(layout.dateInput.right).toBeLessThanOrEqual(layout.detailInput.left);
+        expect(layout.detailInput.right).toBeLessThanOrEqual(layout.remove.left);
+        if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(Math.max(layout.dateInput.bottom, layout.detailInput.bottom));
       }
     }
     await expectNoPageOverflow(page);
