@@ -185,6 +185,28 @@ export async function assertCandidateSource(candidateRoot, candidateSha) {
   }
 }
 
+async function assertCandidateSourceIdentity(candidateRoot, candidateSha) {
+  try {
+    const { resolveSourceCheckoutIdentity } = await import('./generate-doc-assets.mjs');
+    return resolveSourceCheckoutIdentity(candidateRoot, candidateSha);
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
+async function cleanCandidateSiteMetadata(candidateRoot) {
+  try {
+    const { cleanDocumentationSiteMetadata } = await import('./generate-doc-assets.mjs');
+    const removedSiteMetadata = await cleanDocumentationSiteMetadata(candidateRoot);
+    if (removedSiteMetadata.length) {
+      console.log(`Removed known regenerable site metadata:\n${removedSiteMetadata.map((file) => `- ${file}`).join('\n')}`);
+    }
+    return removedSiteMetadata;
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
 export function assertArtifactManifestProvenance(provenance, identity) {
   requireValue(provenance?.artifactName === identity.artifactName
     && provenance.checkoutCommit === identity.mergeSha && provenance.qualityRunId === identity.qualityRunId,
@@ -394,6 +416,8 @@ export async function promoteCandidateDocumentationAssets({ candidateRoot = proc
   const removeTemporaryDirectory = dependencies.removeTemporaryDirectory
     || ((directory) => rm(directory, { force: true, recursive: true }));
   assertOfficialOrigin(candidate, gitCommand);
+  await assertCandidateSourceIdentity(candidate, values['source-sha']);
+  const removedSiteMetadata = await cleanCandidateSiteMetadata(candidate);
   await assertCandidateSource(candidate, values['source-sha']);
   assertCleanAssetTargets(candidate);
   const workflow = apiRequest(api, 'actions/workflows/release-candidate-assets.yml');
@@ -419,8 +443,12 @@ export async function promoteCandidateDocumentationAssets({ candidateRoot = proc
       && provenance.producer.runAttempt === identity.runAttempt
       && provenance.producer.workflow === candidateWorkflowPath,
     'candidate artifact manifest provenance does not match the selected artifact identity');
-    await promoteReleaseAssets({ assetRoot: temporary, sourceRoot: candidate, sourceSha: identity.sourceSha });
-    return { files: [...releaseDocumentationAssetPaths], ...identity };
+    const promotion = await promoteReleaseAssets({ assetRoot: temporary, sourceRoot: candidate, sourceSha: identity.sourceSha });
+    return {
+      files: [...releaseDocumentationAssetPaths],
+      removedSiteMetadata: [...new Set([...removedSiteMetadata, ...promotion.removedSiteMetadata])],
+      ...identity
+    };
   } finally {
     await removeTemporaryDirectory(temporary);
   }
@@ -457,6 +485,8 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
   const qualityJob = exactQualityJob(run.id, pullRequest.head.sha, api);
   const artifact = exactArtifact(run.id, mergeSha, pullRequest.head.sha, api);
   const identity = resolvePromotionIdentity({ artifact, mergeSha, pullRequest, qualityJob, run, workflow });
+  await assertCandidateSourceIdentity(candidate, identity.candidateSha);
+  const removedSiteMetadata = await cleanCandidateSiteMetadata(candidate);
   await assertCandidateSource(candidate, identity.candidateSha);
   assertCleanAssetTargets(candidate);
 
@@ -474,13 +504,17 @@ export async function promotePullRequestDocumentationAssets({ candidateRoot = pr
     await mkdir(artifactRoot);
     await download(identity.qualityRunId, identity.artifactName, artifactRoot);
     assertArtifactManifestProvenance(await readReleaseAssetProvenance(artifactRoot), identity);
-    await promoteReleaseAssets({ assetRoot: artifactRoot, sourceRoot, sourceSha: identity.mergeSha });
+    const promotion = await promoteReleaseAssets({ assetRoot: artifactRoot, sourceRoot, sourceSha: identity.mergeSha });
     const { verifyDocumentationAssets } = await import('./verify-doc-assets.mjs');
     await verifyDocumentationAssets({
       assetRoot: sourceRoot, requireExactSource: false, sourceRoot: candidate, sourceSha: identity.candidateSha
     });
     await copyPromotedFiles({ candidateRoot: candidate, sourceRoot });
-    result = { files: [...releaseDocumentationAssetPaths], ...identity };
+    result = {
+      files: [...releaseDocumentationAssetPaths],
+      removedSiteMetadata: [...new Set([...removedSiteMetadata, ...promotion.removedSiteMetadata])],
+      ...identity
+    };
   } catch (error) {
     operationError = error;
   } finally {
