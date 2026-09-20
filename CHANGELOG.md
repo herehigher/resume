@@ -27,6 +27,7 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 - 透過 PNG の写真を処理する際に alpha を保持し、編集欄と PDF で背景が黒くなる問題を修正。
 - 日本語履歴書の印刷日と年齢表示で日付を厳密に解釈し、label と値を正しく表示。
 - 展示 sample の三言語 profile link を統一し、locale 切替を伴う生成時に架空の草稿を確実に復元。
+- 展示 asset の生成・local promotion 前に `site/` を検査し、未追跡の通常 `.DS_Store` だけを自動清掃。その他の未追跡・ignored file は path を示して停止し、hash 不一致や意図しない削除を防止。
 
 ## [0.3.2] - 2026-09-13
 

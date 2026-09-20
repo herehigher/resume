@@ -285,9 +285,14 @@ export async function promoteReleaseAssets({ assetRoot, sourceRoot = root, sourc
     || canonicalSource.startsWith(`${canonicalAssets}${path.sep}`)) {
     fail('promotion asset and source roots must be independent');
   }
-  const [{ resolveSourceCommit }, { verifyDocumentationAssets }] = await Promise.all([
+  const [{ cleanDocumentationSiteMetadata, resolveSourceCheckoutIdentity, resolveSourceCommit }, { verifyDocumentationAssets }] = await Promise.all([
     import('./generate-doc-assets.mjs'), import('./verify-doc-assets.mjs')
   ]);
+  resolveSourceCheckoutIdentity(canonicalSource, sourceSha);
+  const removedSiteMetadata = await cleanDocumentationSiteMetadata(canonicalSource);
+  if (removedSiteMetadata.length) {
+    console.log(`Removed known regenerable site metadata:\n${removedSiteMetadata.map((file) => `- ${file}`).join('\n')}`);
+  }
   resolveSourceCommit(canonicalSource, sourceSha);
   await verifyDocumentationAssets({
     assetRoot: canonicalAssets, requireExactSource: false, sourceRoot: canonicalSource, sourceSha
@@ -305,7 +310,7 @@ export async function promoteReleaseAssets({ assetRoot, sourceRoot = root, sourc
     }
     await copyFile(source, target);
   }
-  return { files: [...assetPaths] };
+  return { files: [...assetPaths], removedSiteMetadata };
 }
 
 function parseOptions(args, allowed) {

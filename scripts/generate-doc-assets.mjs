@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -146,7 +146,7 @@ function isWithin(directory, candidate) {
   return candidate === directory || candidate.startsWith(`${directory}${path.sep}`);
 }
 
-export function resolveSourceCommit(sourceRoot, sourceCommit) {
+export function resolveSourceCheckoutIdentity(sourceRoot, sourceCommit) {
   if (!fullCommitPattern.test(sourceCommit || '')) {
     throw new Error('Documentation assets require a full lowercase source SHA.');
   }
@@ -159,6 +159,11 @@ export function resolveSourceCommit(sourceRoot, sourceCommit) {
   if (currentCommit !== sourceCommit) {
     throw new Error('Documentation asset source SHA does not match the source checkout.');
   }
+  return currentCommit;
+}
+
+export function resolveSourceCommit(sourceRoot, sourceCommit) {
+  const currentCommit = resolveSourceCheckoutIdentity(sourceRoot, sourceCommit);
   let siteStatus;
   try {
     siteStatus = execFileSync(
@@ -176,6 +181,62 @@ export function resolveSourceCommit(sourceRoot, sourceCommit) {
     throw new Error('Documentation asset source checkout has uncommitted site, package, or generator changes.');
   }
   return currentCommit;
+}
+
+async function scanUntrackedSiteEntries(directory, sourceRoot, trackedPaths, result) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const absolutePath = path.join(directory, entry.name);
+    const relativePath = path.relative(sourceRoot, absolutePath).split(path.sep).join('/');
+    const metadata = await lstat(absolutePath);
+    if (metadata.isDirectory() && !metadata.isSymbolicLink()) {
+      await scanUntrackedSiteEntries(absolutePath, sourceRoot, trackedPaths, result);
+      continue;
+    }
+    if (trackedPaths.has(relativePath)) continue;
+    if (metadata.isFile() && !metadata.isSymbolicLink() && path.basename(absolutePath) === '.DS_Store') {
+      result.regenerableMetadata.push(absolutePath);
+      continue;
+    }
+    result.unknownPaths.push(relativePath);
+  }
+}
+
+export async function cleanDocumentationSiteMetadata(sourceRoot = root) {
+  const sourceSiteRoot = path.join(sourceRoot, 'site');
+  let siteMetadata;
+  try {
+    siteMetadata = await lstat(sourceSiteRoot);
+  } catch {
+    throw new Error('Documentation asset source site directory is unavailable.');
+  }
+  if (!siteMetadata.isDirectory() || siteMetadata.isSymbolicLink()) {
+    throw new Error('Documentation asset source site directory must be a real directory.');
+  }
+
+  let trackedPaths;
+  try {
+    trackedPaths = new Set(execFileSync('git', ['-C', sourceRoot, 'ls-files', '-z', '--', 'site'], {
+      encoding: 'utf8'
+    }).split('\0').filter(Boolean));
+  } catch {
+    throw new Error('Documentation asset source checkout could not be checked for tracked site files.');
+  }
+
+  const result = { regenerableMetadata: [], unknownPaths: [] };
+  await scanUntrackedSiteEntries(sourceSiteRoot, sourceRoot, trackedPaths, result);
+  if (result.unknownPaths.length) {
+    throw new Error(`Documentation asset source site contains untracked entries that require confirmation:\n${result.unknownPaths.map((entry) => `- ${entry}`).join('\n')}`);
+  }
+
+  for (const file of result.regenerableMetadata) {
+    const metadata = await lstat(file);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || path.basename(file) !== '.DS_Store') {
+      throw new Error(`Documentation asset source site metadata changed during cleanup: ${path.relative(sourceRoot, file).split(path.sep).join('/')}`);
+    }
+    await unlink(file);
+  }
+  return result.regenerableMetadata.map((file) => path.relative(sourceRoot, file).split(path.sep).join('/'));
 }
 
 export async function prepareDocumentationOutputDirectory({ outputRoot, sourceRoot }) {
@@ -449,7 +510,12 @@ export async function generateDocumentationAssets({
     || !fullCommitPattern.test(producerControlSha || sourceCommit)) {
     throw new Error('Documentation assets require valid producer provenance.');
   }
+  resolveSourceCheckoutIdentity(sourceRoot, sourceCommit);
+  const removedSiteMetadata = await cleanDocumentationSiteMetadata(sourceRoot);
   const verifiedSourceCommit = resolveSourceCommit(sourceRoot, sourceCommit);
+  if (removedSiteMetadata.length) {
+    console.log(`Removed known regenerable site metadata:\n${removedSiteMetadata.map((file) => `- ${file}`).join('\n')}`);
+  }
   const verifiedOutputRoot = await prepareDocumentationOutputDirectory({ outputRoot, sourceRoot });
   await mkdir(path.join(verifiedOutputRoot, 'docs/screenshots'), { recursive: true });
   await mkdir(path.join(verifiedOutputRoot, 'output/pdf'), { recursive: true });
