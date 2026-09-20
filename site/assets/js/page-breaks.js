@@ -562,11 +562,16 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
       if (!boundary || !page) return;
       const pageBox = page.getBoundingClientRect();
       const targetBox = candidate.element.getBoundingClientRect();
-      const previousBox = candidate.visualPrevious.element.getBoundingClientRect();
-      // The semantic boundary is before the next element, but its visual line
-      // belongs in the gap just after the previous one. Keep a four-pixel
-      // clearance from the next element's focus/highlight outline without
-      // changing document layout.
+      const previousElement = candidate.visualPrevious.element;
+      // Unregistered content can sit between semantic sections (for example,
+      // the Japanese contact details after the profile). Place the marker after
+      // the actual preceding sibling so it matches the printed break target.
+      const precedingSibling = candidate.element.previousElementSibling;
+      const visualPrevious = previousElement.parentElement === candidate.element.parentElement
+        ? precedingSibling || previousElement : previousElement;
+      const previousBox = visualPrevious.getBoundingClientRect();
+      // Keep a four-pixel clearance from the next element's highlight outline
+      // without changing document layout.
       const boundaryTop = Math.min(previousBox.bottom + 4, (previousBox.bottom + targetBox.top) / 2, targetBox.top - 4);
       let lane = 0;
       while (laneEnds[lane] !== undefined && targetBox.top - laneEnds[lane] < 30) lane += 1;
