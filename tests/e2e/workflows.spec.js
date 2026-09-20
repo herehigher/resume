@@ -956,6 +956,64 @@ test('[mobile] 日本語: 編集・保存復元・書き出し・プレビュー
   await expectNoPageOverflow(page);
 });
 
+test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でも320–390pxで重ならない', async ({ page }) => {
+  for (const width of [320, 375, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await openLocale(page, 'ja');
+
+    const education = page.locator('#educationList .repeating-row').first();
+    const employment = page.locator('#employmentList .repeating-row').first();
+    const qualification = page.locator('#qualificationList .repeating-row').first();
+    await education.evaluate((element) => element.closest('details').open = true);
+    await qualification.evaluate((element) => element.closest('details').open = true);
+
+    const rows = [education, employment, qualification];
+    for (const row of rows) {
+      await row.locator('[data-key="date"]').evaluate((input) => {
+        input.style.height = '48px';
+        input.style.minWidth = '120px';
+      });
+    }
+
+    await education.locator('[data-key="date"]').fill('2020-04');
+    await education.locator('[data-key="detail"]').fill('モバイル大学 入学');
+    await employment.locator('[data-key="date"]').fill('2024-04');
+    await employment.locator('[data-key="detail"]').fill('架空株式会社 入社');
+    await qualification.locator('[data-key="date"]').fill('2025-04');
+    await qualification.locator('[data-key="detail"]').fill('架空資格 取得');
+    await qualification.locator('[data-key="url"]').fill('https://example.test/credential');
+
+    for (const row of rows) {
+      const layout = await row.evaluate((element) => {
+        const rect = (selector) => element.querySelector(selector).closest('label').getBoundingClientRect().toJSON();
+        const remove = element.querySelector('.remove-row-button').getBoundingClientRect().toJSON();
+        return {
+          date: rect('[data-key="date"]'),
+          detail: rect('[data-key="detail"]'),
+          remove,
+          url: element.querySelector('[data-key="url"]') ? rect('[data-key="url"]') : null
+        };
+      });
+
+      expect(layout.remove.width).toBeGreaterThanOrEqual(44);
+      expect(layout.remove.height).toBeGreaterThanOrEqual(44);
+      if (width <= 360) {
+        expect(layout.date.bottom).toBeLessThanOrEqual(layout.detail.top);
+        expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
+        expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
+        expect(layout.remove.left - layout.detail.right).toBeCloseTo(8, 1);
+        if (layout.url) expect(layout.url.top).toBeGreaterThanOrEqual(layout.detail.bottom);
+      } else {
+        expect(layout.date.top).toBe(layout.detail.top);
+        expect(layout.date.right).toBeLessThanOrEqual(layout.detail.left);
+        expect(layout.detail.right).toBeLessThanOrEqual(layout.remove.left);
+        if (layout.url) expect(layout.url.top).toBeGreaterThanOrEqual(Math.max(layout.date.bottom, layout.detail.bottom));
+      }
+    }
+    await expectNoPageOverflow(page);
+  }
+});
+
 test('[mobile] 简体中文: 编辑、保存恢复和预览均可操作', async ({ page }) => {
   await openLocale(page, 'zh-CN');
   const workspace = page.locator('#chineseWorkspace');
