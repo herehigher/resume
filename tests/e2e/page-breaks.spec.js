@@ -80,6 +80,8 @@ async function expectDesktopPanelToAvoidPersistentSurfaces(panel) {
     const toggleBox = element.parentElement?.querySelector('.page-break-all-positions')?.getBoundingClientRect();
     const trustBox = document.querySelector('#trustCapsule')?.getBoundingClientRect();
     const versionBox = document.querySelector('#trustCapsule .trust-version')?.getBoundingClientRect();
+    const repositoryLink = document.querySelector('#repositoryLink');
+    const repositoryBox = repositoryLink?.getBoundingClientRect();
     const previewScroll = element.parentElement?.querySelector('.preview-scroll');
     const previewScrollBox = previewScroll?.getBoundingClientRect();
     const pageBoxes = [...document.querySelectorAll('.workspace:not([hidden]) .document-page, .workspace:not([hidden]) .zh-resume-document')]
@@ -102,6 +104,18 @@ async function expectDesktopPanelToAvoidPersistentSurfaces(panel) {
       });
     const markerBoxes = [...document.querySelectorAll('.page-break-overlay:not([hidden]) .page-break-boundary')]
       .map((marker) => marker.getBoundingClientRect());
+    const trustCoversOverlappingMarkers = [...document.querySelectorAll('.page-break-overlay:not([hidden]) .page-break-boundary')]
+      .filter((marker) => trustBox && intersects(marker.getBoundingClientRect(), trustBox))
+      .every((marker) => {
+        const markerBox = marker.getBoundingClientRect();
+        const x = (Math.max(markerBox.left, trustBox.left) + Math.min(markerBox.right, trustBox.right)) / 2;
+        const y = (Math.max(markerBox.top, trustBox.top) + Math.min(markerBox.bottom, trustBox.bottom)) / 2;
+        return document.querySelector('#trustCapsule')?.contains(document.elementFromPoint(x, y));
+      });
+    const sourceLinkIsTopmost = Boolean(repositoryLink && repositoryBox)
+      && repositoryLink.contains(document.elementFromPoint(repositoryBox.left + (repositoryBox.width / 2), repositoryBox.top + (repositoryBox.height / 2)));
+    const versionIsTopmost = Boolean(versionBox)
+      && document.querySelector('#trustCapsule .trust-version')?.contains(document.elementFromPoint(versionBox.left + (versionBox.width / 2), versionBox.top + (versionBox.height / 2)));
     return {
       anchored: Boolean(toggleBox) && panelBox.top >= toggleBox.bottom - 1 && Math.abs(panelBox.right - toggleBox.right) <= 1,
       inViewport: panelBox.left >= 0 && panelBox.right <= innerWidth && panelBox.top >= 0 && panelBox.bottom <= innerHeight,
@@ -110,12 +124,16 @@ async function expectDesktopPanelToAvoidPersistentSurfaces(panel) {
       avoidsDocument: pageBoxes.every((pageBox) => !intersects(panelBox, pageBox)),
       avoidsMarkers: markerBoxes.every((markerBox) => !intersects(panelBox, markerBox)),
       boundariesTrackDocument,
+      trustCoversOverlappingMarkers,
+      sourceLinkIsTopmost,
+      versionIsTopmost,
       previewRemainsUsable: Boolean(previewScrollBox) && previewScroll.clientHeight > 0
         && previewScrollBox.top >= panelBox.bottom && previewScrollBox.bottom <= innerHeight,
       panelBox: panelBox.toJSON(),
       toggleBox: toggleBox?.toJSON(),
       trustBox: trustBox?.toJSON(),
       versionBox: versionBox?.toJSON(),
+      repositoryBox: repositoryBox?.toJSON(),
       previewScrollBox: previewScrollBox?.toJSON(),
       pageBoxes: pageBoxes.map((pageBox) => pageBox.toJSON()),
       markerBoxes: markerBoxes.map((markerBox) => markerBox.toJSON())
@@ -128,6 +146,9 @@ async function expectDesktopPanelToAvoidPersistentSurfaces(panel) {
   expect(geometry.avoidsDocument, JSON.stringify(geometry)).toBe(true);
   expect(geometry.avoidsMarkers, JSON.stringify(geometry)).toBe(true);
   expect(geometry.boundariesTrackDocument, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.trustCoversOverlappingMarkers, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.sourceLinkIsTopmost, JSON.stringify(geometry)).toBe(true);
+  expect(geometry.versionIsTopmost, JSON.stringify(geometry)).toBe(true);
   expect(geometry.previewRemainsUsable, JSON.stringify(geometry)).toBe(true);
 }
 
@@ -557,6 +578,29 @@ test('[mobile] Japanese mobile panel is closed by default and uses a single rovi
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
   await expect(panelToggle).toBeFocused();
+});
+
+test('[mobile] a supplemental panel stays open within its toolbar region and closes when Tab leaves it', async ({ page }) => {
+  await openLocale(page, 'en');
+  await page.locator('[data-en-load-sample]').click();
+  await page.locator('[data-en-mobile-view="preview"]').click();
+  const workspace = page.locator('[data-english-editor]');
+  const trigger = workspace.locator('.page-break-menu');
+  const panelToggle = workspace.locator('.page-break-panel-toggle');
+  const panel = workspace.locator('#page-break-panel-en');
+
+  await trigger.press('Enter');
+  await panelToggle.press('Enter');
+  const firstRow = panel.locator('.page-break-row').first();
+  await expect(firstRow).toBeFocused();
+  await expect(panel).toBeVisible();
+  await panelToggle.focus();
+  await expect(panel).toBeVisible();
+  await firstRow.focus();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(panel).toBeHidden();
+  await expect(panelToggle).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('[mobile][mobile-webkit] smartphone panels cover pagination markers in every locale', async ({ page }) => {

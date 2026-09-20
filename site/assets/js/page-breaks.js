@@ -723,7 +723,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     setMode(false);
     menu.focus();
   }, true);
-  toolbar.addEventListener('focusout', (event) => {
+  previewPanel?.addEventListener('focusout', (event) => {
     if (!isDesktop() && !panel.hidden && event.relatedTarget instanceof Node
       && !toolbar.contains(event.relatedTarget) && !panel.contains(event.relatedTarget)) setMobilePanel(false);
   });

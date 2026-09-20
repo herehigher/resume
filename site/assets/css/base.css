@@ -235,7 +235,7 @@ button { cursor: pointer; }
   overflow: hidden;
   position: fixed;
   right: calc(14px + env(safe-area-inset-right));
-  z-index: 40;
+  z-index: 42;
 }
 
 .trust-source-link,
