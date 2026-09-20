@@ -6,6 +6,29 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-20
+
+### Added / 追加
+
+- 保存形式と JSON import/export を `version: 4` に更新し、繰り返し項目の安定 ID と意味的な改ページ境界を追加。`resume-studio-web-v3` の草稿は read-only で移行し、新形式への保存成功後にだけ旧草稿と鍵を削除。
+- Desktop preview に改ページ編集 rail、smartphone に境界ごとの改ページ操作を追加し、keyboard、touch、focus 移動に対応。
+- 展示用の三言語 screenshot・PDF で、サイト icon のマーモットを架空の履歴書写真として使用。
+
+### Changed / 変更
+
+- 改ページ操作を履歴書・職務経歴書の実際の record 境界へ固定し、画面幅、preview の再配置、用紙・言語切替後も操作状態を同期。
+- 三言語の複数 page PDF から継続 label を削除し、見出しと record の改ページ保護を維持。
+- 旧式の release asset check を削除し、候補 artifact と `Quality` による展示 asset 照合へ整理。
+
+### Fixed / 修正
+
+- 狭い preview で改ページ marker が操作 panel と重なる、画面外へ出る、または smartphone で操作できなくなる問題を修正。
+- Desktop の「すべての改ページ位置」を編集ボタンの隣へ移し、version 表示との重なりを解消。Smartphone の focus と trust capsule の表示も維持。
+- 透過 PNG の写真を処理する際に alpha を保持し、編集欄と PDF で背景が黒くなる問題を修正。
+- 日本語履歴書の印刷日と年齢表示で日付を厳密に解釈し、label と値を正しく表示。
+- 展示 sample の三言語 profile link を統一し、locale 切替を伴う生成時に架空の草稿を確実に復元。
+- 展示 asset の生成・local promotion 前に `site/` を検査し、未追跡の通常 `.DS_Store` だけを自動清掃。その他の未追跡・ignored file は path を示して停止し、hash 不一致や意図しない削除を防止。
+
 ## [0.3.2] - 2026-09-13
 
 ### Changed / 変更

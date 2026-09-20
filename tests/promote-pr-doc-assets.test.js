@@ -449,6 +449,8 @@ test('candidate promotion copies only seven verified files from one explicit run
       controlSha, kind: 'release-candidate', runAttempt: '2', workflow: '.github/workflows/release-candidate-assets.yml'
     }
   });
+  const localMetadata = path.join(fixture.candidateRoot, 'site', '.DS_Store');
+  await writeFile(localMetadata, 'regenerable Finder metadata');
   const candidateWorkflow = { id: 18, path: '.github/workflows/release-candidate-assets.yml' };
   const candidateRun = {
     conclusion: 'success', event: 'workflow_dispatch', head_branch: 'main', head_repository: repository, head_sha: controlSha,
@@ -481,7 +483,9 @@ test('candidate promotion copies only seven verified files from one explicit run
     values: { 'run-attempt': '2', 'run-id': '91', 'source-sha': fixture.candidateSha }
   });
   assert.deepEqual(result.files, releaseDocumentationAssetPaths);
+  assert.deepEqual(result.removedSiteMetadata, ['site/.DS_Store']);
   assert.equal(result.artifactId, '1234');
+  assert.equal(existsSync(localMetadata), false);
   assert.equal(existsSync(temporaryRoot), false);
   assert.deepEqual(
     git(fixture.candidateRoot, 'diff', '--name-only', '--no-renames').split('\n').filter(Boolean).sort(),
