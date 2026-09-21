@@ -9,6 +9,7 @@
     "lint:fix": "biome lint --write .",
     "generate:doc-assets": "node scripts/generate-doc-assets.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
+    "release:candidate-assets": "node scripts/release-candidate-assets.mjs",
     "promote:doc-assets": "node scripts/release-doc-assets.mjs promote",
     "promote:pr-doc-assets": "node scripts/promote-pr-doc-assets.mjs",
     "promote:candidate-doc-assets": "node scripts/promote-pr-doc-assets.mjs candidate",

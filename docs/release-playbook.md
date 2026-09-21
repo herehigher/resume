@@ -37,15 +37,13 @@ Repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` �
 
 ### 3. 候補 asset を生成・取り込み
 
-固定した candidate SHA に対し、main の `Release candidate assets` を実行します。
+固定した candidate SHA に対しては、候補 branch の clean な checkout で補助 CLI を実行します。これは official origin、candidate branch、40桁の HEAD、remote branch との一致を確認し、main の `Release candidate assets` を一度だけ起動します。起動ごとに予測不能な correlation ID を workflow の run title へ固定し、その ID の run だけを待機・照合します。反映待ち、複数一致、timeout は推測せず停止します。成功時に表示される run URL と promotion command をそのまま使います。補助 CLI は artifact を候補 checkout へ取り込まず、release state も保存しません。
 
 ```bash
-gh workflow run release-candidate-assets.yml --ref main \
-  -f candidate_ref=CANDIDATE_BRANCH \
-  -f candidate_sha=CANDIDATE_SHA
+npm run release:candidate-assets
 ```
 
-Workflow が成功したら Actions の run ID と attempt を確認し、同じ candidate SHA の clean checkout で次を実行します。
+表示された promotion command は、固定済みの candidate SHA、run ID、attempt を含みます。同じ candidate SHA の clean checkout で実行します。
 
 ```bash
 npm run promote:candidate-doc-assets -- \
@@ -114,6 +112,7 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 | Release preflight: `deferred` | summary の `check` / `reason` に従って local、target、または重複 object を修正して再実行する。`pass` になるまで Version 更新へ進まない |
 | Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
 | 候補生成 workflow の失敗 | Candidate SHA と branch、generator、依存関係を確認する。候補内容を直した場合は新しい SHA、run、attempt で生成し直す |
+| 候補生成 CLI の待機が中断 | 同じ clean な candidate checkout で、表示済みまたは Actions run URL の run ID と候補 SHA を明示して再開する。CLI は同じ repository、workflow、event、run が記録した main control ref、成功結果、attempt、artifact、manifest provenance を再照合する。再開時に current main が進んでいても、別の control ref へ置き換えない。例：`npm run release:candidate-assets -- --run-id RUN_ID --source-sha CANDIDATE_SHA` |
 | 候補 artifact が失効・不一致 | 同じ固定 SHA で候補生成 workflow を再実行し、新しい run と attempt を指定して promotion する。別 artifact を代用しない |
 | PR の Quality 失敗 | Product・test・generator、または release asset の source SHA、run、attempt、artifact、digest、7 fileの不一致を該当 step と summary で確認する。修正で candidate SHA が変わった場合は候補生成と promotion からやり直す |
 | Release eligibility の失敗 | Quality run、repository・workflow・SHA、full Quality、merged PR、base / current version の照合結果を確認する。Release Pages を手動で迂回しない |
