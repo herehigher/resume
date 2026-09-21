@@ -1,27 +1,37 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { chmod, copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   CandidateAssetsFailure,
+  candidateRunTitle,
   candidateCheckoutIdentity,
   parseArguments,
+  repositoryEndpoint,
   runCandidateAssets,
-  selectDispatchedRun,
+  selectCorrelatedRun,
   verifyCandidateRun
 } from '../scripts/release-candidate-assets.mjs';
 
+const root = fileURLToPath(new URL('../', import.meta.url));
 const repository = { id: 1, full_name: 'herehigher/resume' };
 const sourceSha = 'a'.repeat(40);
 const controlSha = 'c'.repeat(40);
 const workflow = { id: 42, path: '.github/workflows/release-candidate-assets.yml' };
+const correlationId = 'e'.repeat(32);
 
 function run({
   conclusion = 'success', event = 'workflow_dispatch', headBranch = 'main', headSha = controlSha,
-  id = 91, runAttempt = 2, status = 'completed'
+  displayTitle, id = 91, runAttempt = 2, status = 'completed'
 } = {}) {
   return {
     conclusion, event, head_branch: headBranch, head_repository: repository, head_sha: headSha, id,
-    path: workflow.path, repository, run_attempt: runAttempt, status, workflow_id: workflow.id
+    path: workflow.path, repository, run_attempt: runAttempt, status, workflow_id: workflow.id,
+    ...(displayTitle ? { display_title: displayTitle } : {})
   };
 }
 
@@ -76,25 +86,26 @@ function apiFixture({ candidateRun = run(), listedRuns, runResponses = [candidat
   };
 }
 
-test('candidate CLI dispatches once, keeps the exact new run ID, and returns the verified promotion command', async () => {
-  const candidateRun = run({ status: 'queued' });
-  const completed = run();
+test('candidate CLI waits for its unique correlation and returns the verified promotion command', async () => {
+  const candidateRun = run({ displayTitle: candidateRunTitle(correlationId), status: 'queued' });
+  const completed = run({ displayTitle: candidateRunTitle(correlationId) });
   const dispatched = [];
   const result = await runCandidateAssets({
     dependencies: {
       api: apiFixture({
         candidateRun,
-        listedRuns: [[run({ id: 90 })], [run({ id: 90 }), candidateRun]],
+        listedRuns: [[run({ id: 90 })], [candidateRun]],
         runResponses: [candidateRun, completed], artifacts: [artifact({ candidateRun: completed })]
       }),
-      dispatch(branch, sha) { dispatched.push({ branch, sha }); },
+      createCorrelationId: () => correlationId,
+      dispatch(branch, sha, correlation) { dispatched.push({ branch, correlation, sha }); },
       git: gitFixture(),
       readArtifactProvenance: async () => provenance({ candidateRun: completed }),
       wait: async () => {}
     },
     rootDirectory: '/fixture', values: parseArguments([])
   });
-  assert.deepEqual(dispatched, [{ branch: 'release-v0.4.0', sha: sourceSha }]);
+  assert.deepEqual(dispatched, [{ branch: 'release-v0.4.0', correlation: correlationId, sha: sourceSha }]);
   assert.equal(result.url, 'https://github.com/herehigher/resume/actions/runs/91');
   assert.equal(result.command, `npm run promote:candidate-doc-assets -- --source-sha ${sourceSha} --run-id 91 --run-attempt 2`);
 });
@@ -109,10 +120,13 @@ test('candidate checkout requires a pushed clean official branch whose remote HE
   assert.throws(() => candidateCheckoutIdentity({ gitCommand: gitFixture({ branch: 'main' }) }), /branch is invalid/);
 });
 
-test('candidate CLI stops on dispatch ambiguity, start failure, and untrusted run metadata', async () => {
-  assert.throws(() => selectDispatchedRun({
-    after: [run({ id: 91 }), run({ id: 92 })], before: [], controlSha, workflow
-  }), /exactly one/);
+test('candidate CLI stops on dispatch ambiguity, timeout, start failure, and untrusted run metadata', async () => {
+  assert.throws(() => selectCorrelatedRun({
+    controlSha, correlationId, runs: [
+      run({ displayTitle: candidateRunTitle(correlationId), id: 91 }),
+      run({ displayTitle: candidateRunTitle(correlationId), id: 92 })
+    ], workflow
+  }), /correlation is ambiguous/);
   await assert.rejects(runCandidateAssets({
     dependencies: {
       api: apiFixture({ listedRuns: [[]] }), dispatch() { throw new CandidateAssetsFailure('candidate workflow could not be dispatched'); },
@@ -121,12 +135,18 @@ test('candidate CLI stops on dispatch ambiguity, start failure, and untrusted ru
   }), /could not be dispatched/);
   await assert.rejects(runCandidateAssets({
     dependencies: {
+      api: apiFixture({ listedRuns: [[], []] }), createCorrelationId: () => correlationId,
+      dispatch() {}, git: gitFixture(), maxCorrelationPolls: 2, wait: async () => {}
+    }, rootDirectory: '/fixture', values: parseArguments([])
+  }), /correlation timed out/);
+  await assert.rejects(runCandidateAssets({
+    dependencies: {
       api: apiFixture({ candidateRun: run({ event: 'push' }) }), git: gitFixture(),
       readArtifactProvenance: async () => provenance()
     }, rootDirectory: '/fixture', values: parseArguments(['--run-id', '91', '--source-sha', sourceSha])
   }), /trusted main control ref/);
   for (const candidateRun of [
-    run({ headBranch: 'release-v0.4.0' }), run({ headSha: 'b'.repeat(40) }),
+    run({ headBranch: 'release-v0.4.0' }),
     { ...run(), repository: { id: 2, full_name: 'elsewhere/resume' } },
     { ...run(), path: '.github/workflows/ci.yml' }, { ...run(), run_attempt: 0 }
   ]) {
@@ -165,7 +185,7 @@ test('an interrupted wait makes no state, and explicit run ID plus source SHA re
   const queued = run({ status: 'in_progress' });
   await assert.rejects(runCandidateAssets({
     dependencies: {
-      api: apiFixture({ candidateRun: queued, runResponses: [queued] }), git: gitFixture(),
+      api: apiFixture({ candidateRun: queued, runResponses: [queued, queued] }), git: gitFixture(),
       wait: async () => { throw new Error('interrupted'); }
     }, rootDirectory: '/fixture', values: parseArguments(['--run-id', '91', '--source-sha', sourceSha])
   }), /interrupted/);
@@ -179,4 +199,69 @@ test('an interrupted wait makes no state, and explicit run ID plus source SHA re
   assert.equal(resumed.url, 'https://github.com/herehigher/resume/actions/runs/91');
   assert.throws(() => parseArguments(['--run-id', '91']), /provide no arguments/);
   assert.throws(() => parseArguments(['--run-id', '91', '--source-sha', 'short']), /invalid/);
+});
+
+test('resume binds historical control SHA from the explicit run after main has advanced', async () => {
+  const historicalControlSha = 'd'.repeat(40);
+  const historicalRun = run({ headSha: historicalControlSha });
+  const result = await runCandidateAssets({
+    dependencies: {
+      api: apiFixture({ candidateRun: historicalRun }), git: gitFixture(),
+      readArtifactProvenance: async () => ({ ...provenance({ candidateRun: historicalRun }), producer: {
+        ...provenance({ candidateRun: historicalRun }).producer, controlSha: historicalControlSha
+      } })
+    }, rootDirectory: '/fixture', values: parseArguments(['--run-id', '91', '--source-sha', sourceSha])
+  });
+  assert.equal(result.run.head_sha, historicalControlSha);
+});
+
+test('repository root API omits a trailing slash and the CLI entrypoint works from a path with spaces', async (t) => {
+  assert.equal(repositoryEndpoint(''), 'repos/herehigher/resume');
+  const temporary = await mkdtemp(path.join(os.tmpdir(), 'resume candidate cli '));
+  t.after(() => rm(temporary, { force: true, recursive: true }));
+  const spacedRoot = path.join(temporary, 'checkout with spaces');
+  const scriptsDirectory = path.join(spacedRoot, 'scripts');
+  const bin = path.join(temporary, 'bin');
+  await mkdir(scriptsDirectory, { recursive: true });
+  await mkdir(bin);
+  await copyFile(path.join(root, 'scripts/release-candidate-assets.mjs'), path.join(scriptsDirectory, 'release-candidate-assets.mjs'));
+  await copyFile(path.join(root, 'scripts/release-doc-assets.mjs'), path.join(scriptsDirectory, 'release-doc-assets.mjs'));
+  const requests = path.join(temporary, 'gh-requests');
+  const fakeGit = path.join(bin, 'git');
+  const fakeGh = path.join(bin, 'gh');
+await writeFile(fakeGit, `#!/bin/sh
+printf '%s\\n' "$*" >> "$FAKE_GIT_REQUESTS"
+shift 2
+case "$1" in
+  remote) printf '%s\\n' https://github.com/herehigher/resume.git ;;
+  status) ;;
+  branch) printf '%s\\n' release-v0.4.0 ;;
+  rev-parse) printf '%s\\n' ${sourceSha} ;;
+  ls-remote)
+    case "$5" in
+      refs/heads/release-v0.4.0) printf '%s\\t%s\\n' ${sourceSha} refs/heads/release-v0.4.0 ;;
+      refs/heads/main) printf '%s\\t%s\\n' ${controlSha} refs/heads/main ;;
+      *) exit 64 ;;
+    esac ;;
+  *) exit 64 ;;
+esac
+`);
+  await writeFile(fakeGh, `#!/bin/sh
+printf '%s\\n' "$*" >> "$FAKE_GH_REQUESTS"
+if [ "$1" = api ] && [ "$2" = repos/herehigher/resume ]; then
+  printf '%s\\n' '{"id":1,"full_name":"herehigher/resume"}'
+  exit 0
+fi
+exit 64
+`);
+  await chmod(fakeGit, 0o755);
+  await chmod(fakeGh, 0o755);
+  const executed = spawnSync(process.execPath, [path.join(scriptsDirectory, 'release-candidate-assets.mjs')], {
+    cwd: spacedRoot, encoding: 'utf8', env: {
+      ...process.env, FAKE_GH_REQUESTS: requests, FAKE_GIT_REQUESTS: `${requests}-git`, PATH: `${bin}${path.delimiter}${process.env.PATH}`
+    }
+  });
+  assert.equal(executed.status, 1);
+  assert.match(executed.stderr, /GitHub verification is unavailable/, await readFile(`${requests}-git`, 'utf8'));
+  assert.match(await readFile(requests, 'utf8'), /^api repos\/herehigher\/resume$/m);
 });

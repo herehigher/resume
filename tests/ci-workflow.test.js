@@ -44,7 +44,9 @@ test('quality classifies scope after its primary checkout', () => {
 });
 
 test('candidate generation is a separate trusted workflow and does not claim product Quality', () => {
-  assert.match(candidateWorkflow, /workflow_dispatch:[\s\S]+candidate_ref:[\s\S]+candidate_sha:/);
+  assert.match(candidateWorkflow, /workflow_dispatch:[\s\S]+candidate_ref:[\s\S]+candidate_sha:[\s\S]+correlation_id:/);
+  assert.match(candidateWorkflow, /run-name: Candidate asset evidence \$\{\{ inputs\.correlation_id \}\}/);
+  assert.match(candidateWorkflow, /CORRELATION_ID: \$\{\{ inputs\.correlation_id \}\}[\s\S]+\[\[ "\$CORRELATION_ID" =~ \^\[0-9a-f\]\{32\}\$ \]\]/);
   assert.match(candidateWorkflow, /Checkout trusted workflow control[\s\S]+ref: \$\{\{ github\.sha \}\}[\s\S]+persist-credentials: false/);
   assert.match(candidateWorkflow, /Resolve official candidate branch[\s\S]+git fetch --no-tags origin "refs\/heads\/\$CANDIDATE_REF"[\s\S]+rev-parse FETCH_HEAD/);
   assert.match(candidateWorkflow, /Checkout immutable candidate source[\s\S]+ref: \$\{\{ inputs\.candidate_sha \}\}/);

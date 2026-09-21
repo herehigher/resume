@@ -1,8 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { readReleaseAssetProvenance } from './release-doc-assets.mjs';
 
@@ -13,6 +15,7 @@ const fullCommitPattern = /^[0-9a-f]{40}$/;
 const positiveId = /^[1-9][0-9]*$/;
 const branchPattern = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const artifactDigestPattern = /^sha256:[0-9a-f]{64}$/;
+const correlationPattern = /^[0-9a-f]{32}$/;
 
 export class CandidateAssetsFailure extends Error {
   constructor(message) {
@@ -38,11 +41,15 @@ function git(rootDirectory, args) {
   }
 }
 
+export function repositoryEndpoint(endpoint) {
+  return endpoint ? `repos/${repository}/${endpoint}` : `repos/${repository}`;
+}
+
 function githubApi(endpoint, paginate = false) {
   try {
     const args = ['api'];
     if (paginate) args.push('--paginate', '--slurp');
-    args.push(`repos/${repository}/${endpoint}`);
+    args.push(repositoryEndpoint(endpoint));
     return JSON.parse(execFileSync('gh', args, {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024
     }));
@@ -53,7 +60,7 @@ function githubApi(endpoint, paginate = false) {
 
 function githubBinary(endpoint) {
   try {
-    return execFileSync('gh', ['api', `repos/${repository}/${endpoint}`], {
+    return execFileSync('gh', ['api', repositoryEndpoint(endpoint)], {
       encoding: 'buffer', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024
     });
   } catch {
@@ -153,12 +160,17 @@ function artifactName(sourceSha, runAttempt) {
   return `release-candidate-documentation-assets-${sourceSha}-attempt-${runAttempt}`;
 }
 
-export function selectDispatchedRun({ after, before, controlSha: expectedControlSha, workflow }) {
-  const previousIds = new Set(before.map((run) => String(run?.id || '')));
-  const created = after.filter((run) => !previousIds.has(String(run?.id || '')));
-  requireValue(created.length === 1, 'workflow dispatch did not identify exactly one new run');
-  assertRunIdentity({ controlSha: expectedControlSha, run: created[0], workflow });
-  return created[0];
+export function candidateRunTitle(correlationId) {
+  requireValue(correlationPattern.test(correlationId || ''), 'dispatch correlation ID is invalid');
+  return `Candidate asset evidence ${correlationId}`;
+}
+
+export function selectCorrelatedRun({ controlSha: expectedControlSha, correlationId, runs, workflow }) {
+  const matches = runs.filter((run) => run?.display_title === candidateRunTitle(correlationId));
+  requireValue(matches.length <= 1, 'workflow dispatch correlation is ambiguous');
+  if (matches.length === 0) return null;
+  assertRunIdentity({ controlSha: expectedControlSha, run: matches[0], workflow });
+  return matches[0];
 }
 
 function workflowRuns(api, workflow) {
@@ -168,15 +180,15 @@ function workflowRuns(api, workflow) {
   return pages.flatMap((page) => page.workflow_runs);
 }
 
-function dispatchWorkflow({ branch, dispatch = defaultDispatch, sourceSha }) {
-  dispatch(branch, sourceSha);
+function dispatchWorkflow({ branch, correlationId, dispatch = defaultDispatch, sourceSha }) {
+  dispatch(branch, sourceSha, correlationId);
 }
 
-function defaultDispatch(branch, sourceSha) {
+function defaultDispatch(branch, sourceSha, correlationId) {
   try {
     execFileSync('gh', [
       'workflow', 'run', workflowFile, '--repo', repository, '--ref', 'main',
-      '-f', `candidate_ref=${branch}`, '-f', `candidate_sha=${sourceSha}`
+      '-f', `candidate_ref=${branch}`, '-f', `candidate_sha=${sourceSha}`, '-f', `correlation_id=${correlationId}`
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch {
     fail('candidate workflow could not be dispatched');
@@ -185,6 +197,24 @@ function defaultDispatch(branch, sourceSha) {
 
 async function defaultWait() {
   await new Promise((resolve) => setTimeout(resolve, 1_000));
+}
+
+function defaultCorrelationId() {
+  return randomUUID().replaceAll('-', '');
+}
+
+export async function waitForCorrelatedRun({
+  api, controlSha: expectedControlSha, correlationId, maxPolls = 60, wait = defaultWait, workflow
+}) {
+  requireValue(Number.isInteger(maxPolls) && maxPolls > 0, 'dispatch polling limit is invalid');
+  for (let poll = 0; poll < maxPolls; poll += 1) {
+    const selected = selectCorrelatedRun({
+      controlSha: expectedControlSha, correlationId, runs: workflowRuns(api, workflow), workflow
+    });
+    if (selected) return selected;
+    await wait();
+  }
+  fail('workflow dispatch correlation timed out');
 }
 
 export async function waitForCompletedRun({ api, controlSha: expectedControlSha, runId, wait = defaultWait, workflow }) {
@@ -268,8 +298,6 @@ export async function runCandidateAssets({ rootDirectory = process.cwd(), depend
   const gitCommand = dependencies.git || git;
   const api = dependencies.api || githubApi;
   const checkout = candidateCheckoutIdentity({ gitCommand, rootDirectory });
-  const expectedControlSha = (dependencies.controlSha || controlSha)(checkout.root, gitCommand);
-  requireValue(fullCommitPattern.test(expectedControlSha), 'main control SHA is invalid');
   assertGithubRepository(api);
   const workflow = apiRequest(api, `actions/workflows/${workflowFile}`);
   assertWorkflow(workflow);
@@ -277,11 +305,23 @@ export async function runCandidateAssets({ rootDirectory = process.cwd(), depend
     'explicit source SHA does not match the candidate checkout');
 
   let runId = values.runId;
+  let expectedControlSha;
   if (values.mode === 'start') {
-    const before = workflowRuns(api, workflow);
-    dispatchWorkflow({ branch: checkout.branch, dispatch: dependencies.dispatch || defaultDispatch, sourceSha: checkout.sourceSha });
-    const after = workflowRuns(api, workflow);
-    runId = String(selectDispatchedRun({ after, before, controlSha: expectedControlSha, workflow }).id);
+    expectedControlSha = (dependencies.controlSha || controlSha)(checkout.root, gitCommand);
+    requireValue(fullCommitPattern.test(expectedControlSha), 'main control SHA is invalid');
+    const correlationId = (dependencies.createCorrelationId || defaultCorrelationId)();
+    requireValue(correlationPattern.test(correlationId || ''), 'dispatch correlation ID is invalid');
+    dispatchWorkflow({
+      branch: checkout.branch, correlationId, dispatch: dependencies.dispatch || defaultDispatch, sourceSha: checkout.sourceSha
+    });
+    runId = String((await waitForCorrelatedRun({
+      api, controlSha: expectedControlSha, correlationId, maxPolls: dependencies.maxCorrelationPolls ?? 60,
+      wait: dependencies.wait || defaultWait, workflow
+    })).id);
+  } else {
+    const selectedRun = apiRequest(api, `actions/runs/${runId}`);
+    assertRunIdentity({ controlSha: selectedRun?.head_sha, run: selectedRun, workflow });
+    expectedControlSha = selectedRun.head_sha;
   }
   const completedRun = await waitForCompletedRun({
     api, controlSha: expectedControlSha, runId, wait: dependencies.wait || defaultWait, workflow
@@ -292,7 +332,16 @@ export async function runCandidateAssets({ rootDirectory = process.cwd(), depend
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+function isEntrypoint() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(path.resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntrypoint()) {
   try {
     const result = await runCandidateAssets({ values: parseArguments(process.argv.slice(2)) });
     console.log(result.url);

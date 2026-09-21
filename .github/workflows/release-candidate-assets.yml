@@ -1,5 +1,7 @@
 name: Release candidate assets
 
+run-name: Candidate asset evidence ${{ inputs.correlation_id }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -9,6 +11,10 @@ on:
         type: string
       candidate_sha:
         description: Full candidate commit SHA to generate
+        required: true
+        type: string
+      correlation_id:
+        description: Unique CLI dispatch correlation ID
         required: true
         type: string
 
@@ -24,12 +30,14 @@ jobs:
         env:
           CANDIDATE_REF: ${{ inputs.candidate_ref }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CORRELATION_ID: ${{ inputs.correlation_id }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]
           [[ "$CANDIDATE_REF" != main ]]
           [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CORRELATION_ID" =~ ^[0-9a-f]{32}$ ]]
 
       - name: Checkout trusted workflow control
         uses: actions/checkout@v7
