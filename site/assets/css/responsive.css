@@ -85,6 +85,19 @@
   .career-detail-add-button { min-height: 44px; }
 }
 
+@media (min-width: 521px) and (max-width: 820px) {
+  .repeating-row {
+    align-items: start;
+    grid-template-columns: minmax(160px, .7fr) minmax(0, 1fr) 44px;
+  }
+  .remove-row-button {
+    align-self: end;
+    height: 44px;
+    margin-bottom: 0;
+    width: 44px;
+  }
+}
+
 @media (max-width: 520px) {
   .brand strong { font-size: 12px; }
   .locale-picker select { font-size: 11px; }

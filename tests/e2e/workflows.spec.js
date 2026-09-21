@@ -956,8 +956,8 @@ test('[mobile] 日本語: 編集・保存復元・書き出し・プレビュー
   await expectNoPageOverflow(page);
 });
 
-test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でも320–520pxで重ならない', async ({ page }) => {
-  for (const width of [320, 375, 390, 401, 520]) {
+test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でも320–820pxで重ならない', async ({ page }) => {
+  for (const width of [320, 375, 390, 401, 520, 521, 768, 820]) {
     await page.setViewportSize({ width, height: 844 });
     await openLocale(page, 'ja');
 
@@ -1005,11 +1005,18 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
       expect(layout.dateInput.height).toBeGreaterThanOrEqual(53);
       expect(layout.remove.width).toBeGreaterThanOrEqual(44);
       expect(layout.remove.height).toBeGreaterThanOrEqual(44);
-      expect(layout.dateInput.bottom).toBeLessThanOrEqual(layout.detail.top);
-      expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
-      expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
-      expect(layout.remove.left - layout.detailInput.right).toBeCloseTo(8, 1);
-      if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(layout.detailInput.bottom);
+      if (width <= 520) {
+        expect(layout.dateInput.bottom).toBeLessThanOrEqual(layout.detail.top);
+        expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
+        expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
+        expect(layout.remove.left - layout.detailInput.right).toBeCloseTo(8, 1);
+        if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(layout.detailInput.bottom);
+      } else {
+        expect(layout.date.top).toBe(layout.detail.top);
+        expect(layout.dateInput.right).toBeLessThanOrEqual(layout.detailInput.left);
+        expect(layout.detailInput.right).toBeLessThanOrEqual(layout.remove.left);
+        if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(Math.max(layout.dateInput.bottom, layout.detailInput.bottom));
+      }
     }
     const editor = await page.locator('#japaneseWorkspace .editor-panel').evaluate((element) => ({
       clientWidth: element.clientWidth,
