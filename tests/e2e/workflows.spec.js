@@ -956,8 +956,8 @@ test('[mobile] 日本語: 編集・保存復元・書き出し・プレビュー
   await expectNoPageOverflow(page);
 });
 
-test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でも320–390pxで重ならない', async ({ page }) => {
-  for (const width of [320, 375, 390]) {
+test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でも320–520pxで重ならない', async ({ page }) => {
+  for (const width of [320, 375, 390, 401, 520]) {
     await page.setViewportSize({ width, height: 844 });
     await openLocale(page, 'ja');
 
@@ -970,15 +970,15 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
     const rows = [education, employment, qualification];
     for (const row of rows) {
       await row.locator('[data-key="date"]').evaluate((input) => {
-        input.style.height = '48px';
-        input.style.minWidth = '120px';
+        input.style.height = '53px';
+        input.style.minWidth = '160px';
       });
     }
 
     await education.locator('[data-key="date"]').fill('2020-04');
     await education.locator('[data-key="detail"]').fill('モバイル大学 入学');
     await employment.locator('[data-key="date"]').fill('2024-04');
-    await employment.locator('[data-key="detail"]').fill('架空株式会社 入社');
+    await employment.locator('[data-key="detail"]').fill('架空株式会社で長い職務内容を入力する場合も横幅を超えないことを確認します');
     await qualification.locator('[data-key="date"]').fill('2025-04');
     await qualification.locator('[data-key="detail"]').fill('架空資格 取得');
     await qualification.locator('[data-key="url"]').fill('https://example.test/credential');
@@ -1002,21 +1002,14 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
       });
 
       expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
-      expect(layout.dateInput.height).toBeGreaterThanOrEqual(48);
+      expect(layout.dateInput.height).toBeGreaterThanOrEqual(53);
       expect(layout.remove.width).toBeGreaterThanOrEqual(44);
       expect(layout.remove.height).toBeGreaterThanOrEqual(44);
-      if (width <= 360) {
-        expect(layout.dateInput.bottom).toBeLessThanOrEqual(layout.detail.top);
-        expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
-        expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
-        expect(layout.remove.left - layout.detailInput.right).toBeCloseTo(8, 1);
-        if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(layout.detailInput.bottom);
-      } else {
-        expect(layout.date.top).toBe(layout.detail.top);
-        expect(layout.dateInput.right).toBeLessThanOrEqual(layout.detailInput.left);
-        expect(layout.detailInput.right).toBeLessThanOrEqual(layout.remove.left);
-        if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(Math.max(layout.dateInput.bottom, layout.detailInput.bottom));
-      }
+      expect(layout.dateInput.bottom).toBeLessThanOrEqual(layout.detail.top);
+      expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
+      expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
+      expect(layout.remove.left - layout.detailInput.right).toBeCloseTo(8, 1);
+      if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(layout.detailInput.bottom);
     }
     const editor = await page.locator('#japaneseWorkspace .editor-panel').evaluate((element) => ({
       clientWidth: element.clientWidth,
