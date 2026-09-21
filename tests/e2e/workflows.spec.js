@@ -989,16 +989,19 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
         const inputRect = (selector) => element.querySelector(selector).getBoundingClientRect().toJSON();
         const remove = element.querySelector('.remove-row-button').getBoundingClientRect().toJSON();
         return {
+          clientWidth: element.clientWidth,
           date: fieldRect('[data-key="date"]'),
           dateInput: inputRect('[data-key="date"]'),
           detail: fieldRect('[data-key="detail"]'),
           detailInput: inputRect('[data-key="detail"]'),
           remove,
+          scrollWidth: element.scrollWidth,
           url: element.querySelector('[data-key="url"]') ? fieldRect('[data-key="url"]') : null,
           urlInput: element.querySelector('[data-key="url"]') ? inputRect('[data-key="url"]') : null
         };
       });
 
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
       expect(layout.dateInput.height).toBeGreaterThanOrEqual(48);
       expect(layout.remove.width).toBeGreaterThanOrEqual(44);
       expect(layout.remove.height).toBeGreaterThanOrEqual(44);
@@ -1015,7 +1018,11 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
         if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(Math.max(layout.dateInput.bottom, layout.detailInput.bottom));
       }
     }
-    await expectNoPageOverflow(page);
+    const editor = await page.locator('#japaneseWorkspace .editor-panel').evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    }));
+    expect(editor.scrollWidth).toBeLessThanOrEqual(editor.clientWidth);
   }
 });
 
