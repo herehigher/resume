@@ -85,7 +85,8 @@
   .career-detail-add-button { min-height: 44px; }
 }
 
-@media (min-width: 521px) and (max-width: 820px) {
+@media (min-width: 521px) and (max-width: 820px),
+  (min-width: 521px) and (max-width: 900px) and (max-height: 500px) {
   .repeating-row {
     align-items: start;
     grid-template-columns: minmax(160px, .7fr) minmax(0, 1fr) 44px;

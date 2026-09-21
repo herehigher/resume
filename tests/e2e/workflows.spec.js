@@ -956,9 +956,19 @@ test('[mobile] 日本語: 編集・保存復元・書き出し・プレビュー
   await expectNoPageOverflow(page);
 });
 
-test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でも320–820pxで重ならない', async ({ page }) => {
-  for (const width of [320, 375, 390, 401, 520, 521, 768, 820]) {
-    await page.setViewportSize({ width, height: 844 });
+test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は大きい月選択欄でもmobile breakpointで重ならない', async ({ page }) => {
+  for (const { width, height } of [
+    { width: 320, height: 844 },
+    { width: 375, height: 844 },
+    { width: 390, height: 844 },
+    { width: 401, height: 844 },
+    { width: 520, height: 844 },
+    { width: 521, height: 844 },
+    { width: 768, height: 844 },
+    { width: 820, height: 844 },
+    { width: 844, height: 390 }
+  ]) {
+    await page.setViewportSize({ width, height });
     await openLocale(page, 'ja');
 
     const education = page.locator('#educationList .repeating-row').first();
