@@ -103,14 +103,19 @@
   .two-columns, .three-columns, .postal-grid { grid-template-columns: 1fr; }
   .repeating-row {
     align-items: start;
-    grid-template-columns: minmax(120px, .7fr) minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) 44px;
   }
+  .repeating-row > .compact-field:not(.credential-link-field) { grid-column: 1; }
   .remove-row-button {
     align-self: end;
+    grid-column: 2;
+    grid-row: 2;
     height: 44px;
     margin-bottom: 0;
     width: 44px;
   }
+  .repeating-row.has-credential-link .remove-row-button { grid-column: 2; grid-row: 2; }
+  .repeating-row.has-credential-link .credential-link-field { grid-column: 1; grid-row: 3; }
   .editor-footer { gap: 20px; }
   .editor-footer-actions { align-items: flex-start; }
   .editor-legal { padding-bottom: 62px; }
@@ -144,12 +149,4 @@
   .privacy-security-heading { gap: 11px; }
   .privacy-security-heading h2 { font-size: 17px; }
   .privacy-security-icon { height: 36px; width: 36px; }
-}
-
-@media (max-width: 360px) {
-  .repeating-row { grid-template-columns: minmax(0, 1fr) 44px; }
-  .repeating-row > .compact-field:not(.credential-link-field) { grid-column: 1; }
-  .repeating-row .remove-row-button { grid-column: 2; grid-row: 2; }
-  .repeating-row.has-credential-link .remove-row-button { grid-column: 2; grid-row: 2; }
-  .repeating-row.has-credential-link .credential-link-field { grid-column: 1; grid-row: 3; }
 }
