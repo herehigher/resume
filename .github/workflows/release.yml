@@ -74,7 +74,6 @@ jobs:
       actions: read
       contents: read
     outputs:
-      analytics_delivery: ${{ steps.evidence.outputs.analytics_delivery }}
       artifact_digest: ${{ steps.evidence.outputs.artifact_digest }}
       package_version: ${{ steps.evidence.outputs.package_version }}
       prepared_artifact_id: ${{ steps.upload.outputs.artifact-id }}
@@ -99,9 +98,6 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/release-source" "$RELEASE_SHA"
           git -C "$RUNNER_TEMP/release-source" lfs pull \
             --include="docs/screenshots/*.png,output/pdf/*.pdf" --exclude=""
-          manifest_path="$RUNNER_TEMP/release-source/.github/pages-release-manifest.json"
-          echo "manifest_path=$manifest_path" >> "$GITHUB_OUTPUT"
-          echo "analytics_delivery=$(jq -er '.analyticsDelivery' "$manifest_path")" >> "$GITHUB_OUTPUT"
 
       - name: Verify the successful main Quality run for the exact release commit
         id: quality
@@ -141,21 +137,19 @@ jobs:
           --generated-root "${{ runner.temp }}/quality-documentation-assets"
           --source-sha "${SOURCE_SHA}"
 
-      - name: Prepare the single Pages artifact
+      - name: Prepare the immutable site artifact
         env:
-          MANIFEST_PATH: ${{ steps.source.outputs.manifest_path }}
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
           SOURCE_ROOT: ${{ runner.temp }}/release-source
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/prepare-pages-artifact.mjs prepare \
-            --source "$SOURCE_ROOT/site" --output "$RUNNER_TEMP/pages-site" \
-            --manifest "$MANIFEST_PATH"
+          node scripts/prepare-site-artifact.mjs prepare \
+            --source "$SOURCE_ROOT/site" --output "$RUNNER_TEMP/site-artifact"
           node scripts/release-artifact-evidence.mjs create \
-            --artifact-dir "$RUNNER_TEMP/pages-site" --evidence "$RUNNER_TEMP/release-evidence.json" \
+            --artifact-dir "$RUNNER_TEMP/site-artifact" --evidence "$RUNNER_TEMP/release-evidence.json" \
             --source-dir "$SOURCE_ROOT" --source-sha "$RELEASE_SHA"
-          node scripts/validate-pages-smoke.mjs --directory "$RUNNER_TEMP/pages-site" \
+          node scripts/validate-pages-smoke.mjs --directory "$RUNNER_TEMP/site-artifact" \
             --package-version "$(jq -r .version "$SOURCE_ROOT/package.json")"
 
       - name: Export non-secret artifact evidence
@@ -167,14 +161,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "artifact_digest=$(jq -r '.artifactDigest' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
-          echo "analytics_delivery=$(jq -r '.analyticsDelivery' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           echo "package_version=$(jq -r '.packageVersion' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           echo "source_digest=$(jq -r '.sourceDigest' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           {
-            echo '## Pages artifact prepared after merge authorization'
+            echo '## Site artifact prepared after merge authorization'
             echo
             echo "- Tag / source: \`${{ needs.authorize.outputs.release_tag }}\` / \`${{ needs.authorize.outputs.release_sha }}\`"
-            echo "- Analytics delivery: \`$(jq -r '.analyticsDelivery' "$EVIDENCE")\`"
             echo "- Source digest: \`$(jq -r '.sourceDigest' "$EVIDENCE")\`"
             echo "- Artifact digest: \`$(jq -r '.artifactDigest' "$EVIDENCE")\`"
             echo "- Quality: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${QUALITY_RUN_ID}"
@@ -184,9 +176,9 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v7
         with:
-          name: pages-release-artifact-${{ github.run_attempt }}
+          name: site-release-artifact-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/pages-site
+            ${{ runner.temp }}/site-artifact
             ${{ runner.temp }}/release-evidence.json
           if-no-files-found: error
           retention-days: 30
@@ -241,7 +233,6 @@ jobs:
           release_sha="$(jq -r '.sourceSha' "$EVIDENCE")"
           test "$release_sha" = "$EXPECTED_SHA"
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
-          echo "analytics_delivery=$(jq -r '.analyticsDelivery' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           echo "artifact_digest=$(jq -r '.artifactDigest' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the exact prepared source beside trusted tooling
@@ -278,7 +269,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           node scripts/release-publication.mjs publish \
-            --artifact-dir "$RUNNER_TEMP/prepared/pages-site" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
+            --artifact-dir "$RUNNER_TEMP/prepared/site-artifact" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
             --source-dir "$RUNNER_TEMP/prepared-source" --source-sha "$RELEASE_SHA" --cwd . --tag "$RELEASE_TAG"
           remote_sha="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG^{}" | awk '{print $1}')"
           local_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
@@ -310,13 +301,13 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/release-artifact-evidence.mjs verify \
-            --artifact-dir "$RUNNER_TEMP/prepared/pages-site" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
+            --artifact-dir "$RUNNER_TEMP/prepared/site-artifact" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
             --source-dir "$RUNNER_TEMP/prepared-source" --source-sha "$RELEASE_SHA"
 
       - name: Upload the verified original bytes for Pages
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ${{ runner.temp }}/prepared/pages-site
+          path: ${{ runner.temp }}/prepared/site-artifact
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -1,13 +1,11 @@
 import { createHash } from 'node:crypto';
-import { appendFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { appendFile, cp, lstat, mkdir, mkdtemp, realpath, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { htmlDocumentContracts } from './deployment-path-contract.mjs';
 
-export const ANALYTICS_DELIVERY_CONTRACT = 'hosting-managed';
-
-const adapterPath = fileURLToPath(import.meta.url);
+const scriptPath = fileURLToPath(import.meta.url);
 const htmlPaths = Object.freeze(htmlDocumentContracts().map(({ artifactPath }) => artifactPath).sort(compareUtf8));
 
 function fail(message) {
@@ -22,6 +20,29 @@ function canonicalRelativePath(value) {
   if (!value || value.includes('\\') || path.posix.isAbsolute(value)) return false;
   return path.posix.normalize(value) === value
     && !value.split('/').some((part) => !part || part === '.' || part === '..');
+}
+
+function overlapsTree(left, right) {
+  return left === right
+    || left.startsWith(`${right}${path.sep}`)
+    || right.startsWith(`${left}${path.sep}`);
+}
+
+async function realpathWithMissingSuffix(value) {
+  let current = value;
+  const missingParts = [];
+  while (true) {
+    try {
+      const existingAncestor = await realpath(current);
+      return path.join(existingAncestor, ...missingParts.reverse());
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      const parent = path.dirname(current);
+      if (parent === current) throw error;
+      missingParts.push(path.basename(current));
+      current = parent;
+    }
+  }
 }
 
 async function collectFiles(root, directory = root) {
@@ -57,33 +78,10 @@ export async function computeTreeDigest(directory) {
   return hash.digest('hex');
 }
 
-function exactKeys(value, expected, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`);
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
-    fail(`${label} contains unknown or missing fields`);
-  }
-}
-
-export function validateManifest(value) {
-  exactKeys(value, ['analyticsDelivery', 'schemaVersion'], 'Pages release manifest');
-  if (value.schemaVersion !== 3) fail('Unsupported Pages release manifest schemaVersion');
-  if (value.analyticsDelivery !== ANALYTICS_DELIVERY_CONTRACT) fail('Unsupported analytics delivery contract');
-  return Object.freeze({ ...value });
-}
-
-async function readManifest(manifestPath) {
-  let parsed;
-  try {
-    parsed = JSON.parse(await readFile(manifestPath, 'utf8'));
-  } catch {
-    fail('Pages release manifest is missing or invalid JSON');
-  }
-  return validateManifest(parsed);
-}
-
 async function validateSourceSite(sourceDirectory) {
+  const metadata = await lstat(sourceDirectory);
+  if (metadata.isSymbolicLink()) fail('Source directory must not be a symbolic link');
+  if (!metadata.isDirectory()) fail('Source path must be a directory');
   const files = await collectFiles(sourceDirectory);
   const actualHtml = files
     .map(({ relativePath }) => relativePath)
@@ -125,47 +123,46 @@ async function writeOutputs(values) {
   await appendFile(process.env.GITHUB_OUTPUT, lines);
 }
 
-export async function validateReleaseSource({ manifestPath, sourceDirectory }) {
-  const manifest = await readManifest(manifestPath);
+export async function validateReleaseSource({ sourceDirectory }) {
   await validateSourceSite(sourceDirectory);
   const sourceDigest = await computeTreeDigest(sourceDirectory);
-  const outputs = {
-    analytics_delivery: manifest.analyticsDelivery,
-    source_digest: sourceDigest
-  };
-  await writeOutputs(outputs);
-  return { manifest, ...outputs };
+  return Object.freeze({ sourceDigest });
 }
 
 export async function prepareArtifact({
-  manifestPath,
   outputDirectory,
   sourceDirectory
 }) {
-  const { manifest, source_digest: sourceDigest } = await validateReleaseSource({ manifestPath, sourceDirectory });
+  const { sourceDigest } = await validateReleaseSource({ sourceDirectory });
 
-  const sourceAbsolute = path.resolve(sourceDirectory);
+  const sourceAbsolute = await realpath(sourceDirectory);
   const outputAbsolute = path.resolve(outputDirectory);
-  if (sourceAbsolute === outputAbsolute
-    || outputAbsolute.startsWith(`${sourceAbsolute}${path.sep}`)
-    || sourceAbsolute.startsWith(`${outputAbsolute}${path.sep}`)) {
+  const prospectiveOutput = await realpathWithMissingSuffix(outputAbsolute);
+  if (overlapsTree(sourceAbsolute, prospectiveOutput)) {
     fail('Artifact output must be outside the source tree');
   }
+  await assertOutputMissing(prospectiveOutput);
+
   const outputParent = path.dirname(outputAbsolute);
   await mkdir(outputParent, { recursive: true });
-  await assertOutputMissing(outputAbsolute);
-  const stagingRoot = await mkdtemp(path.join(outputParent, `.${path.basename(outputAbsolute)}.tmp-`));
+  const outputParentAbsolute = await realpath(outputParent);
+  const resolvedOutput = path.join(outputParentAbsolute, path.basename(outputAbsolute));
+  if (overlapsTree(sourceAbsolute, resolvedOutput)) {
+    fail('Artifact output must be outside the source tree');
+  }
+  await assertOutputMissing(resolvedOutput);
+  const stagingRoot = await mkdtemp(path.join(outputParentAbsolute, `.${path.basename(resolvedOutput)}.tmp-`));
   const temporaryOutput = path.join(stagingRoot, 'artifact');
   try {
     await cp(sourceAbsolute, temporaryOutput, { errorOnExist: true, force: false, recursive: true });
     await validateSourceSite(temporaryOutput);
-    const finalDigest = await computeTreeDigest(temporaryOutput);
-    if (finalDigest !== sourceDigest) fail('Prepared artifact differs from the validated source bytes');
-    await assertOutputMissing(outputAbsolute);
-    await rename(temporaryOutput, outputAbsolute);
-    const outputs = { final_digest: finalDigest, source_digest: sourceDigest };
+    const artifactDigest = await computeTreeDigest(temporaryOutput);
+    if (artifactDigest !== sourceDigest) fail('Prepared artifact differs from the validated source bytes');
+    await assertOutputMissing(resolvedOutput);
+    await rename(temporaryOutput, resolvedOutput);
+    const outputs = { artifact_digest: artifactDigest, source_digest: sourceDigest };
     await writeOutputs(outputs);
-    return { finalDigest, manifest, sourceDigest };
+    return Object.freeze({ artifactDigest, sourceDigest });
   } finally {
     await rm(stagingRoot, { force: true, recursive: true });
   }
@@ -182,7 +179,7 @@ function parseArguments(values) {
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('Invalid command arguments');
     const key = name.slice(2);
-    if (!['manifest', 'output', 'source'].includes(key) || key in options) {
+    if (!['output', 'source'].includes(key) || key in options) {
       fail('Unknown or duplicate command argument');
     }
     options[key] = value;
@@ -193,25 +190,27 @@ function parseArguments(values) {
 async function main() {
   const { command, options } = parseArguments(process.argv.slice(2));
   if (command === 'validate') {
-    if (!options.source || !options.manifest || Object.keys(options).length !== 2) fail('validate requires --source and --manifest');
-    await validateReleaseSource({ manifestPath: options.manifest, sourceDirectory: options.source });
+    if (!options.source || Object.keys(options).length !== 1) fail('validate requires --source');
+    const result = await validateReleaseSource({ sourceDirectory: options.source });
+    await writeOutputs({ source_digest: result.sourceDigest });
+    console.log(`Validated site source ${result.sourceDigest}.`);
     return;
   }
-  if (!options.source || !options.output || !options.manifest || Object.keys(options).length !== 3) {
-    fail('prepare requires --source, --output, and --manifest');
+  if (!options.source || !options.output || Object.keys(options).length !== 2) {
+    fail('prepare requires --source and --output');
   }
-  await prepareArtifact({
-    manifestPath: options.manifest,
+  const result = await prepareArtifact({
     outputDirectory: options.output,
     sourceDirectory: options.source
   });
+  console.log(`Prepared site artifact ${result.artifactDigest}.`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === adapterPath) {
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
   try {
     await main();
   } catch (error) {
-    console.error(`Pages artifact preparation failed: ${error.message}`);
+    console.error(`Site artifact preparation failed: ${error.message}`);
     process.exitCode = 1;
   }
 }

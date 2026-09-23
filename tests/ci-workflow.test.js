@@ -91,7 +91,7 @@ test('quality is the only required workflow job and materializes release assets 
 });
 
 test('release preparation checks committed assets against the final Quality evidence', () => {
-  assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets are current for final Quality source[\s\S]+Prepare the single Pages artifact/);
+  assert.match(releaseWorkflow, /Download exact Quality documentation assets[\s\S]+Verify release documentation assets are current for final Quality source[\s\S]+Prepare the immutable site artifact/);
   assert.match(releaseWorkflow, /documentation-assets-\$\{\{ needs\.authorize\.outputs\.release_sha \}\}/);
   assert.match(releaseWorkflow, /run-id: \$\{\{ steps\.quality\.outputs\.run_id \}\}/);
   assert.match(releaseWorkflow, /git -C "\$RUNNER_TEMP\/release-source" lfs pull/);
@@ -118,15 +118,16 @@ test('prepare, tag, and deploy reuse one exact artifact under the production loc
   assert.doesNotMatch(releaseWorkflow, /^concurrency:/m);
 });
 
-test('release fixes Analytics delivery at the hosting layer and smokes the production origin root', () => {
-  assert.match(releaseWorkflow, /analytics_delivery: \$\{\{ steps\.evidence\.outputs\.analytics_delivery \}\}/);
-  assert.match(releaseWorkflow, /analyticsDelivery/);
-  assert.doesNotMatch(releaseWorkflow, /analytics_mode|analytics_provider|ANALYTICS_MODE|ANALYTICS_PROVIDER|CLOUDFLARE_WEB_ANALYTICS_TOKEN|--analytics-(?:mode|provider)|provider-compatibility/i);
-  assert.match(releaseWorkflow, /prepare-pages-artifact\.mjs prepare[\s\S]+--manifest "\$MANIFEST_PATH"/);
+test('release prepares provider-neutral site bytes and smokes the production origin root', () => {
+  assert.doesNotMatch(releaseWorkflow, /analytics_delivery|analyticsDelivery|analytics_mode|analytics_provider|ANALYTICS_MODE|ANALYTICS_PROVIDER|CLOUDFLARE_WEB_ANALYTICS_TOKEN|provider-compatibility|MANIFEST_PATH/i);
+  assert.match(releaseWorkflow, /prepare-site-artifact\.mjs prepare[\s\S]+--source "\$SOURCE_ROOT\/site" --output "\$RUNNER_TEMP\/site-artifact"/);
+  assert.doesNotMatch(releaseWorkflow, /--manifest/);
+  assert.match(releaseWorkflow, /name: site-release-artifact-/);
+  assert.match(releaseWorkflow, /artifact-dir "\$RUNNER_TEMP\/prepared\/site-artifact"/);
   assert.match(releaseWorkflow, /PRODUCTION_ORIGIN: \$\{\{ vars\.PRODUCTION_ORIGIN \}\}[\s\S]+test "\$PRODUCTION_ORIGIN" = 'https:\/\/rs\.herehigher\.com\/'[\s\S]+validate-pages-smoke\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
   assert.match(releaseWorkflow, /check-online-editor\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
   assert.doesNotMatch(releaseWorkflow, /steps\.deployment\.outputs\.page_url|PAGE_URL/);
-  assert.doesNotMatch(releaseWorkflow, /recovery|rollback|legacy-pages-release-manifest/i);
+  assert.doesNotMatch(releaseWorkflow, /recovery|rollback/i);
   assert.match(releaseWorkflow, /Cloudflare Pages Analytics injection and manual browser acceptance remain unverified/);
 });
 

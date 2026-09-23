@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -18,28 +19,18 @@ import { fileURLToPath } from 'node:url';
 import {
   computeTreeDigest,
   prepareArtifact,
-  validateManifest
-} from '../scripts/prepare-pages-artifact.mjs';
+  validateReleaseSource
+} from '../scripts/prepare-site-artifact.mjs';
 import { CLOUDFLARE_BEACON_URL } from '../scripts/cloudflare-analytics.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sourceSite = path.join(root, 'site');
-const adapterPath = path.join(root, 'scripts/prepare-pages-artifact.mjs');
+const scriptPath = path.join(root, 'scripts/prepare-site-artifact.mjs');
 
 function temporaryDirectory(t) {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'resume-pages-test-'));
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'resume-site-artifact-test-'));
   t.after(() => rmSync(directory, { force: true, recursive: true }));
   return directory;
-}
-
-function manifestValue(overrides = {}) {
-  return { analyticsDelivery: 'hosting-managed', schemaVersion: 3, ...overrides };
-}
-
-function writeManifest(directory, value) {
-  const manifestPath = path.join(directory, 'manifest.json');
-  writeFileSync(manifestPath, `${JSON.stringify(value)}\n`);
-  return manifestPath;
 }
 
 function collectFiles(directory, rootDirectory = directory) {
@@ -52,68 +43,63 @@ function collectFiles(directory, rootDirectory = directory) {
     });
 }
 
-test('manifest accepts only the fixed hosting-managed analytics delivery contract', () => {
-  assert.deepEqual(validateManifest(manifestValue()), manifestValue());
-  assert.throws(() => validateManifest(manifestValue({ analyticsDelivery: 'application-managed' })), /Unsupported analytics delivery contract/);
-  assert.throws(() => validateManifest({ analyticsMode: 'enabled', analyticsProvider: 'cloudflare-web-analytics', schemaVersion: 2 }), /unknown or missing fields/);
-  assert.throws(() => validateManifest({
-    ...manifestValue(),
-    endpoint: 'https://example.test'
-  }), /unknown or missing fields/);
-  assert.throws(() => validateManifest({
-    ...manifestValue(),
-    schemaVersion: 0
-  }), /Unsupported Pages release manifest schemaVersion/);
-});
-
-test('final gate validate CLI fails closed for malformed manifest contracts', async (t) => {
+test('validate CLI checks the complete source site and reports its digest', async (t) => {
   const temporary = temporaryDirectory(t);
-  const valid = manifestValue();
-  const cases = [
-    ['invalid delivery', { ...valid, analyticsDelivery: 'application-managed' }],
-    ['unknown field', { ...valid, providerConfig: 'forbidden' }],
-    ['unsupported schema', { ...valid, schemaVersion: 0 }]
-  ];
-  const run = (manifestPath) => spawnSync('bash', ['-c', `
-set -euo pipefail
-node "$1" validate --source "$2" --manifest "$3"
-printf 'FINAL_GATE_SUCCESS\\n'
-`, 'final-gate-validate', adapterPath, sourceSite, manifestPath], { encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [scriptPath, 'validate', '--source', sourceSite], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_OUTPUT: path.join(temporary, 'actions-output') }
+  });
+  const sourceDigest = await computeTreeDigest(sourceSite);
+  assert.equal((await validateReleaseSource({ sourceDirectory: sourceSite })).sourceDigest, sourceDigest);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`Validated site source ${sourceDigest}\\.`));
+  assert.equal(readFileSync(path.join(temporary, 'actions-output'), 'utf8'), `source_digest=${sourceDigest}\n`);
 
-  const validResult = run(writeManifest(temporary, valid));
-  assert.equal(validResult.status, 0, validResult.stderr);
-  assert.match(validResult.stdout, /FINAL_GATE_SUCCESS/);
-
-  for (const [name, manifest] of cases) {
-    const caseDirectory = path.join(temporary, name.replaceAll(' ', '-'));
-    mkdirSync(caseDirectory);
-    const result = run(writeManifest(caseDirectory, manifest));
-    assert.notEqual(result.status, 0, name);
-    assert.doesNotMatch(result.stdout, /FINAL_GATE_SUCCESS/, name);
-  }
+  const invalidSite = path.join(temporary, 'invalid-site');
+  cpSync(sourceSite, invalidSite, { recursive: true });
+  writeFileSync(path.join(invalidSite, 'extra.html'), '<html></html>');
+  const invalidResult = spawnSync(process.execPath, [scriptPath, 'validate', '--source', invalidSite], { encoding: 'utf8' });
+  assert.notEqual(invalidResult.status, 0);
+  assert.match(invalidResult.stderr, /exactly the public and editor HTML paths/);
 });
 
-test('prepared artifacts remain byte-identical to source for every repository', async (t) => {
+test('prepared site artifact is byte-identical to the validated source', async (t) => {
   const temporary = temporaryDirectory(t);
   const sourceDigest = await computeTreeDigest(sourceSite);
-  const manifestPath = writeManifest(temporary, manifestValue());
   const output = path.join(temporary, 'output');
   const before = await computeTreeDigest(sourceSite);
 
   const result = await prepareArtifact({
-    manifestPath,
     outputDirectory: output,
     sourceDirectory: sourceSite
   });
 
-  assert.equal(result.manifest.analyticsDelivery, 'hosting-managed');
-  assert.equal(result.finalDigest, sourceDigest);
+  assert.equal(result.artifactDigest, sourceDigest);
   assert.equal(await computeTreeDigest(output), sourceDigest);
   assert.equal(await computeTreeDigest(sourceSite), before);
   assert.deepEqual(collectFiles(output), collectFiles(sourceSite));
 });
 
-test('source validation rejects beacon, legacy state, missing notice, body, path, and symlink defects', async (t) => {
+test('preparation rejects symlinked source roots and output paths that resolve into the source tree', async (t) => {
+  const temporary = temporaryDirectory(t);
+  const source = path.join(temporary, 'site');
+  const sourceLink = path.join(temporary, 'site-link');
+  const outputParentLink = path.join(temporary, 'output-parent-link');
+  cpSync(sourceSite, source, { recursive: true });
+  symlinkSync(source, sourceLink, 'dir');
+  symlinkSync(source, outputParentLink, 'dir');
+  await assert.rejects(prepareArtifact({
+    sourceDirectory: sourceLink,
+    outputDirectory: path.join(temporary, 'source-link-output')
+  }), /source directory must not be a symbolic link/i);
+  await assert.rejects(prepareArtifact({
+    sourceDirectory: source,
+    outputDirectory: path.join(outputParentLink, 'prepared')
+  }), /outside the source tree/);
+  assert.deepEqual(collectFiles(source), collectFiles(sourceSite));
+});
+
+test('site source validation rejects beacon, legacy state, missing notice, body, path, and symlink defects', async (t) => {
   const temporary = temporaryDirectory(t);
   const cases = [
     ['existing beacon', (site) => {
@@ -142,9 +128,7 @@ test('source validation rejects beacon, legacy state, missing notice, body, path
     const site = path.join(temporary, name.replaceAll(' ', '-'));
     cpSync(sourceSite, site, { recursive: true });
     mutate(site);
-    const manifestPath = writeManifest(path.dirname(site), manifestValue());
     await assert.rejects(prepareArtifact({
-      manifestPath,
       outputDirectory: `${site}-output`,
       sourceDirectory: site
     }), undefined, name);
@@ -155,29 +139,41 @@ test('artifact output cannot overlap the source tree', async (t) => {
   const temporary = temporaryDirectory(t);
   const source = path.join(temporary, 'site');
   cpSync(sourceSite, source, { recursive: true });
-  const manifestPath = writeManifest(temporary, manifestValue());
-  mkdirSync(path.join(source, 'nested'));
+  const originalDigest = await computeTreeDigest(source);
+  const originalFiles = collectFiles(source);
+
+  const absentParent = path.join(source, 'must-not-be-created', 'deeper');
   await assert.rejects(prepareArtifact({
-    manifestPath,
+    outputDirectory: path.join(absentParent, 'artifact'),
+    sourceDirectory: source
+  }), /outside the source tree/);
+  assert.equal(existsSync(path.join(source, 'must-not-be-created')), false);
+  assert.equal(await computeTreeDigest(source), originalDigest);
+  assert.deepEqual(collectFiles(source), originalFiles);
+
+  mkdirSync(path.join(source, 'nested'));
+  const nestedDigest = await computeTreeDigest(source);
+  const nestedFiles = collectFiles(source);
+  await assert.rejects(prepareArtifact({
     outputDirectory: path.join(source, 'nested', 'artifact'),
     sourceDirectory: source
   }), /outside the source tree/);
+  assert.equal(await computeTreeDigest(source), nestedDigest);
+  assert.deepEqual(collectFiles(source), nestedFiles);
 });
 
 test('prepare CLI refuses an existing output without changing its sentinel', async (t) => {
   const temporary = temporaryDirectory(t);
-  const manifestPath = writeManifest(temporary, manifestValue());
   const output = path.join(temporary, 'existing-output');
   const sentinel = path.join(output, 'sentinel.txt');
   mkdirSync(output);
   writeFileSync(sentinel, 'preserve me');
 
   const result = spawnSync(process.execPath, [
-    adapterPath,
+    scriptPath,
     'prepare',
     '--source', sourceSite,
-    '--output', output,
-    '--manifest', manifestPath
+    '--output', output
   ], { encoding: 'utf8' });
 
   assert.notEqual(result.status, 0);
@@ -185,23 +181,21 @@ test('prepare CLI refuses an existing output without changing its sentinel', asy
   assert.equal(readFileSync(sentinel, 'utf8'), 'preserve me');
 });
 
-test('prepare CLI builds the byte-identical hosting-managed artifact without analytics credentials', async (t) => {
+test('prepare CLI builds and reports the byte-identical site artifact', async (t) => {
   const temporary = temporaryDirectory(t);
-  const manifestPath = writeManifest(temporary, manifestValue());
   const output = path.join(temporary, 'prepared-site');
   const actionsOutput = path.join(temporary, 'actions-output');
-  const result = spawnSync(process.execPath, [adapterPath,
-    'prepare', '--source', sourceSite, '--output', output,
-    '--manifest', manifestPath
+  const result = spawnSync(process.execPath, [scriptPath,
+    'prepare', '--source', sourceSite, '--output', output
   ], {
     encoding: 'utf8',
-    env: { ...process.env, CLOUDFLARE_WEB_ANALYTICS_TOKEN: 'fictional-token-must-not-be-used', GITHUB_OUTPUT: actionsOutput }
+    env: { ...process.env, GITHUB_OUTPUT: actionsOutput }
   });
   assert.equal(result.status, 0, result.stderr);
   const digest = await computeTreeDigest(output);
-  assert.ok(readFileSync(actionsOutput, 'utf8').includes(`final_digest=${digest}\n`));
+  assert.ok(readFileSync(actionsOutput, 'utf8').includes(`artifact_digest=${digest}\n`));
+  assert.ok(readFileSync(actionsOutput, 'utf8').includes(`source_digest=${digest}\n`));
   const html = readFileSync(path.join(output, 'editor/index.html'), 'utf8');
   assert.equal(digest, await computeTreeDigest(sourceSite));
   assert.ok(!html.includes(CLOUDFLARE_BEACON_URL));
-  assert.ok(!html.includes('fictional-token-must-not-be-used'));
 });

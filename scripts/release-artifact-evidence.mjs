@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ANALYTICS_DELIVERY_CONTRACT, computeTreeDigest } from './prepare-pages-artifact.mjs';
+import { computeTreeDigest } from './prepare-site-artifact.mjs';
 
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^[0-9a-f]{64}$/;
@@ -16,7 +16,7 @@ function stableTag(version) {
 
 function validateEvidence(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('evidence must be an object');
-  const expected = ['analyticsDelivery', 'artifactDigest', 'packageVersion', 'sourceDigest', 'sourceSha'];
+  const expected = ['artifactDigest', 'packageVersion', 'sourceDigest', 'sourceSha'];
   const actual = Object.keys(value).sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
     fail('evidence contains unknown or missing fields');
@@ -27,7 +27,6 @@ function validateEvidence(value) {
     fail('artifact and source digests must be lowercase SHA-256 values');
   }
   if (value.sourceDigest !== value.artifactDigest) fail('prepared artifact must be source-identical');
-  if (value.analyticsDelivery !== ANALYTICS_DELIVERY_CONTRACT) fail('analytics delivery contract is invalid');
   return Object.freeze({ ...value });
 }
 
@@ -49,7 +48,6 @@ function sourceSiteDirectory(sourceDirectory) {
 export async function createArtifactEvidence({ artifactDirectory, sourceDirectory, sourceSha }) {
   if (!shaPattern.test(sourceSha || '')) fail('source SHA must be a full lowercase commit SHA');
   return validateEvidence({
-    analyticsDelivery: ANALYTICS_DELIVERY_CONTRACT,
     artifactDigest: await computeTreeDigest(artifactDirectory),
     packageVersion: await packageVersion(sourceDirectory),
     sourceDigest: await computeTreeDigest(sourceSiteDirectory(sourceDirectory)),
@@ -69,6 +67,7 @@ export async function verifyArtifactEvidence({
   sourceDirectory,
   sourceSha
 }) {
+  if (!shaPattern.test(sourceSha || '')) fail('source SHA must be a full lowercase commit SHA');
   let evidence;
   try {
     evidence = validateEvidence(JSON.parse(await readFile(evidencePath, 'utf8')));
@@ -76,7 +75,7 @@ export async function verifyArtifactEvidence({
     if (error.message?.startsWith('Release artifact evidence failed:')) throw error;
     fail('evidence is unavailable or invalid JSON');
   }
-  if (sourceSha && evidence.sourceSha !== sourceSha) fail('artifact was prepared for a different source SHA');
+  if (evidence.sourceSha !== sourceSha) fail('artifact was prepared for a different source SHA');
   if (evidence.packageVersion !== await packageVersion(sourceDirectory)) fail('package version does not match the evidence');
   if (evidence.sourceDigest !== await computeTreeDigest(sourceSiteDirectory(sourceDirectory))) fail('source bytes do not match the evidence');
   if (evidence.artifactDigest !== await computeTreeDigest(artifactDirectory)) fail('artifact bytes do not match the evidence');

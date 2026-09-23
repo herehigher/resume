@@ -7,7 +7,6 @@ import {
   DEPLOYMENT_PATH_CONTRACTS,
   publicDocumentContracts
 } from './deployment-path-contract.mjs';
-import { ANALYTICS_DELIVERY_CONTRACT } from './prepare-pages-artifact.mjs';
 const publicHreflangAlternates = Object.freeze([
   Object.freeze({ hreflang: 'ja', href: DEPLOYMENT_ORIGIN }),
   Object.freeze({ hreflang: 'zh-CN', href: `${DEPLOYMENT_ORIGIN}zh-cn/` }),
@@ -162,7 +161,6 @@ async function validateWithReader(options, readArtifact, { allowHostingInjection
     assertSemanticContract(contract, content, metadata, { ...options, allowHostingInjection });
   }
   return Object.freeze({
-    analyticsDelivery: ANALYTICS_DELIVERY_CONTRACT,
     packageVersion: options.packageVersion,
   });
 }
