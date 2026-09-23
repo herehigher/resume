@@ -52,11 +52,8 @@ files.filter((file) => extname(file) === '.html').forEach((file) => {
   if (findExternalRuntimeAssets(pageHtml).length) {
     failures.push(`${file}: external runtime assets are not allowed`);
   }
-  if (!pageHtml.includes('data-analytics-mode="disabled" data-analytics-provider="none"')) {
-    failures.push(`${file}: source analytics status must be disabled/none`);
-  }
-  if (/data-cf-beacon|cloudflareinsights\.com/i.test(pageHtml)) {
-    failures.push(`${file}: source pages must not contain analytics runtime code`);
+  if (/\bdata-analytics-(?:mode|provider)\s*=|\bdata-cf-beacon\s*=|cloudflareinsights\.com/i.test(pageHtml)) {
+    failures.push(`${file}: source pages must not contain analytics state or beacon code`);
   }
 });
 

@@ -1,12 +1,10 @@
-import {
-  CLOUDFLARE_BEACON_URL,
-  CLOUDFLARE_RUM_URL
-} from './prepare-pages-artifact.mjs';
 import { documentUrlPaths } from './deployment-path-contract.mjs';
 
+export const CLOUDFLARE_BEACON_URL = 'https://static.cloudflareinsights.com/beacon.min.js';
+export const CLOUDFLARE_RUM_URL = 'https://cloudflareinsights.com/cdn-cgi/rum';
+
 const DOCUMENT_PATHS = new Set([
-  ...documentUrlPaths(),
-  ...documentUrlPaths('/resume/')
+  ...documentUrlPaths()
 ]);
 const LOCALES = new Set(['ja', 'zh-CN', 'en']);
 const RUM_KEYS = new Set([
@@ -170,5 +168,3 @@ export function cloudflareAnalyticsMockScript(expectedToken) {
   };
   return `const payload=${JSON.stringify(payload)};payload.location=window.location.href;const request=new XMLHttpRequest();request.open('POST',${JSON.stringify(CLOUDFLARE_RUM_URL)});request.setRequestHeader('content-type','application/json');request.send(JSON.stringify(payload));`;
 }
-
-export { CLOUDFLARE_BEACON_URL, CLOUDFLARE_RUM_URL };

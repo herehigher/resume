@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { verifyArtifactEvidence } from './release-artifact-evidence.mjs';
 
 const stableTagPattern = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
-const rollbackTags = new Set(['v0.2.2']);
 
 function fail(message) {
   throw new Error(`Release publication failed: ${message}`);
@@ -23,13 +22,6 @@ function tagExists(cwd, tag) {
     if (error.status === 1) return false;
     fail(`unable to inspect existing release tag: ${error.message}`);
   }
-}
-
-export function validateRollbackTag(tag) {
-  if (tag === 'v0.2.1') fail('v0.2.1 is not an accepted rollback target');
-  if (tag === 'v0.2.0') fail('v0.2.0 requires an incompatible legacy path and cannot be prepared by the current adapter');
-  if (!rollbackTags.has(tag)) fail('rollback tag is not an accepted historical release');
-  return tag;
 }
 
 export async function ensureImmutableReleaseTag({ artifactDirectory, cwd, evidencePath, sourceDirectory, sourceSha, tag }) {
@@ -52,7 +44,7 @@ export async function ensureImmutableReleaseTag({ artifactDirectory, cwd, eviden
 
 function parseArguments(args) {
   const [command, ...values] = args;
-  if (!['publish', 'rollback'].includes(command)) fail('expected publish or rollback command');
+  if (command !== 'publish') fail('expected publish command');
   const options = {};
   for (let index = 0; index < values.length; index += 2) {
     const name = values[index];
@@ -66,11 +58,7 @@ function parseArguments(args) {
 }
 
 async function main() {
-  const { command, options } = parseArguments(process.argv.slice(2));
-  if (command === 'rollback') {
-    console.log(`Accepted rollback target ${validateRollbackTag(options.tag)}.`);
-    return;
-  }
+  const { options } = parseArguments(process.argv.slice(2));
   for (const required of ['artifact-dir', 'cwd', 'evidence', 'source-dir', 'source-sha', 'tag']) {
     if (!options[required]) fail(`${required} is required`);
   }

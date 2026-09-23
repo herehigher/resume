@@ -24,14 +24,6 @@ function privacyNoticeUrl(locale) {
   return `${REPOSITORY_URL}/blob/main/PRIVACY.md#${PRIVACY_ANCHORS[locale]}`;
 }
 
-export function analyticsStatusFrom(element) {
-  const mode = element?.dataset?.analyticsMode;
-  const provider = element?.dataset?.analyticsProvider;
-  if (mode === 'disabled' && provider === 'none') return 'disabled';
-  if (mode === 'enabled' && provider === 'cloudflare-web-analytics') return 'enabled';
-  return 'configurationError';
-}
-
 export function initPrivacySecurity(initialLocale, { draftStorageAvailable = true } = {}) {
   const button = document.getElementById('privacySecurityButton');
   const dialog = document.getElementById('privacySecurityDialog');
@@ -45,17 +37,16 @@ export function initPrivacySecurity(initialLocale, { draftStorageAvailable = tru
 
   function applyLocale(locale) {
     const copy = getMessages(locale).privacySecurity;
-    const analyticsStatus = analyticsStatusFrom(document.documentElement);
     for (const [id, key] of Object.entries(TEXT_TARGETS)) {
       document.getElementById(id).textContent = copy[key];
     }
     document.getElementById('privacySecurityStorageBody').textContent = copy[
       draftStorageAvailable ? 'storageBody' : 'storageUnavailableBody'
     ];
-    document.getElementById('privacySecurityUserBody').textContent = copy[`${analyticsStatus}UserBody`];
-    document.getElementById('privacySecurityTechnicalBody').textContent = copy[`${analyticsStatus}TechnicalBody`];
-    document.querySelectorAll('[data-analytics-disclosure="status"], [data-editor-analytics-disclosure="status"]').forEach((element) => {
-      element.textContent = copy[`${analyticsStatus}Disclosure`];
+    document.getElementById('privacySecurityUserBody').textContent = copy.userBody;
+    document.getElementById('privacySecurityTechnicalBody').textContent = copy.technicalBody;
+    document.querySelectorAll('[data-privacy-notice]').forEach((element) => {
+      element.textContent = copy.disclosure;
     });
     button.setAttribute('aria-label', copy.badgeAria.replace('{version}', APP_VERSION));
     repositoryLink.setAttribute('aria-label', copy.sourceLinkAria);

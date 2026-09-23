@@ -6,7 +6,7 @@ Resume Studio is a personal, static web app for editing Japanese, Simplified Chi
 
 ## Web App
 
-Web App: [https://herehigher.github.io/resume/](https://herehigher.github.io/resume/)
+Web App: [https://rs.herehigher.com/](https://rs.herehigher.com/)
 
 ## Documents and paper sizes
 
@@ -77,7 +77,7 @@ These historical showcase samples use fictional data. Their source at generation
 - If saving or migration fails, the existing draft and decryption key are retained. When the browser cannot use Web Locks, saving, deletion, and migration stop to avoid conflicts. Previously deployed clients that do not participate in Web Locks, and manual storage operations, are outside this cross-tab exclusivity guarantee. Export JSON before reopening in a supported browser.
 - Clearing browser data, ending a private-browsing session, exceeding the storage quota, or browser storage eviction can remove a draft. Export important drafts as JSON backups.
 - In-app deletion clears only the current v3 state. It does not delete unrelated storage entries, out-of-range older drafts, downloaded JSON/PDF files, or browser download history.
-- The repository `site/`, clones, and forks disable analytics by default and make no analytics requests beyond same-origin static assets. Only official CI adds standard Cloudflare Web Analytics to a prepared artifact when the source commit’s configuration manifest enables it. After approval, that same artifact is published with its immutable stable tag. It uses no cookies, localStorage, user-level IDs, or custom events and sends no resume input, photo, JSON, or on-device draft. The page status and Network panel expose the active mode.
+- The repository `site/`, clones, and forks contain no Analytics beacon. Cloudflare Pages injects Cloudflare Web Analytics at the delivery layer on the official hosted site. The app never includes resume input, photos, JSON, or on-device drafts in Analytics requests.
 
 Read [Privacy / English](PRIVACY.md#privacy-en) for the complete policy.
 

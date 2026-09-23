@@ -105,7 +105,8 @@ test('only Release eligibility dispatches Release Pages after merged-version aut
   assert.match(eligibilityWorkflow, /Record ineligible main update[\s\S]+release_required != 'true'/);
   assert.match(eligibilityWorkflow, /Dispatch Release Pages for the eligible Quality run[\s\S]+release_required == 'true'[\s\S]+gh workflow run release\.yml[\s\S]+-f quality_run_id/);
   assert.doesNotMatch(releaseWorkflow, /workflow_run:/);
-  assert.match(releaseWorkflow, /workflow_dispatch:[\s\S]+quality_run_id:[\s\S]+recovery_tag:/);
+  assert.match(releaseWorkflow, /workflow_dispatch:[\s\S]+quality_run_id:/);
+  assert.doesNotMatch(releaseWorkflow, /recovery_tag|outputs\.recovery|prepare-legacy-release-config|git archive/);
   assert.match(releaseWorkflow, /validate-release-run\.mjs eligibility --run-id "\$QUALITY_RUN_ID"/);
   assert.match(releaseWorkflow, /test "\$release_required" = true[\s\S]+Recheck current version under the production lock/);
   assert.doesNotMatch(releaseWorkflow, /mode=publish|prepared_run_id|inputs\.prepared_artifact_id/);
@@ -117,9 +118,21 @@ test('prepare, tag, and deploy reuse one exact artifact under the production loc
   assert.doesNotMatch(releaseWorkflow, /^concurrency:/m);
 });
 
+test('release fixes Analytics delivery at the hosting layer and smokes the production origin root', () => {
+  assert.match(releaseWorkflow, /analytics_delivery: \$\{\{ steps\.evidence\.outputs\.analytics_delivery \}\}/);
+  assert.match(releaseWorkflow, /analyticsDelivery/);
+  assert.doesNotMatch(releaseWorkflow, /analytics_mode|analytics_provider|ANALYTICS_MODE|ANALYTICS_PROVIDER|CLOUDFLARE_WEB_ANALYTICS_TOKEN|--analytics-(?:mode|provider)|provider-compatibility/i);
+  assert.match(releaseWorkflow, /prepare-pages-artifact\.mjs prepare[\s\S]+--manifest "\$MANIFEST_PATH"/);
+  assert.match(releaseWorkflow, /PRODUCTION_ORIGIN: \$\{\{ vars\.PRODUCTION_ORIGIN \}\}[\s\S]+test "\$PRODUCTION_ORIGIN" = 'https:\/\/rs\.herehigher\.com\/'[\s\S]+validate-pages-smoke\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
+  assert.match(releaseWorkflow, /check-online-editor\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
+  assert.doesNotMatch(releaseWorkflow, /steps\.deployment\.outputs\.page_url|PAGE_URL/);
+  assert.doesNotMatch(releaseWorkflow, /recovery|rollback|legacy-pages-release-manifest/i);
+  assert.match(releaseWorkflow, /Cloudflare Pages Analytics injection and manual browser acceptance remain unverified/);
+});
+
 test('CI installs only the browser binaries required by headless execution', () => {
   assert.match(qualityWorkflow, /npx playwright install --with-deps --only-shell chromium webkit/);
-  assert.equal(releaseWorkflow.match(/npx playwright install --with-deps --only-shell chromium/g)?.length, 2);
+  assert.equal(releaseWorkflow.match(/npx playwright install --with-deps --only-shell chromium/g)?.length, 1);
   assert.doesNotMatch(playwrightConfig, /\bchannel\s*:/);
   assert.doesNotMatch(playwrightConfig, /\bheadless\s*:\s*false/);
 });

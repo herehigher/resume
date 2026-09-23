@@ -1,6 +1,6 @@
 # Privacy / 隐私 / プライバシー
 
-Version 1.1 - Effective 2026-09-01
+Version 1.2 - Effective 2026-09-23
 
 - [日本語](#privacy-ja)
 - [简体中文](#privacy-zh-cn)
@@ -20,9 +20,9 @@ Resume Studio は、現在の browser origin の `localStorage` に `resume-stud
 
 ### Network と外部送信
 
-Repository の `site/`、clone、fork では Analytics は無効で、HTML、CSS、JavaScript、画像などの同一 origin static asset request 以外の解析通信は発生しません。`herehigher/resume` の検証済み stable tag だけは、tag に固定された manifest が有効な場合に deployment-only adapter が Pages artifact へ Cloudflare Web Analytics を追加します。現在の状態は HTML の `data-analytics-mode` / `data-analytics-provider`、画面の status、Network panel で確認できます。未対応の組は configuration error として表示され、無効状態へ黙って降格しません。
+Repository の `site/`、clone、fork に Analytics beacon は含まれません。公式 hosted site では Cloudflare Pages が delivery layer で Cloudflare Web Analytics を挿入します。アプリは履歴書入力、写真、import / export JSON、端末上の草稿を Analytics request に含めません。
 
-有効な公式 artifact は `static.cloudflareinsights.com` の固定 URL から beacon script を読み込み、`cloudflareinsights.com` へ集計 page view と performance 情報を送信します。この構成は Cookie、localStorage、利用者単位の ID、application が作成する fingerprint、user profile、custom event、form 操作 tracking を使用せず、履歴書入力、写真、import / export JSON、端末上の下書きを送りません。標準 beacon の 2026-09-02 版は browser engine / browser / OS の version を `bi` という集計 field に含めます。これは browser の user agent / user-agent client hints から得る環境情報で、Resume Studio が独自の識別子や fingerprint を作るものではありません。Cloudflare は通常の接続情報（IP address や user agent など）と page / referrer / performance 統計を自身の規約に従って処理する場合があります。固定 URL や HTML artifact の digest は第三者 script の内容を固定しません。提供者による説明と beacon 更新履歴は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) および [beacon changelog](https://developers.cloudflare.com/web-analytics/changelog/) を確認してください。利用者が preview 内の `http://` または `https://` profile link を選んだ場合は、その link 先へ移動します。これら以外の analytics、外部 API、CDN、外部 font service は使用せず、履歴書本文を受け取る application backend はありません。
+公式 hosted site の Cloudflare Web Analytics は page view と performance 情報を集計します。Cloudflare は通常の接続情報（IP address や user agent など）と page、referrer、performance 情報を自身の規約に従って処理する場合があります。詳細は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) を確認してください。preview 内の `http://` または `https://` profile link を利用者が選ぶと、その link 先へ移動します。アプリはこれら以外の analytics、外部 API、CDN、外部 font service を使用せず、履歴書本文を受け取る backend もありません。
 
 ### 保持、削除、損失リスク
 
@@ -46,9 +46,9 @@ Resume Studio 使用按 data version 区分的 key `resume-studio-web-v4`，把�
 
 ### 网络与外部提交
 
-Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics；除加载 HTML、CSS、JavaScript、图片等同一 origin 静态 asset 外，不会产生统计通信。仅官方 CI 可按待验证 commit 的配置 manifest，在发布前向产物加入 Cloudflare Web Analytics；批准后将同一产物与 immutable stable tag 对应发布。可通过 HTML 的 `data-analytics-mode` / `data-analytics-provider`、页面 status 和 Network panel 核查当前状态。未知组合会显示 configuration error，不会静默降级为禁用状态。
+Repository 的 `site/`、clone 和 fork 均不包含 Analytics beacon。官方托管站点由 Cloudflare Pages 在 delivery layer 注入 Cloudflare Web Analytics。应用不会把简历输入、照片、import / export JSON 或设备草稿放入 Analytics request。
 
-启用 Analytics 的官方 artifact 会通过 `static.cloudflareinsights.com` 上的固定 URL 加载 beacon script，并向 `cloudflareinsights.com` 发送汇总页面访问量和 performance 信息。该配置不使用 Cookie、localStorage、用户级 ID、由 application 创建的 fingerprint、用户画像、custom event 或表单操作 tracking，也不会发送简历输入、照片、import / export JSON 或设备草稿。2026-09-02 版标准 beacon 会在名为 `bi` 的汇总 field 中包含 browser engine / browser / OS 的 version。这些环境信息来自 browser 的 user agent / user-agent client hints；Resume Studio 不会创建自己的 identifier 或 fingerprint。Cloudflare 可能按其自身条款处理普通连接信息（例如 IP address、user agent）以及 page、referrer 和 performance 统计信息。固定 URL 和 HTML artifact digest 不会固定第三方 script 的内容。提供方的说明和 beacon 更新记录请参阅 [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) 及 [beacon changelog](https://developers.cloudflare.com/web-analytics/changelog/)。用户主动点击 preview 中的 `http://` 或 `https://` profile link 时会访问目标网站。除此之外，本应用不使用其他 analytics、外部 API、CDN 或外部 font service，也没有接收简历正文的 application backend。
+官方托管站点的 Cloudflare Web Analytics 会汇总页面访问量与性能信息。Cloudflare 可能根据其自身条款处理普通连接信息（例如 IP address、user agent）以及 page、referrer 和 performance 信息。详情请参阅 [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/)。用户主动选择 preview 中的 `http://` 或 `https://` profile link 时，browser 会访问目标网站。除此之外，本应用不使用其他 analytics、外部 API、CDN 或外部 font service，也没有接收简历正文的 backend。
 
 ### 保留、删除与丢失风险
 
@@ -72,9 +72,9 @@ The app can read the current format and explicitly supported formats from up to 
 
 ### Network and external submission
 
-Analytics is disabled in the repository `site/`, clones, and forks; they make only same-origin static asset requests for HTML, CSS, JavaScript, images, and related files. Only official CI adds Cloudflare Web Analytics to a prepared artifact when the source commit’s configuration manifest enables it. After approval, that same artifact is published with its immutable stable tag. The HTML `data-analytics-mode` / `data-analytics-provider`, page status, and Network panel expose the active state. An unsupported tuple is shown as a configuration error and never silently downgraded to disabled.
+The repository `site/`, clones, and forks contain no Analytics beacon. Cloudflare Pages injects Cloudflare Web Analytics at the delivery layer on the official hosted site. The app never includes resume input, photos, imported or exported JSON, or on-device drafts in Analytics requests.
 
-An enabled official artifact loads the beacon script at a fixed URL from `static.cloudflareinsights.com` and sends aggregate page-view and performance information to `cloudflareinsights.com`. It uses no cookies, localStorage, user-level IDs, application-created fingerprints, user profiles, custom events, or form-interaction tracking and sends no resume input, photos, imported or exported JSON, or on-device drafts. The standard beacon version dated 2026-09-02 includes browser-engine, browser, and OS-version values in an aggregate `bi` field. Those environment values come from the browser’s user agent / user-agent client hints; Resume Studio does not create its own identifier or fingerprint. Cloudflare may process ordinary connection information (such as IP address and user agent) and page, referrer, and performance statistics under its own terms. The fixed URL and HTML artifact digest do not pin the contents of the third-party script. See [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) and its [beacon changelog](https://developers.cloudflare.com/web-analytics/changelog/) for the provider’s description and updates. If the user selects an `http://` or `https://` profile link in the preview, the browser navigates to that target. The app uses no other analytics, external APIs, CDNs, or external font services, and there is no application backend that receives resume content.
+Cloudflare Web Analytics on the official hosted site aggregates page-view and performance information. Cloudflare may process ordinary connection details (such as IP address and user agent) and page, referrer, and performance information under its own terms. See [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) for details. If a user selects an `http://` or `https://` profile link in the preview, the browser navigates to that target. The app uses no other analytics, external APIs, CDNs, or external font services, and there is no backend that receives resume content.
 
 ### Retention, deletion, and loss risks
 

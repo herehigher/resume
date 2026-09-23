@@ -1,6 +1,6 @@
 # リリース手順
 
-対象：`herehigher/resume` → [Resume Studio](https://herehigher.github.io/resume/)。公開用 PR を1件用意し、必要な展示 asset・check・review を揃えたうえで、その PR の merge を本番公開の承認として扱います。
+対象：`herehigher/resume` → [Resume Studio](https://rs.herehigher.com/)。公開用 PR を1件用意し、必要な展示 asset・check・review を揃えたうえで、その PR の merge を本番公開の承認として扱います。
 
 Public release、tag、Pages 設定、repository visibility の変更には owner の明示承認が必要です。通常公開では、version を更新した公開 PR を owner が merge する操作を、その merge 結果 commit の tag 作成と Pages 公開に対する明示承認とします。Merge 後に同じ対象への追加承認や ID・digest の転記は要求しません。Tag は移動・上書き・削除しません。
 
@@ -93,17 +93,13 @@ Summary は tag、commit、artifact の識別情報・digest、run URL、公開 
 
 ## Analytics の扱い
 
-Source は既定で無効です。公式 CI だけが設定 manifest の mode / provider に従って標準 Cloudflare Web Analytics を配布物へ追加し、公開画面で利用を明示します。公式以外の repository は disabled の source-identical artifact だけを許可します。
+Repository source、clone、fork は Analytics beacon を含みません。公式 hosted site では Cloudflare Pages の delivery layer が Cloudflare Web Analytics を挿入します。アプリは履歴書入力、写真、JSON、端末上の草稿を Analytics request に含めません。画面の説明は [PRIVACY.md](../PRIVACY.md) を参照します。
 
-公開 beacon site token は repository variable `CLOUDFLARE_WEB_ANALYTICS_TOKEN` から渡す通常の site 設定です。存在、書式、安全な埋込みを検証し、専用の秘密管理・fingerprint・承認・ログ検査は設けません。GitHub 認証情報やアカウント操作用 API token は実 credential として保護します。
+`PRODUCTION_ORIGIN` は GitHub Actions の repository variable と `scripts/deployment-path-contract.mjs` の両方で `https://rs.herehigher.com/` に固定します。公開 smoke は custom domain の root URL と app が管理する path / metadata / JSON contract を確認します。Analytics beacon の配信と provider-side processing は Cloudflare Pages の責任範囲です。
 
-許可する外部 runtime は `https://static.cloudflareinsights.com/beacon.min.js` の GET と `https://cloudflareinsights.com/cdn-cgi/rum` の標準 POST です。履歴書入力・写真・import/export JSON・草稿・custom event・利用者単位 ID を送信する変更は認めません。Cookie、localStorage、fingerprinting を追加しません。固定 URL や HTML digest は第三者 script 内容を固定するものではありません。利用者向け説明は [PRIVACY.md](../PRIVACY.md) を参照します。
+現行 `Release Pages` workflow はまだ GitHub Pages の deployment action を使い、この変更だけでは Cloudflare Pages の delivery-layer injection を実証しません。Transport の Direct Upload への切替は #251 の範囲です。切替後に pages.dev と custom domain の両方で hosted smoke と Analytics injection を確認するまで、production hosting contract の実測完了とは扱いません。
 
-Analytics 有効時は、準備した配布物で実 provider script の互換性を検査します。架空 data の操作・再読込・移動を行い、headless browser で自然には発生しないページ非表示は明示的に模擬します。未知の payload 契約や予期しない通信は公開を失敗させます。RUM は送信前に intercept するため、Cloudflare 側の受信成功は検証しません。観測範囲は summary と準備 artifact 内の `provider-compatibility.json` に記録します。
-
-Field の根拠と互換性検査の範囲は [provider contract](cloudflare-analytics-contract.md) にまとめています。
-
-Artifact 全体の整合性は site token の秘密性と別に検証し、生成後の digest は CI evidence に記録します。事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
+Artifact の整合性は引き続き source と配布物の SHA-256 digest で検証し、CI evidence に記録します。事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
 
 ## 失敗したとき
 
@@ -119,20 +115,18 @@ Artifact 全体の整合性は site token の秘密性と別に検証し、生�
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
 | 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release Pages を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
 | Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |
-| Deploy 後の smoke failure | 「公開済み・確認未完了」。自動 rollback はない。一時障害は再検査、内容不良は受入済み版へ戻す |
+| Deploy 後の smoke failure | 「公開済み・確認未完了」。自動 rollback はない。一時障害は再検査、内容不良は新しい修正 version を公開する |
 | 公開内容の修正 | 修正 PR と新しい version を用意。既存 tag を変更しない |
 
 ### 前のバージョンへ戻す
 
-新経路で作った版は、失敗した Release Pages run を再実行します。Artifact が失効している場合は、その release 結果 commit が現在の main version と一致する間に main Quality を再実行すると、新しい Release Pages run が準備から開始し、既存 tag が同じ commit を指すことを確認して deploy を再開します。Main が次の version へ進んだ後はこの標準入口から旧版を再配布しません。
+新しい release の deploy 後に一時障害が起きた場合は、同じ immutable tag・commit・artifact を持つ Release Pages run を再実行します。Artifact が失効している場合は、新しい Quality run が作った artifact から同じ source を再準備し、既存 tag が同じ commit を指すことを確認して deploy を再開します。内容不良は修正 PR と新しい version で直します。
 
-旧形式で current adapter に適合する受入済み tag は `v0.2.2` だけです。所有者が [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を main から `recovery_tag=v0.2.2` で手動実行する操作を、その復旧公開の承認とします。小さな互換 adapter が当時の mode / provider を読み、現在の公開 site 設定で配布物を準備し、同じ run 内で検証・tag 照合・deploy まで進みます。古い公開 bytes の完全再現とは区別し、実行前に必要な目視証拠を別途確認します。
-
-放棄済み `v0.2.1`、source の hreflang contract が current adapter と異なる `v0.2.0`、互換 adapter 未対応の `v0.1.0` はこの復旧入口の対象外です。どの経路でも既存 tag を移動せず、所有者の指示・承認の範囲で再配布し、smoke の成功を確認します。
+現在の Release Pages workflow は、過去の tag を custom-domain root へ復旧する入口を持ちません。旧 `v0.2.2` の source は GitHub Pages `/resume/` の canonical / hreflang、旧 Analytics state と disclosure、schema v1 を含み、現行 root hosting・privacy・schema v4 contract に適合しません。古い tag とその code は変更せず保持しますが、新しい公開 artifact としては再配布しません。旧 source を root 向けに移行する正式な検証・受入れが必要な場合は、別途 migration を行い新しい version として公開します。
 
 ## 初回設定・設定変更時だけ行うこと
 
-Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。Main の merge ruleset が要求する check は `quality` です。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。通常公開は version を更新した公開 PR の merge、旧版復旧は `recovery_tag` を指定した手動実行を、それぞれ承認の実行とします。
+Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。Main の merge ruleset が要求する check は `quality` です。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。公開 PR の merge が通常公開の承認です。Release Pages は承認済みの eligible Quality run だけを受け付け、legacy tag の復旧入力はありません。
 
 Local の GitHub query / PR 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は、許可された sandbox 外の実行へ切り替えます。Token を抽出・export・複製せず、特定 OS の credential backend は要件にしません。
 

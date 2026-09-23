@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, expect } from '@playwright/test';
 
-import { CLOUDFLARE_BEACON_URL } from './cloudflare-analytics.mjs';
 import { DEPLOYMENT_PATH_CONTRACTS } from './deployment-path-contract.mjs';
 import { observeNetwork } from './network-contract.mjs';
 
@@ -49,14 +48,9 @@ export async function checkOnlineEditor(baseUrl) {
       assert.equal(result.status(), 200, `${locale}: editor response`);
       await expect(page.locator('#localeSelect')).toHaveValue(locale);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
-      const beacon = page.locator(`script[src="${CLOUDFLARE_BEACON_URL}"]`);
-      const count = await beacon.count();
-      if (count === 1) {
-        const configuration = JSON.parse(await beacon.getAttribute('data-cf-beacon') || '');
-        assert.match(configuration.token || '', /^[0-9a-f]{32}$/, `${locale}: analytics beacon configuration`);
-      } else {
-        assert.equal(count, 0, `${locale}: analytics beacon must not be duplicated`);
-      }
+      const html = await page.locator('html').evaluate((element) => element.outerHTML);
+      assert.doesNotMatch(html, /\bdata-analytics-(?:mode|provider)\s*=/i,
+        `${locale}: the app must not expose an Analytics mode/provider state`);
       await page.locator('#importDataInput').setInputFiles({
         name: 'fictional-online-check.json', mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(example))

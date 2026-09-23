@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { findExternalRuntimeAssets } from '../scripts/check-site.mjs';
-import { publicDocumentContracts } from '../scripts/deployment-path-contract.mjs';
+import { DEPLOYMENT_ORIGIN, documentUrlPaths, publicDocumentContracts } from '../scripts/deployment-path-contract.mjs';
 import {
   CARD_PRESENTATIONS,
   MASCOT_RELATIVE_PATH,
@@ -72,6 +72,22 @@ const descriptionTerms = Object.freeze({
 function source(file) {
   return readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 }
+
+test('production URLs use the custom-domain root without a legacy GitHub Pages mount', () => {
+  const legacyProductionOrigin = 'https://herehigher.github.io/resume/';
+  assert.equal(DEPLOYMENT_ORIGIN, 'https://rs.herehigher.com/');
+  assert.equal(documentUrlPaths.length, 0);
+  assert.equal([...documentUrlPaths()].some((pathname) => pathname.startsWith('/resume/')), false);
+  for (const file of [
+    ...routes.map((route) => route.file), 'site/ja/index.html', 'site/editor/index.html',
+    'site/sitemap.xml', 'site/schema/resume-studio-web-v4.schema.json',
+    'README.md', 'README.zh-CN.md', 'README.en.md', 'PRIVACY.md', 'docs/release-playbook.md',
+    'scripts/deployment-path-contract.mjs'
+  ]) {
+    assert.doesNotMatch(source(file), new RegExp(legacyProductionOrigin.replaceAll('.', '\\.').replaceAll('/', '\\/')),
+      `${file} must not publish the legacy production origin`);
+  }
+});
 
 function linkTarget(html, rel, language = '') {
   const match = html.match(new RegExp(`<link\\s+[^>]*rel="${rel}"[^>]*${language ? `hreflang="${language}"[^>]*` : ''}href="([^"]+)"`, 'i'));
@@ -174,24 +190,24 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
 
   for (const route of routes) {
     const html = source(route.file);
-    assert.match(html, /<html\b[^>]*data-analytics-mode="disabled"[^>]*data-analytics-provider="none"/i);
-    assert.doesNotMatch(html, /data-cf-beacon|cloudflareinsights\.com/i);
+    assert.match(html, /<html\b[^>]*lang=/i);
+    assert.doesNotMatch(html, /\bdata-analytics-(?:mode|provider)\s*=|\bdata-cf-beacon\s*=|cloudflareinsights\.com/i);
     assert.deepEqual(findExternalRuntimeAssets(html), []);
   }
 
   for (const route of routes.slice(1)) {
     const html = source(route.file);
-    assert.match(html, /source build|official release/);
+    assert.match(html, /delivery layer|Cloudflare Pages/i);
     assert.match(html, /PDF/i);
     assert.match(html, /JSON/i);
     assert.match(html, /<a class="entry-button" href="\.\.\/editor\/\?lang=/);
     assert.match(html, /href="\.\.\/schema\/resume-studio-web-v4\.schema\.json"/);
     assert.match(html, new RegExp(`<div class="entry-brand">[\\s\\S]*?<img class="entry-mark" src="\\.\\.\\/assets\\/favicon\\/resume-studio-marmot-192\\.png" alt="" width="50" height="50">[\\s\\S]*?<div class="entry-brand-copy"><strong class="entry-brand-title">Resume Studio<\\/strong><small class="entry-brand-subtitle">${route.brandSubtitle}<\\/small>`));
-    assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-analytics-disclosure="status"/);
+    assert.match(html, /<div class="entry-main">[\s\S]*?<p class="entry-lede">[\s\S]*?<div class="entry-trust-list"[\s\S]*?data-privacy-notice/);
     assert.equal((html.match(/class="entry-trust-row"/g) || []).length, 2);
     assert.match(html, /<a class="entry-button"[^>]*>[\s\S]*?<span aria-hidden="true">→<\/span><\/a>/);
     assert.equal(existsSync(new URL('../site/schema/resume-studio-web-v4.schema.json', import.meta.url)), true);
-    assert.match(html, new RegExp(`data-analytics-disclosure="status"[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
+    assert.match(html, new RegExp(`data-privacy-notice[\\s\\S]*?${licenseUrl.replaceAll('/', '\\/')}`));
     assert.match(html, new RegExp(`<a[^>]*href="${licenseUrl}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>MIT License<\\/a>`));
   }
 
@@ -268,7 +284,7 @@ test('default Japanese entry opens the editor directly and the legacy Japanese U
   assert.doesNotMatch(root, /\.\/ja\//);
 
   const legacy = source('site/ja/index.html');
-  assert.match(legacy, /<link rel="canonical" href="https:\/\/herehigher\.github\.io\/resume\/">/);
+  assert.match(legacy, /<link rel="canonical" href="https:\/\/rs\.herehigher\.com\/">/);
   assert.doesNotMatch(legacy, /hreflang=/);
   assert.match(legacy, /<a class="entry-button" href="\.\.\/editor\/\?lang=ja">/);
 });
@@ -311,8 +327,8 @@ test('editor brand opens the active locale entry and public entries use the shar
 
 test('static guard permits only canonical and alternate external link metadata', () => {
   assert.deepEqual(findExternalRuntimeAssets([
-    '<link rel="canonical" href="https://herehigher.github.io/resume/">',
-    '<link rel="alternate" hreflang="en" href="https://herehigher.github.io/resume/en/">'
+    '<link rel="canonical" href="https://rs.herehigher.com/">',
+    '<link rel="alternate" hreflang="en" href="https://rs.herehigher.com/en/">'
   ].join('')), []);
   for (const tag of [
     `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js?unexpected=1" data-cf-beacon='{"token":"${'a'.repeat(32)}"}'></script>`,

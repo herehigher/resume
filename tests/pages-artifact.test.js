@@ -16,18 +16,15 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  CLOUDFLARE_BEACON_URL,
-  CLOUDFLARE_PROVIDER,
-  OFFICIAL_REPOSITORY,
   computeTreeDigest,
   prepareArtifact,
   validateManifest
 } from '../scripts/prepare-pages-artifact.mjs';
+import { CLOUDFLARE_BEACON_URL } from '../scripts/cloudflare-analytics.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sourceSite = path.join(root, 'site');
 const adapterPath = path.join(root, 'scripts/prepare-pages-artifact.mjs');
-const token = 'a'.repeat(32);
 
 function temporaryDirectory(t) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'resume-pages-test-'));
@@ -35,12 +32,8 @@ function temporaryDirectory(t) {
   return directory;
 }
 
-function manifestValue({ mode = 'disabled' } = {}) {
-  return {
-    analyticsMode: mode,
-    analyticsProvider: mode === 'enabled' ? CLOUDFLARE_PROVIDER : 'none',
-    schemaVersion: 2
-  };
+function manifestValue(overrides = {}) {
+  return { analyticsDelivery: 'hosting-managed', schemaVersion: 3, ...overrides };
 }
 
 function writeManifest(directory, value) {
@@ -59,18 +52,10 @@ function collectFiles(directory, rootDirectory = directory) {
     });
 }
 
-test('manifest accepts only the two closed analytics tuples', () => {
-  const values = ['disabled', 'enabled', 'unknown'];
-  const providers = ['none', CLOUDFLARE_PROVIDER, 'unknown'];
-  for (const analyticsMode of values) {
-    for (const analyticsProvider of providers) {
-      const value = { analyticsMode, analyticsProvider, schemaVersion: 2 };
-      const valid = (analyticsMode === 'disabled' && analyticsProvider === 'none')
-        || (analyticsMode === 'enabled' && analyticsProvider === CLOUDFLARE_PROVIDER);
-      if (valid) assert.deepEqual(validateManifest(value), value);
-      else assert.throws(() => validateManifest(value), /Unsupported analytics mode\/provider tuple/);
-    }
-  }
+test('manifest accepts only the fixed hosting-managed analytics delivery contract', () => {
+  assert.deepEqual(validateManifest(manifestValue()), manifestValue());
+  assert.throws(() => validateManifest(manifestValue({ analyticsDelivery: 'application-managed' })), /Unsupported analytics delivery contract/);
+  assert.throws(() => validateManifest({ analyticsMode: 'enabled', analyticsProvider: 'cloudflare-web-analytics', schemaVersion: 2 }), /unknown or missing fields/);
   assert.throws(() => validateManifest({
     ...manifestValue(),
     endpoint: 'https://example.test'
@@ -85,7 +70,7 @@ test('final gate validate CLI fails closed for malformed manifest contracts', as
   const temporary = temporaryDirectory(t);
   const valid = manifestValue();
   const cases = [
-    ['invalid tuple', { ...valid, analyticsMode: 'unknown' }],
+    ['invalid delivery', { ...valid, analyticsDelivery: 'application-managed' }],
     ['unknown field', { ...valid, providerConfig: 'forbidden' }],
     ['unsupported schema', { ...valid, schemaVersion: 0 }]
   ];
@@ -108,7 +93,7 @@ printf 'FINAL_GATE_SUCCESS\\n'
   }
 });
 
-test('disabled artifacts and non-official repositories remain byte-identical to source', async (t) => {
+test('prepared artifacts remain byte-identical to source for every repository', async (t) => {
   const temporary = temporaryDirectory(t);
   const sourceDigest = await computeTreeDigest(sourceSite);
   const manifestPath = writeManifest(temporary, manifestValue());
@@ -118,64 +103,17 @@ test('disabled artifacts and non-official repositories remain byte-identical to 
   const result = await prepareArtifact({
     manifestPath,
     outputDirectory: output,
-    repository: 'fork/example',
     sourceDirectory: sourceSite
   });
 
+  assert.equal(result.manifest.analyticsDelivery, 'hosting-managed');
   assert.equal(result.finalDigest, sourceDigest);
   assert.equal(await computeTreeDigest(output), sourceDigest);
   assert.equal(await computeTreeDigest(sourceSite), before);
   assert.deepEqual(collectFiles(output), collectFiles(sourceSite));
 });
 
-test('enabled official artifact changes only the five allowlisted HTML documents', async (t) => {
-  const temporary = temporaryDirectory(t);
-  const sourceDigest = await computeTreeDigest(sourceSite);
-  const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
-  const output = path.join(temporary, 'output');
-
-  await prepareArtifact({
-    manifestPath,
-    outputDirectory: output,
-    repository: OFFICIAL_REPOSITORY,
-    sourceDirectory: sourceSite,
-    token
-  });
-
-  assert.deepEqual(collectFiles(output), collectFiles(sourceSite));
-  for (const relativePath of collectFiles(sourceSite)) {
-    const source = readFileSync(path.join(sourceSite, relativePath));
-    const artifact = readFileSync(path.join(output, relativePath));
-    if (!relativePath.endsWith('.html')) {
-      assert.deepEqual(artifact, source, relativePath);
-      continue;
-    }
-    const html = artifact.toString('utf8');
-    assert.match(html, /data-analytics-mode="enabled" data-analytics-provider="cloudflare-web-analytics"/);
-    assert.equal((html.match(new RegExp(CLOUDFLARE_BEACON_URL.replaceAll('.', '\\.'), 'g')) || []).length, 1);
-    assert.match(html, new RegExp(token));
-  }
-  assert.equal(await computeTreeDigest(sourceSite), sourceDigest);
-});
-
-test('enabled preparation rejects token and repository failures with invalid public configuration', async (t) => {
-  const temporary = temporaryDirectory(t);
-  const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
-  const run = (candidate, repository = OFFICIAL_REPOSITORY) => prepareArtifact({
-    manifestPath,
-    outputDirectory: path.join(temporary, `output-${Math.random()}`),
-    repository,
-    sourceDirectory: sourceSite,
-    token: candidate
-  });
-
-  for (const candidate of ['', 'a'.repeat(31), 'g'.repeat(32), `${token} `]) {
-    await assert.rejects(run(candidate), /missing or invalid/);
-  }
-  await assert.rejects(run('', 'fork/example'), /restricted to the official repository/);
-});
-
-test('source validation rejects beacon, body, HTML path, symlink, and non-canonical path defects', async (t) => {
+test('source validation rejects beacon, legacy state, missing notice, body, path, and symlink defects', async (t) => {
   const temporary = temporaryDirectory(t);
   const cases = [
     ['existing beacon', (site) => {
@@ -186,12 +124,13 @@ test('source validation rejects beacon, body, HTML path, symlink, and non-canoni
       const file = path.join(site, 'index.html');
       writeFileSync(file, readFileSync(file, 'utf8').replace('</body>', ''));
     }],
-    ['misplaced analytics attributes', (site) => {
+    ['legacy analytics attributes', (site) => {
       const file = path.join(site, 'index.html');
-      const attributes = 'data-analytics-mode="disabled" data-analytics-provider="none"';
-      writeFileSync(file, readFileSync(file, 'utf8')
-        .replace(` ${attributes}`, '')
-        .replace('<body>', `<body ${attributes}>`));
+      writeFileSync(file, readFileSync(file, 'utf8').replace('<html lang="ja">', '<html lang="ja" data-analytics-mode="disabled">'));
+    }],
+    ['missing privacy notice', (site) => {
+      const file = path.join(site, 'index.html');
+      writeFileSync(file, readFileSync(file, 'utf8').replace('data-privacy-notice', 'aria-label'));
     }],
     ['extra HTML', (site) => writeFileSync(path.join(site, 'extra.html'), '<html></html>')],
     ['missing HTML', (site) => rmSync(path.join(site, 'en/index.html'))],
@@ -207,7 +146,6 @@ test('source validation rejects beacon, body, HTML path, symlink, and non-canoni
     await assert.rejects(prepareArtifact({
       manifestPath,
       outputDirectory: `${site}-output`,
-      repository: 'fork/example',
       sourceDirectory: site
     }), undefined, name);
   }
@@ -222,7 +160,6 @@ test('artifact output cannot overlap the source tree', async (t) => {
   await assert.rejects(prepareArtifact({
     manifestPath,
     outputDirectory: path.join(source, 'nested', 'artifact'),
-    repository: 'fork/example',
     sourceDirectory: source
   }), /outside the source tree/);
 });
@@ -240,8 +177,7 @@ test('prepare CLI refuses an existing output without changing its sentinel', asy
     'prepare',
     '--source', sourceSite,
     '--output', output,
-    '--manifest', manifestPath,
-    '--repository', 'fork/example'
+    '--manifest', manifestPath
   ], { encoding: 'utf8' });
 
   assert.notEqual(result.status, 0);
@@ -249,22 +185,23 @@ test('prepare CLI refuses an existing output without changing its sentinel', asy
   assert.equal(readFileSync(sentinel, 'utf8'), 'preserve me');
 });
 
-test('prepare CLI builds the enabled artifact and emits its byte digest', async (t) => {
+test('prepare CLI builds the byte-identical hosting-managed artifact without analytics credentials', async (t) => {
   const temporary = temporaryDirectory(t);
-  const manifestPath = writeManifest(temporary, manifestValue({ mode: 'enabled' }));
+  const manifestPath = writeManifest(temporary, manifestValue());
   const output = path.join(temporary, 'prepared-site');
   const actionsOutput = path.join(temporary, 'actions-output');
   const result = spawnSync(process.execPath, [adapterPath,
     'prepare', '--source', sourceSite, '--output', output,
-    '--manifest', manifestPath, '--repository', OFFICIAL_REPOSITORY
+    '--manifest', manifestPath
   ], {
     encoding: 'utf8',
-    env: { ...process.env, CLOUDFLARE_WEB_ANALYTICS_TOKEN: token, GITHUB_OUTPUT: actionsOutput }
+    env: { ...process.env, CLOUDFLARE_WEB_ANALYTICS_TOKEN: 'fictional-token-must-not-be-used', GITHUB_OUTPUT: actionsOutput }
   });
   assert.equal(result.status, 0, result.stderr);
   const digest = await computeTreeDigest(output);
   assert.ok(readFileSync(actionsOutput, 'utf8').includes(`final_digest=${digest}\n`));
   const html = readFileSync(path.join(output, 'editor/index.html'), 'utf8');
-  assert.ok(html.includes(CLOUDFLARE_BEACON_URL));
-  assert.ok(html.includes(`&quot;token&quot;:&quot;${token}&quot;`));
+  assert.equal(digest, await computeTreeDigest(sourceSite));
+  assert.ok(!html.includes(CLOUDFLARE_BEACON_URL));
+  assert.ok(!html.includes('fictional-token-must-not-be-used'));
 });

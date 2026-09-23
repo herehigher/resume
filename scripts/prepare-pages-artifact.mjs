@@ -1,40 +1,14 @@
 import { createHash } from 'node:crypto';
-import { appendFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { appendFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { htmlDocumentContracts } from './deployment-path-contract.mjs';
 
-export const OFFICIAL_REPOSITORY = 'herehigher/resume';
-export const CLOUDFLARE_PROVIDER = 'cloudflare-web-analytics';
-export const CLOUDFLARE_BEACON_URL = 'https://static.cloudflareinsights.com/beacon.min.js';
-export const CLOUDFLARE_RUM_URL = 'https://cloudflareinsights.com/cdn-cgi/rum';
+export const ANALYTICS_DELIVERY_CONTRACT = 'hosting-managed';
 
 const adapterPath = fileURLToPath(import.meta.url);
-const cloudflareTokenPattern = /^[0-9a-f]{32}$/;
 const htmlPaths = Object.freeze(htmlDocumentContracts().map(({ artifactPath }) => artifactPath).sort(compareUtf8));
-const disclosureCopy = Object.freeze({
-  'editor/index.html': Object.freeze({
-    disabled: 'この source build では Analytics は無効で、解析用の外部 request は発生しません。',
-    enabled: 'この公式 release は、集計 page view と performance のため Cookie を使わない Cloudflare Web Analytics を利用します。'
-  }),
-  'en/index.html': Object.freeze({
-    disabled: 'Analytics is disabled in this source build. It makes no analytics requests.',
-    enabled: 'This official release uses cookie-free Cloudflare Web Analytics for aggregate page views and performance.'
-  }),
-  'index.html': Object.freeze({
-    disabled: 'この source build では Analytics は無効で、解析用の外部 request は発生しません。',
-    enabled: 'この公式 release は、集計 page view と performance のため Cookie を使わない Cloudflare Web Analytics を利用します。'
-  }),
-  'ja/index.html': Object.freeze({
-    disabled: 'この source build では Analytics は無効で、解析用の外部 request は発生しません。',
-    enabled: 'この公式 release は、集計 page view と performance のため Cookie を使わない Cloudflare Web Analytics を利用します。'
-  }),
-  'zh-cn/index.html': Object.freeze({
-    disabled: '此 source build 未启用 Analytics，不会发出统计用外部请求。',
-    enabled: '此官方 release 使用不设 Cookie 的 Cloudflare Web Analytics 汇总页面访问量与性能。'
-  })
-});
 
 function fail(message) {
   throw new Error(message);
@@ -93,17 +67,9 @@ function exactKeys(value, expected, label) {
 }
 
 export function validateManifest(value) {
-  exactKeys(value, [
-    'analyticsMode',
-    'analyticsProvider',
-    'schemaVersion'
-  ], 'Pages release manifest');
-  if (value.schemaVersion !== 2) fail('Unsupported Pages release manifest schemaVersion');
-  const disabled = value.analyticsMode === 'disabled'
-    && value.analyticsProvider === 'none';
-  const cloudflare = value.analyticsMode === 'enabled'
-    && value.analyticsProvider === CLOUDFLARE_PROVIDER;
-  if (!disabled && !cloudflare) fail('Unsupported analytics mode/provider tuple');
+  exactKeys(value, ['analyticsDelivery', 'schemaVersion'], 'Pages release manifest');
+  if (value.schemaVersion !== 3) fail('Unsupported Pages release manifest schemaVersion');
+  if (value.analyticsDelivery !== ANALYTICS_DELIVERY_CONTRACT) fail('Unsupported analytics delivery contract');
   return Object.freeze({ ...value });
 }
 
@@ -117,24 +83,6 @@ async function readManifest(manifestPath) {
   return validateManifest(parsed);
 }
 
-function analyticsAttributes(mode, provider) {
-  return `data-analytics-mode="${mode}" data-analytics-provider="${provider}"`;
-}
-
-function disclosureElement(copy) {
-  return `<span data-analytics-disclosure="status">${copy}</span>`;
-}
-
-function cloudflareScript(token) {
-  const configuration = JSON.stringify({ token })
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-  return `<script type="module" src="${CLOUDFLARE_BEACON_URL}" data-cf-beacon="${configuration}"></script>`;
-}
-
 async function validateSourceSite(sourceDirectory) {
   const files = await collectFiles(sourceDirectory);
   const actualHtml = files
@@ -146,18 +94,17 @@ async function validateSourceSite(sourceDirectory) {
   for (const relativePath of htmlPaths) {
     const html = await readFile(path.join(sourceDirectory, relativePath), 'utf8');
     const openingTags = html.match(/<html\b[^>]*>/gi) || [];
-    const sourceAttributes = analyticsAttributes('disabled', 'none');
-    if (openingTags.length !== 1
-      || !openingTags[0].includes(sourceAttributes)
-      || html.split(sourceAttributes).length !== 2) {
-      fail(`Source analytics attributes are missing or invalid: ${relativePath}`);
+    if (openingTags.length !== 1) fail(`Source page must contain one html element: ${relativePath}`);
+    if (/\bdata-analytics-(?:mode|provider|disclosure)\s*=/i.test(html)) {
+      fail(`Source page contains legacy analytics state: ${relativePath}`);
     }
-    if (html.includes(CLOUDFLARE_BEACON_URL) || html.includes('data-cf-beacon')) {
-      fail(`Source site already contains an analytics beacon: ${relativePath}`);
+    if (/\bdata-cf-beacon\s*=|cloudflareinsights\.com/i.test(html)) {
+      fail(`Source page contains an application analytics beacon: ${relativePath}`);
+    }
+    if ((html.match(/\bdata-privacy-notice\b/g) || []).length !== 1) {
+      fail(`Source privacy notice is missing or duplicated: ${relativePath}`);
     }
     if ((html.match(/<\/body>/gi) || []).length !== 1) fail(`Source page has no unique closing body: ${relativePath}`);
-    const disclosure = disclosureElement(disclosureCopy[relativePath].disabled);
-    if (html.split(disclosure).length !== 2) fail(`Source analytics disclosure is missing or duplicated: ${relativePath}`);
   }
   return files;
 }
@@ -172,28 +119,6 @@ async function assertOutputMissing(outputDirectory) {
   fail('Artifact output already exists; refusing to overwrite it');
 }
 
-async function transformCloudflareArtifact(directory, token) {
-  if (!cloudflareTokenPattern.test(token || '')) fail('Cloudflare Web Analytics token is missing or invalid');
-  for (const relativePath of htmlPaths) {
-    const absolutePath = path.join(directory, relativePath);
-    const source = await readFile(absolutePath, 'utf8');
-    const disabledAttributes = analyticsAttributes('disabled', 'none');
-    const enabledAttributes = analyticsAttributes('enabled', CLOUDFLARE_PROVIDER);
-    const disabledDisclosure = disclosureElement(disclosureCopy[relativePath].disabled);
-    const enabledDisclosure = disclosureElement(disclosureCopy[relativePath].enabled);
-    if (source.split(disabledAttributes).length !== 2 || source.split(disabledDisclosure).length !== 2) {
-      fail(`Artifact source markers are missing or duplicated: ${relativePath}`);
-    }
-    const withStatus = source
-      .replace(disabledAttributes, enabledAttributes)
-      .replace(disabledDisclosure, enabledDisclosure);
-    const closingBody = withStatus.lastIndexOf('</body>');
-    if (closingBody < 0) fail(`Artifact page has no closing body: ${relativePath}`);
-    const transformed = `${withStatus.slice(0, closingBody)}  ${cloudflareScript(token)}\n${withStatus.slice(closingBody)}`;
-    await writeFile(absolutePath, transformed);
-  }
-}
-
 async function writeOutputs(values) {
   if (!process.env.GITHUB_OUTPUT) return;
   const lines = Object.entries(values).map(([key, value]) => `${key}=${value}\n`).join('');
@@ -205,8 +130,7 @@ export async function validateReleaseSource({ manifestPath, sourceDirectory }) {
   await validateSourceSite(sourceDirectory);
   const sourceDigest = await computeTreeDigest(sourceDirectory);
   const outputs = {
-    analytics_mode: manifest.analyticsMode,
-    analytics_provider: manifest.analyticsProvider,
+    analytics_delivery: manifest.analyticsDelivery,
     source_digest: sourceDigest
   };
   await writeOutputs(outputs);
@@ -216,19 +140,9 @@ export async function validateReleaseSource({ manifestPath, sourceDirectory }) {
 export async function prepareArtifact({
   manifestPath,
   outputDirectory,
-  repository,
-  sourceDirectory,
-  token = ''
+  sourceDirectory
 }) {
   const { manifest, source_digest: sourceDigest } = await validateReleaseSource({ manifestPath, sourceDirectory });
-  if (repository !== OFFICIAL_REPOSITORY && manifest.analyticsMode === 'enabled') {
-    fail('Enabled analytics artifacts are restricted to the official repository');
-  }
-  if (repository === OFFICIAL_REPOSITORY && manifest.analyticsMode === 'enabled') {
-    if (!cloudflareTokenPattern.test(token)) fail('Cloudflare Web Analytics token is missing or invalid');
-  } else if (token) {
-    fail('Analytics token must not be provided for this artifact mode');
-  }
 
   const sourceAbsolute = path.resolve(sourceDirectory);
   const outputAbsolute = path.resolve(outputDirectory);
@@ -245,8 +159,8 @@ export async function prepareArtifact({
   try {
     await cp(sourceAbsolute, temporaryOutput, { errorOnExist: true, force: false, recursive: true });
     await validateSourceSite(temporaryOutput);
-    if (manifest.analyticsMode === 'enabled') await transformCloudflareArtifact(temporaryOutput, token);
     const finalDigest = await computeTreeDigest(temporaryOutput);
+    if (finalDigest !== sourceDigest) fail('Prepared artifact differs from the validated source bytes');
     await assertOutputMissing(outputAbsolute);
     await rename(temporaryOutput, outputAbsolute);
     const outputs = { final_digest: finalDigest, source_digest: sourceDigest };
@@ -268,7 +182,7 @@ function parseArguments(values) {
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('Invalid command arguments');
     const key = name.slice(2);
-    if (!['manifest', 'output', 'repository', 'source'].includes(key) || key in options) {
+    if (!['manifest', 'output', 'source'].includes(key) || key in options) {
       fail('Unknown or duplicate command argument');
     }
     options[key] = value;
@@ -283,15 +197,13 @@ async function main() {
     await validateReleaseSource({ manifestPath: options.manifest, sourceDirectory: options.source });
     return;
   }
-  if (!options.source || !options.output || !options.manifest || !options.repository || Object.keys(options).length !== 4) {
-    fail('prepare requires --source, --output, --manifest, and --repository');
+  if (!options.source || !options.output || !options.manifest || Object.keys(options).length !== 3) {
+    fail('prepare requires --source, --output, and --manifest');
   }
   await prepareArtifact({
     manifestPath: options.manifest,
     outputDirectory: options.output,
-    repository: options.repository,
-    sourceDirectory: options.source,
-    token: process.env.CLOUDFLARE_WEB_ANALYTICS_TOKEN || ''
+    sourceDirectory: options.source
   });
 }
 

@@ -10,7 +10,7 @@ import {
 
 const TEST_ANALYTICS_TOKEN = 'a'.repeat(32);
 
-const expectedOrigin = 'https://herehigher.github.io';
+const expectedOrigin = 'https://rs.herehigher.com';
 
 function rumRequest(overrides = {}) {
   const payload = {
@@ -18,7 +18,7 @@ function rumRequest(overrides = {}) {
     firstContentfulPaint: 128,
     firstPaint: 128,
     bi: { be: 'Blink', bev: '134', bv: '134', ov: '11' },
-    location: `${expectedOrigin}/resume/?lang=ja`,
+    location: `${expectedOrigin}/?lang=ja`,
     memory: {
       jsHeapSizeLimit: 4_294_705_152,
       totalJSHeapSize: 21_398_290,
@@ -72,7 +72,7 @@ test('analytics request allowlist accepts only the fixed GET and constrained sta
   assert.equal(isAllowedCloudflareAnalyticsRequest({ ...rumRequest({
     payload: {
       eventType: 3,
-      lcp: { url: 'blob:https://herehigher.github.io/opaque-photo-id' },
+      lcp: { url: 'blob:https://rs.herehigher.com/opaque-photo-id' },
       st: 1
     },
     resourceType: 'ping'
@@ -98,7 +98,7 @@ test('analytics request allowlist accepts only the fixed GET and constrained sta
     rumRequest({ payload: { bi: { be: 'Unknown', bv: '134' } } }),
     rumRequest({ payload: { bi: { be: 'Blink', browser: '134' } } }),
     rumRequest({ payload: { bi: { be: 'Blink', bv: 'version 134' } } }),
-    rumRequest({ payload: { location: `${expectedOrigin}/resume/?name=personal-data` } }),
+    rumRequest({ payload: { location: `${expectedOrigin}/?name=personal-data` } }),
     rumRequest({ payload: { referrer: 'https://example.test/?personal-data=1' } }),
     rumRequest({
       payload: {
