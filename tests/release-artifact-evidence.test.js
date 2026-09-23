@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { computeTreeDigest } from '../scripts/prepare-pages-artifact.mjs';
+import { computeTreeDigest } from '../scripts/prepare-site-artifact.mjs';
 import {
   createArtifactEvidence,
   verifyArtifactEvidence,
@@ -33,7 +33,7 @@ test('artifact evidence binds immutable bytes, package version, and source SHA',
   const created = await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
   const verified = await verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha });
   assert.deepEqual(verified, created);
-  assert.equal(created.analyticsDelivery, 'hosting-managed');
+  assert.deepEqual(Object.keys(created).sort(), ['artifactDigest', 'packageVersion', 'sourceDigest', 'sourceSha']);
 });
 
 test('artifact evidence rejects source and prepared artifact digest mismatches', async (t) => {
@@ -44,7 +44,6 @@ test('artifact evidence rejects source and prepared artifact digest mismatches',
 
   const packageVersion = JSON.parse(readFileSync(path.join(source, 'package.json'), 'utf8')).version;
   writeFileSync(evidence, `${JSON.stringify({
-    analyticsDelivery: 'hosting-managed',
     artifactDigest: await computeTreeDigest(artifact),
     packageVersion,
     sourceDigest: await computeTreeDigest(path.join(source, 'site')),
@@ -58,6 +57,7 @@ test('artifact evidence rejects mismatched source, artifact, and resume attempts
   const sha = 'b'.repeat(40);
   await writeArtifactEvidence({ artifactDirectory: artifact, outputPath: evidence, sourceDirectory: source, sourceSha: sha });
   await assert.rejects(verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: 'c'.repeat(40) }), /different source SHA/);
+  await assert.rejects(verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source }), /source SHA must be a full lowercase commit SHA/);
   writeFileSync(path.join(artifact, 'index.html'), `${readFileSync(path.join(artifact, 'index.html'), 'utf8')}\n`);
   await assert.rejects(verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha }), /artifact bytes/);
 });

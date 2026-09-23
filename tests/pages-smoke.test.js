@@ -6,7 +6,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
-import { prepareArtifact } from '../scripts/prepare-pages-artifact.mjs';
+import { prepareArtifact } from '../scripts/prepare-site-artifact.mjs';
 import { CLOUDFLARE_BEACON_URL } from '../scripts/cloudflare-analytics.mjs';
 import { validateDeploymentArtifact, validatePublishedDeployment } from '../scripts/validate-pages-smoke.mjs';
 
@@ -30,21 +30,15 @@ async function validate(directory, overrides = {}) {
 }
 
 async function preparedArtifact(directory) {
-  const manifestPath = path.join(path.dirname(directory), `${path.basename(directory)}.manifest.json`);
-  writeFileSync(manifestPath, `${JSON.stringify({
-    analyticsDelivery: 'hosting-managed',
-    schemaVersion: 3,
-  })}\n`);
   const output = `${directory}-prepared`;
   await prepareArtifact({
-    manifestPath,
     outputDirectory: output,
     sourceDirectory: directory
   });
   return output;
 }
 
-test('semantic smoke accepts the provider-neutral prepared artifact with legal extra attributes', async (t) => {
+test('semantic smoke accepts a prepared site artifact with legal extra attributes', async (t) => {
   const temporary = temporaryDirectory(t);
   const candidate = path.join(temporary, 'artifact');
   cpSync(source, candidate, { recursive: true });
@@ -54,7 +48,7 @@ test('semantic smoke accepts the provider-neutral prepared artifact with legal e
     writeFileSync(fullPath, readFileSync(fullPath, 'utf8').replace('<html ', '<html data-release-check="local" '));
   }
   const result = await validate(prepared);
-  assert.equal(result.analyticsDelivery, 'hosting-managed');
+  assert.equal(result.packageVersion, packageVersion);
 });
 
 test('semantic smoke detects language, legacy app state, app-owned beacon, and origin regressions', async (t) => {

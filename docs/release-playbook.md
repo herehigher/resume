@@ -83,7 +83,7 @@ Version、変更内容、必要な目視結果、`Quality` を所有者が確認
 
 ## 自動で確認・記録すること
 
-CI は保存・読込・言語分離・PDF・データ保護、version、source SHA、site bytes、asset の生成・semantic contract と各 artifact 自身の digest を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
+CI は保存・読込・言語分離・PDF・データ保護、version、source SHA、prepared site の source-identical digest、asset の生成・semantic contract と各 artifact 自身の digest を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
 
 PR の `quality` は manifest が示す候補 artifact を取得し、commit 済みの7 file が promotion 元 artifact の exact bytes と一致することを先に確認します。そのうえで、同じ job が fresh に生成した artifact を使い、version、site、generator、browser、PDF、screenshot の契約と照合します。別 run の Chromium rasterization bytes の完全一致は要求しません。Asset が未準備、不一致、失効している場合は `quality` を失敗させます。Version を変えない PR の展示 asset 変更も拒否します。
 
@@ -99,7 +99,7 @@ Repository source、clone、fork は Analytics beacon を含みません。公�
 
 現行 `Release Pages` workflow はまだ GitHub Pages の deployment action を使い、この変更だけでは Cloudflare Pages の delivery-layer injection を実証しません。Transport の Direct Upload への切替は #251 の範囲です。切替後に pages.dev と custom domain の両方で hosted smoke と Analytics injection を確認するまで、production hosting contract の実測完了とは扱いません。
 
-Artifact の整合性は引き続き source と配布物の SHA-256 digest で検証し、CI evidence に記録します。事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
+Release artifact preparation は `site/` の HTML path、file type、symlink、relative path を検査し、source tree を output へ exact copy します。Preparation CLI は network request や provider credential を使いません。Evidence は authorized source SHA、package version、source digest、artifact digest の4項目を記録し、source と artifact digest が一致しない場合は公開を止めます。Artifact digest の事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
 
 ## 失敗したとき
 
