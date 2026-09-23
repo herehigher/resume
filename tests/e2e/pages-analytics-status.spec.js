@@ -1,27 +1,15 @@
-import { createReadStream, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 
-import {
-  CLOUDFLARE_BEACON_URL,
-  CLOUDFLARE_RUM_URL,
-  cloudflareAnalyticsMockScript
-} from '../../scripts/cloudflare-analytics.mjs';
-import {
-  CLOUDFLARE_PROVIDER,
-  OFFICIAL_REPOSITORY,
-  prepareArtifact
-} from '../../scripts/prepare-pages-artifact.mjs';
 import { observeNetwork } from '../../scripts/network-contract.mjs';
 import { exercisePrivacyCanary } from '../../scripts/privacy-canary-check.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const sourceSite = path.join(root, 'site');
-const token = 'b'.repeat(32);
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -29,32 +17,21 @@ const contentTypes = new Map([
   ['.json', 'application/json; charset=utf-8']
 ]);
 
-let enabledBaseURL;
+async function expectNoHorizontalOverflow(page) {
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.scrollWidth <= window.innerWidth
+  ))).toBe(true);
+}
+
+let sourceBaseURL;
 let server;
-let temporary;
 
 test.beforeAll(async () => {
-  temporary = mkdtempSync(path.join(os.tmpdir(), 'resume-enabled-pages-'));
-  const output = path.join(temporary, 'site');
-  const manifestPath = path.join(temporary, 'manifest.json');
-  writeFileSync(manifestPath, `${JSON.stringify({
-    analyticsMode: 'enabled',
-    analyticsProvider: CLOUDFLARE_PROVIDER,
-    schemaVersion: 2
-  })}\n`);
-  await prepareArtifact({
-    manifestPath,
-    outputDirectory: output,
-    repository: OFFICIAL_REPOSITORY,
-    sourceDirectory: sourceSite,
-    token
-  });
-
   server = createServer(async (request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
     const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '').replace(/\/$/, '/index.html');
-    const target = path.resolve(output, relativePath);
-    if (target !== output && !target.startsWith(`${output}${path.sep}`)) {
+    const target = path.resolve(sourceSite, relativePath);
+    if (target !== sourceSite && !target.startsWith(`${sourceSite}${path.sep}`)) {
       response.writeHead(403).end('Forbidden');
       return;
     }
@@ -74,55 +51,77 @@ test.beforeAll(async () => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
   });
-  enabledBaseURL = `http://127.0.0.1:${server.address().port}`;
+  sourceBaseURL = `http://127.0.0.1:${server.address().port}`;
 });
 
 test.afterAll(async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
-  if (temporary) rmSync(temporary, { force: true, recursive: true });
 });
 
-test('enabled artifact keeps fictional resume canaries out of every observed request across reload and leave', async ({ context, page }) => {
-  const pageErrors = [];
-  const network = observeNetwork(context, { baseUrl: enabledBaseURL, expectedToken: token });
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  await context.route(CLOUDFLARE_BEACON_URL, (route) => route.fulfill({
-    body: cloudflareAnalyticsMockScript(token),
-    contentType: 'text/javascript; charset=utf-8',
-    status: 200
-  }));
-  await context.route(CLOUDFLARE_RUM_URL, (route) => route.fulfill({ status: 204 }));
-
-  await page.goto(`${enabledBaseURL}/editor/`);
-  await expect(page.locator('html')).toHaveAttribute('data-analytics-mode', 'enabled');
-  await expect(page.locator('html')).toHaveAttribute('data-analytics-provider', CLOUDFLARE_PROVIDER);
-  await expect(page.locator('[data-analytics-disclosure="status"]')).toContainText('公式 release');
-  const beacon = page.locator(`script[src="${CLOUDFLARE_BEACON_URL}"]`);
-  await expect(beacon).toHaveCount(1);
-  await expect(beacon).toHaveAttribute('data-cf-beacon', JSON.stringify({ token }));
-
-  await page.locator('#privacySecurityButton').click();
-  await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Web Analytics');
-  await expect(page.locator('#privacySecurityTechnicalBody')).toContainText('標準 RUM endpoint');
-  await page.keyboard.press('Escape');
-
-  const { canaries } = await exercisePrivacyCanary(page, { leaveUrl: `${enabledBaseURL}/en/` });
-  await expect(page.locator('[data-analytics-disclosure="status"]')).toContainText('official release');
-  await expect.poll(() => network.requests.some((request) => request.url === CLOUDFLARE_RUM_URL)).toBe(true);
-  network.assertClean({ canaries });
-  expect(pageErrors).toEqual([]);
-  network.dispose();
-});
-
-test('enabled no-JavaScript entry preserves the tagged disclosure and beacon markup', async ({ browser }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false });
+test('source entry and editor explain the hosting boundary in all locales without app analytics state', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  const network = observeNetwork(context, { baseUrl: sourceBaseURL });
+  const entryPages = [
+    ['ja', '', 'source、clone、fork'],
+    ['zh-CN', 'zh-cn/', '本仓库的 source'],
+    ['en', 'en/', 'Source, clone, and fork']
+  ];
   try {
-    const page = await context.newPage();
-    await page.goto(`${enabledBaseURL}/en/`);
-    await expect(page.locator('html')).toHaveAttribute('data-analytics-mode', 'enabled');
-    await expect(page.locator('[data-analytics-disclosure="status"]')).toContainText('official release');
-    await expect(page.locator(`script[src="${CLOUDFLARE_BEACON_URL}"]`)).toHaveCount(1);
+    for (const [locale, pathName, notice] of entryPages) {
+      await page.goto(`${sourceBaseURL}/${pathName}`);
+      const entryNotice = page.locator('.entry-trust-list [data-privacy-notice]');
+      await expect(page.locator('html')).not.toHaveAttribute('data-analytics-mode', /.+/);
+      await expect(page.locator('html')).not.toHaveAttribute('data-analytics-provider', /.+/);
+      await expect(entryNotice).toContainText(notice);
+      await expect(entryNotice).toContainText('Cloudflare Pages');
+      await expect(entryNotice).toContainText(/Analytics request/);
+      await expect(page.locator('[data-cf-beacon]')).toHaveCount(0);
+
+      for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        await expect(entryNotice).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+      }
+      await page.setViewportSize({ width: 1440, height: 1000 });
+
+      await page.goto(`${sourceBaseURL}/editor/?lang=${encodeURIComponent(locale)}`);
+      const editorNotice = page.locator('[data-privacy-notice]:visible');
+      await expect(editorNotice).toHaveCount(1);
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      await expect(editorNotice).toContainText('Cloudflare Pages');
+      await page.locator('#privacySecurityButton').click();
+      await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Pages');
+      await expect(page.locator('#privacySecurityTechnicalBody')).toContainText(/delivery layer/i);
+      await page.locator('#privacySecurityCloseButton').click();
+
+      for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        await expect(editorNotice).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+        await page.locator('#privacySecurityButton').click();
+        await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Pages');
+        await page.locator('#privacySecurityCloseButton').click();
+      }
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
+    network.assertClean();
   } finally {
+    network.dispose();
+    await context.close();
+  }
+});
+
+test('source editor keeps fictional resume canaries out of requests across reload and leave', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const network = observeNetwork(context, { baseUrl: sourceBaseURL });
+  try {
+    await page.goto(`${sourceBaseURL}/editor/?lang=ja`);
+    const { canaries } = await exercisePrivacyCanary(page, { leaveUrl: `${sourceBaseURL}/en/` });
+    network.assertClean({ canaries });
+  } finally {
+    network.dispose();
     await context.close();
   }
 });

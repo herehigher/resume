@@ -7,14 +7,7 @@ import {
   DEPLOYMENT_PATH_CONTRACTS,
   publicDocumentContracts
 } from './deployment-path-contract.mjs';
-import {
-  CLOUDFLARE_BEACON_URL,
-  cloudflareAnalyticsScriptTags,
-  isCloudflareAnalyticsScriptTag
-} from './cloudflare-analytics.mjs';
-import { CLOUDFLARE_PROVIDER } from './prepare-pages-artifact.mjs';
-
-const tokenPattern = /^[0-9a-f]{32}$/;
+import { ANALYTICS_DELIVERY_CONTRACT } from './prepare-pages-artifact.mjs';
 const publicHreflangAlternates = Object.freeze([
   Object.freeze({ hreflang: 'ja', href: DEPLOYMENT_ORIGIN }),
   Object.freeze({ hreflang: 'zh-CN', href: `${DEPLOYMENT_ORIGIN}zh-cn/` }),
@@ -62,44 +55,12 @@ function assertCanonicalLinks(html, contract, metadata) {
   }
 }
 
-function cloudflareTokens(html) {
-  return [...html.matchAll(/<script\b[^>]*\bdata-cf-beacon\s*=\s*(["']).*?\1[^>]*><\/script>/gis)]
-    .map((match) => match[0])
-    .map((tag) => {
-      const configuration = attributes(tag).get('data-cf-beacon');
-      try {
-        const token = JSON.parse(configuration || '').token;
-        return tokenPattern.test(token || '') && isCloudflareAnalyticsScriptTag(tag, token) ? token : null;
-      } catch {
-        return null;
-      }
-    });
-}
-
-function assertAnalytics(html, contract, metadata, { analyticsMode, analyticsProvider }) {
-  const htmlAttributes = openingHtml(html, contract, metadata);
-  for (const attribute of ['data-analytics-mode', 'data-analytics-provider']) {
-    if ((html.match(new RegExp(`\\b${attribute}\\s*=`, 'gi')) || []).length !== 1) {
-      failure(contract, metadata, `${attribute} must appear exactly once`);
-    }
+function assertAnalyticsBoundary(html, contract, metadata, { allowHostingInjection }) {
+  if (/\bdata-analytics-(?:mode|provider|disclosure)\s*=/i.test(html)) {
+    failure(contract, metadata, 'contains legacy application analytics state');
   }
-  if (htmlAttributes.get('data-analytics-mode') !== analyticsMode
-    || htmlAttributes.get('data-analytics-provider') !== analyticsProvider) {
-    failure(contract, metadata, 'analytics tuple is invalid');
-  }
-
-  const beaconAttributes = html.match(/\bdata-cf-beacon\s*=/gi) || [];
-  const beaconUrls = html.match(new RegExp(CLOUDFLARE_BEACON_URL.replaceAll('.', '\\.'), 'gi')) || [];
-  if (analyticsMode === 'disabled') {
-    if (beaconAttributes.length || beaconUrls.length || /cloudflareinsights\.com/i.test(html)) {
-      failure(contract, metadata, 'includes analytics runtime while disabled');
-    }
-    return;
-  }
-  if (beaconAttributes.length !== 1 || beaconUrls.length !== 1) failure(contract, metadata, 'must contain one analytics beacon');
-  const tokens = cloudflareTokens(html);
-  if (tokens.length !== 1 || !tokens[0] || cloudflareAnalyticsScriptTags(html, tokens[0]).length !== 1) {
-    failure(contract, metadata, 'analytics beacon contract is invalid');
+  if (!allowHostingInjection && (/\bdata-cf-beacon\s*=|cloudflareinsights\.com/i.test(html))) {
+    failure(contract, metadata, 'contains an application analytics runtime');
   }
 }
 
@@ -127,7 +88,7 @@ function assertSemanticContract(contract, content, metadata, options) {
     const htmlAttributes = openingHtml(content, contract, metadata);
     if (htmlAttributes.get('lang') !== contract.lang) failure(contract, metadata, 'language is invalid');
     assertCanonicalLinks(content, contract, metadata);
-    assertAnalytics(content, contract, metadata, options);
+    assertAnalyticsBoundary(content, contract, metadata, options);
     return;
   }
   if (contract.semantic === 'compatibility-document') {
@@ -137,7 +98,7 @@ function assertSemanticContract(contract, content, metadata, options) {
       .filter((item) => item.get('rel') === 'canonical');
     if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) failure(contract, metadata, 'canonical URL is invalid');
     if (/hreflang=/i.test(content)) failure(contract, metadata, 'must not join the public hreflang cluster');
-    assertAnalytics(content, contract, metadata, options);
+    assertAnalyticsBoundary(content, contract, metadata, options);
     return;
   }
   if (contract.semantic === 'editor-document') {
@@ -148,7 +109,7 @@ function assertSemanticContract(contract, content, metadata, options) {
     if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) failure(contract, metadata, 'canonical URL is invalid');
     if (!/<meta\s+name="robots"\s+content="noindex,follow">/i.test(content)) failure(contract, metadata, 'must be noindex,follow');
     if (/hreflang=/i.test(content)) failure(contract, metadata, 'must not join the public hreflang cluster');
-    assertAnalytics(content, contract, metadata, options);
+    assertAnalyticsBoundary(content, contract, metadata, options);
     return;
   }
   if (contract.semantic === 'sitemap') {
@@ -190,22 +151,18 @@ function assertSemanticContract(contract, content, metadata, options) {
   }
 }
 
-function validateOptions({ analyticsMode, analyticsProvider, packageVersion }) {
-  if (!['disabled', 'enabled'].includes(analyticsMode)) fail('unsupported analytics mode');
-  const expectedProvider = analyticsMode === 'enabled' ? CLOUDFLARE_PROVIDER : 'none';
-  if (analyticsProvider !== expectedProvider) fail('unsupported analytics provider');
+function validateOptions({ packageVersion }) {
   if (!/^\d+\.\d+\.\d+$/.test(packageVersion || '')) fail('invalid package version');
 }
 
-async function validateWithReader(options, readArtifact) {
+async function validateWithReader(options, readArtifact, { allowHostingInjection = false } = {}) {
   validateOptions(options);
   for (const contract of DEPLOYMENT_PATH_CONTRACTS) {
     const { content, metadata } = await readArtifact(contract);
-    assertSemanticContract(contract, content, metadata, options);
+    assertSemanticContract(contract, content, metadata, { ...options, allowHostingInjection });
   }
   return Object.freeze({
-    analyticsMode: options.analyticsMode,
-    analyticsProvider: options.analyticsProvider,
+    analyticsDelivery: ANALYTICS_DELIVERY_CONTRACT,
     packageVersion: options.packageVersion,
   });
 }
@@ -220,7 +177,7 @@ export async function validateDeploymentArtifact({ directory, ...options }) {
     } catch {
       failure(contract, { contentType: 'unknown', status: 'missing' }, 'artifact file is unavailable');
     }
-  });
+  }, { allowHostingInjection: false });
 }
 
 export async function validatePublishedDeployment({
@@ -235,9 +192,10 @@ export async function validatePublishedDeployment({
   let origin;
   try {
     origin = new URL(baseUrl);
-    if (origin.protocol !== 'https:' || origin.username || origin.password || !origin.pathname.endsWith('/')) throw new Error();
+    if (origin.protocol !== 'https:' || origin.username || origin.password
+      || origin.pathname !== '/' || origin.search || origin.hash) throw new Error();
   } catch {
-    fail('published deployment base URL must be an https URL ending in /');
+    fail('published deployment base URL must be an https origin root');
   }
   if (!Number.isInteger(attempts) || attempts < 1 || attempts > 4) fail('published deployment attempts must be between 1 and 4');
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1 || requestTimeoutMs > 30_000) {
@@ -268,7 +226,7 @@ export async function validatePublishedDeployment({
       if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 3000));
     }
     failure(contract, metadata, 'response did not satisfy the required marker and content type');
-  });
+  }, { allowHostingInjection: true });
 }
 
 function parseArguments(args) {
@@ -278,7 +236,7 @@ function parseArguments(args) {
     const value = args[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('invalid command arguments');
     const key = name.slice(2);
-    if (!['directory', 'base-url', 'release-sha', 'analytics-mode', 'analytics-provider', 'package-version'].includes(key)
+    if (!['directory', 'base-url', 'release-sha', 'package-version'].includes(key)
       || key in options) fail('unknown or duplicate command argument');
     options[key] = value;
   }
@@ -288,19 +246,17 @@ function parseArguments(args) {
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   const shared = {
-    analyticsMode: options['analytics-mode'],
-    analyticsProvider: options['analytics-provider'],
     packageVersion: options['package-version'],
   };
-  if (options.directory && Object.keys(options).length === 4) {
+  if (options.directory && Object.keys(options).length === 2) {
     await validateDeploymentArtifact({ directory: options.directory, ...shared });
     return;
   }
-  if (options['base-url'] && options['release-sha'] && Object.keys(options).length === 5) {
+  if (options['base-url'] && options['release-sha'] && Object.keys(options).length === 3) {
     await validatePublishedDeployment({ baseUrl: options['base-url'], releaseSha: options['release-sha'], ...shared });
     return;
   }
-  fail('provide either --directory or --base-url with --release-sha and all shared smoke arguments');
+  fail('provide either --directory or --base-url with --release-sha and --package-version');
 }
 
 const scriptPath = fileURLToPath(import.meta.url);

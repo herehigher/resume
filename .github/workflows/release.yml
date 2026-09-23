@@ -9,10 +9,6 @@ on:
         description: Completed eligible Quality workflow run ID
         required: false
         type: string
-      recovery_tag:
-        description: Accepted historical release tag to restore
-        required: false
-        type: string
 
 permissions: {}
 
@@ -25,7 +21,6 @@ jobs:
       pull-requests: read
     outputs:
       quality_run_id: ${{ steps.release.outputs.quality_run_id }}
-      recovery: ${{ steps.release.outputs.recovery }}
       release_required: ${{ steps.release.outputs.release_required }}
       release_sha: ${{ steps.release.outputs.release_sha }}
       release_tag: ${{ steps.release.outputs.release_tag }}
@@ -38,49 +33,35 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
-      - name: Resolve merge authorization or accepted recovery
+      - name: Resolve merge authorization
         id: release
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
           QUALITY_RUN_ID: ${{ inputs.quality_run_id || '' }}
-          RECOVERY_TAG: ${{ inputs.recovery_tag || '' }}
           WORKFLOW_REF: ${{ github.ref }}
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = 'herehigher/resume'
           test "$WORKFLOW_REF" = "refs/heads/$DEFAULT_BRANCH"
-          if [[ -n "$RECOVERY_TAG" ]]; then
-            test -z "$QUALITY_RUN_ID"
-            node scripts/release-publication.mjs rollback --tag "$RECOVERY_TAG"
-            release_sha="$(git rev-parse --verify --end-of-options "$RECOVERY_TAG^{commit}")"
-            git merge-base --is-ancestor "$release_sha" "origin/$DEFAULT_BRANCH"
-            quality_run_id=''
-            recovery=true
-            release_required=true
-            release_tag="$RECOVERY_TAG"
-          else
-            test -n "$QUALITY_RUN_ID"
-            eligibility="$RUNNER_TEMP/release-eligibility"
-            GITHUB_OUTPUT="$eligibility" node scripts/validate-release-run.mjs eligibility --run-id "$QUALITY_RUN_ID"
-            quality_run_id="$(sed -n 's/^quality_run_id=//p' "$eligibility")"
-            release_required="$(sed -n 's/^release_required=//p' "$eligibility")"
-            release_sha="$(sed -n 's/^release_sha=//p' "$eligibility")"
-            release_tag="$(sed -n 's/^release_tag=//p' "$eligibility")"
-            test "$quality_run_id" = "$QUALITY_RUN_ID"
-            [[ "$release_sha" =~ ^[0-9a-f]{40}$ ]]
-            test "$release_required" = true
-            test -n "$release_tag"
-            recovery=false
-            {
-              echo '## Release authorization revalidated'
-              echo "- Tag / source: \`$release_tag\` / \`$release_sha\`"
-              echo "- Quality: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${quality_run_id}"
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+          test -n "$QUALITY_RUN_ID"
+          eligibility="$RUNNER_TEMP/release-eligibility"
+          GITHUB_OUTPUT="$eligibility" node scripts/validate-release-run.mjs eligibility --run-id "$QUALITY_RUN_ID"
+          quality_run_id="$(sed -n 's/^quality_run_id=//p' "$eligibility")"
+          release_required="$(sed -n 's/^release_required=//p' "$eligibility")"
+          release_sha="$(sed -n 's/^release_sha=//p' "$eligibility")"
+          release_tag="$(sed -n 's/^release_tag=//p' "$eligibility")"
+          test "$quality_run_id" = "$QUALITY_RUN_ID"
+          [[ "$release_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$release_required" = true
+          test -n "$release_tag"
+          {
+            echo '## Release authorization revalidated'
+            echo "- Tag / source: \`$release_tag\` / \`$release_sha\`"
+            echo "- Quality: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${quality_run_id}"
+          } >> "$GITHUB_STEP_SUMMARY"
           echo "quality_run_id=$quality_run_id" >> "$GITHUB_OUTPUT"
-          echo "recovery=$recovery" >> "$GITHUB_OUTPUT"
           echo "release_required=$release_required" >> "$GITHUB_OUTPUT"
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
@@ -93,8 +74,7 @@ jobs:
       actions: read
       contents: read
     outputs:
-      analytics_mode: ${{ steps.evidence.outputs.analytics_mode }}
-      analytics_provider: ${{ steps.evidence.outputs.analytics_provider }}
+      analytics_delivery: ${{ steps.evidence.outputs.analytics_delivery }}
       artifact_digest: ${{ steps.evidence.outputs.artifact_digest }}
       package_version: ${{ steps.evidence.outputs.package_version }}
       prepared_artifact_id: ${{ steps.upload.outputs.artifact-id }}
@@ -111,27 +91,17 @@ jobs:
       - name: Checkout the authorized source
         id: source
         env:
-          RECOVERY: ${{ needs.authorize.outputs.recovery }}
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
-          RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$RECOVERY" == true ]]; then
-            mkdir "$RUNNER_TEMP/release-source"
-            git archive --format=tar "$RELEASE_SHA" | tar -xf - -C "$RUNNER_TEMP/release-source"
-            manifest_path="$RUNNER_TEMP/legacy-pages-release-manifest.json"
-            node scripts/prepare-legacy-release-config.mjs "$RELEASE_TAG" "$RUNNER_TEMP/release-source" "$manifest_path"
-          else
-            git fetch --no-tags origin "$RELEASE_SHA"
-            git worktree add --detach "$RUNNER_TEMP/release-source" "$RELEASE_SHA"
-            git -C "$RUNNER_TEMP/release-source" lfs pull \
-              --include="docs/screenshots/*.png,output/pdf/*.pdf" --exclude=""
-            manifest_path="$RUNNER_TEMP/release-source/.github/pages-release-manifest.json"
-          fi
+          git fetch --no-tags origin "$RELEASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/release-source" "$RELEASE_SHA"
+          git -C "$RUNNER_TEMP/release-source" lfs pull \
+            --include="docs/screenshots/*.png,output/pdf/*.pdf" --exclude=""
+          manifest_path="$RUNNER_TEMP/release-source/.github/pages-release-manifest.json"
           echo "manifest_path=$manifest_path" >> "$GITHUB_OUTPUT"
-          echo "analytics_mode=$(jq -r '.analyticsMode' "$manifest_path")" >> "$GITHUB_OUTPUT"
-          echo "analytics_provider=$(jq -r '.analyticsProvider' "$manifest_path")" >> "$GITHUB_OUTPUT"
+          echo "analytics_delivery=$(jq -er '.analyticsDelivery' "$manifest_path")" >> "$GITHUB_OUTPUT"
 
       - name: Verify the successful main Quality run for the exact release commit
         id: quality
@@ -142,12 +112,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(quality --sha "$RELEASE_SHA")
-          if [[ -n "$QUALITY_RUN_ID" ]]; then args+=(--run-id "$QUALITY_RUN_ID"); fi
-          node scripts/validate-release-run.mjs "${args[@]}"
+          test -n "$QUALITY_RUN_ID"
+          node scripts/validate-release-run.mjs quality --sha "$RELEASE_SHA" --run-id "$QUALITY_RUN_ID"
 
       - name: Download exact Quality documentation assets
-        if: ${{ needs.authorize.outputs.recovery != 'true' }}
         uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
@@ -161,11 +129,9 @@ jobs:
           node-version: 24
 
       - name: Install documentation asset verification dependencies
-        if: ${{ needs.authorize.outputs.recovery != 'true' }}
         run: npm ci
 
       - name: Verify release documentation assets are current for final Quality source
-        if: ${{ needs.authorize.outputs.recovery != 'true' }}
         env:
           SOURCE_ROOT: ${{ runner.temp }}/release-source
           SOURCE_SHA: ${{ needs.authorize.outputs.release_sha }}
@@ -177,57 +143,20 @@ jobs:
 
       - name: Prepare the single Pages artifact
         env:
-          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
-          ANALYTICS_MODE: ${{ steps.source.outputs.analytics_mode }}
-          ANALYTICS_PROVIDER: ${{ steps.source.outputs.analytics_provider }}
           MANIFEST_PATH: ${{ steps.source.outputs.manifest_path }}
           RELEASE_SHA: ${{ needs.authorize.outputs.release_sha }}
           SOURCE_ROOT: ${{ runner.temp }}/release-source
         shell: bash
         run: |
           set -euo pipefail
-          token=''
-          if [[ "$ANALYTICS_MODE" == enabled ]]; then token="$CLOUDFLARE_WEB_ANALYTICS_TOKEN"; fi
-          CLOUDFLARE_WEB_ANALYTICS_TOKEN="$token" node scripts/prepare-pages-artifact.mjs prepare \
+          node scripts/prepare-pages-artifact.mjs prepare \
             --source "$SOURCE_ROOT/site" --output "$RUNNER_TEMP/pages-site" \
-            --manifest "$MANIFEST_PATH" --repository "$GITHUB_REPOSITORY"
+            --manifest "$MANIFEST_PATH"
           node scripts/release-artifact-evidence.mjs create \
-            --analytics-mode "$ANALYTICS_MODE" --analytics-provider "$ANALYTICS_PROVIDER" \
             --artifact-dir "$RUNNER_TEMP/pages-site" --evidence "$RUNNER_TEMP/release-evidence.json" \
             --source-dir "$SOURCE_ROOT" --source-sha "$RELEASE_SHA"
           node scripts/validate-pages-smoke.mjs --directory "$RUNNER_TEMP/pages-site" \
-            --analytics-mode "$ANALYTICS_MODE" --analytics-provider "$ANALYTICS_PROVIDER" \
             --package-version "$(jq -r .version "$SOURCE_ROOT/package.json")"
-
-      - name: Install live provider compatibility dependencies
-        if: ${{ steps.source.outputs.analytics_mode == 'enabled' }}
-        run: |
-          npm ci
-          npx playwright install --with-deps --only-shell chromium
-
-      - name: Check actual provider compatibility before publication
-        if: ${{ steps.source.outputs.analytics_mode == 'enabled' }}
-        run: >-
-          node scripts/check-cloudflare-analytics-compatibility.mjs
-          --directory "${{ runner.temp }}/pages-site"
-          --output "${{ runner.temp }}/provider-compatibility.json"
-
-      - name: Record provider observation scope
-        if: ${{ always() && steps.source.outputs.analytics_mode == 'enabled' }}
-        env:
-          PROVIDER_REPORT: ${{ runner.temp }}/provider-compatibility.json
-        run: |
-          {
-            echo '## Live provider compatibility'
-            echo 'Actual provider script; RUM intercepted locally. Provider receipt is not checked.'
-            if test -f "$PROVIDER_REPORT"; then
-              echo '```json'
-              cat "$PROVIDER_REPORT"
-              echo '```'
-            else
-              echo 'Compatibility evidence unavailable; preparation cannot be accepted.'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Export non-secret artifact evidence
         id: evidence
@@ -238,14 +167,14 @@ jobs:
         run: |
           set -euo pipefail
           echo "artifact_digest=$(jq -r '.artifactDigest' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
-          echo "analytics_mode=$(jq -r '.analyticsMode' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
-          echo "analytics_provider=$(jq -r '.analyticsProvider' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
+          echo "analytics_delivery=$(jq -r '.analyticsDelivery' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           echo "package_version=$(jq -r '.packageVersion' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           echo "source_digest=$(jq -r '.sourceDigest' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           {
             echo '## Pages artifact prepared after merge authorization'
             echo
             echo "- Tag / source: \`${{ needs.authorize.outputs.release_tag }}\` / \`${{ needs.authorize.outputs.release_sha }}\`"
+            echo "- Analytics delivery: \`$(jq -r '.analyticsDelivery' "$EVIDENCE")\`"
             echo "- Source digest: \`$(jq -r '.sourceDigest' "$EVIDENCE")\`"
             echo "- Artifact digest: \`$(jq -r '.artifactDigest' "$EVIDENCE")\`"
             echo "- Quality: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${QUALITY_RUN_ID}"
@@ -259,7 +188,6 @@ jobs:
           path: |
             ${{ runner.temp }}/pages-site
             ${{ runner.temp }}/release-evidence.json
-            ${{ runner.temp }}/provider-compatibility.json
           if-no-files-found: error
           retention-days: 30
 
@@ -272,7 +200,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ vars.PRODUCTION_ORIGIN }}
     permissions:
       actions: read
       contents: write
@@ -313,8 +241,7 @@ jobs:
           release_sha="$(jq -r '.sourceSha' "$EVIDENCE")"
           test "$release_sha" = "$EXPECTED_SHA"
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
-          echo "analytics_mode=$(jq -r '.analyticsMode' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
-          echo "analytics_provider=$(jq -r '.analyticsProvider' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
+          echo "analytics_delivery=$(jq -r '.analyticsDelivery' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
           echo "artifact_digest=$(jq -r '.artifactDigest' "$EVIDENCE")" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the exact prepared source beside trusted tooling
@@ -328,7 +255,6 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/prepared-source" "$RELEASE_SHA"
 
       - name: Recheck current version under the production lock
-        if: ${{ needs.authorize.outputs.recovery != 'true' }}
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           EVIDENCE: ${{ runner.temp }}/prepared/release-evidence.json
@@ -346,8 +272,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
           RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
-          ANALYTICS_MODE: ${{ steps.prepared.outputs.analytics_mode }}
-          ANALYTICS_PROVIDER: ${{ steps.prepared.outputs.analytics_provider }}
         shell: bash
         run: |
           set -euo pipefail
@@ -383,12 +307,9 @@ jobs:
       - name: Verify original bytes against the tagged source
         env:
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
-          ANALYTICS_MODE: ${{ steps.prepared.outputs.analytics_mode }}
-          ANALYTICS_PROVIDER: ${{ steps.prepared.outputs.analytics_provider }}
         run: |
           set -euo pipefail
           node scripts/release-artifact-evidence.mjs verify \
-            --analytics-mode "$ANALYTICS_MODE" --analytics-provider "$ANALYTICS_PROVIDER" \
             --artifact-dir "$RUNNER_TEMP/prepared/pages-site" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
             --source-dir "$RUNNER_TEMP/prepared-source" --source-sha "$RELEASE_SHA"
 
@@ -409,33 +330,31 @@ jobs:
       - name: Smoke test deployed public paths and editor
         id: smoke
         env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          PRODUCTION_ORIGIN: ${{ vars.PRODUCTION_ORIGIN }}
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
           RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
-          ANALYTICS_MODE: ${{ steps.prepared.outputs.analytics_mode }}
-          ANALYTICS_PROVIDER: ${{ steps.prepared.outputs.analytics_provider }}
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/validate-pages-smoke.mjs --base-url "${PAGE_URL%/}/" --release-sha "$RELEASE_SHA" \
-            --analytics-mode "$ANALYTICS_MODE" --analytics-provider "$ANALYTICS_PROVIDER" \
+          test "$PRODUCTION_ORIGIN" = 'https://rs.herehigher.com/'
+          node scripts/validate-pages-smoke.mjs --base-url "$PRODUCTION_ORIGIN" --release-sha "$RELEASE_SHA" \
             --package-version "${RELEASE_TAG#v}"
-          node scripts/check-online-editor.mjs --base-url "${PAGE_URL%/}/"
+          node scripts/check-online-editor.mjs --base-url "$PRODUCTION_ORIGIN"
           {
             echo '## Pages release result'
             echo
             echo "- Tag: \`$RELEASE_TAG\`"
             echo "- Source SHA: \`$RELEASE_SHA\`"
             echo "- Artifact ID: \`${{ needs.prepare.outputs.prepared_artifact_id }}\`"
-            echo "- URL: ${PAGE_URL}"
-            echo '- Smoke: passed; live RUM receipt and manual browser acceptance remain unverified.'
+            echo "- URL: ${PRODUCTION_ORIGIN}"
+            echo '- Smoke: passed; Cloudflare Pages Analytics injection and manual browser acceptance remain unverified.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record publication outcome
         if: ${{ always() }}
         env:
           ARTIFACT_DIGEST: ${{ steps.prepared.outputs.artifact_digest }}
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          PRODUCTION_ORIGIN: ${{ vars.PRODUCTION_ORIGIN }}
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
           RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
         shell: bash
@@ -447,8 +366,8 @@ jobs:
             echo "- Source SHA: \`${RELEASE_SHA:-unavailable}\`"
             echo "- Run / artifact: \`${GITHUB_RUN_ID}\` / \`${{ needs.prepare.outputs.prepared_artifact_id }}\`"
             echo "- Artifact digest: \`${ARTIFACT_DIGEST:-unavailable}\`"
-            echo "- URL: ${PAGE_URL:-unavailable}"
+            echo "- URL: ${PRODUCTION_ORIGIN:-unavailable}"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Tag: ${{ steps.tag.outcome }}; deploy: ${{ steps.deployment.outcome }}; smoke: ${{ steps.smoke.outcome }}"
-            echo '- Unverified: live RUM receipt and manual browser acceptance.'
+            echo '- Unverified: Cloudflare Pages Analytics injection and manual browser acceptance.'
           } >> "$GITHUB_STEP_SUMMARY"

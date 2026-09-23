@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 2,
-  "analyticsMode": "enabled",
-  "analyticsProvider": "cloudflare-web-analytics"
+  "schemaVersion": 3,
+  "analyticsDelivery": "hosting-managed"
 }

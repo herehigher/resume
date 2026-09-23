@@ -2,12 +2,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { computeTreeDigest } from './prepare-pages-artifact.mjs';
+import { ANALYTICS_DELIVERY_CONTRACT, computeTreeDigest } from './prepare-pages-artifact.mjs';
 
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^[0-9a-f]{64}$/;
-const cloudflareProvider = 'cloudflare-web-analytics';
-
 function fail(message) {
   throw new Error(`Release artifact evidence failed: ${message}`);
 }
@@ -18,7 +16,7 @@ function stableTag(version) {
 
 function validateEvidence(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('evidence must be an object');
-  const expected = ['analyticsMode', 'analyticsProvider', 'artifactDigest', 'packageVersion', 'sourceDigest', 'sourceSha'];
+  const expected = ['analyticsDelivery', 'artifactDigest', 'packageVersion', 'sourceDigest', 'sourceSha'];
   const actual = Object.keys(value).sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
     fail('evidence contains unknown or missing fields');
@@ -28,9 +26,8 @@ function validateEvidence(value) {
   if (!digestPattern.test(value.sourceDigest) || !digestPattern.test(value.artifactDigest)) {
     fail('artifact and source digests must be lowercase SHA-256 values');
   }
-  const disabled = value.analyticsMode === 'disabled' && value.analyticsProvider === 'none';
-  const enabled = value.analyticsMode === 'enabled' && value.analyticsProvider === cloudflareProvider;
-  if (!disabled && !enabled) fail('analytics mode and provider are invalid');
+  if (value.sourceDigest !== value.artifactDigest) fail('prepared artifact must be source-identical');
+  if (value.analyticsDelivery !== ANALYTICS_DELIVERY_CONTRACT) fail('analytics delivery contract is invalid');
   return Object.freeze({ ...value });
 }
 
@@ -49,11 +46,10 @@ function sourceSiteDirectory(sourceDirectory) {
   return path.join(sourceDirectory, 'site');
 }
 
-export async function createArtifactEvidence({ analyticsMode, analyticsProvider, artifactDirectory, sourceDirectory, sourceSha }) {
+export async function createArtifactEvidence({ artifactDirectory, sourceDirectory, sourceSha }) {
   if (!shaPattern.test(sourceSha || '')) fail('source SHA must be a full lowercase commit SHA');
   return validateEvidence({
-    analyticsMode,
-    analyticsProvider,
+    analyticsDelivery: ANALYTICS_DELIVERY_CONTRACT,
     artifactDigest: await computeTreeDigest(artifactDirectory),
     packageVersion: await packageVersion(sourceDirectory),
     sourceDigest: await computeTreeDigest(sourceSiteDirectory(sourceDirectory)),
@@ -68,8 +64,6 @@ export async function writeArtifactEvidence({ outputPath, ...options }) {
 }
 
 export async function verifyArtifactEvidence({
-  analyticsMode,
-  analyticsProvider,
   artifactDirectory,
   evidencePath,
   sourceDirectory,
@@ -83,8 +77,6 @@ export async function verifyArtifactEvidence({
     fail('evidence is unavailable or invalid JSON');
   }
   if (sourceSha && evidence.sourceSha !== sourceSha) fail('artifact was prepared for a different source SHA');
-  if (analyticsMode && evidence.analyticsMode !== analyticsMode) fail('analytics mode does not match the evidence');
-  if (analyticsProvider && evidence.analyticsProvider !== analyticsProvider) fail('analytics provider does not match the evidence');
   if (evidence.packageVersion !== await packageVersion(sourceDirectory)) fail('package version does not match the evidence');
   if (evidence.sourceDigest !== await computeTreeDigest(sourceSiteDirectory(sourceDirectory))) fail('source bytes do not match the evidence');
   if (evidence.artifactDigest !== await computeTreeDigest(artifactDirectory)) fail('artifact bytes do not match the evidence');
@@ -100,7 +92,7 @@ function parseArguments(args) {
     const value = values[index + 1];
     if (!name?.startsWith('--') || value === undefined || value.startsWith('--')) fail('invalid command arguments');
     const key = name.slice(2);
-    if (!['analytics-mode', 'analytics-provider', 'artifact-dir', 'evidence', 'source-dir', 'source-sha'].includes(key) || key in options) fail('unknown or duplicate argument');
+    if (!['artifact-dir', 'evidence', 'source-dir', 'source-sha'].includes(key) || key in options) fail('unknown or duplicate argument');
     options[key] = value;
   }
   return { command, options };
@@ -108,23 +100,21 @@ function parseArguments(args) {
 
 async function main() {
   const { command, options } = parseArguments(process.argv.slice(2));
-  if (!options['analytics-mode'] || !options['analytics-provider'] || !options['artifact-dir'] || !options['source-dir'] || !options['source-sha']) {
-    fail('analytics mode, provider, artifact, source, and source SHA are required');
+  if (!options['artifact-dir'] || !options['source-dir'] || !options['source-sha']) {
+    fail('artifact, source, and source SHA are required');
   }
   if (command === 'create') {
-    if (!options.evidence) fail('create requires --evidence');
+    if (!options.evidence || Object.keys(options).length !== 4) fail('create requires --evidence');
     const evidence = await writeArtifactEvidence({
-      artifactDirectory: options['artifact-dir'], evidencePath: options.evidence,
-      analyticsMode: options['analytics-mode'], analyticsProvider: options['analytics-provider'],
+      artifactDirectory: options['artifact-dir'],
       outputPath: options.evidence, sourceDirectory: options['source-dir'], sourceSha: options['source-sha']
     });
     console.log(`Prepared ${stableTag(evidence.packageVersion)} artifact ${evidence.artifactDigest}.`);
     return;
   }
-  if (Object.keys(options).length !== 6 || !options.evidence) fail('verify requires the complete evidence contract');
+  if (Object.keys(options).length !== 4 || !options.evidence) fail('verify requires the complete evidence contract');
   const evidence = await verifyArtifactEvidence({
     artifactDirectory: options['artifact-dir'], evidencePath: options.evidence,
-    analyticsMode: options['analytics-mode'], analyticsProvider: options['analytics-provider'],
     sourceDirectory: options['source-dir'], sourceSha: options['source-sha']
   });
   console.log(`Verified ${stableTag(evidence.packageVersion)} artifact ${evidence.artifactDigest}.`);

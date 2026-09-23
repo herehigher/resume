@@ -394,7 +394,7 @@ test('localized public pages remain useful when JavaScript is disabled', async (
     await expect(page.locator('.entry-lede')).toHaveCSS('font-size', '16px');
     await expect(page.locator('.entry-trust-row')).toHaveCount(2);
     await expect(page.locator('.entry-trust-dot').first()).toHaveCSS('height', '19px');
-    await expect(page.locator('[data-analytics-disclosure="status"]')).toHaveCount(1);
+    await expect(page.locator('[data-privacy-notice]')).toHaveCount(1);
     await expect(page.locator('.entry-button')).toBeVisible();
     const xContact = page.locator('.x-contact-link');
     await expect(xContact).toBeVisible();
@@ -411,7 +411,7 @@ test('legacy Japanese URL remains useful without joining the public hreflang clu
   await expect(page).toHaveURL(/\/ja\/$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.locator('h1')).toHaveText('日本語の履歴書・職務経歴書を作成');
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://herehigher.github.io/resume/');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://rs.herehigher.com/');
   await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
   await expect(page.locator('.entry-button')).toHaveAttribute('href', '../editor/?lang=ja');
   await context.close();

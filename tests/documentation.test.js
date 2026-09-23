@@ -104,13 +104,16 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /同じ job が fresh に生成した artifact/);
   assert.match(playbook, /Release eligibility[\s\S]*通常の main 更新[\s\S]*`Release Pages` の run を作りません/);
   assert.match(playbook, /Release Pages[\s\S]*immutable tag[\s\S]*単一の artifact[\s\S]*online smoke/);
+  assert.match(playbook, /まだ GitHub Pages の deployment action/);
+  assert.match(playbook, /#251/);
+  assert.match(playbook, /pages\.dev と custom domain の両方/);
 });
 
 test('the public v4 JSON example remains importable under the runtime data contract', () => {
   const schema = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v4.schema.json'), 'utf8'));
   const example = JSON.parse(readFileSync(path.join(root, 'site/schema/resume-studio-web-v4.example.json'), 'utf8'));
 
-  assert.equal(schema.$id, 'https://herehigher.github.io/resume/schema/resume-studio-web-v4.schema.json');
+  assert.equal(schema.$id, 'https://rs.herehigher.com/schema/resume-studio-web-v4.schema.json');
   assert.equal(schema.properties.version.const, 4);
   assert.equal(Object.hasOwn(schema.properties, 'schemaRevision'), false);
   assert.deepEqual(schema.properties.settings.properties.locale.enum, ['ja', 'zh-CN', 'en']);

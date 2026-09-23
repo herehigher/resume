@@ -6,7 +6,7 @@ Resume Studio は、ブラウザ内で日本語・简体中文・English の履�
 
 ## Web版
 
-Web版: [https://herehigher.github.io/resume/](https://herehigher.github.io/resume/)
+Web版: [https://rs.herehigher.com/](https://rs.herehigher.com/)
 
 ## 対応する文書と用紙
 
@@ -77,7 +77,7 @@ Chrome で `http://localhost:8000/` を開いて日本語 editor を直接始め
 - 保存や移行に失敗したときは既存の下書きと復号 key を保持します。browser が Web Locks を利用できない場合は、競合を避けるため保存・削除・移行を停止します。Web Locks に参加しない既配信 client や手動 storage 操作は、この cross-tab 排他保証の対象外です。内容を JSON で書き出してから、対応する browser で開いてください。
 - browser data の消去、private browsing の終了、保存容量不足、browser による storage eviction で下書きを失うことがあります。重要な下書きは JSON で backup してください。
 - アプリ内削除は現在の v4 state だけを消します。無関係な storage 項目、対応範囲外の旧草稿、download 済み JSON/PDF、browser の download 履歴は削除しません。
-- Repository の `site/`、clone、fork は Analytics 無効で、同一 origin の静的 asset 以外へ解析 request を送りません。公式 CI は検証対象 commit の設定 manifest が有効な場合だけ、公開前の配布物へ標準 Cloudflare Web Analytics を追加します。承認後は同じ配布物を immutable stable tag と対応付けて公開します。Cookie、localStorage、利用者単位 ID、custom event は使わず、履歴書入力、写真、JSON、local draft は送信しません。画面の status 表示と Network panel で現在の mode を確認できます。
+- Repository の `site/`、clone、fork に Analytics beacon は含まれません。公式 hosted site では Cloudflare Pages の delivery layer が Cloudflare Web Analytics を挿入します。アプリは履歴書入力、写真、JSON、local draft を Analytics request に含めません。
 
 詳細は [Privacy / 日本語](PRIVACY.md#privacy-ja) を確認してください。
 

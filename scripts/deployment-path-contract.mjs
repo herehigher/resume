@@ -1,4 +1,4 @@
-export const DEPLOYMENT_ORIGIN = 'https://herehigher.github.io/resume/';
+export const DEPLOYMENT_ORIGIN = 'https://rs.herehigher.com/';
 
 export const DEPLOYMENT_PATH_CONTRACTS = Object.freeze([
   Object.freeze({
@@ -67,11 +67,10 @@ export function htmlDocumentContracts() {
   return DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract.kind === 'html');
 }
 
-export function documentUrlPaths(basePath = '/') {
-  const prefix = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+export function documentUrlPaths() {
   return new Set(htmlDocumentContracts().flatMap((contract) => {
+    if (!contract.urlPath) return ['/', '/index.html'];
     const directoryPath = `/${contract.urlPath}`;
-    if (!contract.urlPath) return [`${prefix}/`, `${prefix}/index.html`];
-    return [`${prefix}${directoryPath}`, `${prefix}${directoryPath}index.html`];
+    return [directoryPath, `${directoryPath}index.html`];
   }));
 }

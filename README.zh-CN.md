@@ -6,7 +6,7 @@ Resume Studio 是一款个人使用的静态 Web 应用，可在浏览器中编�
 
 ## 在线版
 
-在线版：[https://herehigher.github.io/resume/](https://herehigher.github.io/resume/)
+在线版：[https://rs.herehigher.com/](https://rs.herehigher.com/)
 
 ## 支持的文档和纸张
 
@@ -77,7 +77,7 @@ npx --yes http-server site --port 8000
 - 保存或迁移失败时会保留现有草稿和解密 key。browser 无法使用 Web Locks 时，为避免冲突会停止保存、删除和迁移。未参与 Web Locks 的已部署旧 client 或手动 storage 操作不在此跨标签页互斥保证范围内。请先导出 JSON，再使用受支持的 browser 打开。
 - 清除 browser data、结束 private browsing、存储容量不足或 browser storage eviction 都可能导致草稿丢失。重要草稿请导出 JSON backup。
 - 应用内删除只清除当前 v3 state，不会删除无关的 storage 项、超出兼容范围的旧草稿、已下载的 JSON/PDF 或 browser download history。
-- Repository 中的 `site/`、clone 和 fork 默认禁用 Analytics，不会向同一 origin 静态 asset 以外的地址发送统计请求。仅官方 CI 可按待验证 commit 的配置 manifest，在发布前向产物加入标准 Cloudflare Web Analytics；批准后将同一产物与 immutable stable tag 对应发布。它不使用 Cookie、localStorage、用户级 ID 或 custom event，也不会发送简历输入、照片、JSON 或设备草稿。可通过页面 status 与 Network panel 核查当前 mode。
+- Repository 的 `site/`、clone 和 fork 均不包含 Analytics beacon。官方托管站点由 Cloudflare Pages 在 delivery layer 注入 Cloudflare Web Analytics。应用不会把简历输入、照片、JSON 或设备草稿放入 Analytics request。
 
 详情请阅读 [隐私说明 / 简体中文](PRIVACY.md#privacy-zh-cn)。
 

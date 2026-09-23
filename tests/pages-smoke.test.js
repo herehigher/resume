@@ -6,17 +6,14 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
-import {
-  CLOUDFLARE_PROVIDER,
-  OFFICIAL_REPOSITORY,
-  prepareArtifact
-} from '../scripts/prepare-pages-artifact.mjs';
+import { prepareArtifact } from '../scripts/prepare-pages-artifact.mjs';
+import { CLOUDFLARE_BEACON_URL } from '../scripts/cloudflare-analytics.mjs';
 import { validateDeploymentArtifact, validatePublishedDeployment } from '../scripts/validate-pages-smoke.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = path.join(root, 'site');
-const token = 'a'.repeat(32);
 const packageVersion = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const productionOrigin = 'https://rs.herehigher.com/';
 
 function temporaryDirectory(t) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'resume-pages-smoke-'));
@@ -27,90 +24,57 @@ function temporaryDirectory(t) {
 async function validate(directory, overrides = {}) {
   return validateDeploymentArtifact({
     directory,
-    analyticsMode: 'disabled',
-    analyticsProvider: 'none',
     packageVersion,
     ...overrides
   });
 }
 
-async function enabledArtifact(directory) {
-  const manifest = {
-    analyticsMode: 'enabled',
-    analyticsProvider: CLOUDFLARE_PROVIDER,
-    schemaVersion: 2,
-  };
-  const manifestPath = path.join(path.dirname(directory), `${path.basename(directory)}.manifest.json`);
-  writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
-  const output = `${directory}-prepared`;
-  await prepareArtifact({
-    manifestPath,
-    outputDirectory: output,
-    repository: OFFICIAL_REPOSITORY,
-    sourceDirectory: directory,
-    token
-  });
-  return { directory: output };
-}
-
-async function disabledArtifact(directory) {
+async function preparedArtifact(directory) {
   const manifestPath = path.join(path.dirname(directory), `${path.basename(directory)}.manifest.json`);
   writeFileSync(manifestPath, `${JSON.stringify({
-    analyticsMode: 'disabled',
-    analyticsProvider: 'none',
-    schemaVersion: 2,
+    analyticsDelivery: 'hosting-managed',
+    schemaVersion: 3,
   })}\n`);
   const output = `${directory}-prepared`;
   await prepareArtifact({
     manifestPath,
     outputDirectory: output,
-    repository: 'fork/example',
     sourceDirectory: directory
   });
   return output;
 }
 
-test('semantic smoke accepts disabled and enabled prepared artifacts with legal extra attributes', async (t) => {
+test('semantic smoke accepts the provider-neutral prepared artifact with legal extra attributes', async (t) => {
   const temporary = temporaryDirectory(t);
-  const disabledSource = path.join(temporary, 'disabled');
-  cpSync(source, disabledSource, { recursive: true });
-  const disabled = await disabledArtifact(disabledSource);
-  const disabledHtml = path.join(disabled, 'ja/index.html');
-  writeFileSync(disabledHtml, readFileSync(disabledHtml, 'utf8').replace('<html ', '<html data-release-check="local" '));
-  await validate(disabled);
-
-  const enabled = path.join(temporary, 'enabled');
-  cpSync(source, enabled, { recursive: true });
-  const prepared = await enabledArtifact(enabled);
-  for (const file of ['index.html', 'ja/index.html', 'zh-cn/index.html', 'en/index.html']) {
-    const fullPath = path.join(prepared.directory, file);
+  const candidate = path.join(temporary, 'artifact');
+  cpSync(source, candidate, { recursive: true });
+  const prepared = await preparedArtifact(candidate);
+  for (const file of ['index.html', 'ja/index.html', 'zh-cn/index.html', 'en/index.html', 'editor/index.html']) {
+    const fullPath = path.join(prepared, file);
     writeFileSync(fullPath, readFileSync(fullPath, 'utf8').replace('<html ', '<html data-release-check="local" '));
   }
-  await validate(prepared.directory, {
-    analyticsMode: 'enabled',
-    analyticsProvider: CLOUDFLARE_PROVIDER,
-  });
+  const result = await validate(prepared);
+  assert.equal(result.analyticsDelivery, 'hosting-managed');
 });
 
-test('semantic smoke detects language, analytics tuple, beacon duplication, and invalid beacon configuration', async (t) => {
+test('semantic smoke detects language, legacy app state, app-owned beacon, and origin regressions', async (t) => {
   const temporary = temporaryDirectory(t);
   const cases = [
     ['language', 'en/index.html', (html) => html.replace('lang="en"', 'lang="ja"'), /language is invalid/],
-    ['tuple', 'ja/index.html', (html) => html.replace('data-analytics-provider="none"', 'data-analytics-provider="other"'), /analytics tuple/],
-    ['duplicate tuple', 'ja/index.html', (html) => html.replace('<html ', '<html data-analytics-mode="disabled" '), /must appear exactly once/],
-    ['legacy canonical', 'ja/index.html', (html) => html.replace('https://herehigher.github.io/resume/', 'https://example.invalid/'), /canonical URL/],
+    ['legacy app state', 'ja/index.html', (html) => html.replace('<html ', '<html data-analytics-mode="disabled" '), /legacy application analytics state/],
+    ['legacy canonical', 'ja/index.html', (html) => html.replace('https://rs.herehigher.com/', 'https://example.invalid/'), /canonical URL/],
     ['legacy hreflang', 'ja/index.html', (html) => html.replace('</head>', '<link rel="alternate" hreflang="ja" href="https://herehigher.github.io/resume/">\n</head>'), /must not join the public hreflang cluster/],
-    ['ja alternate', 'index.html', (html) => html.replace('hreflang="ja" href="https://herehigher.github.io/resume/"', 'hreflang="ja" href="https://example.invalid/"'), /ja alternate URL/],
+    ['ja alternate', 'index.html', (html) => html.replace('hreflang="ja" href="https://rs.herehigher.com/"', 'hreflang="ja" href="https://example.invalid/"'), /ja alternate URL/],
     ['unexpected alternate', 'index.html', (html) => html.replace('</head>', '<link rel="alternate" hreflang="fr" href="https://example.invalid/">\n</head>'), /alternate URL set is invalid/],
     ['canonical', 'zh-cn/index.html', (html) => html.replace(
-      '<link rel="canonical" href="https://herehigher.github.io/resume/zh-cn/">',
+      '<link rel="canonical" href="https://rs.herehigher.com/zh-cn/">',
       '<link rel="canonical" href="https://example.invalid/">'
     ), /canonical URL/],
     ['editor', 'editor/index.html', (html) => html.replace('noindex,follow', 'index,follow'), /editor\/ \[artifact=editor\/index\.html; status=local; content-type=text\/html\]: must be noindex,follow/],
-    ['schema identity', 'schema/resume-studio-web-v4.schema.json', (schema) => schema.replace('https://herehigher.github.io/resume/schema/', 'https://example.invalid/'), /identity or title is invalid/],
+    ['schema identity', 'schema/resume-studio-web-v4.schema.json', (schema) => schema.replace('https://rs.herehigher.com/schema/', 'https://example.invalid/'), /identity or title is invalid/],
     ['import version', 'schema/resume-studio-web-v4.example.json', (example) => example.replace('"version": 4', '"version": 3'), /version is invalid/],
     ['version', 'assets/js/config.js', (config) => config.replace(`APP_VERSION = '${packageVersion}'`, "APP_VERSION = '9.9.9'"), /APP_VERSION/],
-    ['beacon', 'index.html', (html) => `${html}<script data-cf-beacon="{}"></script>`, /analytics runtime/]
+    ['application beacon', 'index.html', (html) => `${html}<script src="${CLOUDFLARE_BEACON_URL}"></script>`, /application analytics runtime/]
   ];
   for (const [name, file, mutate, expected] of cases) {
     const artifact = path.join(temporary, name);
@@ -120,36 +84,9 @@ test('semantic smoke detects language, analytics tuple, beacon duplication, and 
     await assert.rejects(validate(artifact), expected);
   }
 
-  const enabled = path.join(temporary, 'enabled');
-  cpSync(source, enabled, { recursive: true });
-  const prepared = await enabledArtifact(enabled);
-  const target = path.join(prepared.directory, 'en/index.html');
-  writeFileSync(target, readFileSync(target, 'utf8').replace(token, 'invalid-site-setting'));
-  await assert.rejects(validate(prepared.directory, {
-    analyticsMode: 'enabled',
-    analyticsProvider: CLOUDFLARE_PROVIDER,
-  }), /beacon contract/);
-
-  for (const [name, mutate, expected] of [
-    ['missing-beacon', (html) => html.replace(/\s*<script[^>]*data-cf-beacon[^>]*><\/script>/, ''), /must contain one analytics beacon/],
-    ['duplicate-beacon', (html) => {
-      const beacon = html.match(/<script[^>]*data-cf-beacon[^>]*><\/script>/)?.[0] || '';
-      return html.replace('</body>', `${beacon}</body>`);
-    }, /must contain one analytics beacon/]
-  ]) {
-    const sourceArtifact = path.join(temporary, `${name}-source`);
-    cpSync(source, sourceArtifact, { recursive: true });
-    const artifact = await enabledArtifact(sourceArtifact);
-    const file = path.join(artifact.directory, 'index.html');
-    writeFileSync(file, mutate(readFileSync(file, 'utf8')));
-    await assert.rejects(validate(artifact.directory, {
-      analyticsMode: 'enabled',
-      analyticsProvider: CLOUDFLARE_PROVIDER,
-    }), expected);
-  }
 });
 
-test('published smoke fetches every authoritative path and reports editor response metadata', async () => {
+test('published smoke fetches custom-domain root paths and tolerates host-injected Analytics', async () => {
   const requests = [];
   const contentTypeFor = (kind) => {
     if (kind === 'html') return 'text/html; charset=utf-8';
@@ -159,24 +96,28 @@ test('published smoke fetches every authoritative path and reports editor respon
   };
   const fetchImpl = async (url) => {
     const request = new URL(url);
-    const urlPath = request.pathname.replace('/resume/', '');
-    requests.push(urlPath);
-    const contract = DEPLOYMENT_PATH_CONTRACTS.find((candidate) => candidate.urlPath === urlPath);
+    requests.push(request.pathname);
+    const relativePath = request.pathname.slice(1);
+    const artifactPath = relativePath === '' ? 'index.html'
+      : relativePath.endsWith('/') ? `${relativePath}index.html` : relativePath;
+    const contract = DEPLOYMENT_PATH_CONTRACTS.find((candidate) => candidate.artifactPath === artifactPath);
     if (!contract) return new Response('not found', { status: 404 });
-    return new Response(readFileSync(path.join(source, contract.artifactPath), 'utf8'), {
+    let content = readFileSync(path.join(source, contract.artifactPath), 'utf8');
+    if (contract.kind === 'html') {
+      content = content.replace('</body>', '<script src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="hosting-managed"></script></body>');
+    }
+    return new Response(content, {
       headers: { 'content-type': contentTypeFor(contract.kind) },
       status: 200
     });
   };
   await validatePublishedDeployment({
-    analyticsMode: 'disabled',
-    analyticsProvider: 'none',
-    baseUrl: 'https://example.test/resume/',
+    baseUrl: productionOrigin,
     fetchImpl,
     packageVersion,
     releaseSha: 'a'.repeat(40)
   });
-  assert.deepEqual(requests, DEPLOYMENT_PATH_CONTRACTS.map((contract) => contract.urlPath));
+  assert.deepEqual(requests, DEPLOYMENT_PATH_CONTRACTS.map((contract) => new URL(contract.urlPath, productionOrigin).pathname));
 
   const missingEditor = async (url) => {
     const request = new URL(url);
@@ -189,13 +130,22 @@ test('published smoke fetches every authoritative path and reports editor respon
     return fetchImpl(url);
   };
   await assert.rejects(validatePublishedDeployment({
-    analyticsMode: 'disabled',
-    analyticsProvider: 'none',
     attempts: 1,
-    baseUrl: 'https://example.test/resume/',
+    baseUrl: productionOrigin,
     fetchImpl: missingEditor,
     packageVersion,
   }), /editor\/ \[artifact=editor\/index\.html; status=404; content-type=text\/html; charset=utf-8\]/);
+});
+
+test('published smoke rejects the retired GitHub Pages origin and mounted paths', async () => {
+  for (const baseUrl of ['https://herehigher.github.io/resume/', 'https://rs.herehigher.com/resume/']) {
+    await assert.rejects(validatePublishedDeployment({
+      attempts: 1,
+      baseUrl,
+      fetchImpl: async () => { throw new Error('fetch must not run for a legacy or mounted base URL'); },
+      packageVersion
+    }), /https origin root/);
+  }
 });
 
 test('published smoke bounds every request with an injectable timeout signal', async () => {
@@ -205,10 +155,8 @@ test('published smoke bounds every request with an injectable timeout signal', a
     return AbortSignal.abort(new Error('simulated timeout'));
   };
   await assert.rejects(validatePublishedDeployment({
-    analyticsMode: 'disabled',
-    analyticsProvider: 'none',
     attempts: 1,
-    baseUrl: 'https://example.test/resume/',
+    baseUrl: productionOrigin,
     fetchImpl: async (_url, { signal }) => {
       assert.equal(signal.aborted, true);
       throw signal.reason;

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://herehigher.github.io/resume/schema/resume-studio-web-v4.schema.json",
+  "$id": "https://rs.herehigher.com/schema/resume-studio-web-v4.schema.json",
   "title": "Resume Studio web v4 export",
   "description": "The JSON backup format exported by Resume Studio. Resume data must not be uploaded, transmitted, or shared without the user's explicit authorization. The required x-resume-studio-uniqueBy applicator rejects duplicate stable record IDs.",
   "type": "object",

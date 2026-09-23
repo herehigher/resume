@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja" data-analytics-mode="disabled" data-analytics-provider="none">
+<html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,7 +11,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="../assets/favicon/resume-studio-marmot-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../assets/favicon/resume-studio-marmot-512.png">
   <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="../assets/favicon/resume-studio-marmot-180.png">
-  <link rel="canonical" href="https://herehigher.github.io/resume/">
+  <link rel="canonical" href="https://rs.herehigher.com/">
   <link rel="stylesheet" href="../assets/css/public-entry.css">
 </head>
 <body>
@@ -26,7 +26,7 @@
         <p class="entry-lede">履歴書と職務経歴書をブラウザで編集し、ライブプレビューで確認できます。日本語の書類はA4用紙に対応しています。</p>
         <div class="entry-trust-list" aria-label="製品説明">
           <div class="entry-trust-row"><span class="entry-trust-dot" aria-hidden="true">✓</span><span>入力内容はこのブラウザ内で処理・保存され、外部へ送信されません。</span></div>
-          <div class="entry-trust-row"><span class="entry-trust-dot" aria-hidden="true">✓</span><span data-analytics-disclosure="status">この source build では Analytics は無効で、解析用の外部 request は発生しません。</span></div>
+          <div class="entry-trust-row"><span class="entry-trust-dot" aria-hidden="true">✓</span><span data-privacy-notice>source、clone、fork に beacon は含まれません。公式 hosted site では Cloudflare Pages の delivery layer が Analytics を挿入します。履歴書入力、写真、JSON、草稿は Analytics request に含まれません。</span></div>
         </div>
       </div>
       <div class="entry-actions"><a class="entry-button" href="../editor/?lang=ja">日本語で編集を始める <span aria-hidden="true">→</span></a></div>
@@ -36,7 +36,7 @@
     <div class="entry-grid">
       <section class="entry-card"><h2>作成できる書類</h2><p>履歴書と職務経歴書を切り替えて作成できます。氏名・連絡先・オンラインプロフィールは共通で、各言語の書類内容は独立して保存されます。</p></section>
       <section class="entry-card"><h2>PDFとJSON</h2><p>印刷機能からPDFとして保存できます。JSONの書き出しと読み込みで、端末上の下書きをバックアップ・復元できます。<a href="../schema/resume-studio-web-v4.schema.json">JSON Schema</a> も確認できます。</p></section>
-      <section class="entry-card"><h2>プライバシー</h2><p>アプリは履歴書データをアップロードしません。公式 release で Analytics が有効な場合も、履歴書入力、写真、JSON、端末上の下書きは送信しません。書き出したPDFやJSONには写真や個人情報が含まれる場合があります。</p></section>
+      <section class="entry-card"><h2>プライバシー</h2><p>source、clone、fork に beacon は含まれません。公式 hosted site では Cloudflare Pages の delivery layer が Cloudflare Web Analytics を挿入します。アプリは履歴書入力、写真、JSON、端末上の草稿を Analytics request に含めません。書き出した PDF や JSON には個人情報が含まれる場合があります。</p></section>
       <section class="entry-card"><h2>データを扱う自動化ツールへ</h2><p>履歴書データは、利用者から明確な許可を得るまで、アップロード、送信、共有してはいけません。</p></section>
     </div>
   </main>
