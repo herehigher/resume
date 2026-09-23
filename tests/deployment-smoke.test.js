@@ -110,12 +110,23 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
     packageVersion
   }), /HTTP response was not successful/);
 
-  await assert.rejects(validatePublishedDeployment({
-    attempts: 1,
-    baseUrl,
-    fetchImpl: async () => new Response(validHtml, { headers: { 'content-type': 'application/octet-stream' } }),
-    packageVersion
-  }), /unexpected content type for html/);
+  const malformedContentTypes = [
+    ['index.html', 'text/htmlx; charset=utf-8', /unexpected content type for html/],
+    ['sitemap.xml', 'application/xmlp', /unexpected content type for xml/],
+    ['assets/js/config.js', 'text/javascript-malformed', /unexpected content type for javascript/],
+    ['schema/resume-studio-web-v4.schema.json', 'application/jsonp; charset=utf-8', /unexpected content type for json/]
+  ];
+  for (const [artifactPath, contentType, expected] of malformedContentTypes) {
+    const fetchImpl = async (url) => {
+      const contract = contractAtPath(new URL(url).pathname);
+      const content = readFileSync(path.join(source, contract.artifactPath), 'utf8');
+      return new Response(content, {
+        headers: { 'content-type': contract.artifactPath === artifactPath ? contentType : contentTypeFor(contract.kind) },
+        status: 200
+      });
+    };
+    await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl, fetchImpl, packageVersion }), expected);
+  }
 
   await assert.rejects(validatePublishedDeployment({
     attempts: 1,

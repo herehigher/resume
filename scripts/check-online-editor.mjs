@@ -28,7 +28,8 @@ export async function checkOnlineEditor(baseUrl) {
       await route.continue();
     });
     const examplePath = DEPLOYMENT_PATH_CONTRACTS.find((item) => item.semantic === 'import-example').urlPath;
-    const response = await context.request.get(new URL(examplePath, base).href);
+    // APIRequestContext bypasses browser routes; never follow a redirect from the example URL.
+    const response = await context.request.get(new URL(examplePath, base).href, { maxRedirects: 0 });
     assert.equal(response.status(), 200, 'Published example must be available.');
     const example = await response.json();
     assert.equal(example.version, 4);

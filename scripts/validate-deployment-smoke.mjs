@@ -62,11 +62,21 @@ function expectedContentType(kind) {
 }
 
 function hasExpectedContentType(kind, contentType) {
-  const value = contentType.toLowerCase();
-  if (kind === 'html') return value.startsWith('text/html');
-  if (kind === 'xml') return value.startsWith('application/xml') || value.startsWith('text/xml');
-  if (kind === 'javascript') return value.startsWith('text/javascript') || value.startsWith('application/javascript');
-  return value.startsWith('application/json');
+  const expectedEssences = {
+    html: ['text/html'],
+    xml: ['application/xml', 'text/xml'],
+    javascript: ['text/javascript', 'application/javascript'],
+    json: ['application/json']
+  }[kind];
+  if (!expectedEssences) return false;
+
+  const [essence, ...parameters] = contentType.split(';');
+  if (!expectedEssences.includes(essence.trim().toLowerCase())) return false;
+  if (parameters.length === 0) return true;
+  if (parameters.length !== 1) return false;
+
+  const charset = parameters[0].trim().match(/^charset\s*=\s*(.+)$/i)?.[1]?.trim();
+  return Boolean(charset && /^(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[!#$%&'*+.^_`|~0-9A-Za-z-]+")$/.test(charset));
 }
 
 function assertSemanticContract(contract, content, metadata, options) {

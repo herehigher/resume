@@ -138,6 +138,8 @@ test('deployment and online editor smoke use provider-neutral contracts', () => 
   assert.doesNotMatch(deploymentSmoke, /data-cf-beacon|data-analytics-(?:mode|provider|disclosure)|cloudflareinsights|RUM|expectedToken/i);
   assert.doesNotMatch(onlineEditorCheck, /data-analytics-(?:mode|provider|disclosure)|cloudflareinsights|RUM|siteToken|expectedToken/i);
   assert.doesNotMatch(networkContract, /cloudflareinsights|RUM|siteToken|expectedToken/i);
+  assert.match(onlineEditorCheck, /context\.request\.get\(new URL\(examplePath, base\)\.href, \{ maxRedirects: 0 \}\)/);
+  assert.match(onlineEditorCheck, /assert\.equal\(response\.status\(\), 200/);
 });
 
 test('CI installs only the browser binaries required by headless execution', () => {
