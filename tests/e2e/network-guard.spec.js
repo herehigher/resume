@@ -28,12 +28,13 @@ const forbiddenCases = [
     expected: /unexpected request \(GET same-origin\)/
   },
   {
-    name: '外部 RUM POST',
-    action: () => fetch('https://cloudflareinsights.com/cdn-cgi/rum', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ siteToken: 'a'.repeat(32) })
+    name: '外部第三方 POST',
+    action: () => fetch('https://third-party.example.invalid/collect', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: 'fictional-third-party-canary'
     }).catch(() => {}),
-    matches: (request) => request.method === 'POST' && request.url === 'https://cloudflareinsights.com/cdn-cgi/rum',
-    expected: /unexpected request \(POST external\)/
+    canaries: ['fictional-third-party-canary'],
+    matches: (request) => request.method === 'POST' && request.url === 'https://third-party.example.invalid/collect',
+    expected: /unexpected request \(POST external\).*resume canary appeared in a request URL or body/
   },
   {
     name: 'WebSocket',

@@ -97,7 +97,7 @@ Repository source、clone、fork は Analytics beacon を含みません。公�
 
 `PRODUCTION_ORIGIN` は GitHub Actions の repository variable と `scripts/deployment-path-contract.mjs` の両方で `https://rs.herehigher.com/` に固定します。公開 smoke は custom domain の root URL と app が管理する path / metadata / JSON contract を確認します。Analytics beacon の配信と provider-side processing は Cloudflare Pages の責任範囲です。
 
-現行 `Release Pages` workflow はまだ GitHub Pages の deployment action を使い、この変更だけでは Cloudflare Pages の delivery-layer injection を実証しません。Transport の Direct Upload への切替は #251 の範囲です。切替後に pages.dev と custom domain の両方で hosted smoke と Analytics injection を確認するまで、production hosting contract の実測完了とは扱いません。
+現行 `Release Pages` workflow はまだ GitHub Pages の deployment action を使います。deployment smoke は app-owned path と metadata の semantic contract を検査し、配信先の加工後の response bytes は比較しません。この issue の CLI / mock test は live hosting を実証しません。Transport の Direct Upload への切替は #251 の範囲です。切替後に pages.dev と custom domain の両方で live smoke を実行するまで、production hosting contract の実測完了とは扱いません。
 
 Release artifact preparation は `site/` の HTML path、file type、symlink、relative path を検査し、source tree を output へ exact copy します。Preparation CLI は network request や provider credential を使いません。Evidence は authorized source SHA、package version、source digest、artifact digest の4項目を記録し、source と artifact digest が一致しない場合は公開を止めます。Artifact digest の事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
 

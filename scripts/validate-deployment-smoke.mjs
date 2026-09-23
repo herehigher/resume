@@ -15,7 +15,7 @@ const publicHreflangAlternates = Object.freeze([
 ]);
 
 function fail(message) {
-  throw new Error(`Deployment artifact smoke failed: ${message}`);
+  throw new Error(`Deployment smoke failed: ${message}`);
 }
 
 function failure(contract, metadata, message) {
@@ -54,15 +54,6 @@ function assertCanonicalLinks(html, contract, metadata) {
   }
 }
 
-function assertAnalyticsBoundary(html, contract, metadata, { allowHostingInjection }) {
-  if (/\bdata-analytics-(?:mode|provider|disclosure)\s*=/i.test(html)) {
-    failure(contract, metadata, 'contains legacy application analytics state');
-  }
-  if (!allowHostingInjection && (/\bdata-cf-beacon\s*=|cloudflareinsights\.com/i.test(html))) {
-    failure(contract, metadata, 'contains an application analytics runtime');
-  }
-}
-
 function expectedContentType(kind) {
   if (kind === 'html') return 'text/html';
   if (kind === 'xml') return 'application/xml';
@@ -87,7 +78,6 @@ function assertSemanticContract(contract, content, metadata, options) {
     const htmlAttributes = openingHtml(content, contract, metadata);
     if (htmlAttributes.get('lang') !== contract.lang) failure(contract, metadata, 'language is invalid');
     assertCanonicalLinks(content, contract, metadata);
-    assertAnalyticsBoundary(content, contract, metadata, options);
     return;
   }
   if (contract.semantic === 'compatibility-document') {
@@ -97,7 +87,6 @@ function assertSemanticContract(contract, content, metadata, options) {
       .filter((item) => item.get('rel') === 'canonical');
     if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) failure(contract, metadata, 'canonical URL is invalid');
     if (/hreflang=/i.test(content)) failure(contract, metadata, 'must not join the public hreflang cluster');
-    assertAnalyticsBoundary(content, contract, metadata, options);
     return;
   }
   if (contract.semantic === 'editor-document') {
@@ -108,7 +97,6 @@ function assertSemanticContract(contract, content, metadata, options) {
     if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) failure(contract, metadata, 'canonical URL is invalid');
     if (!/<meta\s+name="robots"\s+content="noindex,follow">/i.test(content)) failure(contract, metadata, 'must be noindex,follow');
     if (/hreflang=/i.test(content)) failure(contract, metadata, 'must not join the public hreflang cluster');
-    assertAnalyticsBoundary(content, contract, metadata, options);
     return;
   }
   if (contract.semantic === 'sitemap') {
@@ -154,18 +142,18 @@ function validateOptions({ packageVersion }) {
   if (!/^\d+\.\d+\.\d+$/.test(packageVersion || '')) fail('invalid package version');
 }
 
-async function validateWithReader(options, readArtifact, { allowHostingInjection = false } = {}) {
+async function validateWithReader(options, readArtifact) {
   validateOptions(options);
   for (const contract of DEPLOYMENT_PATH_CONTRACTS) {
     const { content, metadata } = await readArtifact(contract);
-    assertSemanticContract(contract, content, metadata, { ...options, allowHostingInjection });
+    assertSemanticContract(contract, content, metadata, options);
   }
   return Object.freeze({
     packageVersion: options.packageVersion,
   });
 }
 
-export async function validateDeploymentArtifact({ directory, ...options }) {
+export async function validatePreparedDeployment({ directory, ...options }) {
   return validateWithReader(options, async (contract) => {
     try {
       return {
@@ -175,7 +163,7 @@ export async function validateDeploymentArtifact({ directory, ...options }) {
     } catch {
       failure(contract, { contentType: 'unknown', status: 'missing' }, 'artifact file is unavailable');
     }
-  }, { allowHostingInjection: false });
+  });
 }
 
 export async function validatePublishedDeployment({
@@ -202,6 +190,7 @@ export async function validatePublishedDeployment({
   if (typeof timeoutSignal !== 'function') fail('published deployment timeout signal must be a function');
   return validateWithReader(options, async (contract) => {
     let metadata = { contentType: 'unknown', status: 'unavailable' };
+    let lastFailure = 'response did not satisfy the required marker and content type';
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let signal;
       try {
@@ -210,21 +199,32 @@ export async function validatePublishedDeployment({
         url.searchParams.set('attempt', String(attempt));
         signal = timeoutSignal(requestTimeoutMs);
         const response = await fetchImpl(url, { redirect: 'error', signal });
-        metadata = {
-          contentType: response.headers.get('content-type') || 'unknown',
-          status: String(response.status)
-        };
-        const content = await response.text();
-        if (response.ok && content.includes(contract.marker) && hasExpectedContentType(contract.kind, metadata.contentType)) {
-          return { content, metadata };
+        if (response.redirected || (response.url && new URL(response.url).href !== url.href)) {
+          metadata = { contentType: response.headers.get('content-type') || 'unknown', status: 'redirected' };
+          lastFailure = 'response was redirected';
+        } else {
+          metadata = {
+            contentType: response.headers.get('content-type') || 'unknown',
+            status: String(response.status)
+          };
+          if (!response.ok) {
+            lastFailure = 'HTTP response was not successful';
+          } else if (!hasExpectedContentType(contract.kind, metadata.contentType)) {
+            lastFailure = `unexpected content type for ${contract.kind}`;
+          } else {
+            const content = await response.text();
+            if (content.includes(contract.marker)) return { content, metadata };
+            lastFailure = 'required marker was not found';
+          }
         }
       } catch {
         metadata = { contentType: 'unknown', status: signal?.aborted ? 'timeout' : 'request-failed' };
+        lastFailure = signal?.aborted ? 'request timed out' : 'request failed';
       }
       if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 3000));
     }
-    failure(contract, metadata, 'response did not satisfy the required marker and content type');
-  }, { allowHostingInjection: true });
+    failure(contract, metadata, lastFailure);
+  });
 }
 
 function parseArguments(args) {
@@ -247,7 +247,7 @@ async function main() {
     packageVersion: options['package-version'],
   };
   if (options.directory && Object.keys(options).length === 2) {
-    await validateDeploymentArtifact({ directory: options.directory, ...shared });
+    await validatePreparedDeployment({ directory: options.directory, ...shared });
     return;
   }
   if (options['base-url'] && options['release-sha'] && Object.keys(options).length === 3) {

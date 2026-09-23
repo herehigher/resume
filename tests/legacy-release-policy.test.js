@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { validateDeploymentArtifact } from '../scripts/validate-pages-smoke.mjs';
+import { validatePreparedDeployment } from '../scripts/validate-deployment-smoke.mjs';
 
 const oldProductionOrigin = 'https://herehigher.github.io/resume/';
 const packageVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -32,5 +32,5 @@ test('root smoke rejects metadata from the retired GitHub Pages mount', async (t
   const { site } = fixture(t);
   const entry = path.join(site, 'index.html');
   writeFileSync(entry, readFileSync(entry, 'utf8').replace('href="https://rs.herehigher.com/"', `href="${oldProductionOrigin}"`));
-  await assert.rejects(validateDeploymentArtifact({ directory: site, packageVersion }), /canonical URL is invalid/);
+  await assert.rejects(validatePreparedDeployment({ directory: site, packageVersion }), /canonical URL is invalid/);
 });
