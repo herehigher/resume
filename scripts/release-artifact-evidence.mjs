@@ -26,6 +26,7 @@ function validateEvidence(value) {
   if (!digestPattern.test(value.sourceDigest) || !digestPattern.test(value.artifactDigest)) {
     fail('artifact and source digests must be lowercase SHA-256 values');
   }
+  if (value.sourceDigest !== value.artifactDigest) fail('prepared artifact must be source-identical');
   if (value.analyticsDelivery !== ANALYTICS_DELIVERY_CONTRACT) fail('analytics delivery contract is invalid');
   return Object.freeze({ ...value });
 }

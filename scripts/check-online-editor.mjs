@@ -10,8 +10,8 @@ export async function checkOnlineEditor(baseUrl) {
   const base = new URL(baseUrl);
   const local = ['127.0.0.1', 'localhost'].includes(base.hostname);
   assert.ok((base.protocol === 'https:' || (local && base.protocol === 'http:'))
-    && !base.username && !base.password && !base.search && !base.hash && base.pathname.endsWith('/'),
-  'Use an HTTPS site URL ending in / (HTTP loopback is allowed for local tests).');
+    && !base.username && !base.password && !base.search && !base.hash && base.pathname === '/',
+  'Use an HTTPS origin root (HTTP loopback root is allowed for local tests).');
   const browser = await chromium.launch();
   const pageErrors = [];
   const context = await browser.newContext({ serviceWorkers: 'block' });

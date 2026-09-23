@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { computeTreeDigest } from '../scripts/prepare-pages-artifact.mjs';
 import {
   createArtifactEvidence,
   verifyArtifactEvidence,
@@ -33,6 +34,23 @@ test('artifact evidence binds immutable bytes, package version, and source SHA',
   const verified = await verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha });
   assert.deepEqual(verified, created);
   assert.equal(created.analyticsDelivery, 'hosting-managed');
+});
+
+test('artifact evidence rejects source and prepared artifact digest mismatches', async (t) => {
+  const { artifact, evidence, source } = fixture(t);
+  const sha = 'f'.repeat(40);
+  writeFileSync(path.join(artifact, 'index.html'), `${readFileSync(path.join(artifact, 'index.html'), 'utf8')}\n`);
+  await assert.rejects(createArtifactEvidence({ artifactDirectory: artifact, sourceDirectory: source, sourceSha: sha }), /source-identical/);
+
+  const packageVersion = JSON.parse(readFileSync(path.join(source, 'package.json'), 'utf8')).version;
+  writeFileSync(evidence, `${JSON.stringify({
+    analyticsDelivery: 'hosting-managed',
+    artifactDigest: await computeTreeDigest(artifact),
+    packageVersion,
+    sourceDigest: await computeTreeDigest(path.join(source, 'site')),
+    sourceSha: sha
+  })}\n`);
+  await assert.rejects(verifyArtifactEvidence({ artifactDirectory: artifact, evidencePath: evidence, sourceDirectory: source, sourceSha: sha }), /source-identical/);
 });
 
 test('artifact evidence rejects mismatched source, artifact, and resume attempts', async (t) => {
