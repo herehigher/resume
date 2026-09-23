@@ -73,6 +73,46 @@ test('prepared artifact validates its paths, language metadata, Schema, and vers
   assert.equal(cli.status, 0, cli.stderr);
 });
 
+test('prepared deployment smoke detects locale, URL, indexability, sitemap, Schema, and version regressions', async (t) => {
+  const temporary = temporaryDirectory(t);
+  const cases = [
+    ['locale', 'en/index.html', (content) => content.replace('lang="en"', 'lang="ja"'), /language is invalid/],
+    ['canonical', 'index.html', (content) => content.replace(
+      '<link rel="canonical" href="https://rs.herehigher.com/">',
+      '<link rel="canonical" href="https://example.invalid/">'
+    ), /canonical URL is invalid/],
+    ['hreflang cluster', 'index.html', (content) => content.replace(
+      '</head>', '<link rel="alternate" hreflang="fr" href="https://example.invalid/">\n</head>'
+    ), /alternate URL set is invalid/],
+    ['compatibility hreflang', 'ja/index.html', (content) => content.replace(
+      '</head>', '<link rel="alternate" hreflang="ja" href="https://rs.herehigher.com/ja/">\n</head>'
+    ), /must not join the public hreflang cluster/],
+    ['editor indexability', 'editor/index.html', (content) => content.replace('noindex,follow', 'index,follow'), /must be noindex,follow/],
+    ['sitemap canonical URLs', 'sitemap.xml', (content) => content.replace(
+      '<loc>https://rs.herehigher.com/en/</loc>', '<loc>https://example.invalid/en/</loc>'
+    ), /does not match public document canonical URLs/],
+    ['Schema identity', 'schema/resume-studio-web-v4.schema.json', (content) => content.replace(
+      'https://rs.herehigher.com/schema/', 'https://example.invalid/schema/'
+    ), /identity or title is invalid/],
+    ['example version', 'schema/resume-studio-web-v4.example.json', (content) => content.replace(
+      '"version": 4', '"version": 3'
+    ), /version is invalid/],
+    ['APP_VERSION', 'assets/js/config.js', (content) => content.replace(
+      `APP_VERSION = '${packageVersion}'`, "APP_VERSION = '9.9.9'"
+    ), /APP_VERSION does not match package version/]
+  ];
+
+  for (const [name, artifactPath, mutate, expected] of cases) {
+    const candidate = path.join(temporary, `${name}-source`);
+    const prepared = path.join(temporary, `${name}-prepared`);
+    cpSync(source, candidate, { recursive: true });
+    await prepareArtifact({ outputDirectory: prepared, sourceDirectory: candidate });
+    const target = path.join(prepared, artifactPath);
+    writeFileSync(target, mutate(readFileSync(target, 'utf8')));
+    await assert.rejects(validatePreparedDeployment({ directory: prepared, packageVersion }), expected, name);
+  }
+});
+
 test('prepared and published deployment use the same semantic contract on custom and pages.dev roots', async (t) => {
   const temporary = temporaryDirectory(t);
   const candidate = path.join(temporary, 'source-copy');
