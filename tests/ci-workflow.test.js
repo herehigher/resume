@@ -7,6 +7,9 @@ const eligibilityWorkflow = readFileSync(new URL('../.github/workflows/release-e
 const releaseWorkflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 const candidateWorkflow = readFileSync(new URL('../.github/workflows/release-candidate-assets.yml', import.meta.url), 'utf8');
 const playwrightConfig = readFileSync(new URL('../playwright.config.js', import.meta.url), 'utf8');
+const deploymentSmoke = readFileSync(new URL('../scripts/validate-deployment-smoke.mjs', import.meta.url), 'utf8');
+const onlineEditorCheck = readFileSync(new URL('../scripts/check-online-editor.mjs', import.meta.url), 'utf8');
+const networkContract = readFileSync(new URL('../scripts/network-contract.mjs', import.meta.url), 'utf8');
 
 function workflowJobBlock(workflow, name) {
   const start = workflow.indexOf(`  ${name}:\n`);
@@ -124,11 +127,19 @@ test('release prepares provider-neutral site bytes and smokes the production ori
   assert.doesNotMatch(releaseWorkflow, /--manifest/);
   assert.match(releaseWorkflow, /name: site-release-artifact-/);
   assert.match(releaseWorkflow, /artifact-dir "\$RUNNER_TEMP\/prepared\/site-artifact"/);
-  assert.match(releaseWorkflow, /PRODUCTION_ORIGIN: \$\{\{ vars\.PRODUCTION_ORIGIN \}\}[\s\S]+test "\$PRODUCTION_ORIGIN" = 'https:\/\/rs\.herehigher\.com\/'[\s\S]+validate-pages-smoke\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
+  assert.match(releaseWorkflow, /PRODUCTION_ORIGIN: \$\{\{ vars\.PRODUCTION_ORIGIN \}\}[\s\S]+test "\$PRODUCTION_ORIGIN" = 'https:\/\/rs\.herehigher\.com\/'[\s\S]+validate-deployment-smoke\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
   assert.match(releaseWorkflow, /check-online-editor\.mjs --base-url "\$PRODUCTION_ORIGIN"/);
   assert.doesNotMatch(releaseWorkflow, /steps\.deployment\.outputs\.page_url|PAGE_URL/);
   assert.doesNotMatch(releaseWorkflow, /recovery|rollback/i);
-  assert.match(releaseWorkflow, /Cloudflare Pages Analytics injection and manual browser acceptance remain unverified/);
+  assert.match(releaseWorkflow, /live pages\.dev\/custom-domain checks after the destination switch and manual browser acceptance remain unverified/);
+});
+
+test('deployment and online editor smoke use provider-neutral contracts', () => {
+  assert.doesNotMatch(deploymentSmoke, /data-cf-beacon|data-analytics-(?:mode|provider|disclosure)|cloudflareinsights|RUM|expectedToken/i);
+  assert.doesNotMatch(onlineEditorCheck, /data-analytics-(?:mode|provider|disclosure)|cloudflareinsights|RUM|siteToken|expectedToken/i);
+  assert.doesNotMatch(networkContract, /cloudflareinsights|RUM|siteToken|expectedToken/i);
+  assert.match(onlineEditorCheck, /context\.request\.get\(new URL\(examplePath, base\)\.href, \{ maxRedirects: 0 \}\)/);
+  assert.match(onlineEditorCheck, /assert\.equal\(response\.status\(\), 200/);
 });
 
 test('CI installs only the browser binaries required by headless execution', () => {

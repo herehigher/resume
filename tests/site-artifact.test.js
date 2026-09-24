@@ -21,7 +21,6 @@ import {
   prepareArtifact,
   validateReleaseSource
 } from '../scripts/prepare-site-artifact.mjs';
-import { CLOUDFLARE_BEACON_URL } from '../scripts/cloudflare-analytics.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sourceSite = path.join(root, 'site');
@@ -104,7 +103,7 @@ test('site source validation rejects beacon, legacy state, missing notice, body,
   const cases = [
     ['existing beacon', (site) => {
       const file = path.join(site, 'index.html');
-      writeFileSync(file, readFileSync(file, 'utf8').replace('</body>', `<script src="${CLOUDFLARE_BEACON_URL}"></script></body>`));
+      writeFileSync(file, readFileSync(file, 'utf8').replace('</body>', '<script src="https://static.cloudflareinsights.com/beacon.min.js"></script></body>'));
     }],
     ['missing body', (site) => {
       const file = path.join(site, 'index.html');
@@ -197,5 +196,5 @@ test('prepare CLI builds and reports the byte-identical site artifact', async (t
   assert.ok(readFileSync(actionsOutput, 'utf8').includes(`source_digest=${digest}\n`));
   const html = readFileSync(path.join(output, 'editor/index.html'), 'utf8');
   assert.equal(digest, await computeTreeDigest(sourceSite));
-  assert.ok(!html.includes(CLOUDFLARE_BEACON_URL));
+  assert.doesNotMatch(html, /\bdata-cf-beacon\s*=|cloudflareinsights\.com/i);
 });

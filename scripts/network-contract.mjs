@@ -2,7 +2,6 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CLOUDFLARE_BEACON_URL, isAllowedCloudflareAnalyticsRequest } from './cloudflare-analytics.mjs';
 import { documentUrlPaths } from './deployment-path-contract.mjs';
 
 const siteRoot = fileURLToPath(new URL('../site/', import.meta.url));
@@ -42,18 +41,16 @@ export function requestDetails(request) {
   };
 }
 
-export function isAllowedNetworkRequest(request, { allowBlockedBeaconScript = false, baseUrl, expectedToken = '' }) {
+export function isAllowedNetworkRequest(request, { allowBlockedThirdPartyScripts = false, baseUrl }) {
   const base = new URL(baseUrl);
   const url = new URL(request.url);
   if (!['http:', 'https:'].includes(url.protocol)) return true;
   if (url.username || url.password || url.hash) return false;
   if (url.origin !== base.origin) {
-    if (allowBlockedBeaconScript
+    return allowBlockedThirdPartyScripts
       && request.method === 'GET'
       && request.resourceType === 'script'
-      && request.postData === null
-      && request.url === CLOUDFLARE_BEACON_URL) return true;
-    return isAllowedCloudflareAnalyticsRequest({ ...request, expectedOrigin: base.origin, expectedToken });
+      && request.postData === null;
   }
   const pathname = mountedPath(url, base);
   if (request.method !== 'GET' || request.postData !== null || !pathname) return false;
@@ -80,7 +77,7 @@ function includesCanary(request, canaries) {
   return canaries.some((canary) => values.some((value) => value.includes(canary)));
 }
 
-export function observeNetwork(context, { allowBlockedBeaconScript = false, baseUrl, expectedToken = '' }) {
+export function observeNetwork(context, { allowBlockedThirdPartyScripts = false, baseUrl }) {
   const requests = [];
   const webSockets = [];
   const observeRequest = (request) => requests.push(requestDetails(request));
@@ -100,7 +97,7 @@ export function observeNetwork(context, { allowBlockedBeaconScript = false, base
     webSockets,
     assertClean({ canaries = [] } = {}) {
       const unexpected = requests.filter((request) => !isAllowedNetworkRequest(request, {
-        allowBlockedBeaconScript, baseUrl, expectedToken
+        allowBlockedThirdPartyScripts, baseUrl
       }));
       const leaked = requests.filter((request) => includesCanary(request, canaries));
       const failures = [];

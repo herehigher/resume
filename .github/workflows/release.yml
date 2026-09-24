@@ -149,7 +149,7 @@ jobs:
           node scripts/release-artifact-evidence.mjs create \
             --artifact-dir "$RUNNER_TEMP/site-artifact" --evidence "$RUNNER_TEMP/release-evidence.json" \
             --source-dir "$SOURCE_ROOT" --source-sha "$RELEASE_SHA"
-          node scripts/validate-pages-smoke.mjs --directory "$RUNNER_TEMP/site-artifact" \
+          node scripts/validate-deployment-smoke.mjs --directory "$RUNNER_TEMP/site-artifact" \
             --package-version "$(jq -r .version "$SOURCE_ROOT/package.json")"
 
       - name: Export non-secret artifact evidence
@@ -328,17 +328,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$PRODUCTION_ORIGIN" = 'https://rs.herehigher.com/'
-          node scripts/validate-pages-smoke.mjs --base-url "$PRODUCTION_ORIGIN" --release-sha "$RELEASE_SHA" \
+          node scripts/validate-deployment-smoke.mjs --base-url "$PRODUCTION_ORIGIN" --release-sha "$RELEASE_SHA" \
             --package-version "${RELEASE_TAG#v}"
           node scripts/check-online-editor.mjs --base-url "$PRODUCTION_ORIGIN"
           {
-            echo '## Pages release result'
+            echo '## Production deployment result'
             echo
             echo "- Tag: \`$RELEASE_TAG\`"
             echo "- Source SHA: \`$RELEASE_SHA\`"
             echo "- Artifact ID: \`${{ needs.prepare.outputs.prepared_artifact_id }}\`"
             echo "- URL: ${PRODUCTION_ORIGIN}"
-            echo '- Smoke: passed; Cloudflare Pages Analytics injection and manual browser acceptance remain unverified.'
+            echo '- Smoke: application paths, metadata, Schema, and version passed; live pages.dev/custom-domain checks after the destination switch and manual browser acceptance remain unverified.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record publication outcome
@@ -351,7 +351,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo '## Pages publication outcome'
+            echo '## Production publication outcome'
             echo
             echo "- Tag: \`${RELEASE_TAG}\`"
             echo "- Source SHA: \`${RELEASE_SHA:-unavailable}\`"
@@ -360,5 +360,5 @@ jobs:
             echo "- URL: ${PRODUCTION_ORIGIN:-unavailable}"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Tag: ${{ steps.tag.outcome }}; deploy: ${{ steps.deployment.outcome }}; smoke: ${{ steps.smoke.outcome }}"
-            echo '- Unverified: Cloudflare Pages Analytics injection and manual browser acceptance.'
+            echo '- Unverified: live pages.dev/custom-domain checks after the destination switch and manual browser acceptance.'
           } >> "$GITHUB_STEP_SUMMARY"

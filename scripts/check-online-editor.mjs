@@ -15,10 +15,9 @@ export async function checkOnlineEditor(baseUrl) {
   const browser = await chromium.launch();
   const pageErrors = [];
   const context = await browser.newContext({ serviceWorkers: 'block' });
-  // Routes block the fixed beacon GET; no RUM request is allowed in this deterministic app check.
-  const network = observeNetwork(context, { allowBlockedBeaconScript: true, baseUrl });
+  const network = observeNetwork(context, { allowBlockedThirdPartyScripts: true, baseUrl });
   try {
-    // Third-party runtime is blocked; this checks the editor, not the live RUM provider.
+    // Third-party requests are blocked before delivery; only blocked script fetches are tolerated.
     await context.route('**/*', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
@@ -29,7 +28,8 @@ export async function checkOnlineEditor(baseUrl) {
       await route.continue();
     });
     const examplePath = DEPLOYMENT_PATH_CONTRACTS.find((item) => item.semantic === 'import-example').urlPath;
-    const response = await context.request.get(new URL(examplePath, base).href);
+    // APIRequestContext bypasses browser routes; never follow a redirect from the example URL.
+    const response = await context.request.get(new URL(examplePath, base).href, { maxRedirects: 0 });
     assert.equal(response.status(), 200, 'Published example must be available.');
     const example = await response.json();
     assert.equal(example.version, 4);
@@ -48,9 +48,6 @@ export async function checkOnlineEditor(baseUrl) {
       assert.equal(result.status(), 200, `${locale}: editor response`);
       await expect(page.locator('#localeSelect')).toHaveValue(locale);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
-      const html = await page.locator('html').evaluate((element) => element.outerHTML);
-      assert.doesNotMatch(html, /\bdata-analytics-(?:mode|provider)\s*=/i,
-        `${locale}: the app must not expose an Analytics mode/provider state`);
       await page.locator('#importDataInput').setInputFiles({
         name: 'fictional-online-check.json', mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(example))
@@ -61,8 +58,8 @@ export async function checkOnlineEditor(baseUrl) {
       await page.close();
     }
     assert.deepEqual(pageErrors, [], 'Editor must execute without page errors.');
-    network.assertClean();
-    console.log('Editor smoke passed: ja, zh-CN, en and public example import. Third-party scripts blocked; live RUM receipt and human acceptance unverified.');
+    network.assertClean({ canaries: ['Fictional Online Check', 'online-check@example.invalid'] });
+    console.log('Editor smoke passed: ja, zh-CN, en and public example import. Third-party requests were blocked; live hosting checks and human acceptance remain unverified.');
   } finally {
     network.dispose();
     await context.close();
