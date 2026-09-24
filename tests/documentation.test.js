@@ -102,11 +102,12 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /Version を変えない PR で展示 asset を変更してはいけません/);
   assert.match(playbook, /promotion 元 artifact の exact bytes/);
   assert.match(playbook, /同じ job が fresh に生成した artifact/);
-  assert.match(playbook, /Release eligibility[\s\S]*通常の main 更新[\s\S]*`Release Pages` の run を作りません/);
-  assert.match(playbook, /Release Pages[\s\S]*immutable tag[\s\S]*単一の artifact[\s\S]*online smoke/);
-  assert.match(playbook, /まだ GitHub Pages の deployment action/);
-  assert.match(playbook, /#251/);
-  assert.match(playbook, /pages\.dev と custom domain の両方/);
+  assert.match(playbook, /Release eligibility[\s\S]*通常の main 更新[\s\S]*`Release production` の run を作りません/);
+  assert.match(playbook, /immutable tag[\s\S]*単一の artifact[\s\S]*Cloudflare preview smoke[\s\S]*production Direct Upload[\s\S]*Pages\.dev と custom domain/);
+  assert.match(playbook, /production branch `main`[\s\S]*認可済み tag \/ SHA と artifact/);
+  assert.doesNotMatch(playbook, /まだ GitHub Pages の deployment action/);
+  assert.match(playbook, /#251 の live hosting 完了判定/);
+  assert.match(playbook, /Pages\.dev と custom domain の双方/);
 });
 
 test('the public v4 JSON example remains importable under the runtime data contract', () => {

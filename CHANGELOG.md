@@ -6,6 +6,19 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-24
+
+### Changed / 変更
+
+- 正式公開先を Cloudflare Pages Direct Upload と custom domain の root に移行。承認済み release の同一 artifact を preview で検査してから production に配布し、両 URL で application と online editor を確認する。
+- 配布 artifact を source と同一 bytes に保ち、Web Analytics を Cloudflare Pages の配信層で管理。公開 origin、metadata、privacy の説明を root hosting に合わせる。
+- 公開候補の展示 asset を固定 commit から生成・照合する手順を整備。
+
+### Fixed / 修正
+
+- 日本語履歴書の改ページ位置を PDF の実際の record 境界と一致させる。
+- 日本語の繰り返し入力行と年月欄が smartphone、iPad、横向き画面で崩れる問題を修正。
+
 ## [0.4.0] - 2026-09-20
 
 ### Added / 追加
