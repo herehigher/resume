@@ -117,7 +117,7 @@ test('only Release eligibility dispatches Release Pages after merged-version aut
 
 test('prepare, tag, and deploy reuse one exact artifact under the production lock', () => {
   assert.match(releaseWorkflow, /publish:[\s\S]+needs: \[authorize, prepare\][\s\S]+artifact-ids: \$\{\{ needs\.prepare\.outputs\.prepared_artifact_id \}\}[\s\S]+run-id: \$\{\{ github\.run_id \}\}/);
-  assert.match(releaseWorkflow, /publish:[\s\S]+concurrency:[\s\S]+group: pages-production[\s\S]+Recheck current version under the production lock[\s\S]+prepared_version" = "\$current_version"[\s\S]+Reverify bytes and create or resume the immutable tag[\s\S]+Verify original bytes against the tagged source[\s\S]+Deploy the verified artifact to Cloudflare Pages/);
+  assert.match(releaseWorkflow, /publish:[\s\S]+concurrency:[\s\S]+group: pages-production[\s\S]+Recheck current version under the production lock[\s\S]+prepared_version" = "\$current_version"[\s\S]+Reverify bytes and create or resume the immutable tag[\s\S]+Verify original bytes against the tagged source[\s\S]+Deploy the verified artifact to the Cloudflare preview environment[\s\S]+Reverify the prepared artifact before production upload[\s\S]+Deploy the verified artifact to the Cloudflare production environment/);
   assert.doesNotMatch(releaseWorkflow, /^concurrency:/m);
 });
 
@@ -131,34 +131,77 @@ test('release prepares provider-neutral site bytes and smokes the production ori
   assert.match(releaseWorkflow, /check-online-editor\.mjs --base-url "\$base_url"/);
   assert.doesNotMatch(releaseWorkflow, /steps\.deployment\.outputs\.page_url|PAGE_URL/);
   assert.doesNotMatch(releaseWorkflow, /recovery|rollback/i);
-  assert.match(releaseWorkflow, /Pages\.dev smoke: application \$\{PAGES_DEV_APPLICATION_SMOKE:-not-run\}; online editor \$\{PAGES_DEV_EDITOR_SMOKE:-not-run\}/);
-  assert.match(releaseWorkflow, /Production smoke: application \$\{PRODUCTION_APPLICATION_SMOKE:-not-run\}; online editor \$\{PRODUCTION_EDITOR_SMOKE:-not-run\}/);
+  assert.match(releaseWorkflow, /Preview smoke: application \$\{PREVIEW_APPLICATION_SMOKE:-not-run\}; online editor \$\{PREVIEW_EDITOR_SMOKE:-not-run\}/);
+  assert.match(releaseWorkflow, /Production Pages\.dev smoke: application \$\{PRODUCTION_PAGES_APPLICATION_SMOKE:-not-run\}; online editor \$\{PRODUCTION_PAGES_EDITOR_SMOKE:-not-run\}/);
+  assert.match(releaseWorkflow, /Custom domain smoke: application \$\{CUSTOM_DOMAIN_APPLICATION_SMOKE:-not-run\}; online editor \$\{CUSTOM_DOMAIN_EDITOR_SMOKE:-not-run\}/);
   assert.doesNotMatch(releaseWorkflow, /live pages\.dev\/custom-domain checks after the destination switch/);
 });
 
-test('release workflow uses Cloudflare Pages Direct Upload and production-only outputs', () => {
+test('release workflow requires preview smoke and unchanged artifact before production Direct Upload', () => {
   const publishJob = workflowJobBlock(releaseWorkflow, 'publish');
   const project = workflowStep(publishJob, 'Validate configured Cloudflare Pages project');
-  const deploy = workflowStep(publishJob, 'Deploy the verified artifact to Cloudflare Pages');
+  const productionBranch = workflowStep(publishJob, 'Validate configured Cloudflare Pages production branch');
+  const previewBranch = workflowStep(publishJob, 'Resolve release preview branch');
+  const collisionCheck = workflowStep(publishJob, 'Reject a preview branch that collides with production');
+  const previewPagesProject = workflowStep(publishJob, 'Verify Cloudflare production branch before preview upload');
+  const productionPagesProject = workflowStep(publishJob, 'Verify Cloudflare production branch before production upload');
+  const previewDeploy = workflowStep(publishJob, 'Deploy the verified artifact to the Cloudflare preview environment');
+  const previewValidate = workflowStep(publishJob, 'Validate the Pages preview deployment identity');
+  const previewSmoke = workflowStep(publishJob, 'Smoke test the Cloudflare preview deployment');
+  const reverify = workflowStep(publishJob, 'Reverify the prepared artifact before production upload');
+  const deploy = workflowStep(publishJob, 'Deploy the verified artifact to the Cloudflare production environment');
   const validate = workflowStep(publishJob, 'Validate the Pages production deployment identity');
-  const smoke = workflowStep(publishJob, 'Smoke test Pages.dev deployment and production origin');
+  const smoke = workflowStep(publishJob, 'Smoke test production Pages.dev deployment and custom domain');
   assert.match(releaseWorkflow, /name: production[\s\S]+url: \$\{\{ vars\.PRODUCTION_ORIGIN \}\}/);
   assert.match(project.body, /CLOUDFLARE_PAGES_PROJECT[\s\S]+\^\[a-z0-9\]\(\[a-z0-9-\]\{0,61\}\[a-z0-9\]\)\?\$/);
+  assert.match(productionBranch.body, /vars\.CLOUDFLARE_PAGES_PRODUCTION_BRANCH[\s\S]+validate-cloudflare-pages-branch\.mjs/);
+  assert.match(previewBranch.body, /release-preview-branch\.mjs --tag "\$RELEASE_TAG"/);
+  assert.match(collisionCheck.body, /PREVIEW_BRANCH" == "\$PRODUCTION_BRANCH"[\s\S]+exit 1/);
+  for (const pagesProject of [previewPagesProject, productionPagesProject]) {
+    assert.match(pagesProject.body, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
+    assert.match(pagesProject.body, /Authorization: Bearer \$CLOUDFLARE_API_TOKEN/);
+    assert.match(pagesProject.body, /\/accounts\/\$CLOUDFLARE_ACCOUNT_ID\/pages\/projects\/\$CLOUDFLARE_PAGES_PROJECT/);
+    assert.match(pagesProject.body, /verify-cloudflare-pages-project\.mjs[\s\S]+--production-branch "\$PRODUCTION_BRANCH" --preview-branch "\$PREVIEW_BRANCH"/);
+    assert.match(pagesProject.body, /trap 'rm -f "\$response_file"' EXIT/);
+  }
+  assert.match(previewDeploy.body, /uses: cloudflare\/wrangler-action@v4/);
+  assert.match(previewDeploy.body, /secrets\.CLOUDFLARE_API_TOKEN/);
+  assert.match(previewDeploy.body, /vars\.CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(previewDeploy.body, /vars\.CLOUDFLARE_PAGES_PROJECT/);
+  assert.match(previewDeploy.body, /command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\} --branch=\$\{\{ steps\.preview_branch\.outputs\.branch \}\} --commit-hash=\$\{\{ needs\.authorize\.outputs\.release_sha \}\}/);
+  assert.doesNotMatch(previewDeploy.body, /\$RUNNER_TEMP|\$CLOUDFLARE_PAGES_PROJECT/);
+  assert.match(previewValidate.body, /steps\.preview_deployment\.outputs\.pages-environment/);
+  assert.match(previewValidate.body, /steps\.preview_deployment\.outputs\.deployment-url/);
+  assert.match(previewValidate.body, /--expected-environment preview/);
+  assert.match(previewSmoke.body, /steps\.preview_identity\.outcome == 'success'[\s\S]+steps\.smoke_dependencies\.outcome == 'success'/);
+  assert.match(previewSmoke.body, /validate-deployment-smoke\.mjs --base-url "\$PREVIEW_URL"[\s\S]+check-online-editor\.mjs --base-url "\$PREVIEW_URL"/);
+  assert.match(reverify.body, /release-artifact-evidence\.mjs verify[\s\S]+--artifact-dir "\$RUNNER_TEMP\/prepared\/site-artifact"/);
   assert.match(deploy.body, /uses: cloudflare\/wrangler-action@v4/);
   assert.match(deploy.body, /secrets\.CLOUDFLARE_API_TOKEN/);
   assert.match(deploy.body, /vars\.CLOUDFLARE_ACCOUNT_ID/);
   assert.match(deploy.body, /vars\.CLOUDFLARE_PAGES_PROJECT/);
-  assert.match(deploy.body, /command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\}/);
+  assert.match(deploy.body, /command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\} --branch=\$\{\{ steps\.production_pages_project\.outputs\.branch \}\} --commit-hash=\$\{\{ needs\.authorize\.outputs\.release_sha \}\}/);
   assert.doesNotMatch(deploy.body, /\$RUNNER_TEMP|\$CLOUDFLARE_PAGES_PROJECT/);
-  assert.doesNotMatch(deploy.body, /--branch(?:=|\s)/);
-  assert.ok(project.index < deploy.index);
-  assert.match(validate.body, /steps\.deployment\.outputs\.pages-environment/);
-  assert.match(validate.body, /steps\.deployment\.outputs\.deployment-url/);
+  assert.ok(project.index < productionBranch.index && productionBranch.index < previewBranch.index);
+  assert.match(validate.body, /steps\.production_deployment\.outputs\.pages-environment/);
+  assert.match(validate.body, /steps\.production_deployment\.outputs\.deployment-url/);
+  assert.match(validate.body, /--expected-environment production/);
   assert.match(validate.body, /validate-cloudflare-pages-deployment\.mjs/);
-  assert.ok(deploy.index < validate.index && validate.index < smoke.index);
-  assert.match(smoke.body, /run_smoke pages_dev "\$PAGES_DEV_URL"[\s\S]+run_smoke production "\$PRODUCTION_ORIGIN"/);
-  assert.match(releaseWorkflow, /Pages target: Direct Upload default \(no branch override\)/);
-  assert.doesNotMatch(releaseWorkflow, /--branch(?:=|\s)|Pages production branch: `main`/);
+  assert.match(smoke.body, /run_smoke pages_dev "\$PAGES_DEV_URL"[\s\S]+run_smoke custom_domain "\$PRODUCTION_ORIGIN"/);
+  assert.ok(project.index < productionBranch.index && productionBranch.index < previewBranch.index
+    && previewBranch.index < previewDeploy.index
+    && previewDeploy.index < previewValidate.index && previewValidate.index < previewSmoke.index
+    && previewSmoke.index < reverify.index && reverify.index < deploy.index
+    && deploy.index < validate.index && validate.index < smoke.index);
+  assert.match(releaseWorkflow, /Preview smoke: application \$\{PREVIEW_APPLICATION_SMOKE:-not-run\}; online editor \$\{PREVIEW_EDITOR_SMOKE:-not-run\}/);
+  assert.match(releaseWorkflow, /Production Direct Upload: \$\{production_deployment_status\}/);
+  assert.match(releaseWorkflow, /summarize_outcome "\$\{PRODUCTION_DEPLOYMENT_OUTCOME:-\}"/);
+  assert.match(releaseWorkflow, /Production Pages branch: .*configured Cloudflare production route label/);
+  assert.match(releaseWorkflow, /Artifact source: authorized release SHA[\s\S]+commit-hash[\s\S]+to both uploads/);
+  assert.doesNotMatch(releaseWorkflow, /Pages production branch: `main`/);
+  assert.ok(productionBranch.index < previewBranch.index && previewBranch.index < collisionCheck.index
+    && collisionCheck.index < previewPagesProject.index && previewPagesProject.index < previewDeploy.index
+    && previewSmoke.index < productionPagesProject.index && productionPagesProject.index < reverify.index);
   assert.doesNotMatch(releaseWorkflow, /actions\/upload-pages-artifact|actions\/deploy-pages|github-pages|id-token:\s*write|pages:\s*write/);
 });
 

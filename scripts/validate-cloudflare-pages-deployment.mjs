@@ -9,8 +9,14 @@ function isDnsLabel(label) {
   return label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label);
 }
 
-export function validateCloudflarePagesDeployment({ deploymentUrl, pagesEnvironment, projectName }) {
-  if (pagesEnvironment !== 'production') fail('deployment must target the production environment');
+export function validateCloudflarePagesDeployment({
+  deploymentUrl,
+  expectedEnvironment,
+  pagesEnvironment,
+  projectName
+}) {
+  if (!['preview', 'production'].includes(expectedEnvironment)) fail('expected Pages environment is invalid');
+  if (pagesEnvironment !== expectedEnvironment) fail(`deployment must target the ${expectedEnvironment} environment`);
   if (typeof projectName !== 'string' || !isDnsLabel(projectName)) fail('configured Pages project name is invalid');
   if (typeof deploymentUrl !== 'string' || deploymentUrl !== deploymentUrl.trim()) fail('deployment URL is invalid');
 
@@ -46,18 +52,21 @@ function parseArguments(args) {
   for (let index = 0; index < args.length; index += 2) {
     const option = args[index];
     const value = args[index + 1];
-    if (!['--deployment-url', '--pages-environment', '--project-name'].includes(option)
+    if (!['--deployment-url', '--expected-environment', '--pages-environment', '--project-name'].includes(option)
       || !value || values.has(option)) {
-      fail('provide deployment URL, Pages environment, and project name');
+      fail('provide deployment URL, expected environment, Pages environment, and project name');
     }
     values.set(option, value);
   }
-  if (args.length !== 6 || values.size !== 3) fail('provide deployment URL, Pages environment, and project name');
+  if (args.length !== 8 || values.size !== 4) {
+    fail('provide deployment URL, expected environment, Pages environment, and project name');
+  }
   return {
     deploymentUrl: values.get('--deployment-url'),
+    expectedEnvironment: values.get('--expected-environment'),
     pagesEnvironment: values.get('--pages-environment'),
     projectName: values.get('--project-name')
-  };
+};
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
