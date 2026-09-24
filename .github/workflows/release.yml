@@ -546,7 +546,6 @@ jobs:
           PREVIEW_BRANCH_CONFIG_OUTCOME: ${{ steps.preview_pages_project.outcome }}
           PRODUCTION_BRANCH_CONFIG_OUTCOME: ${{ steps.production_pages_project.outcome }}
           PREVIEW_DEPLOYMENT_OUTCOME: ${{ steps.preview_deployment.outcome }}
-          PREVIEW_BRANCH_CONFIG_OUTCOME: ${{ steps.preview_pages_project.outcome }}
           PREVIEW_PAGES_ENVIRONMENT: ${{ steps.preview_deployment.outputs.pages-environment }}
           PREVIEW_IDENTITY_OUTCOME: ${{ steps.preview_identity.outcome }}
           PREVIEW_DEPLOYMENT_URL: ${{ steps.preview_identity.outputs.deployment_url }}
@@ -554,7 +553,6 @@ jobs:
           PREVIEW_EDITOR_SMOKE: ${{ steps.preview_smoke.outputs.editor }}
           PREVIEW_SMOKE_OUTCOME: ${{ steps.preview_smoke.outcome }}
           PRODUCTION_ARTIFACT_VERIFY_OUTCOME: ${{ steps.production_artifact_verify.outcome }}
-          PRODUCTION_BRANCH_CONFIG_OUTCOME: ${{ steps.production_pages_project.outcome }}
           PRODUCTION_DEPLOYMENT_OUTCOME: ${{ steps.production_deployment.outcome }}
           PRODUCTION_PAGES_ENVIRONMENT: ${{ steps.production_deployment.outputs.pages-environment }}
           PRODUCTION_IDENTITY_OUTCOME: ${{ steps.production_identity.outcome }}
