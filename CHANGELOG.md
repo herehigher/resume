@@ -6,6 +6,12 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-24
+
+### Changed / 変更
+
+- 日本語・简体中文・English の公開ページで、ローカル処理、ログイン不要、暗号化された下書きの自動保存、ライブプレビュー、PDF / JSON 書き出しを Open Graph / X カードの文言に反映しました。
+
 ## [0.4.1] - 2026-09-24
 
 ### Changed / 変更
