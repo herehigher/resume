@@ -18,17 +18,23 @@ import { parseImportedState } from '../site/assets/js/state/storage.js';
 
 const routePresentation = Object.freeze({
   'en/index.html': {
-    h1: 'Create an English resume', brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/',
+    h1: 'Create an English resume', title: 'Free resume builder. Your data stays on your device — Resume Studio',
+    description: 'No sign-in needed. Create a resume in your browser; your data stays on your device, and drafts are encrypted and saved automatically. Preview as you write, then export to PDF or JSON.',
+    brandSubtitle: 'ATS-friendly English Resume', assetPath: '../assets/favicon/',
     openGraphLocale: 'en_US', openGraphAlternates: ['ja_JP', 'zh_CN'], openGraphImage: 'resume-studio-og-en.png',
     openGraphImageAlt: 'Resume Studio — Build your resume. Keep your data local.'
   },
   'index.html': {
-    h1: '日本語の履歴書・職務経歴書を作成', brandSubtitle: '履歴書・職務経歴書', assetPath: './assets/favicon/',
+    h1: '日本語の履歴書・職務経歴書を作成', title: '無料で履歴書・職務経歴書を作成。データは端末内に — Resume Studio',
+    description: 'ログイン不要。ブラウザで履歴書・職務経歴書を作成できます。入力内容は端末内で処理し、下書きは暗号化して自動保存。編集中にプレビューし、PDFまたはJSONで書き出せます。',
+    brandSubtitle: '履歴書・職務経歴書', assetPath: './assets/favicon/',
     openGraphLocale: 'ja_JP', openGraphAlternates: ['zh_CN', 'en_US'], openGraphImage: 'resume-studio-og-ja.png',
     openGraphImageAlt: 'Resume Studio — 履歴書をつくる。データは端末の中に。'
   },
   'zh-cn/index.html': {
-    h1: '创建简体中文简历', brandSubtitle: '中文简历', assetPath: '../assets/favicon/',
+    h1: '创建简体中文简历', title: '免费制作中文简历，数据留在本地 — Resume Studio',
+    description: '无需登录，在浏览器中制作简历。内容只在本地处理，草稿自动加密保存；边写边预览，可导出 PDF 或 JSON。',
+    brandSubtitle: '中文简历', assetPath: '../assets/favicon/',
     openGraphLocale: 'zh_CN', openGraphAlternates: ['ja_JP', 'en_US'], openGraphImage: 'resume-studio-og-zh-cn.png',
     openGraphImageAlt: 'Resume Studio — 创建简历，数据留在本地。'
   }
@@ -63,10 +69,10 @@ const keywordMetadata = Object.freeze({
   'site/editor/index.html': '無料オンライン履歴書作成, オープンソース履歴書作成, ローカル処理, プライバシー重視, PDF履歴書作成, 免费在线简历制作, 开源简历生成器, 本地处理, 隐私安全, PDF简历生成, free online resume builder, open source resume builder, local processing, privacy-first resume editor, PDF resume generator'
 });
 const descriptionTerms = Object.freeze({
-  'site/index.html': ['無料', 'オープンソース', 'オンライン', '端末内', 'テンプレート', 'PDF'],
-  'site/ja/index.html': ['無料', 'オープンソース', 'オンライン', '端末内', 'テンプレート', 'PDF'],
-  'site/zh-cn/index.html': ['免费', '开源', '在线', '本地设备', '模板', 'PDF'],
-  'site/en/index.html': ['free', 'open-source', 'online', 'locally', 'template', 'PDF']
+  'site/index.html': ['ログイン不要', 'ブラウザ', '端末内', '暗号化', '自動保存', 'PDF', 'JSON'],
+  'site/ja/index.html': ['ログイン不要', 'ブラウザ', '端末内', '暗号化', '自動保存', 'PDF', 'JSON'],
+  'site/zh-cn/index.html': ['无需登录', '浏览器', '本地处理', '加密保存', '预览', 'PDF', 'JSON'],
+  'site/en/index.html': ['No sign-in', 'browser', 'device', 'encrypted', 'saved automatically', 'PDF', 'JSON']
 });
 
 function source(file) {
@@ -166,6 +172,10 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     }
     const title = html.match(/<title>([^<]+)<\/title>/i)?.[1] || '';
     const description = metaValues(html, 'description')[0] || '';
+    assert.equal(title, route.title, `${route.file} title must use the reviewed locale copy`);
+    assert.equal(description, route.description, `${route.file} description must use the reviewed locale copy`);
+    assert.ok(Array.from(title).length <= 70, `${route.file} title must fit a social card`);
+    assert.ok(Array.from(description).length <= 200, `${route.file} description must fit a social card`);
     const imageUrl = `${base}assets/social/${route.openGraphImage}`;
     assert.deepEqual(metaValues(html, 'og:type'), ['website']);
     assert.deepEqual(metaValues(html, 'og:site_name'), ['Resume Studio']);
@@ -187,6 +197,11 @@ test('public routes have reciprocal canonical and hreflang metadata with useful 
     const { width, height } = pngDimensions(new URL(`../site/assets/social/${route.openGraphImage}`, import.meta.url));
     assert.deepEqual({ width, height }, { width: 1200, height: 630 });
   }
+
+  const japaneseRoute = routes.find((route) => route.lang === 'ja');
+  const legacyJapaneseHtml = source('site/ja/index.html');
+  assert.equal(legacyJapaneseHtml.match(/<title>([^<]+)<\/title>/i)?.[1], japaneseRoute.title);
+  assert.deepEqual(metaValues(legacyJapaneseHtml, 'description'), [japaneseRoute.description]);
 
   for (const route of routes) {
     const html = source(route.file);
