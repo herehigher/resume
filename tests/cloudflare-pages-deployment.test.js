@@ -78,7 +78,9 @@ test('release workflow pins the same verified run artifact to a Cloudflare produ
   assert.match(workflow, /concurrency:[\s\S]+group: pages-production[\s\S]+cancel-in-progress: false/);
   assert.match(workflow, /name: production[\s\S]+permissions:[\s\S]+contents: write/);
   assert.match(workflow, /uses: cloudflare\/wrangler-action@v4/);
-  assert.match(workflow, /Validate configured Cloudflare Pages project[\s\S]+\^\[a-z0-9\]\(\[a-z0-9-\]\{0,61\}\[a-z0-9\]\)\?\$[\s\S]+command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\} --branch=main/);
+  assert.match(workflow, /Validate configured Cloudflare Pages project[\s\S]+\^\[a-z0-9\]\(\[a-z0-9-\]\{0,61\}\[a-z0-9\]\)\?\$[\s\S]+command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\}/);
+  assert.doesNotMatch(workflow, /--branch(?:=|\s)|Pages production branch: `main`/);
+  assert.match(workflow, /Pages target: Direct Upload default \(no branch override\)/);
   assert.match(workflow, /steps\.deployment\.outputs\.pages-environment/);
   assert.match(workflow, /steps\.deployment\.outputs\.deployment-url/);
   assert.match(workflow, /validate-cloudflare-pages-deployment\.mjs/);

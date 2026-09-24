@@ -319,7 +319,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy "${{ runner.temp }}/prepared/site-artifact" --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
+          command: pages deploy "${{ runner.temp }}/prepared/site-artifact" --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
 
       - name: Validate the Pages production deployment identity
         id: deployment_identity
@@ -405,7 +405,7 @@ jobs:
             echo "- Source SHA: \`${RELEASE_SHA:-unavailable}\`"
             echo "- Run / artifact: \`${GITHUB_RUN_ID}\` / \`${DEPLOYMENT_ARTIFACT_ID:-unavailable}\`"
             echo "- Artifact digest: \`${ARTIFACT_DIGEST:-unavailable}\`"
-            echo '- Pages production branch: `main`'
+            echo '- Pages target: Direct Upload default (no branch override)'
             echo "- Pages environment: \`${PAGES_ENVIRONMENT:-unavailable}\` (expected `production`; validation: ${DEPLOYMENT_IDENTITY_OUTCOME:-unavailable})"
             echo "- Pages.dev deployment URL: ${DEPLOYMENT_URL:-unverified}"
             echo "- Production URL: ${PRODUCTION_ORIGIN:-unavailable}"
