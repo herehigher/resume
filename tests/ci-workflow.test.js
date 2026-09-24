@@ -148,14 +148,17 @@ test('release workflow uses Cloudflare Pages Direct Upload and production-only o
   assert.match(deploy.body, /secrets\.CLOUDFLARE_API_TOKEN/);
   assert.match(deploy.body, /vars\.CLOUDFLARE_ACCOUNT_ID/);
   assert.match(deploy.body, /vars\.CLOUDFLARE_PAGES_PROJECT/);
-  assert.match(deploy.body, /command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\} --branch=main/);
+  assert.match(deploy.body, /command: pages deploy "\$\{\{ runner\.temp \}\}\/prepared\/site-artifact" --project-name=\$\{\{ vars\.CLOUDFLARE_PAGES_PROJECT \}\}/);
   assert.doesNotMatch(deploy.body, /\$RUNNER_TEMP|\$CLOUDFLARE_PAGES_PROJECT/);
+  assert.doesNotMatch(deploy.body, /--branch(?:=|\s)/);
   assert.ok(project.index < deploy.index);
   assert.match(validate.body, /steps\.deployment\.outputs\.pages-environment/);
   assert.match(validate.body, /steps\.deployment\.outputs\.deployment-url/);
   assert.match(validate.body, /validate-cloudflare-pages-deployment\.mjs/);
   assert.ok(deploy.index < validate.index && validate.index < smoke.index);
   assert.match(smoke.body, /run_smoke pages_dev "\$PAGES_DEV_URL"[\s\S]+run_smoke production "\$PRODUCTION_ORIGIN"/);
+  assert.match(releaseWorkflow, /Pages target: Direct Upload default \(no branch override\)/);
+  assert.doesNotMatch(releaseWorkflow, /--branch(?:=|\s)|Pages production branch: `main`/);
   assert.doesNotMatch(releaseWorkflow, /actions\/upload-pages-artifact|actions\/deploy-pages|github-pages|id-token:\s*write|pages:\s*write/);
 });
 
