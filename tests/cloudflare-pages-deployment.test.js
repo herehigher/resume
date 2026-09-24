@@ -142,5 +142,8 @@ test('release workflow gates production on preview smoke and rechecks the same r
   assert.match(workflow, /Production Pages branch: .*configured Cloudflare production route label/);
   assert.match(workflow, /Artifact source: authorized release SHA[\s\S]+commit-hash[\s\S]+to both uploads/);
   assert.doesNotMatch(summaryStep, /(?<!\\)`/);
+  for (const field of ['PREVIEW_BRANCH_CONFIG_OUTCOME', 'PRODUCTION_BRANCH_CONFIG_OUTCOME']) {
+    assert.equal(workflow.match(new RegExp(`^ {10}${field}:`, 'gm'))?.length, 1, `${field} must be declared once`);
+  }
   assert.doesNotMatch(workflow, /actions\/upload-pages-artifact|actions\/deploy-pages|github-pages|id-token:\s*write|pages:\s*write/);
 });
