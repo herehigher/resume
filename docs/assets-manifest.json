@@ -15,7 +15,7 @@
   },
   "source": {
     "appVersion": "0.4.1",
-    "checkoutCommit": "f4adf410545a6a30ab089cfe64e7bedbc7490eb7",
+    "checkoutCommit": "3fd6bd17999605e63a9fc828486bd23fa5e511ee",
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
@@ -23,7 +23,7 @@
       "controlSha": "9b38fc7ca7bf49843202fb657735622e53a557fe",
       "kind": "release-candidate",
       "runAttempt": "1",
-      "runId": "35946347243",
+      "runId": "35946978704",
       "workflow": ".github/workflows/release-candidate-assets.yml"
     },
     "siteHash": "c2d6a0572890051164c26f5ea1bfb858e7d3e794da66972093e8c0e72ff4a0a7",
