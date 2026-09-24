@@ -15,9 +15,9 @@ Public release、tag、Pages 設定、repository visibility の変更には owne
 | 3 | CI・担当者 | 候補 asset を生成・取り込み、7 fileを目視して候補 branch へ commit する | 展示 asset が候補 version・site bytes・生成契約と一致する |
 | 4 | 担当者・CI | 完成した公開 PR を1件作り、`Quality` と review を完了する | `quality` に含まれる fresh 検証と候補 artifact の照合が成功する |
 | 5 | 所有者 | Version・変更内容・必要な目視結果を確認し、公開 PR を main へ merge して本番公開を承認する | 対象の merge 結果 commit が確定し、追加の公開承認なしで自動処理へ進める |
-| 6 | CI | Main Quality の成功後に `Release eligibility` が Quality run、merged PR、version を照合する | 承認済み公開 PR の source だけが `Release Pages` へ渡る |
-| 7 | CI | `Release Pages` が資格を再確認し、同じ commit の Quality 展示 asset を照合して配布物を生成・検査し、immutable tag を作成・deploy する | Tag、commit、配布物が一致する |
-| 8 | CI・担当者 | 公開 URL の自動検査と summary を確認する | Deploy と online smoke が成功する |
+| 6 | CI | Main Quality の成功後に `Release eligibility` が Quality run、merged PR、version を照合する | 承認済み公開 PR の source だけが `Release production` へ渡る |
+| 7 | CI | `Release production` が資格を再確認し、同じ commit の Quality 展示 asset を照合して配布物を生成・検査し、immutable tag を作成する。Cloudflare preview への Direct Upload と smoke が成功した後、同じ配布物を production へ Direct Upload する | Tag、commit、配布物が一致し、preview smoke が production deploy の前に成功する |
+| 8 | CI・担当者 | Pages.dev と custom domain の自動検査と summary を確認する | 両 URL の application・online editor smoke が成功する |
 
 通常公開で実行する full Quality 2回は、完成した公開 PR と merge 結果の main が対象です。候補生成 workflow は展示 asset だけを生成・検証し、product Quality や公開承認の代わりにはなりません。公開までの asset 生成は候補、最終 PR、main の3回です。
 
@@ -68,7 +68,7 @@ Asset-only の追補 commit に fast path は設けません。最終 PR head �
 
 Version、変更内容、必要な目視結果、`Quality` を所有者が確認し、公開 PR を main へ merge します。この merge が、GitHub が記録した merge 結果 commit の tag 作成と Pages 公開に対する承認です。
 
-通常公開では [Release Pages](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。Merge 結果 commit の main Quality が成功すると `Release eligibility` が公開資格を確認し、該当する公開 PR の場合だけ `Release Pages` を開始します。通常の main 更新は資格確認で終了し、`Release Pages` の run を作りません。公開時は immutable tag、同じ workflow run が準備した単一の artifact、deploy、online smoke へ進みます。Summary の tag、commit、run、公開 URL、結果、未確認事項を確認して完了です。
+通常公開では [Release production](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。Merge 結果 commit の main Quality が成功すると `Release eligibility` が公開資格を確認し、該当する公開 PR の場合だけ `Release production` を開始します。通常の main 更新は資格確認で終了し、`Release production` の run を作りません。公開時は immutable tag、同じ workflow run が準備した単一の artifact、Cloudflare preview smoke、production Direct Upload、Pages.dev と custom domain の online smoke へ進みます。Summary の tag、commit、run、各 URL、結果、未確認事項を確認して完了です。
 
 ## 変更内容に応じた確認
 
@@ -87,7 +87,7 @@ CI は保存・読込・言語分離・PDF・データ保護、version、source 
 
 PR の `quality` は manifest が示す候補 artifact を取得し、commit 済みの7 file が promotion 元 artifact の exact bytes と一致することを先に確認します。そのうえで、同じ job が fresh に生成した artifact を使い、version、site、generator、browser、PDF、screenshot の契約と照合します。別 run の Chromium rasterization bytes の完全一致は要求しません。Asset が未準備、不一致、失効している場合は `quality` を失敗させます。Version を変えない PR の展示 asset 変更も拒否します。
 
-Merge 後の `Release eligibility` は official main Quality の完了・成功、full Quality、対象 SHA、対応する唯一の merged PR、PR base からの version 変更、current main version を照合します。照合不能な状態は失敗し、通常の main 更新と current main version に一致しない release は `Release Pages` を開始しません。`Release Pages` は渡された Quality run ID から同じ資格を再確認します。Prepare、publish、deploy は同じ workflow run の exact artifact を再検証して使い、承認後に rebuild や差し替えを行いません。Production lock の取得後にも current main version を確認し、新しい version の後から古い version を deploy しません。
+Merge 後の `Release eligibility` は official main Quality の完了・成功、full Quality、対象 SHA、対応する唯一の merged PR、PR base からの version 変更、current main version を照合します。照合不能な状態は失敗し、通常の main 更新と current main version に一致しない release は `Release production` を開始しません。`Release production` は渡された Quality run ID から同じ資格を再確認します。Prepare、publish、deploy は同じ workflow run の exact artifact を再検証して使い、承認後に rebuild や差し替えを行いません。Production lock の取得後にも current main version を確認し、新しい version の後から古い version を deploy しません。
 
 Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。通常の公開で別の管理 Issue、手入力の hash 一覧、digest 転記用 PR は不要です。
 
@@ -95,9 +95,9 @@ Summary は tag、commit、artifact の識別情報・digest、run URL、公開 
 
 Repository source、clone、fork は Analytics beacon を含みません。公式 hosted site では Cloudflare Pages の delivery layer が Cloudflare Web Analytics を挿入します。アプリは履歴書入力、写真、JSON、端末上の草稿を Analytics request に含めません。画面の説明は [PRIVACY.md](../PRIVACY.md) を参照します。
 
-`PRODUCTION_ORIGIN` は GitHub Actions の repository variable と `scripts/deployment-path-contract.mjs` の両方で `https://rs.herehigher.com/` に固定します。公開 smoke は custom domain の root URL と app が管理する path / metadata / JSON contract を確認します。Analytics beacon の配信と provider-side processing は Cloudflare Pages の責任範囲です。
+`PRODUCTION_ORIGIN` は GitHub Actions の repository variable と `scripts/deployment-path-contract.mjs` の両方で `https://rs.herehigher.com/` に固定します。公開 smoke は Pages.dev の deployment URL と custom domain の root URL で、app が管理する path / metadata / JSON contract と online editor を確認します。Analytics beacon の配信と provider-side processing は Cloudflare Pages の責任範囲です。
 
-現行 `Release Pages` workflow はまだ GitHub Pages の deployment action を使います。deployment smoke は app-owned path と metadata の semantic contract を検査し、配信先の加工後の response bytes は比較しません。この issue の CLI / mock test は live hosting を実証しません。Transport の Direct Upload への切替は #251 の範囲です。切替後に pages.dev と custom domain の両方で live smoke を実行するまで、production hosting contract の実測完了とは扱いません。
+`Release production` は承認済み SHA から同じ run で準備・digest 照合した artifact を Cloudflare Pages に Direct Upload します。Tag から決まる preview branch へ明示的な source SHA とともに upload し、deployment identity と application・online editor smoke を検査します。成功後に artifact を再検証し、Cloudflare project の production branch を再確認して production へ upload します。Production の Pages.dev と custom domain の双方で同じ smoke を実行します。Cloudflare の production branch `main` は Direct Upload の配信先を選ぶ設定値であり、公開 source は認可済み tag / SHA と artifact で固定します。Deployment smoke は配信先で加工された response bytes と artifact digest の byte-for-byte 一致を要求しません。#251 の live hosting 完了判定には、この最初の正式 release run の preview・production smoke 成功が必要です。
 
 Release artifact preparation は `site/` の HTML path、file type、symlink、relative path を検査し、source tree を output へ exact copy します。Preparation CLI は network request や provider credential を使いません。Evidence は authorized source SHA、package version、source digest、artifact digest の4項目を記録し、source と artifact digest が一致しない場合は公開を止めます。Artifact digest の事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
 
@@ -111,22 +111,22 @@ Release artifact preparation は `site/` の HTML path、file type、symlink、r
 | 候補生成 CLI の待機が中断 | 同じ clean な candidate checkout で、表示済みまたは Actions run URL の run ID と候補 SHA を明示して再開する。CLI は同じ repository、workflow、event、run が記録した main control ref、成功結果、attempt、artifact、manifest provenance を再照合する。再開時に current main が進んでいても、別の control ref へ置き換えない。例：`npm run release:candidate-assets -- --run-id RUN_ID --source-sha CANDIDATE_SHA` |
 | 候補 artifact が失効・不一致 | 同じ固定 SHA で候補生成 workflow を再実行し、新しい run と attempt を指定して promotion する。別 artifact を代用しない |
 | PR の Quality 失敗 | Product・test・generator、または release asset の source SHA、run、attempt、artifact、digest、7 fileの不一致を該当 step と summary で確認する。修正で candidate SHA が変わった場合は候補生成と promotion からやり直す |
-| Release eligibility の失敗 | Quality run、repository・workflow・SHA、full Quality、merged PR、base / current version の照合結果を確認する。Release Pages を手動で迂回しない |
+| Release eligibility の失敗 | Quality run、repository・workflow・SHA、full Quality、merged PR、base / current version の照合結果を確認する。Release production を手動で迂回しない |
 | Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
-| 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release Pages を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
+| 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release production を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
 | Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |
 | Deploy 後の smoke failure | 「公開済み・確認未完了」。自動 rollback はない。一時障害は再検査、内容不良は新しい修正 version を公開する |
 | 公開内容の修正 | 修正 PR と新しい version を用意。既存 tag を変更しない |
 
 ### 前のバージョンへ戻す
 
-新しい release の deploy 後に一時障害が起きた場合は、同じ immutable tag・commit・artifact を持つ Release Pages run を再実行します。Artifact が失効している場合は、新しい Quality run が作った artifact から同じ source を再準備し、既存 tag が同じ commit を指すことを確認して deploy を再開します。内容不良は修正 PR と新しい version で直します。
+新しい release の deploy 後に一時障害が起きた場合は、同じ immutable tag・commit・artifact を持つ Release production run を再実行します。Artifact が失効している場合は、新しい Quality run が作った artifact から同じ source を再準備し、既存 tag が同じ commit を指すことを確認して deploy を再開します。内容不良は修正 PR と新しい version で直します。
 
-現在の Release Pages workflow は、過去の tag を custom-domain root へ復旧する入口を持ちません。旧 `v0.2.2` の source は GitHub Pages `/resume/` の canonical / hreflang、旧 Analytics state と disclosure、schema v1 を含み、現行 root hosting・privacy・schema v4 contract に適合しません。古い tag とその code は変更せず保持しますが、新しい公開 artifact としては再配布しません。旧 source を root 向けに移行する正式な検証・受入れが必要な場合は、別途 migration を行い新しい version として公開します。
+現在の Release production workflow は、過去の tag を custom-domain root へ復旧する入口を持ちません。旧 `v0.2.2` の source は GitHub Pages `/resume/` の canonical / hreflang、旧 Analytics state と disclosure、schema v1 を含み、現行 root hosting・privacy・schema v4 contract に適合しません。古い tag とその code は変更せず保持しますが、新しい公開 artifact としては再配布しません。旧 source を root 向けに移行する正式な検証・受入れが必要な場合は、別途 migration を行い新しい version として公開します。
 
 ## 初回設定・設定変更時だけ行うこと
 
-Pages の Source を GitHub Actions にし、公開先と HTTPS、job permissions、production 承認方法、Analytics の公開設定を用意します。Main の merge ruleset が要求する check は `quality` です。通常公開では設定を変更しません。現行 `github-pages` environment は main / stable tag の branch policy だけで required reviewer はないため、environment による承認待ちを前提にしません。公開 PR の merge が通常公開の承認です。Release Pages は承認済みの eligible Quality run だけを受け付け、legacy tag の復旧入力はありません。
+Cloudflare Pages の Direct Upload project、production branch、custom domain の DNS / HTTPS、Web Analytics の配信設定、GitHub Actions の account / project variables と API token secret を用意します。Cloudflare Git Integration による push deploy は使用しません。Main の merge ruleset が要求する check は `quality` です。通常公開では project 設定を変更しません。Workflow の environment は `production` です。公開 PR の owner merge が通常公開の承認で、Release production は承認済みの eligible Quality run だけを受け付け、legacy tag の復旧入力はありません。GitHub Pages の repository Settings 停止と一般文書の移行完了は、最初の Cloudflare-native production smoke 成功後に #253 で行います。
 
 Local の GitHub query / PR 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は、許可された sandbox 外の実行へ切り替えます。Token を抽出・export・複製せず、特定 OS の credential backend は要件にしません。
 
