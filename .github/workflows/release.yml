@@ -1,6 +1,6 @@
-name: Release Pages
+name: Release production
 
-run-name: Release Pages
+run-name: Release production
 
 on:
   workflow_dispatch:
@@ -191,13 +191,11 @@ jobs:
       group: pages-production
       cancel-in-progress: false
     environment:
-      name: github-pages
+      name: production
       url: ${{ vars.PRODUCTION_ORIGIN }}
     permissions:
       actions: read
       contents: write
-      id-token: write
-      pages: write
     steps:
       - name: Checkout trusted release tooling
         uses: actions/checkout@v7
@@ -304,61 +302,116 @@ jobs:
             --artifact-dir "$RUNNER_TEMP/prepared/site-artifact" --evidence "$RUNNER_TEMP/prepared/release-evidence.json" \
             --source-dir "$RUNNER_TEMP/prepared-source" --source-sha "$RELEASE_SHA"
 
-      - name: Upload the verified original bytes for Pages
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: ${{ runner.temp }}/prepared/site-artifact
+      - name: Validate configured Cloudflare Pages project
+        env:
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$CLOUDFLARE_PAGES_PROJECT" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+            echo 'Configured Cloudflare Pages project name is invalid.' >&2
+            exit 1
+          fi
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy the verified artifact to Cloudflare Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy "${{ runner.temp }}/prepared/site-artifact" --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
 
-      - name: Install online smoke dependencies
+      - name: Validate the Pages production deployment identity
+        id: deployment_identity
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment-url }}
+          PAGES_ENVIRONMENT: ${{ steps.deployment.outputs.pages-environment }}
+          PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployment_url="$(node scripts/validate-cloudflare-pages-deployment.mjs \
+            --deployment-url "$DEPLOYMENT_URL" --pages-environment "$PAGES_ENVIRONMENT" \
+            --project-name "$PAGES_PROJECT")"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Install deployment smoke dependencies
+        id: smoke_dependencies
         run: |
           npm ci
           npx playwright install --with-deps --only-shell chromium
 
-      - name: Smoke test deployed public paths and editor
+      - name: Smoke test Pages.dev deployment and production origin
         id: smoke
+        if: ${{ always() && steps.deployment_identity.outcome == 'success' && steps.smoke_dependencies.outcome == 'success' }}
         env:
           PRODUCTION_ORIGIN: ${{ vars.PRODUCTION_ORIGIN }}
+          PAGES_DEV_URL: ${{ steps.deployment_identity.outputs.deployment_url }}
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
-          RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
+          PACKAGE_VERSION: ${{ needs.prepare.outputs.package_version }}
         shell: bash
         run: |
           set -euo pipefail
           test "$PRODUCTION_ORIGIN" = 'https://rs.herehigher.com/'
-          node scripts/validate-deployment-smoke.mjs --base-url "$PRODUCTION_ORIGIN" --release-sha "$RELEASE_SHA" \
-            --package-version "${RELEASE_TAG#v}"
-          node scripts/check-online-editor.mjs --base-url "$PRODUCTION_ORIGIN"
-          {
-            echo '## Production deployment result'
-            echo
-            echo "- Tag: \`$RELEASE_TAG\`"
-            echo "- Source SHA: \`$RELEASE_SHA\`"
-            echo "- Artifact ID: \`${{ needs.prepare.outputs.prepared_artifact_id }}\`"
-            echo "- URL: ${PRODUCTION_ORIGIN}"
-            echo '- Smoke: application paths, metadata, Schema, and version passed; live pages.dev/custom-domain checks after the destination switch and manual browser acceptance remain unverified.'
-          } >> "$GITHUB_STEP_SUMMARY"
+
+          run_smoke() {
+            local label="$1"
+            local base_url="$2"
+            local application_result=passed
+            local editor_result=passed
+
+            if ! node scripts/validate-deployment-smoke.mjs --base-url "$base_url" --release-sha "$RELEASE_SHA" \
+              --package-version "$PACKAGE_VERSION"; then
+              application_result=failed
+            fi
+            if ! node scripts/check-online-editor.mjs --base-url "$base_url"; then
+              editor_result=failed
+            fi
+
+            echo "${label}_application=$application_result" >> "$GITHUB_OUTPUT"
+            echo "${label}_editor=$editor_result" >> "$GITHUB_OUTPUT"
+            [[ "$application_result" == passed && "$editor_result" == passed ]]
+          }
+
+          smoke_result=0
+          if ! run_smoke pages_dev "$PAGES_DEV_URL"; then smoke_result=1; fi
+          if ! run_smoke production "$PRODUCTION_ORIGIN"; then smoke_result=1; fi
+          exit "$smoke_result"
 
       - name: Record publication outcome
         if: ${{ always() }}
         env:
           ARTIFACT_DIGEST: ${{ steps.prepared.outputs.artifact_digest }}
+          DEPLOYMENT_IDENTITY_OUTCOME: ${{ steps.deployment_identity.outcome }}
+          DEPLOYMENT_URL: ${{ steps.deployment_identity.outputs.deployment_url }}
+          DEPLOYMENT_OUTCOME: ${{ steps.deployment.outcome }}
+          PAGES_ENVIRONMENT: ${{ steps.deployment.outputs.pages-environment }}
+          PAGES_DEV_APPLICATION_SMOKE: ${{ steps.smoke.outputs.pages_dev_application }}
+          PAGES_DEV_EDITOR_SMOKE: ${{ steps.smoke.outputs.pages_dev_editor }}
           PRODUCTION_ORIGIN: ${{ vars.PRODUCTION_ORIGIN }}
+          PRODUCTION_APPLICATION_SMOKE: ${{ steps.smoke.outputs.production_application }}
+          PRODUCTION_EDITOR_SMOKE: ${{ steps.smoke.outputs.production_editor }}
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
           RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          SMOKE_DEPENDENCIES_OUTCOME: ${{ steps.smoke_dependencies.outcome }}
+          DEPLOYMENT_ARTIFACT_ID: ${{ needs.prepare.outputs.prepared_artifact_id }}
         shell: bash
         run: |
           {
-            echo '## Production publication outcome'
+            echo '## Cloudflare production publication outcome'
             echo
             echo "- Tag: \`${RELEASE_TAG}\`"
             echo "- Source SHA: \`${RELEASE_SHA:-unavailable}\`"
-            echo "- Run / artifact: \`${GITHUB_RUN_ID}\` / \`${{ needs.prepare.outputs.prepared_artifact_id }}\`"
+            echo "- Run / artifact: \`${GITHUB_RUN_ID}\` / \`${DEPLOYMENT_ARTIFACT_ID:-unavailable}\`"
             echo "- Artifact digest: \`${ARTIFACT_DIGEST:-unavailable}\`"
-            echo "- URL: ${PRODUCTION_ORIGIN:-unavailable}"
+            echo '- Pages production branch: `main`'
+            echo "- Pages environment: \`${PAGES_ENVIRONMENT:-unavailable}\` (expected `production`; validation: ${DEPLOYMENT_IDENTITY_OUTCOME:-unavailable})"
+            echo "- Pages.dev deployment URL: ${DEPLOYMENT_URL:-unverified}"
+            echo "- Production URL: ${PRODUCTION_ORIGIN:-unavailable}"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Tag: ${{ steps.tag.outcome }}; deploy: ${{ steps.deployment.outcome }}; smoke: ${{ steps.smoke.outcome }}"
-            echo '- Unverified: live pages.dev/custom-domain checks after the destination switch and manual browser acceptance.'
+            echo "- Tag: ${{ steps.tag.outcome }}; Direct Upload: ${DEPLOYMENT_OUTCOME:-unavailable}; smoke dependencies: ${SMOKE_DEPENDENCIES_OUTCOME:-unavailable}; smoke: ${SMOKE_OUTCOME:-not-run}"
+            echo "- Pages.dev smoke: application ${PAGES_DEV_APPLICATION_SMOKE:-not-run}; online editor ${PAGES_DEV_EDITOR_SMOKE:-not-run}"
+            echo "- Production smoke: application ${PRODUCTION_APPLICATION_SMOKE:-not-run}; online editor ${PRODUCTION_EDITOR_SMOKE:-not-run}"
+            echo '- Unverified: manual browser acceptance and Cloudflare Web Analytics delivery.'
           } >> "$GITHUB_STEP_SUMMARY"
