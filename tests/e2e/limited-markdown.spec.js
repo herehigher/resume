@@ -51,7 +51,8 @@ test('日文 Markdown 帮助只在目标长文 textarea 出现，并支持 keybo
     await expect(motivationToggle).toHaveAttribute('aria-controls', 'jp-motivation-help');
     await expect(motivationToggle).toHaveAttribute('aria-expanded', 'false');
     await motivationToggle.focus();
-    await page.keyboard.press('Enter');
+    await expect(motivationToggle).toBeFocused();
+    await motivationToggle.press('Enter');
     await expect(motivationToggle).toBeFocused();
     await expect(motivationToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(motivationPanel).toBeVisible();

@@ -120,10 +120,18 @@ function createInlineIndex(line) {
   const nextSingleBacktick = new Int32Array(length + 1).fill(-1);
   const nextCloseBracket = new Int32Array(length + 1).fill(-1);
   const nextOpenBracket = new Int32Array(length + 1).fill(-1);
-  const nextCloseParen = new Int32Array(length + 1).fill(-1);
-  const nextOpenParen = new Int32Array(length + 1).fill(-1);
+  const matchingCloseParen = new Int32Array(length).fill(-1);
   const starRunLength = new Int32Array(length);
   const backtickRunLength = new Int32Array(length);
+
+  const openParentheses = [];
+  for (let index = 0; index < length; index += 1) {
+    if (escaped[index]) continue;
+    if (line[index] === '(') openParentheses.push(index);
+    else if (line[index] === ')' && openParentheses.length) {
+      matchingCloseParen[openParentheses.pop()] = index;
+    }
+  }
 
   for (let index = 0; index < length;) {
     if (escaped[index]) {
@@ -151,8 +159,6 @@ function createInlineIndex(line) {
   let singleBacktick = -1;
   let closeBracket = -1;
   let openBracket = -1;
-  let closeParen = -1;
-  let openParen = -1;
   for (let index = length - 1; index >= 0; index -= 1) {
     if (!escaped[index]) {
       if (starRunLength[index] === 1) singleStar = index;
@@ -160,16 +166,12 @@ function createInlineIndex(line) {
       if (backtickRunLength[index] === 1) singleBacktick = index;
       if (line[index] === ']' && !escaped[index]) closeBracket = index;
       if (line[index] === '[' && !escaped[index]) openBracket = index;
-      if (line[index] === ')' && !escaped[index]) closeParen = index;
-      if (line[index] === '(' && !escaped[index]) openParen = index;
     }
     nextSingleStar[index] = singleStar;
     nextDoubleStar[index] = doubleStar;
     nextSingleBacktick[index] = singleBacktick;
     nextCloseBracket[index] = closeBracket;
     nextOpenBracket[index] = openBracket;
-    nextCloseParen[index] = closeParen;
-    nextOpenParen[index] = openParen;
   }
 
   return {
@@ -181,8 +183,7 @@ function createInlineIndex(line) {
     nextSingleBacktick,
     nextCloseBracket,
     nextOpenBracket,
-    nextCloseParen,
-    nextOpenParen
+    matchingCloseParen
   };
 }
 
@@ -214,11 +215,11 @@ function readBracketMarkup(line, start, index, isImage) {
   const close = index.nextCloseBracket[open + 1];
   if (close < 0) return { type: 'literal', end: line.length };
   if (index.nextOpenBracket[open + 1] >= 0 && index.nextOpenBracket[open + 1] < close) {
-    const paren = line[close + 1] === '(' ? index.nextCloseParen[close + 2] : -1;
+    const paren = line[close + 1] === '(' ? index.matchingCloseParen[close + 1] : -1;
     return { type: 'literal', end: paren < 0 ? line.length : paren + 1 };
   }
   if (line[close + 1] !== '(') return null;
-  const closeParen = index.nextCloseParen[close + 2];
+  const closeParen = index.matchingCloseParen[close + 1];
   if (closeParen < 0) return { type: 'literal', end: line.length };
   const end = closeParen + 1;
   const label = line.slice(open + 1, close);

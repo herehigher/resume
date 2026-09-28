@@ -81,6 +81,17 @@ test('malformed and disallowed links remain plain text', () => {
   }
 });
 
+test('malformed link and image expressions consume balanced URL parentheses before trailing markup', () => {
+  assert.equal(
+    renderLimitedMarkdown('[x](https://example.com/a(b)*tail*)*outside*'),
+    '<p>[x](https://example.com/a(b)*tail*)<em>outside</em></p>'
+  );
+  assert.equal(
+    renderLimitedMarkdown('![alt](https://example.com/a(b)*tail*)*outside*'),
+    '<p>![alt](https://example.com/a(b)*tail*)<em>outside</em></p>'
+  );
+});
+
 test('raw HTML, images, and unsupported block syntax are downgraded safely', () => {
   const html = renderLimitedMarkdown([
     '<script>alert(1)</script>',
