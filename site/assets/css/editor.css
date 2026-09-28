@@ -99,6 +99,18 @@
 .input-field textarea:focus { border-color: #6b91ec; box-shadow: 0 0 0 3px rgba(36, 87, 214, .09); }
 .field-help { color: var(--muted); display: block; font-size: 8px; margin-top: 4px; }
 
+#japaneseWorkspace .markdown-field { display: grid; gap: 6px; min-width: 0; }
+#japaneseWorkspace .markdown-field-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 4px 8px; justify-content: space-between; min-width: 0; }
+#japaneseWorkspace .markdown-field-label { color: #526076; font-size: 9px; font-weight: 750; margin: 0 0 0 1px; }
+#japaneseWorkspace .markdown-help-toggle { background: #f1f5ff; border: 1px solid #cdd9f6; border-radius: 6px; color: #2457a2; font-size: 9px; font-weight: 700; line-height: 1.25; min-height: 44px; min-width: 44px; padding: 6px 9px; }
+#japaneseWorkspace .markdown-help-toggle:hover { background: #e6edff; }
+#japaneseWorkspace .markdown-help-toggle:focus-visible { outline: 2px solid #2457a2; outline-offset: 2px; }
+#japaneseWorkspace .markdown-help-panel { background: #f8faff; border: 1px solid #d7e0f2; border-radius: 7px; color: #34435a; font-size: 10px; line-height: 1.55; min-width: 0; overflow-wrap: anywhere; padding: 9px 11px; }
+#japaneseWorkspace .markdown-help-panel ul { display: grid; gap: 2px; list-style: none; margin: 0; padding: 0; }
+#japaneseWorkspace .markdown-help-panel li { min-width: 0; }
+#japaneseWorkspace .markdown-help-panel code { background: #eef2f8; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+#japaneseWorkspace .markdown-help-panel p { margin: 7px 0 0; }
+
 .list-heading { align-items: center; display: flex; justify-content: space-between; }
 .list-heading strong { font-size: 11px; }
 .list-heading.has-divider { border-top: 1px dashed #dfe4ea; margin-top: 8px; padding-top: 20px; }

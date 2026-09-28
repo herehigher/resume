@@ -21,11 +21,13 @@ async function inspectPdf(buffer) {
       const page = await document.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
+      const annotations = await page.getAnnotations({ intent: 'print' });
       pages.push({
         width: viewport.width,
         height: viewport.height,
         text: content.items.map((item) => item.str).join(' '),
-        items: content.items
+        items: content.items,
+        annotations
       });
     }
   } finally {
@@ -360,6 +362,79 @@ test('PDF ja: 任意タイトルの複数詳細項目は順序・末尾内容を
   expect(text).toContain('CUSTOM-DETAIL-LINE-13');
   expect(text).not.toContain('職務経歴（続き）');
   expect(normalizedText).toContain('長いカスタム詳細タイトル');
+});
+
+test('PDF ja Markdown: A4 resume と career の標準出力でリスト末尾・URL・手動改ページを保つ', async ({ page }) => {
+  const resumeCase = { locale: 'ja', length: 'short', documentType: 'resume', pageSize: 'A4' };
+  const resumeFixture = createPdfFixture(resumeCase);
+  const resumeEnd = `${resumeFixture.endMarker}-MARKDOWN-END`;
+  resumeFixture.state.documents.ja.fields.requests = [
+    '本人希望欄の Markdown 検証。',
+    '',
+    '1. 第一の架空項目',
+    '2. 第二の架空項目',
+    '3. 第三の架空項目',
+    `4. ${resumeEnd}`,
+    '',
+    `長い URL: https://example.test/${'markdown-resume-path-'.repeat(10)}end`,
+    '参照先: [架空リンク](https://example.test/resume-markdown-reference)'
+  ].join('\n');
+  resumeFixture.state.settings.pageBreaks.ja.A4.resume.sections = ['requests'];
+
+  await openLocale(page, 'ja');
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'japanese-markdown-resume.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(resumeFixture.state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('#documentPreview')).toContainText(resumeEnd);
+  await expect(page.locator('[data-section-key="requests"]')).toHaveClass(/has-manual-page-break/);
+  const resumePages = await inspectPdf(await printPdf(page));
+  const resumeText = resumePages.map((item) => item.text).join(' ');
+  expect(resumePages.length).toBeGreaterThanOrEqual(2);
+  expect(resumePages.length).toBeLessThanOrEqual(4);
+  expectPageSize(resumePages, A4);
+  expect(resumePages.every((item) => item.text.trim())).toBe(true);
+  expect(resumePages.at(-1)?.text).toContain(resumeEnd);
+  expect(resumeText.match(new RegExp(resumeEnd, 'g'))).toHaveLength(1);
+  expect(resumeText.replace(/\s/g, '')).toContain('markdown-resume-path-');
+  expect(resumePages.flatMap((item) => item.annotations).some((item) => item.url === 'https://example.test/resume-markdown-reference')).toBe(true);
+
+  const careerCase = { locale: 'ja', length: 'standard', documentType: 'career', pageSize: 'A4' };
+  const careerFixture = createPdfFixture(careerCase);
+  const careerEnd = `${careerFixture.endMarker}-MARKDOWN-END`;
+  careerFixture.state.documents.ja.careers[0].detailSections[1].content = [
+    '担当成果の Markdown 検証。',
+    '',
+    '- 第一の架空成果',
+    '- 第二の架空成果',
+    `- ${careerEnd}`,
+    '',
+    `長い URL: https://example.test/${'markdown-career-path-'.repeat(10)}end`,
+    '参照先: [架空リンク](https://example.test/career-markdown-reference)'
+  ].join('\n');
+  careerFixture.state.settings.pageBreaks.ja.A4.career.sections = ['self-promotion'];
+
+  await page.emulateMedia({ media: 'screen' });
+  await page.locator('#importDataInput').setInputFiles({
+    name: 'japanese-markdown-career.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(careerFixture.state))
+  });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('#documentPreview')).toContainText(careerEnd);
+  await expect(page.locator('[data-section-key="self-promotion"]')).toHaveClass(/has-manual-page-break/);
+  const careerPages = await inspectPdf(await printPdf(page));
+  const careerText = careerPages.map((item) => item.text).join(' ');
+  expect(careerPages.length).toBeGreaterThanOrEqual(2);
+  expect(careerPages.length).toBeLessThanOrEqual(12);
+  expectPageSize(careerPages, A4);
+  expect(careerPages.every((item) => item.text.trim())).toBe(true);
+  expect(careerText).toContain(careerEnd);
+  expect(careerText.match(new RegExp(careerEnd, 'g'))).toHaveLength(1);
+  expect(careerText.replace(/\s/g, '')).toContain('markdown-career-path-');
+  expect(careerPages.flatMap((item) => item.annotations).some((item) => item.url === 'https://example.test/career-markdown-reference')).toBe(true);
 });
 
 test('PDF long record: 四書類は95行を保持し、読みやすい文字サイズを保つ', async ({ page }) => {

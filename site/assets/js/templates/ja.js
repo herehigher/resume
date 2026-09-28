@@ -1,5 +1,6 @@
 import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../utils/date.js';
 import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js';
+import { renderLimitedMarkdown } from '../utils/limited-markdown.js';
 import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
 import { genderLabel } from '../utils/personal-details.js';
 
@@ -9,6 +10,13 @@ function hasContent(value) {
 
 function itemHasContent(item, keys) {
   return keys.some((key) => hasContent(item[key]));
+}
+
+function narrativeText(value, fallback = '') {
+  const source = String(value ?? '');
+  if (!source) return displayText('', fallback);
+  if (!source.trim()) return escapeHTML(source);
+  return `<div class="ja-markdown">${renderLimitedMarkdown(source)}</div>`;
 }
 
 function japaneseDate(value) {
@@ -121,8 +129,8 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <h3 class="resume-section-title">免許・資格</h3>
         ${renderQualificationRows(document.qualification)}
       </section>
-      <section class="paper-text-section" data-section-key="motivation"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${displayText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
-      <section class="paper-text-section requests-section" data-section-key="requests"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${displayText(hasContent(fields.requests) ? fields.requests : '貴社規定に従います。')}</div></section>
+      <section class="paper-text-section" data-section-key="motivation"><div class="paper-text-title">志望動機・自己PRなど</div><div class="paper-text-content">${narrativeText(fields.motivation, '志望動機・自己PRを入力してください')}</div></section>
+      <section class="paper-text-section requests-section" data-section-key="requests"><div class="paper-text-title">本人希望記入欄</div><div class="paper-text-content">${hasContent(fields.requests) ? narrativeText(fields.requests) : '貴社規定に従います。'}</div></section>
     </article>`;
 }
 
@@ -146,13 +154,13 @@ export function renderJapaneseCareer(state) {
         .filter((section) => hasContent(section.content))
         .map((section) => {
           const title = hasContent(section.title) ? String(section.title).trim() : '項目名未入力';
-          return `<div>${escapeHTML(title)}</div><div>${escapeHTML(section.content)}</div>`;
+          return `<div>${escapeHTML(title)}</div><div>${narrativeText(section.content)}</div>`;
         })
         .join('');
       return `
     <section class="career-company" data-record-id="${escapeHTML(career.id)}">
       <div class="career-company-heading"><strong>${displayText(career.company, '会社名未入力')}</strong>${period ? `<span>${period}</span>` : ''}</div>
-      <div class="career-company-info">${displayText(career.companyInfo, '事業内容・会社概要')}</div>
+      <div class="career-company-info">${narrativeText(career.companyInfo, '事業内容・会社概要')}</div>
       <div class="career-company-grid">
         <div>所属・役職</div><div>${displayText(career.role, '未入力')}</div>
         ${detailSections}
@@ -167,10 +175,10 @@ export function renderJapaneseCareer(state) {
         <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '提出日')}<br>${displayText(fields.fullName, '氏名未入力')}${hasContent(fields.nationality) ? `<br>国籍：${escapeHTML(fields.nationality)}` : ''}</div>
         ${renderCareerProfiles(fields)}
       </header>
-      <section class="career-section" data-section-key="summary"><h3 class="career-section-title">職務要約</h3><div class="career-body">${displayText(fields.careerSummary, '職務要約を入力してください')}</div></section>
-      <section class="career-section" data-section-key="skills"><h3 class="career-section-title">活かせる経験・知識・技術</h3><div class="career-body">${displayText(fields.skills, '経験・知識・技術を入力してください')}</div></section>
+      <section class="career-section" data-section-key="summary"><h3 class="career-section-title">職務要約</h3><div class="career-body">${narrativeText(fields.careerSummary, '職務要約を入力してください')}</div></section>
+      <section class="career-section" data-section-key="skills"><h3 class="career-section-title">活かせる経験・知識・技術</h3><div class="career-body">${narrativeText(fields.skills, '経験・知識・技術を入力してください')}</div></section>
       <section class="career-section" data-section-key="career-history"><h3 class="career-section-title">職務経歴</h3>${careers || '<div class="career-body empty-preview">職務経歴を追加してください</div>'}</section>
-      <section class="career-section" data-section-key="self-promotion"><h3 class="career-section-title">自己PR</h3><div class="career-body">${displayText(fields.selfPromotion, '自己PRを入力してください')}</div></section>
+      <section class="career-section" data-section-key="self-promotion"><h3 class="career-section-title">自己PR</h3><div class="career-body">${narrativeText(fields.selfPromotion, '自己PRを入力してください')}</div></section>
     </article>`;
 }
 

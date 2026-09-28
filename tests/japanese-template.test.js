@@ -89,6 +89,37 @@ test('Japanese templates use 提出日 for missing dates and show only valid ful
   assert.match(html, /<div class="career-doc-meta"><span class="empty-preview">提出日<\/span><br>/);
 });
 
+test('Japanese narrative Markdown is limited to the requested fields and never parses empty fallbacks', () => {
+  const state = createDefaultState('ja');
+  state.documents.ja.fields.motivation = '**強み**\n2行目\n\n- 実績';
+  state.documents.ja.fields.requests = '';
+  let html = renderJapaneseDocument(state);
+
+  assert.match(html, /<div class="paper-text-content"><div class="ja-markdown"><p><strong>強み<\/strong><br>2行目<\/p><ul><li>実績<\/li><\/ul><\/div><\/div>/);
+  assert.match(html, /<section class="paper-text-section requests-section" data-section-key="requests"><div class="paper-text-title">本人希望記入欄<\/div><div class="paper-text-content">貴社規定に従います。<\/div>/);
+
+  state.documents.ja.activeDocument = 'career';
+  state.documents.ja.fields.careerSummary = '**要約**';
+  state.documents.ja.fields.skills = '[危険](javascript:alert(1))';
+  state.documents.ja.fields.selfPromotion = '*強み*';
+  state.documents.ja.careers = [{
+    company: '**会社名**',
+    role: '**役職**',
+    startDate: '',
+    endDate: '',
+    companyInfo: '- 会社情報',
+    detailSections: [{ title: '**見出し**', content: '1. 成果' }]
+  }];
+  html = renderJapaneseDocument(state);
+
+  assert.match(html, /<div class="career-body"><div class="ja-markdown"><p><strong>要約<\/strong><\/p><\/div><\/div>/);
+  assert.match(html, /<div class="career-body"><div class="ja-markdown"><p>\[危険\]\(javascript:alert\(1\)\)<\/p><\/div><\/div>/);
+  assert.match(html, /<div class="career-body"><div class="ja-markdown"><p><em>強み<\/em><\/p><\/div><\/div>/);
+  assert.match(html, /<strong>\*\*会社名\*\*<\/strong>/);
+  assert.match(html, /<div>\*\*見出し\*\*<\/div><div><div class="ja-markdown"><ol><li>成果<\/li><\/ol><\/div><\/div>/);
+  assert.doesNotMatch(html, /href="javascript:|<script/);
+});
+
 test('Japanese nationality is optional and locale-independent gender uses a Japanese label', () => {
   const state = createDefaultState('ja');
   state.profile.fields.gender = 'female';
@@ -160,7 +191,7 @@ test('Japanese career detail sections render non-empty content in order, preserv
 
   const html = renderJapaneseDocument(state);
   assert.ok(html.indexOf('プロジェクト概要') < html.indexOf('項目名未入力'));
-  assert.match(html, /<div>項目名未入力<\/div><div>本文だけ<\/div>/);
+  assert.match(html, /<div>項目名未入力<\/div><div><div class="ja-markdown"><p>本文だけ<\/p><\/div><\/div>/);
   assert.doesNotMatch(html, /<div>成果<\/div>|空項目/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
@@ -259,7 +290,7 @@ test('Japanese career company information preserves escaped line breaks', () => 
 
   const html = renderJapaneseDocument(state);
   const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
-  assert.match(html, /SaaS の企画・開発\n資本金: 1 億円/);
+  assert.match(html, /<div class="career-company-info"><div class="ja-markdown"><p>SaaS の企画・開発<br>資本金: 1 億円<br>&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/p><\/div><\/div>/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
   assert.match(japaneseCss, /\.career-company-info\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*white-space:\s*pre-wrap;/s);
