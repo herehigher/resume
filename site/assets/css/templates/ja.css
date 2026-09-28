@@ -74,8 +74,10 @@
 .paper-text-title::before { background: var(--ja-accent-blue); content: ""; height: 17px; width: 4px; }
 .paper-text-content { font-size: 14px; line-height: 1.9; overflow-wrap: anywhere; padding: 12px 5px; white-space: pre-wrap; }
 
-#japaneseWorkspace .ja-markdown { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+#japaneseWorkspace .ja-markdown { min-width: 0; overflow-wrap: anywhere; }
 #japaneseWorkspace .ja-markdown p { margin: 0; orphans: 2; widows: 2; }
+#japaneseWorkspace .ja-markdown p,
+#japaneseWorkspace .ja-markdown li { white-space: pre-wrap; }
 #japaneseWorkspace .ja-markdown p + p { margin-top: .55em; }
 #japaneseWorkspace .ja-markdown ul,
 #japaneseWorkspace .ja-markdown ol { margin: .3em 0; padding-inline-start: 1.35em; }

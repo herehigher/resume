@@ -96,6 +96,28 @@ test('日文 Markdown 帮助只在目标长文 textarea 出现，并支持 keybo
   }
 });
 
+test('日本語 Markdown preview preserves paragraph indentation and repeated spaces', async ({ page }) => {
+  const source = [
+    '通常  文字',
+    ' 1スペース行',
+    '   3スペース行',
+    '    4スペース行',
+    '',
+    '- リスト  内の空白'
+  ].join('\n');
+  await openLocale(page, 'ja');
+  const field = page.locator('#jp-motivation');
+  await revealField(field);
+  await field.fill(source);
+
+  const paragraph = page.locator('#documentPreview .ja-markdown p').first();
+  const listItem = page.locator('#documentPreview .ja-markdown li').first();
+  await expect.poll(() => paragraph.innerText()).toBe('通常  文字\n 1スペース行\n   3スペース行\n    4スペース行');
+  await expect.poll(() => listItem.innerText()).toBe('リスト  内の空白');
+  expect(await paragraph.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('pre-wrap');
+  expect(await listItem.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('pre-wrap');
+});
+
 test('日文 Markdown source は暗号化草稿・JSON 往復で code-unit 単位に保たれ、安全に表示する', async ({ page }) => {
   const source = [
     '**太字** と *斜体* と `コード`',
