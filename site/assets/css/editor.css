@@ -33,6 +33,8 @@
 }
 .draft-controls .secondary-button { min-height: 36px; }
 .draft-primary-row { align-items: center; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; }
+.draft-action-group { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; min-width: 0; }
+.draft-controls.is-sample-mode .draft-action-group { justify-content: flex-start; }
 .draft-controls.is-sample-mode .draft-primary-row,
 .draft-controls.is-error .draft-primary-row { align-items: flex-start; grid-template-columns: 1fr; }
 .draft-normal-actions,
@@ -98,6 +100,17 @@
 .input-field select:focus,
 .input-field textarea:focus { border-color: #6b91ec; box-shadow: 0 0 0 3px rgba(36, 87, 214, .09); }
 .field-help { color: var(--muted); display: block; font-size: 8px; margin-top: 4px; }
+
+#japaneseWorkspace .draft-format-guide-toggle { background: transparent; border-color: transparent; color: #68758a; font-size: 10px; font-weight: 700; min-height: 44px; min-width: 44px; padding: 6px 9px; white-space: nowrap; }
+#japaneseWorkspace .draft-format-guide-toggle:hover { background: #eef3fb; color: #2457a2; }
+#japaneseWorkspace .draft-format-guide-toggle:focus-visible { outline: 2px solid #2457a2; outline-offset: 2px; }
+#japaneseWorkspace .draft-format-guide-panel { background: #f8faff; border: 1px solid #d7e0f2; border-radius: 7px; color: #34435a; font-size: 11px; line-height: 1.6; max-height: min(244px, calc(100dvh - 220px)); min-width: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; padding: 10px 12px; }
+#japaneseWorkspace .draft-format-guide-panel[hidden] { display: none !important; }
+#japaneseWorkspace .draft-format-guide-panel ul { display: grid; gap: 4px; list-style: none; margin: 0; padding: 0; }
+#japaneseWorkspace .draft-format-guide-panel li { min-width: 0; }
+#japaneseWorkspace .draft-format-guide-panel code { background: #eef2f8; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+#japaneseWorkspace .draft-format-guide-panel p { margin: 0 0 7px; }
+#japaneseWorkspace .draft-format-guide-panel p:last-child { margin: 7px 0 0; }
 
 .list-heading { align-items: center; display: flex; justify-content: space-between; }
 .list-heading strong { font-size: 11px; }

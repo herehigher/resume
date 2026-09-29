@@ -118,18 +118,30 @@ test('Japanese career record page breaks stay with stable records through reorde
   assert.deepEqual(target.getState().settings.pageBreaks.ja.A4.career.records, ['record_fictional-second']);
 });
 
-test('Japanese sample keeps the original responsibilities and achievements examples', () => {
+test('Japanese sample keeps its fictional responsibilities and achievements as Markdown lists', () => {
   const state = createJapaneseSampleState(createDefaultState('ja'));
   assert.deepEqual(state.documents.ja.careers[0].detailSections, [
     {
       title: '担当業務',
-      content: '・法人向けSaaSプロダクトの企画、要件定義\n・利用データおよび顧客インタビューに基づく改善施策の立案\n・エンジニア、デザイナー、営業とのプロジェクト推進\n・5名の企画チームのマネジメント'
+      content: '- 法人向けSaaSプロダクトの企画、要件定義\n- 利用データおよび顧客インタビューに基づく改善施策の立案\n- エンジニア、デザイナー、営業とのプロジェクト推進\n- 5名の企画チームのマネジメント'
     },
     {
       title: '実績・成果',
-      content: '・オンボーディング改善により継続率を18ポイント向上\n・新機能の企画・提供により主要指標を前年比125%へ改善\n・開発プロセスの見直しによりリードタイムを30%短縮'
+      content: '1. オンボーディング改善により継続率を18ポイント向上\n2. 新機能の企画・提供により主要指標を前年比125%へ改善\n3. 開発プロセスの見直しによりリードタイムを30%短縮'
     }
   ]);
+});
+
+test('Japanese sample uses limited Markdown in representative narrative fields', () => {
+  const sample = createJapaneseSampleState(createDefaultState('ja'));
+  const fields = sample.documents.ja.fields;
+
+  assert.equal(fields.requests, '貴社規定に従います。');
+  assert.match(fields.motivation, /\*\*関係者と合意形成しながら改善を進めること\*\*/);
+  assert.match(fields.skills, /^- /m);
+  assert.match(fields.selfPromotion, /^1\. /m);
+  assert.match(sample.documents.ja.careers[0].companyInfo, /^- /m);
+  assert.match(sample.documents.ja.careers[0].detailSections[1].content, /^1\. /m);
 });
 
 test('page break settings are isolated and reject unsupported keys and duplicates', () => {

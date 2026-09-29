@@ -568,12 +568,33 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     renderPreview();
   }
 
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const toggle = document.getElementById('japaneseFormatGuideToggle');
+    if (toggle?.getAttribute('aria-expanded') !== 'true') return;
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (!panel || (document.activeElement !== toggle && !panel.contains(document.activeElement))) return;
+    toggle.setAttribute('aria-expanded', 'false');
+    panel.hidden = true;
+    toggle.focus();
+  });
+
   form.addEventListener('input', onFormInput);
   ['educationList', 'employmentList', 'qualificationList', 'careerList'].forEach((id) => {
     document.getElementById(id).addEventListener('input', onListInput);
   });
 
   document.addEventListener('click', (event) => {
+    const formatGuideToggle = event.target.closest('#japaneseFormatGuideToggle');
+    if (formatGuideToggle) {
+      const expanded = formatGuideToggle.getAttribute('aria-expanded') === 'true';
+      const panel = document.getElementById(formatGuideToggle.getAttribute('aria-controls'));
+      if (panel) {
+        formatGuideToggle.setAttribute('aria-expanded', String(!expanded));
+        panel.hidden = expanded;
+      }
+      return;
+    }
     const documentTab = event.target.closest('[data-document]');
     const addButton = event.target.closest('[data-add]');
     const removeButton = event.target.closest('.remove-row-button, .remove-career-button');

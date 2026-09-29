@@ -98,13 +98,28 @@
       <section class="draft-controls" aria-label="下書きの状態と操作">
         <div class="draft-primary-row">
           <span class="draft-message" id="saveStatus">入力すると暗号化してこの端末に保存されます</span>
-          <div class="draft-normal-actions" id="draftNormalActions">
-            <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
+          <div class="draft-action-group">
+            <div class="draft-normal-actions" id="draftNormalActions">
+              <button class="secondary-button" id="loadSampleButton" type="button">入力例を表示</button>
+            </div>
+            <div class="draft-sample-actions" id="sampleModeActions" hidden>
+              <button class="primary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
+              <button class="secondary-button" id="adoptSampleButton" type="button">この例を下書きとして使用</button>
+            </div>
+            <button class="secondary-button draft-format-guide-toggle" id="japaneseFormatGuideToggle" type="button" aria-expanded="false" aria-controls="japaneseFormatGuidePanel">書式ガイド</button>
           </div>
-          <div class="draft-sample-actions" id="sampleModeActions" hidden>
-            <button class="primary-button" id="restoreDraftButton" type="button">元の下書きに戻る</button>
-            <button class="secondary-button" id="adoptSampleButton" type="button">この例を下書きとして使用</button>
-          </div>
+        </div>
+        <div class="draft-format-guide-panel" id="japaneseFormatGuidePanel" role="region" aria-labelledby="japaneseFormatGuideToggle" hidden>
+          <p>書式は、志望動機・自己PR、本人希望記入欄、職務要約、活かせる経験・知識・技術、自己PR、勤務先の会社情報・詳細内容に適用されます。</p>
+          <ul>
+            <li><code>**太字**</code> / <code>*斜体*</code>　太字・斜体</li>
+            <li><code>`コード`</code>　インラインコード</li>
+            <li><code>- 項目</code>　箇条書き</li>
+            <li><code>1. 項目</code>　番号付きリスト</li>
+            <li><code>  - 項目</code>　半角スペース2個で第2階層</li>
+            <li><code>[表示名](https://...)</code>　HTTP(S) リンク</li>
+          </ul>
+          <p>見出し・表・画像・HTML・水平線には対応しません。</p>
         </div>
       </section>
 
