@@ -108,6 +108,11 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.doesNotMatch(playbook, /まだ GitHub Pages の deployment action/);
   assert.match(playbook, /#251 の live hosting 完了判定/);
   assert.match(playbook, /Pages\.dev と custom domain の双方/);
+  assert.match(playbook, /Accept existing Cloudflare production baseline[\s\S]+6968466e-88e8-4156-94e7-39d81a45add8[\s\S]+571384f3-3869-46d3-9af3-80c364bc1ef2/);
+  assert.match(playbook, /Roll back Cloudflare production[\s\S]+current `latest_deployment\.id` が accepted target UUID/);
+  assert.match(playbook, /切替済み・確認未完了/);
+  assert.match(playbook, /github-pages` environment は削除済み/);
+  assert.match(playbook, /issuecomment-5889977750/);
 });
 
 test('the public v4 JSON example remains importable under the runtime data contract', () => {

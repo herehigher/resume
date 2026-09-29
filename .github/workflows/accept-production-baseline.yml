@@ -1,0 +1,88 @@
+name: Accept existing Cloudflare production baseline
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  accept:
+    if: ${{ github.repository == 'herehigher/resume' && github.ref == 'refs/heads/main' && github.actor == 'herehigher' && github.triggering_actor == 'herehigher' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-production
+      cancel-in-progress: false
+    environment: production
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout tagged release evidence
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Fetch the fixed production source commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 33c3ab39c7a08346615bc1b4fd0f413d074aad98 bb2a6bde50b9c9634531f73164a915ec6f5cd9bd
+          git worktree add --detach "$RUNNER_TEMP/v041-source" 33c3ab39c7a08346615bc1b4fd0f413d074aad98
+          git worktree add --detach "$RUNNER_TEMP/v042-source" bb2a6bde50b9c9634531f73164a915ec6f5cd9bd
+
+      - name: Download the exact v0.4.1 production artifact
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          artifact-ids: '10788856459'
+          run-id: '35951587964'
+          path: ${{ runner.temp }}/baseline/v041
+          merge-multiple: true
+
+      - name: Download the exact v0.4.2 production artifact
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          artifact-ids: '10799566904'
+          run-id: '35979958986'
+          path: ${{ runner.temp }}/baseline/v042
+          merge-multiple: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install repository verification dependencies
+        run: npm ci
+
+      - name: Verify exact release artifacts against their tagged sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-artifact-evidence.mjs verify \
+            --artifact-dir "$RUNNER_TEMP/baseline/v041/site-artifact" \
+            --evidence "$RUNNER_TEMP/baseline/v041/release-evidence.json" \
+            --source-dir "$RUNNER_TEMP/v041-source" \
+            --source-sha 33c3ab39c7a08346615bc1b4fd0f413d074aad98
+          node scripts/release-artifact-evidence.mjs verify \
+            --artifact-dir "$RUNNER_TEMP/baseline/v042/site-artifact" \
+            --evidence "$RUNNER_TEMP/baseline/v042/release-evidence.json" \
+            --source-dir "$RUNNER_TEMP/v042-source" \
+            --source-sha bb2a6bde50b9c9634531f73164a915ec6f5cd9bd
+
+      - name: Verify Cloudflare identity and record the v0.4.1 to v0.4.2 baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          BASELINE_V041_EVIDENCE: ${{ runner.temp }}/baseline/v041/release-evidence.json
+          BASELINE_V042_EVIDENCE: ${{ runner.temp }}/baseline/v042/release-evidence.json
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: node scripts/production-state.mjs accept-baseline
