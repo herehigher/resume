@@ -4,7 +4,8 @@ import {
   createCloudflarePagesClient,
   isCloudflarePagesDeploymentId,
   validateAcceptedDeployment,
-  validateCurrentProductionDeployment
+  validateCurrentProductionDeployment,
+  validateReleaseDeploymentEvidence
 } from '../scripts/cloudflare-pages-api.mjs';
 
 const ID = '6968466e-88e8-4156-94e7-39d81a45add8';
@@ -58,6 +59,37 @@ test('Cloudflare deployment identity requires exact production project, branch, 
   assert.throws(() => validateAcceptedDeployment(deployment({ deployment_trigger: { metadata: { branch: 'preview', commit_hash: SHA } } }), expected), /branch/);
   assert.throws(() => validateAcceptedDeployment(deployment({ deployment_trigger: { metadata: { branch: 'main', commit_hash: 'd'.repeat(40) } } }), expected), /SHA/);
   assert.throws(() => validateAcceptedDeployment(deployment({ url: 'https://herehigher-rs.pages.dev/' }), expected), /URL/);
+});
+
+test('release acceptance binds current deployment ID and URL to the validated upload evidence', () => {
+  assert.equal(validateReleaseDeploymentEvidence(deployment(), expected).id, ID);
+
+  const otherId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const otherUrl = 'https://aaaaaaaa.herehigher-rs.pages.dev/';
+  assert.throws(() => validateReleaseDeploymentEvidence(deployment({
+    id: otherId,
+    url: otherUrl
+  }), {
+    ...expected,
+    deploymentId: otherId,
+    deploymentUrl: expected.deploymentUrl
+  }), /URL/);
+  assert.throws(() => validateReleaseDeploymentEvidence(deployment({
+    id: otherId,
+    url: expected.deploymentUrl
+  }), {
+    ...expected,
+    deploymentId: otherId
+  }), /does not correspond to the validated upload URL/);
+  assert.throws(() => validateReleaseDeploymentEvidence(deployment(), {
+    ...expected,
+    deploymentId: otherId
+  }), /ID/);
+  assert.throws(() => validateReleaseDeploymentEvidence(deployment(), {
+    ...expected,
+    deploymentId: null,
+    deploymentUrl: null
+  }), /validated release deployment ID and URL evidence are unavailable/);
 });
 
 test('current project state must match the durable deployment ID', () => {

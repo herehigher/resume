@@ -17,6 +17,7 @@ test('release records the locked pre-state before creating a tag or changing pro
   assert.match(release, /node scripts\/production-state\.mjs start-release/);
   assert.match(release, /node scripts\/production-state\.mjs finish-release/);
   assert.match(release, /production_state_start\.outcome == 'success'/);
+  assert.match(release, /PRODUCTION_DEPLOYMENT_URL: \$\{\{ steps\.production_identity\.outputs\.deployment_url \}\}/);
 });
 
 test('baseline, rollback, and reconciliation are owner-triggered main-only workflows sharing the release lock', () => {
@@ -40,6 +41,8 @@ test('baseline, rollback, and reconciliation are owner-triggered main-only workf
   assert.doesNotMatch(rollback, /wrangler-action|pages deploy|actions\/deploy-pages/);
   assert.match(reconcile, /node scripts\/production-state\.mjs inspect-recovery/);
   assert.match(reconcile, /node scripts\/production-state\.mjs finish-recovery/);
+  const state = readFileSync(new URL('../scripts/production-state.mjs', import.meta.url), 'utf8');
+  assert.match(state, /validateReleaseDeploymentEvidence\(detail, \{[\s\S]+deploymentId: pending\.deploymentId[\s\S]+deploymentUrl: pending\.deploymentUrl/);
   assert.doesNotMatch(reconcile, /wrangler-action|pages deploy|execute-rollback/);
 });
 

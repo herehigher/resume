@@ -12,7 +12,8 @@ import { validateOwnerProductionDispatch } from './production-dispatch-auth.mjs'
 import {
   createCloudflarePagesClient,
   validateAcceptedDeployment,
-  validateCurrentProductionDeployment
+  validateCurrentProductionDeployment,
+  validateReleaseDeploymentEvidence
 } from './cloudflare-pages-api.mjs';
 
 const REPOSITORY = 'herehigher/resume';
@@ -338,13 +339,13 @@ async function finishRelease() {
     return;
   }
   if (!sourceMatches) fail('Cloudflare changed production to an unrecognized deployment; intent remains unresolved');
-  const url = deploymentUrl(detail);
-  const identity = validateAcceptedDeployment(detail, {
+  const uploadedDeploymentUrl = required('PRODUCTION_DEPLOYMENT_URL');
+  const identity = validateReleaseDeploymentEvidence(detail, {
     deploymentId: currentId,
     projectName: PROJECT_NAME,
     productionBranch: PRODUCTION_BRANCH,
     commitSha: pending.record.sourceSha,
-    deploymentUrl: url
+    deploymentUrl: uploadedDeploymentUrl
   });
   const success = runMatches && process.env.PRODUCTION_IDENTITY_OUTCOME === 'success'
     && process.env.PRODUCTION_SMOKE_OUTCOME === 'success';
@@ -613,7 +614,14 @@ async function inspectRecovery() {
       && detail.project_name === PROJECT_NAME && detail.is_skipped === false
       && detail.deployment_trigger?.metadata?.branch === PRODUCTION_BRANCH
       && detail.deployment_trigger?.metadata?.commit_hash === pending.sourceSha) {
-      smokeUrl = deploymentUrl(detail);
+      const identity = validateReleaseDeploymentEvidence(detail, {
+        deploymentId: pending.deploymentId,
+        projectName: PROJECT_NAME,
+        productionBranch: PRODUCTION_BRANCH,
+        commitSha: pending.sourceSha,
+        deploymentUrl: pending.deploymentUrl
+      });
+      smokeUrl = identity.url;
       resolution = 'switched';
     } else {
       fail('current deployment does not match the pending release intent');
@@ -726,18 +734,18 @@ async function finishRecovery() {
       currentUrl = ledger.active.deploymentUrl;
     } else {
       if (!contentMatches) fail('Cloudflare production does not match the pending release source');
+      const identity = validateReleaseDeploymentEvidence(detail, {
+        deploymentId: pending.record.deploymentId,
+        projectName: PROJECT_NAME,
+        productionBranch: PRODUCTION_BRANCH,
+        commitSha: pending.record.sourceSha,
+        deploymentUrl: pending.record.deploymentUrl
+      });
       event = process.env.RECOVERY_PAGES_APPLICATION_SMOKE === 'passed'
         && process.env.RECOVERY_PAGES_EDITOR_SMOKE === 'passed'
         && process.env.RECOVERY_CUSTOM_APPLICATION_SMOKE === 'passed'
         && process.env.RECOVERY_CUSTOM_EDITOR_SMOKE === 'passed'
         ? 'release_accepted' : 'release_unverified';
-      const identity = validateAcceptedDeployment(detail, {
-        deploymentId: currentId,
-        projectName: PROJECT_NAME,
-        productionBranch: PRODUCTION_BRANCH,
-        commitSha: pending.record.sourceSha,
-        deploymentUrl: currentUrl
-      });
       deploymentId = currentId;
       url = identity.url;
       currentUrl = identity.url;

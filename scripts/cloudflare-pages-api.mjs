@@ -135,6 +135,19 @@ export function validateAcceptedDeployment(deployment, expected) {
   return validateDeployment(deployment, expected);
 }
 
+export function validateReleaseDeploymentEvidence(deployment, expected) {
+  if (!expected || !UUID_PATTERN.test(expected.deploymentId || '')
+    || typeof expected.deploymentUrl !== 'string' || expected.deploymentUrl.trim() === '') {
+    fail('validated release deployment ID and URL evidence are unavailable');
+  }
+  const identity = validateAcceptedDeployment(deployment, expected);
+  const hostLabel = new URL(identity.url).hostname.split('.')[0].toLowerCase();
+  if (hostLabel !== identity.id.slice(0, 8)) {
+    fail('deployment ID does not correspond to the validated upload URL');
+  }
+  return identity;
+}
+
 export function validateCurrentProductionDeployment(project, expectedDeploymentId) {
   const current = project?.latest_deployment;
   if (current?.environment !== 'production' || !UUID_PATTERN.test(current.id || '')) {

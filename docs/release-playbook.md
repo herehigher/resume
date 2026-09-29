@@ -120,7 +120,7 @@ Release artifact preparation は `site/` の HTML path、file type、symlink、r
 | production state / deployment ID が台帳と不一致 | production upload は停止。Cloudflare current deployment と issue #252 の履歴を owner が調査し、推測で記録を書き換えない |
 | Deploy 後の smoke failure | 「公開済み・確認未完了」として記録し、以降の production 操作を停止する。一時障害は owner が [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) を main から実行し、Cloudflare identity と両 URL の application・editor smoke を再確認する。内容不良は新しい修正 version を公開する |
 | rollback の current deployment ID が accepted target と異なる | Native API の応答を成功と扱わず「切替済み・確認未完了」を記録する。Ledger を unverified にして release / rollback を止め、owner が current identity を調査する |
-| GitHub issue record 書込みに失敗 | pre-switch failure なら unresolved intent が後続 deploy を止める。切替後なら同じ intent を [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) で照合・smoke し、terminal record を追記する |
+| GitHub issue record 書込みに失敗 | unresolved intent が後続 deploy を止める。Rollback は intent に記録した accepted target ID / URL と current API identity を [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) で照合・smoke できる。Release の切替後に upload identity を ledger へ記録できなかった場合は SHA だけで accepted にせず、intent を残して owner が手動調査する |
 | 公開内容の修正 | 修正 PR と新しい version を用意。既存 tag を変更しない |
 
 ### 前のバージョンへ戻す

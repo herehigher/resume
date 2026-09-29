@@ -560,6 +560,7 @@ jobs:
           CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
           RELEASE_PUBLICATION_SUCCESS: ${{ steps.production_deployment.outcome == 'success' }}
           PRODUCTION_IDENTITY_OUTCOME: ${{ steps.production_identity.outcome }}
+          PRODUCTION_DEPLOYMENT_URL: ${{ steps.production_identity.outputs.deployment_url }}
           PRODUCTION_SMOKE_OUTCOME: ${{ steps.production_smoke.outcome }}
         run: node scripts/production-state.mjs finish-release
 

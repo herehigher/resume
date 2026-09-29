@@ -113,6 +113,7 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /切替済み・確認未完了/);
   assert.match(playbook, /github-pages` environment は削除済み/);
   assert.match(playbook, /issuecomment-5889977750/);
+  assert.match(playbook, /Release の切替後に upload identity を ledger へ記録できなかった場合は SHA だけで accepted にせず/);
 });
 
 test('the public v4 JSON example remains importable under the runtime data contract', () => {
