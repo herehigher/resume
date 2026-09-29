@@ -573,7 +573,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     const toggle = document.getElementById('japaneseFormatGuideToggle');
     if (toggle?.getAttribute('aria-expanded') !== 'true') return;
     const panel = document.getElementById(toggle.getAttribute('aria-controls'));
-    if (!panel) return;
+    if (!panel || (document.activeElement !== toggle && !panel.contains(document.activeElement))) return;
     toggle.setAttribute('aria-expanded', 'false');
     panel.hidden = true;
     toggle.focus();

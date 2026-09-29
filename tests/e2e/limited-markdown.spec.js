@@ -81,6 +81,14 @@ test('日本語の共有書式ガイドは両書類と入力例で使え、ス�
     expect(guideLayout.panelScrollHeight).toBeLessThanOrEqual(guideLayout.panelClientHeight);
     await expectNoPageOverflow(page);
 
+    const unrelatedControl = page.locator('#localeSelect');
+    await unrelatedControl.focus();
+    await expect(unrelatedControl).toBeFocused();
+    await expect(guideToggle).toHaveAttribute('aria-expanded', 'true');
+    await unrelatedControl.press('Escape');
+    await expect(guidePanel).toBeVisible();
+    await expect(unrelatedControl).toBeFocused();
+    await guideToggle.focus();
     await guideToggle.press('Escape');
     await expect(guidePanel).toBeHidden();
     await expect(guideToggle).toBeFocused();
