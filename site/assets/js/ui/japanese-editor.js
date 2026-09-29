@@ -30,66 +30,6 @@ function careerDetailContentPlaceholder(title) {
   return DEFAULT_CAREER_DETAIL_PLACEHOLDERS[String(title ?? '').trim()] || '担当した業務、役割、成果など';
 }
 
-function appendMarkdownHelp(panel) {
-  const examples = [
-    ['**太字**', '太字'],
-    ['*斜体*', '斜体'],
-    ['`コード`', 'インラインコード'],
-    ['- / * / +', '箇条書き'],
-    ['1.', '番号付きリスト'],
-    ['  -', '半角スペース2個で第2階層'],
-    ['[表示名](https://...)', '安全な HTTPS リンク']
-  ];
-  const list = document.createElement('ul');
-  examples.forEach(([syntax, description]) => {
-    const item = document.createElement('li');
-    const code = document.createElement('code');
-    code.textContent = syntax;
-    item.append(code, document.createTextNode(` ${description}`));
-    list.append(item);
-  });
-  const note = document.createElement('p');
-  note.textContent = '見出し・表・画像・HTML・水平線には対応しません。';
-  panel.append(list, note);
-}
-
-function enhanceMarkdownField(field, id) {
-  const sourceLabel = field?.closest('label.input-field');
-  const caption = sourceLabel?.querySelector(':scope > span');
-  if (!sourceLabel || !caption) return;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = `${sourceLabel.className} markdown-field`;
-  const heading = document.createElement('div');
-  heading.className = 'markdown-field-heading';
-  const label = document.createElement('label');
-  label.className = 'markdown-field-label';
-  label.htmlFor = id;
-  label.textContent = caption.textContent;
-  field.id = id;
-
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.id = `${id}-toggle`;
-  toggle.className = 'markdown-help-toggle';
-  toggle.dataset.limitedMarkdownToggle = '';
-  toggle.textContent = 'Markdown の書き方';
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-controls', `${id}-help`);
-
-  const panel = document.createElement('div');
-  panel.id = `${id}-help`;
-  panel.className = 'markdown-help-panel';
-  panel.hidden = true;
-  panel.setAttribute('role', 'region');
-  panel.setAttribute('aria-labelledby', toggle.id);
-  appendMarkdownHelp(panel);
-
-  heading.append(label, toggle);
-  wrapper.append(heading, panel, field);
-  sourceLabel.replaceWith(wrapper);
-}
-
 function careerDetailHasUserInput(section) {
   const title = String(section?.title ?? '').trim();
   return Boolean(String(section?.content ?? '').trim() || (title && !DEFAULT_CAREER_DETAIL_TITLES.has(title)));
@@ -286,7 +226,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       item.querySelectorAll('[data-key]').forEach((field) => {
         field.value = career[field.dataset.key] || '';
       });
-      enhanceMarkdownField(item.querySelector('[data-key="companyInfo"]'), `jp-career-${index}-company-info`);
       const detailContainer = item.querySelector('[data-career-detail-list]');
       career.detailSections.forEach((section, sectionIndex) => {
         const detail = document.getElementById('careerDetailSectionTemplate').content.firstElementChild.cloneNode(true);
@@ -300,7 +239,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
           if (field.dataset.detailKey === 'content') {
             field.placeholder = careerDetailContentPlaceholder(section.title);
             field.rows = section.title.trim() === '担当業務' ? 5 : 4;
-            enhanceMarkdownField(field, `jp-career-${index}-detail-${sectionIndex}-content`);
           }
         });
         detail.querySelector('.remove-career-detail-button').setAttribute('aria-label', `勤務先 ${index + 1} の詳細項目 ${sectionIndex + 1} を削除`);
@@ -630,18 +568,29 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     renderPreview();
   }
 
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const toggle = document.getElementById('japaneseFormatGuideToggle');
+    if (toggle?.getAttribute('aria-expanded') !== 'true') return;
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (!panel) return;
+    toggle.setAttribute('aria-expanded', 'false');
+    panel.hidden = true;
+    toggle.focus();
+  });
+
   form.addEventListener('input', onFormInput);
   ['educationList', 'employmentList', 'qualificationList', 'careerList'].forEach((id) => {
     document.getElementById(id).addEventListener('input', onListInput);
   });
 
   document.addEventListener('click', (event) => {
-    const markdownToggle = event.target.closest('[data-limited-markdown-toggle]');
-    if (markdownToggle) {
-      const expanded = markdownToggle.getAttribute('aria-expanded') === 'true';
-      const panel = document.getElementById(markdownToggle.getAttribute('aria-controls'));
+    const formatGuideToggle = event.target.closest('#japaneseFormatGuideToggle');
+    if (formatGuideToggle) {
+      const expanded = formatGuideToggle.getAttribute('aria-expanded') === 'true';
+      const panel = document.getElementById(formatGuideToggle.getAttribute('aria-controls'));
       if (panel) {
-        markdownToggle.setAttribute('aria-expanded', String(!expanded));
+        formatGuideToggle.setAttribute('aria-expanded', String(!expanded));
         panel.hidden = expanded;
       }
       return;
@@ -765,9 +714,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     if (['import', 'reload', 'reset', 'sample', 'restore'].includes(event.type)) hydrateForm();
   });
 
-  ['motivation', 'requests', 'careerSummary', 'skills', 'selfPromotion'].forEach((name) => {
-    enhanceMarkdownField(form.elements.namedItem(name), `jp-${name}`);
-  });
   hydrateForm();
   setDraftStatus(shouldPersistDraft
     ? '暗号化してこの端末に保存済み'

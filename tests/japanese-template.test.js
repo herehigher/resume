@@ -241,6 +241,20 @@ test('Japanese profile and credential links only activate HTTP URLs', () => {
   assert.match(html, /Website · javascript:alert\(1\)/);
 });
 
+test('Japanese sample Markdown renders in both resume and career templates', () => {
+  const state = createJapaneseSampleState(createDefaultState('ja'));
+  const resumeHtml = renderJapaneseDocument(state);
+
+  assert.match(resumeHtml, /<strong>関係者と合意形成しながら改善を進めること<\/strong>/);
+  assert.match(resumeHtml, /貴社規定に従います。/);
+
+  state.documents.ja.activeDocument = 'career';
+  const careerHtml = renderJapaneseDocument(state);
+  assert.match(careerHtml, /<strong>法人向けプロダクトの企画・運営<\/strong>/);
+  assert.match(careerHtml, /<ul><li>プロダクト企画、要件定義、ロードマップ策定<\/li>/);
+  assert.match(careerHtml, /<ol><li>オンボーディング改善により継続率を18ポイント向上<\/li>/);
+});
+
 test('Japanese resume prints local link icons and concise semantic history headings', () => {
   const state = createJapaneseSampleState(createDefaultState('ja'));
   const html = renderJapaneseDocument(state);

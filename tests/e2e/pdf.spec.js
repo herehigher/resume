@@ -517,16 +517,33 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
   }
 });
 
-test('PDF standard: 日本語の標準例は 2 ページの A4 で主要テキストを抽出できる', async ({ page }) => {
+test('PDF standard: 日本語の入力例は両書類で Markdown を表示する A4 PDF を作る', async ({ page }) => {
   await openLocale(page, 'ja');
   await page.locator('#loadSampleButton').click();
+  await expect(page.locator('#documentPreview .ja-markdown strong')).not.toHaveCount(0);
+  expect(await page.locator('#documentPreview .ja-markdown strong').first().evaluate((element) => Number(getComputedStyle(element).fontWeight))).toBeGreaterThanOrEqual(600);
 
-  const pages = await inspectPdf(await printPdf(page));
-  expect(pages).toHaveLength(2);
-  expectPageSize(pages, A4);
-  const text = pages.map((item) => item.text).join(' ');
-  expect(text).toContain('TOEIC Listening & Reading 850');
-  expect(text).toContain('志望動機');
+  const resumePages = await inspectPdf(await printPdf(page));
+  expect(resumePages).toHaveLength(2);
+  expectPageSize(resumePages, A4);
+  const resumeText = resumePages.map((item) => item.text).join(' ');
+  expectPdfContext(resumeText, 'TOEIC Listening & Reading 850');
+  expectPdfContext(resumeText, '関係者と合意形成しながら改善を進めること');
+  expectPdfContext(resumeText, '貴社規定に従います。');
+
+  await page.emulateMedia({ media: 'screen' });
+  await page.locator('#careerDocumentTab').click();
+  await expect(page.locator('#documentPreview .ja-markdown strong')).not.toHaveCount(0);
+  await expect(page.locator('#documentPreview .ja-markdown ul li')).not.toHaveCount(0);
+  await expect(page.locator('#documentPreview .ja-markdown ol li')).not.toHaveCount(0);
+  const careerPages = await inspectPdf(await printPdf(page));
+  expect(careerPages.length).toBeGreaterThanOrEqual(1);
+  expect(careerPages.length).toBeLessThanOrEqual(8);
+  expectPageSize(careerPages, A4);
+  const careerText = careerPages.map((item) => item.text).join(' ');
+  expectPdfContext(careerText, '法人向けプロダクト');
+  expectPdfContext(careerText, 'オンボーディング改善により継続率を18ポイント向上');
+  expectPdfContext(careerText, '英語：ビジネスレベル');
 });
 
 test('PDF long: English の超長文は複数 Letter ページになり末尾まで抽出できる', async ({ page }) => {

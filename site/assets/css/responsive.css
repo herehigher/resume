@@ -5,6 +5,7 @@
   .document-page { min-height: 927px; padding: 39px 42px; width: 655px; }
   .profile-name { min-height: 57px !important; }
   .draft-primary-row { align-items: flex-start; grid-template-columns: 1fr; }
+  .draft-action-group { justify-content: flex-start; }
   .draft-normal-actions,
   .draft-sample-actions { justify-content: flex-start; }
 }

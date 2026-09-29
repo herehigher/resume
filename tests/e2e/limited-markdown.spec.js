@@ -10,89 +10,138 @@ async function exportJapaneseState(page) {
   return JSON.parse(await readFile(await download.path(), 'utf8'));
 }
 
-test('日文 Markdown 帮助只在目标长文 textarea 出现，并支持 keyboard 与手机内联展开', async ({ page }) => {
+test('日本語の共有書式ガイドは両書類と入力例で使え、スマホでも表示を保つ', async ({ page }) => {
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     await openLocale(page, 'ja');
 
-    for (const name of ['motivation', 'requests']) {
-      const field = page.locator(`#resumeFields [name="${name}"]`);
-      await expect(field).toHaveCount(1);
-      expect(await field.evaluate((element) => Boolean(element.closest('.markdown-field')))).toBe(true);
+    const guideToggle = page.locator('#japaneseFormatGuideToggle');
+    const guidePanel = page.locator('#japaneseFormatGuidePanel');
+    const editorPanel = page.locator('#japaneseWorkspace .editor-panel');
+    await expect(guideToggle).toHaveCount(1);
+    await expect(guideToggle).toBeVisible();
+    await expect(page.locator('#loadSampleButton')).toBeVisible();
+    await expect(page.locator('#japaneseWorkspace .draft-controls')).toHaveCSS('position', 'sticky');
+    await expect(page.locator('#japaneseWorkspace .markdown-field, #japaneseWorkspace .markdown-field-heading, #japaneseWorkspace .markdown-help-panel, #japaneseWorkspace [data-limited-markdown-toggle]')).toHaveCount(0);
+    for (const selector of [
+      '#resumeFields [name="motivation"]',
+      '#resumeFields [name="requests"]',
+      '#careerFields [name="careerSummary"]',
+      '#careerFields [name="skills"]',
+      '#careerFields [name="selfPromotion"]',
+      '#careerList [data-key="companyInfo"]',
+      '#careerList [data-detail-key="content"]'
+    ]) {
+      await expect(page.locator(selector).first()).toHaveCount(1);
     }
-    for (const name of ['careerSummary', 'skills', 'selfPromotion']) {
-      const field = page.locator(`#careerFields [name="${name}"]`);
-      await expect(field).toHaveCount(1);
-      expect(await field.evaluate((element) => Boolean(element.closest('.markdown-field')))).toBe(true);
-    }
+    expect(await guideToggle.evaluate((button) => button.parentElement.contains(document.getElementById('loadSampleButton')))).toBe(true);
+    await expect(guidePanel).toBeHidden();
+    await expect(guideToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(guideToggle).toHaveAttribute('aria-controls', 'japaneseFormatGuidePanel');
 
-    const companyInfo = page.locator('#careerList [data-key="companyInfo"]').first();
-    const detailContent = page.locator('#careerList [data-detail-key="content"]').first();
-    await expect(companyInfo).toHaveCount(1);
-    await expect(detailContent).toHaveCount(1);
-    expect(await companyInfo.evaluate((element) => Boolean(element.closest('.markdown-field')))).toBe(true);
-    expect(await detailContent.evaluate((element) => Boolean(element.closest('.markdown-field')))).toBe(true);
+    await guideToggle.focus();
+    await expect(guideToggle).toBeFocused();
+    await guideToggle.press('Enter');
+    await expect(guideToggle).toBeFocused();
+    await expect(guideToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(guidePanel).toBeVisible();
+    expect(await guidePanel.evaluate((panel) => Number.parseFloat(getComputedStyle(panel).fontSize))).toBeGreaterThanOrEqual(11);
+    await expect(guidePanel).toContainText('志望動機・自己PR');
+    await expect(guidePanel).toContainText('活かせる経験・知識・技術');
+    await expect(guidePanel).toContainText('**太字**');
+    await expect(guidePanel).toContainText('[表示名](https://...)');
+    await expect(guidePanel).toContainText('見出し・表・画像・HTML・水平線には対応しません。');
 
-    const excludedFields = [
-      page.locator('[name="fullName"]'),
-      page.locator('#educationList [data-key="detail"]'),
-      page.locator('#careerList [data-key="company"]'),
-      page.locator('#careerList [data-detail-key="title"]')
-    ];
-    for (const field of excludedFields) {
-      expect(await field.first().evaluate((element) => Boolean(element.closest('.markdown-field')))).toBe(false);
-    }
-
-    const motivation = page.locator('#jp-motivation');
-    await revealField(motivation);
-    const motivationToggle = page.locator('#jp-motivation-toggle');
-    const motivationPanel = page.locator('#jp-motivation-help');
-    await expect(motivationToggle).toHaveText('Markdown の書き方');
-    await expect(motivationToggle).toHaveAttribute('aria-controls', 'jp-motivation-help');
-    await expect(motivationToggle).toHaveAttribute('aria-expanded', 'false');
-    await motivationToggle.focus();
-    await expect(motivationToggle).toBeFocused();
-    await motivationToggle.press('Enter');
-    await expect(motivationToggle).toBeFocused();
-    await expect(motivationToggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(motivationPanel).toBeVisible();
-    await expect(motivationPanel).toContainText('**太字**');
-    await expect(motivationPanel).toContainText('[表示名](https://...)');
-    await expect(motivationPanel).toContainText('見出し・表・画像・HTML・水平線には対応しません。');
-
-    const motivationLayout = await page.evaluate(() => {
-      const button = document.getElementById('jp-motivation-toggle').getBoundingClientRect();
-      const panel = document.getElementById('jp-motivation-help').getBoundingClientRect();
-      const textarea = document.getElementById('jp-motivation').getBoundingClientRect();
-      const wrapper = document.getElementById('jp-motivation').closest('.markdown-field').getBoundingClientRect();
+    const guideLayout = await page.evaluate(() => {
+      const button = document.getElementById('japaneseFormatGuideToggle').getBoundingClientRect();
+      const panel = document.getElementById('japaneseFormatGuidePanel').getBoundingClientRect();
       return {
         buttonHeight: button.height,
         buttonWidth: button.width,
-        panelWidth: panel.width,
-        wrapperWidth: wrapper.width,
-        panelBelowButton: panel.top >= button.bottom,
-        fieldBelowPanel: textarea.top >= panel.bottom
+        buttonBottom: button.bottom,
+        panelLeft: panel.left,
+        panelTop: panel.top,
+        panelRight: panel.right,
+        panelBottom: panel.bottom,
+        panelHeight: panel.height,
+        panelScrollHeight: document.getElementById("japaneseFormatGuidePanel").scrollHeight,
+        panelClientHeight: document.getElementById("japaneseFormatGuidePanel").clientHeight,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight
       };
     });
-    expect(motivationLayout.buttonHeight).toBeGreaterThanOrEqual(44);
-    expect(motivationLayout.buttonWidth).toBeGreaterThanOrEqual(44);
-    expect(motivationLayout.panelWidth).toBeLessThanOrEqual(motivationLayout.wrapperWidth);
-    expect(motivationLayout.panelBelowButton).toBe(true);
-    expect(motivationLayout.fieldBelowPanel).toBe(true);
+    expect(guideLayout.buttonHeight).toBeGreaterThanOrEqual(44);
+    expect(guideLayout.buttonWidth).toBeGreaterThanOrEqual(44);
+    expect(guideLayout.panelLeft).toBeGreaterThanOrEqual(0);
+    expect(guideLayout.panelRight).toBeLessThanOrEqual(guideLayout.viewportWidth);
+    expect(guideLayout.panelTop).toBeGreaterThanOrEqual(guideLayout.buttonBottom);
+    expect(guideLayout.panelBottom).toBeLessThanOrEqual(guideLayout.viewportHeight);
+    expect(guideLayout.panelHeight).toBeLessThanOrEqual(248);
+    expect(guideLayout.panelHeight).toBeLessThan(guideLayout.viewportHeight / 3);
+    expect(guideLayout.panelScrollHeight).toBeLessThanOrEqual(guideLayout.panelClientHeight);
     await expectNoPageOverflow(page);
 
-    await page.locator('#careerDocumentTab').click();
-    await revealField(companyInfo);
-    const companyToggle = companyInfo.locator('xpath=ancestor::div[contains(@class,"markdown-field")]').locator('[data-limited-markdown-toggle]');
-    await companyToggle.click();
-    await expect(companyToggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator(`#${await companyToggle.getAttribute('aria-controls')}`)).toBeVisible();
-  }
+    await guideToggle.press('Escape');
+    await expect(guidePanel).toBeHidden();
+    await expect(guideToggle).toBeFocused();
+    await expect(guideToggle).toHaveAttribute('aria-expanded', 'false');
 
-  for (const locale of ['zh-CN', 'en']) {
-    await openLocale(page, locale);
-    await expect(page.locator('#japaneseWorkspace')).toBeHidden();
-    await expect(page.locator('#japaneseWorkspace [data-limited-markdown-toggle]').first()).toBeHidden();
+    await page.locator('#careerDocumentTab').click();
+    await expect(guideToggle).toBeVisible();
+    await expect(page.locator('#japaneseWorkspace #japaneseFormatGuideToggle')).toHaveCount(1);
+    await expect(page.locator('#careerList [data-key="companyInfo"]')).toHaveCount(1);
+    await expect(page.locator('#careerList [data-detail-key="content"]')).toHaveCount(2);
+
+    await editorPanel.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    await expect(guideToggle).toBeInViewport();
+    await guideToggle.click();
+    await expect(guidePanel).toBeVisible();
+    const stickyGuideLayout = await page.evaluate(() => {
+      const controls = document.querySelector('#japaneseWorkspace .draft-controls').getBoundingClientRect();
+      const button = document.getElementById('japaneseFormatGuideToggle').getBoundingClientRect();
+      const panel = document.getElementById('japaneseFormatGuidePanel').getBoundingClientRect();
+      return { controlsTop: controls.top, buttonTop: button.top, panelBottom: panel.bottom, viewportHeight: window.innerHeight, panelHeight: panel.height };
+    });
+    expect(stickyGuideLayout.buttonTop).toBeGreaterThanOrEqual(stickyGuideLayout.controlsTop);
+    expect(stickyGuideLayout.panelBottom).toBeLessThanOrEqual(stickyGuideLayout.viewportHeight);
+    expect(stickyGuideLayout.panelHeight).toBeLessThanOrEqual(248);
+    await guideToggle.click();
+
+    await page.locator('#loadSampleButton').click();
+    await expect(page.locator('#restoreDraftButton')).toBeVisible();
+    await expect(page.locator('#adoptSampleButton')).toBeVisible();
+    await expect(page.locator('#loadSampleButton')).toBeHidden();
+    await expect(guideToggle).toBeVisible();
+    await expect(page.locator('#documentPreview .ja-markdown strong')).not.toHaveCount(0);
+
+    await page.locator('#careerDocumentTab').click();
+    await expect(page.locator('#japaneseWorkspace #japaneseFormatGuideToggle')).toHaveCount(1);
+    await expect(guideToggle).toBeVisible();
+    await expect(page.locator('#documentPreview .ja-markdown strong')).not.toHaveCount(0);
+    await expect(page.locator('#documentPreview .ja-markdown ul li')).not.toHaveCount(0);
+    await expect(page.locator('#documentPreview .ja-markdown ol li')).not.toHaveCount(0);
+
+    await editorPanel.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    await expect(guideToggle).toBeInViewport();
+    await guideToggle.focus();
+    await expect(guideToggle).toBeFocused();
+    await guideToggle.press('Enter');
+    await expect(guidePanel).toBeVisible();
+    const sampleGuideLayout = await page.evaluate(() => {
+      const button = document.getElementById('japaneseFormatGuideToggle').getBoundingClientRect();
+      const panel = document.getElementById('japaneseFormatGuidePanel').getBoundingClientRect();
+      return { buttonHeight: button.height, buttonWidth: button.width, panelHeight: panel.height, panelBottom: panel.bottom, viewportHeight: window.innerHeight, panelScrollHeight: document.getElementById("japaneseFormatGuidePanel").scrollHeight, panelClientHeight: document.getElementById("japaneseFormatGuidePanel").clientHeight };
+    });
+    expect(sampleGuideLayout.buttonHeight).toBeGreaterThanOrEqual(44);
+    expect(sampleGuideLayout.buttonWidth).toBeGreaterThanOrEqual(44);
+    expect(sampleGuideLayout.panelHeight).toBeLessThanOrEqual(248);
+    expect(sampleGuideLayout.panelHeight).toBeLessThan(sampleGuideLayout.viewportHeight / 3);
+    expect(sampleGuideLayout.panelScrollHeight).toBeLessThanOrEqual(sampleGuideLayout.panelClientHeight);
+    expect(sampleGuideLayout.panelBottom).toBeLessThanOrEqual(sampleGuideLayout.viewportHeight);
+    await guideToggle.press('Escape');
+    await expect(guidePanel).toBeHidden();
+    await page.locator('#restoreDraftButton').click();
+    await expect(guideToggle).toBeVisible();
   }
 });
 
@@ -106,7 +155,7 @@ test('日本語 Markdown preview preserves paragraph indentation and repeated sp
     '- リスト  内の空白'
   ].join('\n');
   await openLocale(page, 'ja');
-  const field = page.locator('#jp-motivation');
+  const field = page.locator('#resumeFields [name="motivation"]');
   await revealField(field);
   await field.fill(source);
 
@@ -155,8 +204,8 @@ test('日文 Markdown source は暗号化草稿・JSON 往復で code-unit 単�
   const detailContent = page.locator('#careerList [data-detail-key="content"]').first();
   await companyInfo.fill(values.companyInfo);
   await detailContent.fill(values.detailContent);
-  await page.locator('#jp-careerSummary-toggle').click();
-  await expect(page.locator('#jp-careerSummary-help')).toBeVisible();
+  await page.locator('#japaneseFormatGuideToggle').click();
+  await expect(page.locator('#japaneseFormatGuidePanel')).toBeVisible();
   await expect(page.locator('#documentPreview')).toContainText('MARKDOWN-END');
   await expect(page.locator('#documentPreview .ja-markdown a')).toHaveCount(1);
   await expect(page.locator('#documentPreview .ja-markdown a')).toHaveAttribute('target', '_blank');
@@ -171,7 +220,7 @@ test('日文 Markdown source は暗号化草稿・JSON 往復で code-unit 単�
   }
   await expect(page.locator('#careerList [data-key="companyInfo"]').first()).toHaveValue(values.companyInfo);
   await expect(page.locator('#careerList [data-detail-key="content"]').first()).toHaveValue(values.detailContent);
-  await expect(page.locator('#jp-careerSummary-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#japaneseFormatGuideToggle')).toHaveAttribute('aria-expanded', 'false');
 
   const exported = await exportJapaneseState(page);
   expect(exported.documents.ja.fields).toMatchObject({
