@@ -615,4 +615,29 @@ for (const [locale, addSelector, previewSelector, pageSize] of [
     expect(text).not.toContain('https://');
     expectPageSize(pages, pageSize);
   });
+
+  test(`profile links ${locale}: 認識したサイト名とローカルアイコンを画面・PDFに表示する`, async ({ page }) => {
+    await openLocale(page, locale);
+    const add = page.locator(addSelector);
+    await revealField(add);
+    await add.click();
+
+    const url = 'https://www.credly.com/users/fictional-profile';
+    const input = page.locator('[data-profile-link-index]').last();
+    await input.fill(url);
+
+    const recognition = page.locator('.profile-link-recognition').last();
+    await expect(recognition).toContainText('Credly');
+    await expect(recognition.locator('.profile-link-icon--credly')).toHaveCount(1);
+    const preview = page.locator(previewSelector);
+    await expect(preview).toContainText('Credly');
+    await expect(preview.locator('.profile-link-icon--credly')).toHaveCount(1);
+    await expect(preview.locator('.profile-link-icon--credly')).toHaveCSS('width', '13px');
+
+    const pages = await inspectPdf(await printPdf(page));
+    const text = pages.map((item) => item.text).join(' ').replace(/\s/g, '');
+    expect(text).toContain('Credly');
+    expect(text).toContain('www.credly.com/users/fictional-profile');
+    expectPageSize(pages, pageSize);
+  });
 }
