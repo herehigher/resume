@@ -98,6 +98,22 @@ test('the production v4 format is current, migrates the explicit v3 namespace, a
   assert.deepEqual(MIGRATION_REGISTRY.map(({ from, to }) => ({ from, to })), [{ from: 2, to: 3 }, { from: 3, to: 4 }]);
 });
 
+test('older v4 data receives empty optional Japanese residence fields without changing the input', () => {
+  const source = createDefaultState('ja');
+  for (const key of ['residenceStatus', 'workRestriction', 'residenceExpiryDate']) {
+    delete source.documents.ja.fields[key];
+  }
+  const before = structuredClone(source);
+
+  const result = migrateState(source);
+  assert.equal(result.status, 'current');
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, result.state.documents.ja.fields[key]])),
+    { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' }
+  );
+  assert.deepEqual(source, before, 'reading an older v4 state does not mutate its input');
+});
+
 test('the v2 to v3 migration normalizes all recognized gender values and adds fixed defaults', () => {
   for (const [legacyGender, gender] of [
     ['男性', 'male'], ['男', 'male'], ['Male', 'male'],
@@ -138,6 +154,10 @@ test('the v3 to v4 migration deterministically adds unique record IDs and separa
   assert.deepEqual(first, second);
   assert.deepEqual(first.state.settings.pageBreaks.ja.A4.resume, { sections: ['qualifications'], records: [] });
   assert.deepEqual(first.state.settings.pageBreaks.en.A4.resume, { sections: ['projects'], records: [] });
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, first.state.documents.ja.fields[key]])),
+    { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' }
+  );
   for (const records of [first.state.documents.ja.careers, first.state.documents['zh-CN'].resume.experience, first.state.documents.en.resume.experience]) {
     assert.equal(new Set(records.map((record) => record.id)).size, records.length);
     assert.ok(records.every((record) => record.id.startsWith('record_')));

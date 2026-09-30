@@ -57,7 +57,48 @@ test('default state contains independent locale documents', () => {
   assert.deepEqual(state.profile.fields, {
     fullName: '', birthDate: '', gender: '', nationality: '', postalCode: '', address: '', phone: '', email: '', links: []
   });
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, state.documents.ja.fields[key]])),
+    { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' }
+  );
+  assert.equal(Object.hasOwn(state.documents['zh-CN'].resume, 'residenceStatus'), false);
+  assert.equal(Object.hasOwn(state.documents.en.resume, 'residenceStatus'), false);
   assert.equal(state.documents.en.resume.showOptionalPersonalDetails, false);
+});
+
+test('Japanese residence fields stay optional, validated, and round-trip through v4 JSON', async () => {
+  const legacyV4 = createDefaultState('ja');
+  for (const key of ['residenceStatus', 'workRestriction', 'residenceExpiryDate']) {
+    delete legacyV4.documents.ja.fields[key];
+  }
+  assert.equal(validateState(legacyV4).valid, true, 'older v4 JSON remains valid without the optional fields');
+
+  const imported = createTestStore(createMemoryStorage(), createDefaultState('ja'));
+  await imported.importJson(JSON.stringify(legacyV4));
+  assert.equal(imported.getState().version, 4);
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, imported.getState().documents.ja.fields[key]])),
+    { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' }
+  );
+
+  imported.update((state) => {
+    state.documents.ja.fields.residenceStatus = '架空の在留資格';
+    state.documents.ja.fields.workRestriction = 'restricted';
+    state.documents.ja.fields.residenceExpiryDate = '2028-02-29';
+  });
+  const restored = createTestStore(createMemoryStorage(), createDefaultState('ja'));
+  await restored.importJson(imported.exportJson());
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, restored.getState().documents.ja.fields[key]])),
+    { residenceStatus: '架空の在留資格', workRestriction: 'restricted', residenceExpiryDate: '2028-02-29' }
+  );
+
+  const invalid = structuredClone(restored.getState());
+  invalid.documents.ja.fields.workRestriction = 'unknown';
+  assert.ok(validateState(invalid).errors.includes('documents.ja.fields.workRestriction is not supported'));
+  invalid.documents.ja.fields.workRestriction = 'none';
+  invalid.documents.ja.fields.residenceExpiryDate = '2026-02-29';
+  assert.ok(validateState(invalid).errors.includes('documents.ja.fields.residenceExpiryDate must be a valid date or empty'));
 });
 
 test('v4 gender values are locale-independent and reject unrecognized values', () => {

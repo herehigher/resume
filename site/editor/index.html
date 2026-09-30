@@ -173,6 +173,28 @@
                   <input name="createdDate" type="date">
                 </label>
               </div>
+              <div class="residence-fields-section">
+                <p class="residence-fields-title">在留資格情報（任意）</p>
+                <div class="field-grid two-columns residence-fields-grid">
+                  <label class="input-field">
+                    <span>在留資格</span>
+                    <input name="residenceStatus">
+                  </label>
+                  <label class="input-field">
+                    <span>就労制限の有無</span>
+                    <select name="workRestriction">
+                      <option value="">未選択</option>
+                      <option value="none">なし</option>
+                      <option value="restricted">あり</option>
+                    </select>
+                  </label>
+                  <label class="input-field">
+                    <span>在留期間（満了日）</span>
+                    <input name="residenceExpiryDate" type="date">
+                  </label>
+                </div>
+                <small class="field-help">必要な場合だけ入力してください。空欄の項目は書類に表示されません。</small>
+              </div>
             </div>
           </details>
 

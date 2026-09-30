@@ -30,6 +30,18 @@ export function mapValidArray(value, mapItem, fallback = []) {
   return result;
 }
 
+function addCompatibleJapaneseFields(state, currentVersion) {
+  if (currentVersion !== STATE_VERSION || !isObject(state.documents?.ja?.fields)) return state;
+  const defaults = { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' };
+  const missing = Object.keys(defaults).filter((key) => !Object.hasOwn(state.documents.ja.fields, key));
+  if (!missing.length) return state;
+  const normalized = copy(state);
+  missing.forEach((key) => {
+    normalized.documents.ja.fields[key] = defaults[key];
+  });
+  return normalized;
+}
+
 const V2_GENDER_VALUES = new Map([
   ['男性', 'male'], ['男', 'male'], ['Male', 'male'],
   ['女性', 'female'], ['女', 'female'], ['Female', 'female'],
@@ -159,8 +171,9 @@ export function createMigrationRunner({
     if (value.version > currentVersion) return rejected('future', 'future-version');
     if (value.version < minimumVersion) return rejected('too-old', 'version-window-expired');
     if (value.version === currentVersion) {
-      const validation = validateCurrent(value);
-      return validation.valid ? { status: 'current', state: value } : rejected('unsupported', 'current-validation-failed');
+      const state = addCompatibleJapaneseFields(value, currentVersion);
+      const validation = validateCurrent(state);
+      return validation.valid ? { status: 'current', state } : rejected('unsupported', 'current-validation-failed');
     }
 
     let state = copy(value);
@@ -180,6 +193,7 @@ export function createMigrationRunner({
       }
     }
 
+    state = addCompatibleJapaneseFields(state, currentVersion);
     const validation = validateCurrent(state);
     return validation.valid
       ? { status: salvaged ? 'salvaged' : 'migrated', state }

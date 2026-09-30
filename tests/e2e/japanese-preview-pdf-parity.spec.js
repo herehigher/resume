@@ -2,6 +2,8 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { expect, openLocale, test } from './fixtures.js';
 
+const A4 = { width: 595.28, height: 841.89 };
+
 function documentGeometry(selector) {
   const page = document.querySelector(selector);
   const style = getComputedStyle(page);
@@ -79,7 +81,7 @@ async function inspectPdf(buffer) {
 }
 
 function normalizePdfText(value) {
-  return String(value).normalize('NFKC').replace(/\s/g, '');
+  return String(value).normalize('NFKC').replace(/\u2ed1/g, '長').replace(/\s/g, '');
 }
 
 function normalizeAsciiUrlText(value) {
@@ -184,6 +186,106 @@ test('[mobile] 日本語: smartphone 幅でも A4 の内部版面を reflow し�
   await page.setViewportSize({ width: 1440, height: 1000 });
   const desktop = await screenGeometry(page, '.resume-document');
   expect(mobile).toEqual(desktop);
+});
+
+test('日本語: 在留情報は任意入力で、履歴書・職務経歴書の A4 PDF にだけ値を表示する', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openLocale(page, 'ja');
+  const initialState = createDefaultState('ja');
+  initialState.documents.ja.education = [{ date: '2020-04', detail: '架空大学 入学' }];
+  await importJapaneseState(page, initialState);
+  const residenceStatus = page.locator('#resumeForm [name="residenceStatus"]');
+  const workRestriction = page.locator('#resumeForm [name="workRestriction"]');
+  const residenceExpiryDate = page.locator('#resumeForm [name="residenceExpiryDate"]');
+
+  await expect(residenceStatus).toBeVisible();
+  const residenceRow = page.locator('.resume-contact .residence-info-value');
+  await expect(page.locator('.resume-contact')).not.toContainText('在留資格');
+  await expect(residenceRow).toHaveCount(0);
+  await expect(page.locator('.resume-contact')).not.toContainText('就労制限の有無');
+  await expect(page.locator('.resume-contact')).not.toContainText('在留期間（満了日）');
+
+  const longStatus = '架空の在留資格・活動内容を示す長い自由入力'.repeat(8);
+  await residenceStatus.fill(longStatus);
+  await workRestriction.selectOption('restricted');
+  await residenceExpiryDate.fill('2028-02-29');
+  await expect(page.locator('.resume-contact')).toContainText(longStatus);
+  await expect(page.locator('.resume-contact .paper-label').last()).toHaveText('在留資格');
+  await expect(page.locator('.resume-contact')).toContainText('あり');
+  await expect(page.locator('.resume-contact')).toContainText('2028年2月29日');
+  await expect(residenceRow).toHaveCount(1);
+  await expect(page.locator('.resume-contact .residence-info-item')).toHaveCount(3);
+  const itemTops = await residenceRow.locator('.residence-info-item').evaluateAll((items) => (
+    items.map((item) => item.getBoundingClientRect().top)
+  ));
+  expect(itemTops[1]).toBeGreaterThan(itemTops[0]);
+  expect(itemTops[2]).toBeGreaterThan(itemTops[1]);
+
+  const desktopGeometry = await screenGeometry(page, '.resume-document');
+  const valueWrap = await page.locator('.resume-contact .residence-info-item').first().evaluate((value) => getComputedStyle(value).overflowWrap);
+  expect(valueWrap).toBe('anywhere');
+  await page.emulateMedia({ media: 'print' });
+  const resumePdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+  expect(resumePdf.length).toBeGreaterThan(0);
+  expect(resumePdf.every((item) => item.items.some((text) => text.str.trim()))).toBe(true);
+  expect(resumePdf.map((item) => [item.width, item.height])).toEqual(resumePdf.map(() => [
+    expect.closeTo(A4.width, 0), expect.closeTo(A4.height, 0)
+  ]));
+  const resumePdfText = normalizePdfText(resumePdf.flatMap((item) => item.items).map((item) => item.str).join(''));
+  expect(resumePdfText).toContain(normalizePdfText(longStatus));
+  expect(resumePdfText).toContain(normalizePdfText('在留資格'));
+  expect(resumePdfText).toContain(normalizePdfText('就労制限の有無'));
+  expect(resumePdfText).toContain(normalizePdfText('在留期間（満了日）'));
+  expect(resumePdfText).toContain(normalizePdfText('2028年2月29日'));
+
+  await page.emulateMedia({ media: 'screen' });
+  await page.locator('#careerDocumentTab').click();
+  await expect(page.locator('.career-doc-meta')).toContainText('在留資格：');
+  await page.emulateMedia({ media: 'print' });
+  const careerPdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+  expect(careerPdf.length).toBeGreaterThan(0);
+  expect(careerPdf.every((item) => item.items.some((text) => text.str.trim()))).toBe(true);
+  expect(careerPdf.map((item) => [item.width, item.height])).toEqual(careerPdf.map(() => [
+    expect.closeTo(A4.width, 0), expect.closeTo(A4.height, 0)
+  ]));
+  const careerPdfText = normalizePdfText(careerPdf.flatMap((item) => item.items).map((item) => item.str).join(''));
+  expect(careerPdfText).toContain(normalizePdfText(longStatus));
+  expect(careerPdfText).toContain(normalizePdfText('就労制限の有無：あり'));
+  expect(careerPdfText).toContain(normalizePdfText('在留期間（満了日）'));
+  expect(careerPdfText).toContain(normalizePdfText('2028年2月29日'));
+
+  await page.emulateMedia({ media: 'screen' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('[data-mobile-view="editor"]').click();
+  const mobileFields = await page.evaluate(() => {
+    const fields = ['residenceStatus', 'workRestriction', 'residenceExpiryDate']
+      .map((name) => document.querySelector(`#resumeForm [name="${name}"]`).getBoundingClientRect());
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      fieldTops: fields.map((field) => Math.round(field.top)),
+      fieldRights: fields.map((field) => Math.round(field.right))
+    };
+  });
+  expect(mobileFields.documentWidth).toBe(390);
+  expect(mobileFields.fieldTops[1]).toBeGreaterThan(mobileFields.fieldTops[0]);
+  expect(mobileFields.fieldTops[2]).toBeGreaterThan(mobileFields.fieldTops[1]);
+  expect(mobileFields.fieldRights.every((right) => right <= 390)).toBe(true);
+  await page.locator('[data-mobile-view="preview"]').click();
+  await page.locator('#resumeDocumentTab').click();
+  expect(await screenGeometry(page, '.resume-document')).toEqual(desktopGeometry);
+
+  await page.locator('[data-mobile-view="editor"]').click();
+  await residenceStatus.fill('');
+  await workRestriction.selectOption('');
+  await residenceExpiryDate.fill('');
+  await expect(residenceRow).toHaveCount(0);
+  await expect(page.locator('.resume-contact')).not.toContainText('在留資格');
+  await expect(page.locator('.resume-contact')).not.toContainText('就労制限の有無');
+  await expect(page.locator('.resume-contact')).not.toContainText('在留期間（満了日）');
+  await page.locator('#careerDocumentTab').click();
+  await expect(page.locator('.career-doc-meta')).not.toContainText('在留資格');
+  await expect(page.locator('.career-doc-meta')).not.toContainText('就労制限の有無');
+  await expect(page.locator('.career-doc-meta')).not.toContainText('在留期間（満了日）');
 });
 
 test('日本語: 印刷時のプロフィールgridは罫線を連続させ、写真frameを固定する', async ({ page }) => {

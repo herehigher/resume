@@ -6,15 +6,25 @@ import { createDefaultState, createJapaneseSampleState } from '../site/assets/js
 import { renderJapaneseDocument } from '../site/assets/js/templates/ja.js';
 import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../site/assets/js/utils/date.js';
 
-test('Japanese editor keeps nationality in basic information without required badges', () => {
+test('Japanese editor keeps nationality and optional residence fields in basic information', () => {
   const editor = readFileSync(new URL('../site/editor/index.html', import.meta.url), 'utf8');
   const basicInformation = editor.indexOf('<strong>基本情報</strong>');
   const nationality = editor.indexOf('name="nationality"');
+  const residenceStatus = editor.indexOf('name="residenceStatus"');
+  const workRestriction = editor.indexOf('name="workRestriction"');
+  const residenceExpiryDate = editor.indexOf('name="residenceExpiryDate"');
   const contactDetails = editor.indexOf('<strong>連絡先</strong>');
 
   assert.ok(basicInformation < nationality);
+  assert.ok(nationality < residenceStatus);
+  assert.ok(residenceStatus < workRestriction);
+  assert.ok(workRestriction < residenceExpiryDate);
+  assert.ok(residenceExpiryDate < contactDetails);
   assert.ok(nationality < contactDetails);
   assert.doesNotMatch(editor, /<em>必須<\/em>/);
+  assert.match(editor, /<option value="">未選択<\/option>\s*<option value="none">なし<\/option>\s*<option value="restricted">あり<\/option>/);
+  assert.match(editor, /<span>在留期間（満了日）<\/span>\s*<input name="residenceExpiryDate" type="date">/);
+  assert.match(editor, /空欄の項目は書類に表示されません/);
   assert.match(editor, /<span>提出日<\/span>\s*<input name="createdDate" type="date">/);
   assert.doesNotMatch(editor, /<span>作成日<\/span>\s*<input name="createdDate" type="date">/);
 });
@@ -132,6 +142,58 @@ test('Japanese nationality is optional and locale-independent gender uses a Japa
   assert.match(renderJapaneseDocument(state), /国籍：&lt;架空 &amp; 国&gt;/);
   state.profile.fields.nationality = '';
   assert.doesNotMatch(renderJapaneseDocument(state), /国籍/);
+});
+
+test('Japanese residence information renders only entered fields and escapes free text', () => {
+  const state = createDefaultState('ja');
+  let html = renderJapaneseDocument(state);
+  assert.doesNotMatch(html, /在留資格|就労制限の有無|在留期間（満了日）/);
+
+  state.documents.ja.fields.residenceStatus = '架空の <資格 & 記載>';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /<span class="paper-label">在留資格<\/span><span class="paper-value full-contact residence-info-value"><span class="residence-info-item">架空の &lt;資格 &amp; 記載&gt;<\/span><\/span><\/div>/);
+  assert.equal((html.match(/class="paper-value full-contact residence-info-value"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /就労制限の有無：|在留期間（満了日）：/);
+  assert.doesNotMatch(html, /<資格|& 記載/);
+
+  state.documents.ja.fields.residenceStatus = '';
+  state.documents.ja.fields.workRestriction = 'none';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /<span class="paper-label">就労制限の有無<\/span><span class="paper-value full-contact residence-info-value"><span class="residence-info-item">なし<\/span><\/span>/);
+  assert.equal((html.match(/class="paper-value full-contact residence-info-value"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /在留資格：|在留期間（満了日）：/);
+
+  state.documents.ja.fields.workRestriction = 'restricted';
+  state.documents.ja.fields.residenceExpiryDate = '2028-02-29';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /<span class="paper-label">就労制限の有無<\/span>/);
+  assert.match(html, /<span class="residence-info-item">あり<\/span>/);
+  assert.match(html, /<span class="residence-info-item">在留期間（満了日）：2028年2月29日<\/span>/);
+  assert.equal((html.match(/class="paper-value full-contact residence-info-value"/g) ?? []).length, 1);
+
+  state.documents.ja.fields.residenceStatus = '架空の在留資格';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /<span class="paper-label">在留資格<\/span>/);
+  assert.match(html, /<span class="residence-info-item">架空の在留資格<\/span><span class="residence-info-item">就労制限の有無：あり<\/span><span class="residence-info-item">在留期間（満了日）：2028年2月29日<\/span>/);
+  assert.doesNotMatch(html, /在留情報|／/);
+
+  state.documents.ja.activeDocument = 'career';
+  html = renderJapaneseDocument(state);
+  assert.match(html, /在留資格：/);
+  assert.match(html, /就労制限の有無：あり/);
+  assert.match(html, /在留期間（満了日）：2028年2月29日/);
+
+  state.documents.ja.fields.residenceStatus = '';
+  state.documents.ja.fields.workRestriction = '';
+  state.documents.ja.fields.residenceExpiryDate = '';
+  html = renderJapaneseDocument(state);
+  assert.doesNotMatch(html, /在留資格：|就労制限の有無：|在留期間（満了日）：/);
+
+  const japaneseCss = readFileSync(new URL('../site/assets/css/templates/ja.css', import.meta.url), 'utf8');
+  assert.match(japaneseCss, /\.career-doc-meta\s*\{[^}]*overflow-wrap:\s*anywhere;/);
+  assert.match(japaneseCss, /\.paper-value\s*\{[^}]*overflow-wrap:\s*anywhere;/);
+  assert.match(japaneseCss, /\.resume-contact \.residence-info-value\s*\{[^}]*display:\s*block;/);
+  assert.match(japaneseCss, /\.residence-info-item\s*\{[^}]*display:\s*block;/);
 });
 
 test('Japanese PDF output omits blank rows and empty career entries', () => {
