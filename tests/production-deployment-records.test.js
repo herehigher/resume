@@ -245,6 +245,38 @@ test('an exact unverified release can roll back to an earlier accepted deploymen
   assert.equal(completed.latestRollbackRunId, '50000000010');
 });
 
+test('a release remains eligible for explicit rollback after a failed verification retry', () => {
+  const records = baselineRecords();
+  const url = 'https://aaaaaaaa.herehigher-rs.pages.dev/';
+  records.push(record({ sequence: 3 }));
+  records.push(record({
+    sequence: 4, event: 'release_unverified', deploymentId: UUID_3,
+    deploymentUrl: url, currentDeploymentId: UUID_3, currentDeploymentUrl: url
+  }));
+  records.push(record({
+    sequence: 5, event: 'production_verification_started', workflow: 'reconcile-production.yml',
+    runId: '50000000005', recordedByRunId: '50000000005', recordedByWorkflow: 'reconcile-production.yml',
+    deploymentId: UUID_3, deploymentUrl: url, fromDeploymentId: UUID_3,
+    currentDeploymentId: UUID_3, currentDeploymentUrl: url
+  }));
+  records.push(record({
+    ...records[4], sequence: 6, event: 'production_verification_unverified',
+    recordedByRunId: '50000000006'
+  }));
+  const afterRetry = resolveProductionRecordLedger(records);
+  assert.equal(afterRetry.active.status, 'unverified');
+  assert.equal(afterRetry.active.unverifiedOrigin, 'release');
+  const target = HISTORICAL_ACCEPTED_RELEASES[1];
+  records.push(record({
+    sequence: 7, event: 'rollback_started', workflow: 'rollback-production.yml',
+    runId: '50000000010', recordedByRunId: '50000000010', recordedByWorkflow: 'rollback-production.yml',
+    tag: target.tag, sourceSha: target.sourceSha, artifactDigest: target.artifactDigest,
+    deploymentId: target.deploymentId, deploymentUrl: target.deploymentUrl,
+    fromDeploymentId: UUID_3, currentDeploymentId: UUID_3, currentDeploymentUrl: url
+  }));
+  assert.equal(resolveProductionRecordLedger(records, { allowPending: true }).pending.operation, 'rollback');
+});
+
 test('an unverified rollback cannot begin another rollback', () => {
   const records = rollbackRecords();
   records[3] = { ...records[3], event: 'rollback_unverified' };

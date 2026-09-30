@@ -131,13 +131,14 @@ Smoke が再び失敗すれば `*_unverified` が残ります。
 
 恒久的な内容不良が `release_unverified` になった場合は[明示的な rollback](#前のバージョンへ戻す)を使います。
 
-`rollback_unverified`、不明な current identity、記録の欠落は自動復旧せず[停止して調査](#停止して調査する)します。
+`rollback_unverified` でも current ID が accepted target UUID と一致し、identity が台帳どおりなら、この照合入口で再検査できます。UUID 不一致、不明な current identity、記録の欠落は[停止して調査](#停止して調査する)します。
 
 ## 通常公開が失敗したとき
 
 | 状態 | 次の操作 |
 | --- | --- |
-| Preflight が `deferred` / `blocked` | Summary の理由を直して再実行。`pass` まで version を変更しない |
+| Release preflight: `deferred` | Summary の `check` / `reason` を読み、local・target・重複 object を修正して再実行する。`pass` になるまで Version 更新へ進まない |
+| Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
 | 候補生成・promotion の失敗 | Candidate SHA、run ID、attempt、artifact provenance を確認。失効したら同じ SHA で再生成し、内容を直したら新しい SHA からやり直す |
 | 候補 CLI の待機中断 | Clean な候補 checkout で `npm run release:candidate-assets -- --run-id RUN_ID --source-sha CANDIDATE_SHA`。表示済みの同じ run だけを再照合する |
 | PR Quality の失敗 | 該当 step と summary を確認し、内容・7 file・候補 artifact を修正。Source SHA が変われば候補生成からやり直す |
@@ -154,7 +155,7 @@ Smoke が再び失敗すれば `*_unverified` が残ります。
 
 通常時は `recover_unverified_release` を既定の `false` のままにします。
 
-恒久的な公開 smoke failure で `release_unverified` の場合だけ、この option を `true` にして明示的に復旧を選びます。
+恒久的な公開 smoke failure で `release_unverified`、またはその後の照合も失敗して `production_verification_unverified` となった release の場合だけ、この option を `true` にして明示的に復旧を選びます。台帳を sequence 順に読み、直近の verification より前の `release_unverified` を確認します。元が `rollback_unverified` なら選べません。
 
 未解決 intent と `rollback_unverified` は、この入口では拒否されます。
 
@@ -168,7 +169,7 @@ Rollback intent を記録してから Cloudflare Pages native rollback API を�
 
 **成功判定：** API 応答 ID と project の current `latest_deployment.id` が accepted target UUID に完全一致し、両 URL の smoke が成功して最新台帳 event が `rollback_completed` なら完了です。Summary の from/to tag、UUID、run URL も確認します。
 
-**失敗時：** 切替前なら `rollback_failed_before_switch` と元の production identity を確認します。切替後の smoke failure、ID 不一致、record 書込み障害は `rollback_unverified` または未解決 intent として後続の production 操作を止め、[照合](#production-の状態を照合する)します。自動でさらに戻しません。通常公開 run を再実行して既存 accepted tag を再配布しません。
+**失敗時：** 切替前なら `rollback_failed_before_switch` と元の production identity を確認します。切替後の smoke failure は `rollback_unverified` として後続の production 操作を止めます。Current ID が accepted target UUID と一致する場合だけ[照合](#production-の状態を照合する)で再検査します。ID 不一致や record 書込み障害は[停止して調査](#停止して調査する)します。自動でさらに戻しません。通常公開 run を再実行して既存 accepted tag を再配布しません。
 
 この入口は ledger に受入済みの Cloudflare production deployment だけを許可します。
 
@@ -194,7 +195,7 @@ Identity と記録を確定できなければ、この手順だけでは再開�
 
 - Cloudflare Pages の Direct Upload project、production branch `main`、custom domain の DNS / HTTPS、Web Analytics 配信、GitHub Actions の account / project variables と API token secret を用意します。Git Integration による push deploy は使いません。通常公開では project 設定を変更しません。
 - Main の merge ruleset が要求する check は `quality` です。Workflow の environment は `production`。公開 PR の owner merge が通常公開の承認です。
-- GitHub Pages は停止済みで `github-pages` environment は削除済みです。旧 URL は 404、repository homepage は `https://rs.herehigher.com/`。設定の owner 記録は [#253](https://github.com/herehigher/resume/issues/253#issuecomment-5889977750) を参照します。
+- GitHub Pages は停止済みで `github-pages` environment は削除済みです。`https://herehigher.github.io/resume/` は 404、repository homepage は `https://rs.herehigher.com/`。設定の owner 記録は [#253](https://github.com/herehigher/resume/issues/253#issuecomment-5889977750) を参照します。
 - Local の GitHub 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は許可された sandbox 外で実行し、token は抽出・export・複製しません。
 
 原案は [#113](https://github.com/herehigher/resume/issues/113)、過去の障害・移行経緯は [#112](https://github.com/herehigher/resume/issues/112) にあります。
