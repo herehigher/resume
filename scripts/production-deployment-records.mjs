@@ -410,7 +410,12 @@ export async function appendProductionRecordDeployment({ record, token, fetchImp
   if (JSON.stringify(created) !== JSON.stringify(valid)) {
     fail('created record deployment could not be verified');
   }
-  return deployment;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const visible = await readProductionRecordHistory({ token, fetchImpl });
+    if (JSON.stringify(visible[valid.sequence - 1]) === JSON.stringify(valid)) return deployment;
+    if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  fail('created record deployment is not visible in production history');
 }
 
 export async function listProductionWorkflowRuns({ workflowFile, minRunId, token, fetchImpl = fetch } = {}) {

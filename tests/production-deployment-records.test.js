@@ -179,6 +179,7 @@ test('record history uses GitHub Deployments and never reads or writes an issue'
     'GET /repos/herehigher/resume/deployments',
     'GET /repos/herehigher/resume/deployments',
     'POST /repos/herehigher/resume/deployments',
+    'GET /repos/herehigher/resume/deployments',
     'GET /repos/herehigher/resume/deployments'
   ]);
 });
