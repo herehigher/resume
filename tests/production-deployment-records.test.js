@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   HISTORICAL_ACCEPTED_RELEASES,
   PRODUCTION_RECORD_BOT,
+  PRODUCTION_RECORD_ENVIRONMENT,
   PRODUCTION_RECORD_TASK,
   acceptedBaselineRecords,
   appendProductionRecordDeployment,
@@ -139,7 +140,7 @@ test('event names match the complete supported form', () => {
 
 test('GitHub deployment records require the Actions bot and exact source identity', () => {
   const payload = record({});
-  const deployment = { id: 123, task: PRODUCTION_RECORD_TASK, environment: 'production',
+  const deployment = { id: 123, task: PRODUCTION_RECORD_TASK, environment: PRODUCTION_RECORD_ENVIRONMENT,
     creator: { login: PRODUCTION_RECORD_BOT }, created_at: '2026-09-30T00:00:00Z',
     ref: payload.sourceSha, sha: payload.sourceSha, payload };
   assert.equal(parseProductionRecordDeployment(deployment).sequence, 3);
@@ -152,7 +153,7 @@ test('GitHub deployment records require the Actions bot and exact source identit
 
 test('record history uses GitHub Deployments and never reads or writes an issue', async () => {
   const intent = record({});
-  const deployment = { id: 123, task: PRODUCTION_RECORD_TASK, environment: 'production',
+  const deployment = { id: 123, task: PRODUCTION_RECORD_TASK, environment: PRODUCTION_RECORD_ENVIRONMENT,
     creator: { login: PRODUCTION_RECORD_BOT }, created_at: '2026-09-30T00:00:00Z',
     ref: intent.sourceSha, sha: intent.sourceSha, payload: intent };
   const requests = [];
@@ -164,7 +165,8 @@ test('record history uses GitHub Deployments and never reads or writes an issue'
     if (options.method === 'GET') return { ok: true, status: 200, json: async () => created ? [deployment] : [] };
     const body = JSON.parse(options.body);
     assert.equal(body.task, PRODUCTION_RECORD_TASK);
-    assert.equal(body.environment, 'production');
+    assert.equal(body.environment, PRODUCTION_RECORD_ENVIRONMENT);
+    assert.equal(body.production_environment, false);
     assert.equal(body.ref, intent.sourceSha);
     assert.deepEqual(body.payload, intent);
     created = true;

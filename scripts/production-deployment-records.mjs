@@ -1,6 +1,7 @@
 export const PRODUCTION_RECORD_REPOSITORY = 'herehigher/resume';
 export const PRODUCTION_RECORD_BOT = 'github-actions[bot]';
 export const PRODUCTION_RECORD_TASK = 'production-record';
+export const PRODUCTION_RECORD_ENVIRONMENT = 'production-records';
 export const BASELINE_ACCEPTANCE_RUN_ID = '36651727138';
 
 export const HISTORICAL_ACCEPTED_RELEASES = Object.freeze([
@@ -130,7 +131,7 @@ export function acceptedBaselineRecords() {
 
 export function parseProductionRecordDeployment(deployment) {
   if (deployment?.task !== PRODUCTION_RECORD_TASK) return null;
-  if (deployment.environment !== 'production' || deployment.creator?.login !== PRODUCTION_RECORD_BOT
+  if (deployment.environment !== PRODUCTION_RECORD_ENVIRONMENT || deployment.creator?.login !== PRODUCTION_RECORD_BOT
     || !Number.isSafeInteger(deployment.id) || deployment.id < 1
     || !Number.isFinite(Date.parse(deployment.created_at))) {
     fail('production record deployment provenance is invalid');
@@ -340,7 +341,7 @@ export async function readProductionRecordHistory({ token, fetchImpl = fetch } =
   const records = [...acceptedBaselineRecords()];
   for (let page = 1; page <= 100; page += 1) {
     const batch = await githubRequest(
-      `/repos/${PRODUCTION_RECORD_REPOSITORY}/deployments?environment=production&per_page=100&page=${page}`,
+      `/repos/${PRODUCTION_RECORD_REPOSITORY}/deployments?environment=${PRODUCTION_RECORD_ENVIRONMENT}&per_page=100&page=${page}`,
       { token, fetchImpl }
     );
     if (!Array.isArray(batch)) fail('GitHub deployment response is invalid');
@@ -398,12 +399,12 @@ export async function appendProductionRecordDeployment({ record, token, fetchImp
     token, fetchImpl, method: 'POST', body: {
       ref: valid.sourceSha,
       task: PRODUCTION_RECORD_TASK,
-      environment: 'production',
+      environment: PRODUCTION_RECORD_ENVIRONMENT,
       description: `Production record ${valid.sequence}: ${valid.event} ${valid.tag}`,
       payload: valid,
       auto_merge: false,
       required_contexts: [],
-      production_environment: true
+      production_environment: false
     }
   });
   const created = parseProductionRecordDeployment(deployment);
