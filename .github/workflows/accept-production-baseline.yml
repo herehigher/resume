@@ -16,7 +16,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-      issues: write
+      deployments: read
     steps:
       - name: Checkout tagged release evidence
         uses: actions/checkout@v7

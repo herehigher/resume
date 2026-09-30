@@ -1,7 +1,7 @@
-export const PRODUCTION_RECORD_MARKER = '<!-- resume-studio-production-record:v1';
-export const PRODUCTION_RECORD_ISSUE = 252;
 export const PRODUCTION_RECORD_REPOSITORY = 'herehigher/resume';
 export const PRODUCTION_RECORD_BOT = 'github-actions[bot]';
+export const PRODUCTION_RECORD_TASK = 'production-record';
+export const BASELINE_ACCEPTANCE_RUN_ID = '36651727138';
 
 export const HISTORICAL_ACCEPTED_RELEASES = Object.freeze([
   Object.freeze({
@@ -104,43 +104,50 @@ export function validateProductionRecord(record) {
   });
 }
 
-export function formatProductionRecordComment(record) {
-  const valid = validateProductionRecord(record);
-  const markerPayload = JSON.stringify(valid);
-  return [
-    `${PRODUCTION_RECORD_MARKER}\n${markerPayload}\n-->`,
-    `### Cloudflare production record: \`${valid.tag}\``,
-    '',
-    `- Event: \`${valid.event}\``,
-    `- Source SHA: \`${valid.sourceSha}\``,
-    `- Site artifact digest: \`${valid.artifactDigest}\``,
-    valid.artifactArchiveDigest ? `- GitHub artifact archive digest: \`${valid.artifactArchiveDigest}\`` : null,
-    `- Cloudflare deployment ID: \`${valid.deploymentId || 'not available before deployment'}\``,
-    `- Deployment URL: ${valid.deploymentUrl || 'not available before deployment'}`,
-    `- Current production deployment ID: \`${valid.currentDeploymentId || 'unavailable'}\``,
-    `- Workflow run: ${valid.runUrl}`
-  ].filter((line) => line !== null).join('\n');
+export function acceptedBaselineRecords() {
+  return Object.freeze(HISTORICAL_ACCEPTED_RELEASES.map((release, index) => validateProductionRecord({
+    schemaVersion: 1,
+    sequence: index + 1,
+    event: 'release_accepted',
+    workflow: 'release.yml',
+    runId: release.releaseRunId,
+    runAttempt: 1,
+    recordedByRunId: BASELINE_ACCEPTANCE_RUN_ID,
+    recordedByRunAttempt: 1,
+    recordedByWorkflow: 'accept-production-baseline.yml',
+    tag: release.tag,
+    sourceSha: release.sourceSha,
+    artifactDigest: release.artifactDigest,
+    artifactArchiveDigest: release.artifactArchiveDigest,
+    deploymentId: release.deploymentId,
+    deploymentUrl: release.deploymentUrl,
+    fromDeploymentId: null,
+    currentDeploymentId: release.deploymentId,
+    currentDeploymentUrl: release.deploymentUrl,
+    runUrl: `https://github.com/${PRODUCTION_RECORD_REPOSITORY}/actions/runs/${release.releaseRunId}`
+  })));
 }
 
-export function parseProductionRecordComment(comment) {
-  if (typeof comment?.body !== 'string' || !comment.body.includes(PRODUCTION_RECORD_MARKER)) return null;
-  if (comment.user?.login !== PRODUCTION_RECORD_BOT) fail('record comment was not created by GitHub Actions');
-  if (!Number.isFinite(Date.parse(comment.created_at)) || !Number.isFinite(Date.parse(comment.updated_at))) {
-    fail('record comment timestamps are missing or invalid');
+export function parseProductionRecordDeployment(deployment) {
+  if (deployment?.task !== PRODUCTION_RECORD_TASK) return null;
+  if (deployment.environment !== 'production' || deployment.creator?.login !== PRODUCTION_RECORD_BOT
+    || !Number.isSafeInteger(deployment.id) || deployment.id < 1
+    || !Number.isFinite(Date.parse(deployment.created_at))) {
+    fail('production record deployment provenance is invalid');
   }
-  if (comment.updated_at !== comment.created_at) {
-    fail('record comment was edited after creation');
+  let payload = deployment.payload;
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      fail('production record deployment payload is invalid JSON');
+    }
   }
-  if (comment.body.split(PRODUCTION_RECORD_MARKER).length !== 2) fail('record comment contains duplicate markers');
-  const match = comment.body.match(/<!-- resume-studio-production-record:v1\n([\s\S]*?)\n-->/);
-  if (!match) fail('record comment marker is malformed');
-  let record;
-  try {
-    record = JSON.parse(match[1]);
-  } catch {
-    fail('record comment JSON is invalid');
+  const record = validateProductionRecord(payload);
+  if (deployment.sha !== record.sourceSha || deployment.ref !== record.sourceSha) {
+    fail('production record deployment source does not match its payload');
   }
-  return validateProductionRecord(record);
+  return record;
 }
 
 function sameReleaseIdentity(record, expected) {
@@ -324,21 +331,23 @@ export async function requestGitHub(path, options = {}) {
   return githubRequest(path, options);
 }
 
-export async function readProductionRecordComments({ token, fetchImpl = fetch } = {}) {
+export async function readProductionLedger({ token, fetchImpl = fetch } = {}) {
   const records = await readProductionRecordHistory({ token, fetchImpl });
   return resolveProductionRecordLedger(records);
 }
 
 export async function readProductionRecordHistory({ token, fetchImpl = fetch } = {}) {
-  const comments = [];
+  const records = [...acceptedBaselineRecords()];
   for (let page = 1; page <= 100; page += 1) {
-    const batch = await githubRequest(`/repos/${PRODUCTION_RECORD_REPOSITORY}/issues/${PRODUCTION_RECORD_ISSUE}/comments?per_page=100&page=${page}`, { token, fetchImpl });
-    if (!Array.isArray(batch)) fail('GitHub issue comment response is invalid');
-    comments.push(...batch);
+    const batch = await githubRequest(
+      `/repos/${PRODUCTION_RECORD_REPOSITORY}/deployments?environment=production&per_page=100&page=${page}`,
+      { token, fetchImpl }
+    );
+    if (!Array.isArray(batch)) fail('GitHub deployment response is invalid');
+    records.push(...batch.map(parseProductionRecordDeployment).filter(Boolean));
     if (batch.length < 100) break;
-    if (page === 100) fail('GitHub issue comment history exceeds the supported limit');
+    if (page === 100) fail('GitHub deployment history exceeds the supported limit');
   }
-  const records = comments.map(parseProductionRecordComment).filter(Boolean);
   return Object.freeze(records.sort((left, right) => left.sequence - right.sequence));
 }
 
@@ -365,7 +374,8 @@ export async function verifyRecordRunAuthenticity(records, { token, fetchImpl = 
       const run = await getWorkflowRun({ runId: id, attempt, token, fetchImpl });
       const path = typeof run.path === 'string' ? run.path.split('@')[0] : '';
       if (String(run.run_attempt) !== String(attempt) || path !== `.github/workflows/${workflow}`
-        || run.head_branch !== 'main' || (expectedSha && run.head_sha !== expectedSha)) {
+        || run.head_branch !== 'main' || (expectedSha && run.head_sha !== expectedSha)
+        || (id === BASELINE_ACCEPTANCE_RUN_ID && run.conclusion !== 'success')) {
         fail('record run does not match its workflow identity');
       }
       runs.set(key, run);
@@ -374,23 +384,33 @@ export async function verifyRecordRunAuthenticity(records, { token, fetchImpl = 
   return true;
 }
 
-export async function appendProductionRecordComment({ record, token, fetchImpl = fetch } = {}) {
+export async function appendProductionRecordDeployment({ record, token, fetchImpl = fetch } = {}) {
   const valid = validateProductionRecord(record);
   const history = await readProductionRecordHistory({ token, fetchImpl });
+  resolveProductionRecordLedger(history, { allowPending: true });
   if (valid.sequence <= history.length) {
     const existing = history[valid.sequence - 1];
     if (JSON.stringify(existing) === JSON.stringify(valid)) return Object.freeze({ alreadyPresent: true, record: existing });
-    fail('record sequence is already occupied by a different comment');
+    fail('record sequence is already occupied by a different deployment');
   }
   if (valid.sequence !== history.length + 1) fail('record sequence is not the next available sequence');
-  const body = formatProductionRecordComment(valid);
-  const comment = await githubRequest(`/repos/${PRODUCTION_RECORD_REPOSITORY}/issues/${PRODUCTION_RECORD_ISSUE}/comments`, {
-    token, fetchImpl, method: 'POST', body: { body }
+  const deployment = await githubRequest(`/repos/${PRODUCTION_RECORD_REPOSITORY}/deployments`, {
+    token, fetchImpl, method: 'POST', body: {
+      ref: valid.sourceSha,
+      task: PRODUCTION_RECORD_TASK,
+      environment: 'production',
+      description: `Production record ${valid.sequence}: ${valid.event} ${valid.tag}`,
+      payload: valid,
+      auto_merge: false,
+      required_contexts: [],
+      production_environment: true
+    }
   });
-  if (comment.user?.login !== PRODUCTION_RECORD_BOT || parseProductionRecordComment(comment)?.sequence !== valid.sequence) {
-    fail('created record comment could not be verified');
+  const created = parseProductionRecordDeployment(deployment);
+  if (JSON.stringify(created) !== JSON.stringify(valid)) {
+    fail('created record deployment could not be verified');
   }
-  return comment;
+  return deployment;
 }
 
 export async function listProductionWorkflowRuns({ workflowFile, minRunId, token, fetchImpl = fetch } = {}) {

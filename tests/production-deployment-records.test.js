@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {
   HISTORICAL_ACCEPTED_RELEASES,
   PRODUCTION_RECORD_BOT,
-  PRODUCTION_RECORD_MARKER,
-  formatProductionRecordComment,
+  PRODUCTION_RECORD_TASK,
+  acceptedBaselineRecords,
+  appendProductionRecordDeployment,
+  readProductionRecordHistory,
   verifyWorkflowRunCoverage,
-  parseProductionRecordComment,
+  parseProductionRecordDeployment,
   resolveProductionRecordLedger,
   validateProductionRecord
 } from '../scripts/production-deployment-records.mjs';
@@ -42,27 +44,7 @@ function record(fields) {
 }
 
 function baselineRecords() {
-  return HISTORICAL_ACCEPTED_RELEASES.map((entry, index) => ({
-    schemaVersion: 1,
-    sequence: index + 1,
-    event: 'release_accepted',
-    workflow: 'release.yml',
-    runId: entry.releaseRunId,
-    runAttempt: 1,
-    recordedByRunId: '50000000001',
-    recordedByRunAttempt: 1,
-    recordedByWorkflow: 'accept-production-baseline.yml',
-    tag: entry.tag,
-    sourceSha: entry.sourceSha,
-    artifactDigest: entry.artifactDigest,
-    artifactArchiveDigest: entry.artifactArchiveDigest,
-    deploymentId: entry.deploymentId,
-    deploymentUrl: entry.deploymentUrl,
-    fromDeploymentId: null,
-    currentDeploymentId: entry.deploymentId,
-    currentDeploymentUrl: entry.deploymentUrl,
-    runUrl: `https://github.com/herehigher/resume/actions/runs/${entry.releaseRunId}`
-  }));
+  return structuredClone(acceptedBaselineRecords());
 }
 
 function rollbackRecords({ mismatchedCurrent = false } = {}) {
@@ -149,20 +131,56 @@ function verificationTerminal(fields = {}) {
 test('release intent with no deployment yet is a valid durable record', () => {
   const intent = record({});
   assert.equal(validateProductionRecord(intent).deploymentId, null);
-  assert.match(formatProductionRecordComment(intent), /not available before deployment/);
 });
 
 test('event names match the complete supported form', () => {
   assert.throws(() => validateProductionRecord(record({ event: 'release_started_extra' })), /event is invalid/);
 });
 
-test('record comments require the Actions bot and reject edits and duplicate markers', () => {
-  const body = formatProductionRecordComment(baselineRecords()[0]);
-  const comment = { body, user: { login: PRODUCTION_RECORD_BOT }, created_at: '2026-09-29T00:00:00Z', updated_at: '2026-09-29T00:00:00Z' };
-  assert.equal(parseProductionRecordComment(comment).sequence, 1);
-  assert.throws(() => parseProductionRecordComment({ ...comment, user: { login: 'somebody' } }), /GitHub Actions/);
-  assert.throws(() => parseProductionRecordComment({ ...comment, updated_at: '2026-09-29T00:01:00Z' }), /edited/);
-  assert.throws(() => parseProductionRecordComment({ ...comment, body: `${body}\n${PRODUCTION_RECORD_MARKER}` }), /duplicate markers/);
+test('GitHub deployment records require the Actions bot and exact source identity', () => {
+  const payload = record({});
+  const deployment = { id: 123, task: PRODUCTION_RECORD_TASK, environment: 'production',
+    creator: { login: PRODUCTION_RECORD_BOT }, created_at: '2026-09-30T00:00:00Z',
+    ref: payload.sourceSha, sha: payload.sourceSha, payload };
+  assert.equal(parseProductionRecordDeployment(deployment).sequence, 3);
+  assert.equal(parseProductionRecordDeployment({ ...deployment, payload: JSON.stringify(payload) }).sequence, 3);
+  assert.throws(() => parseProductionRecordDeployment({ ...deployment, creator: { login: 'somebody' } }), /provenance/);
+  assert.throws(() => parseProductionRecordDeployment({ ...deployment, sha: 'd'.repeat(40) }), /source/);
+  assert.throws(() => parseProductionRecordDeployment({ ...deployment, payload: '{' }), /invalid JSON/);
+  assert.equal(parseProductionRecordDeployment({ ...deployment, task: 'deploy' }), null);
+});
+
+test('record history uses GitHub Deployments and never reads or writes an issue', async () => {
+  const intent = record({});
+  const deployment = { id: 123, task: PRODUCTION_RECORD_TASK, environment: 'production',
+    creator: { login: PRODUCTION_RECORD_BOT }, created_at: '2026-09-30T00:00:00Z',
+    ref: intent.sourceSha, sha: intent.sourceSha, payload: intent };
+  const requests = [];
+  let created = false;
+  const fetchImpl = async (input, options) => {
+    const url = new URL(String(input));
+    requests.push(`${options.method} ${url.pathname}`);
+    assert.equal(url.pathname, '/repos/herehigher/resume/deployments');
+    if (options.method === 'GET') return { ok: true, status: 200, json: async () => created ? [deployment] : [] };
+    const body = JSON.parse(options.body);
+    assert.equal(body.task, PRODUCTION_RECORD_TASK);
+    assert.equal(body.environment, 'production');
+    assert.equal(body.ref, intent.sourceSha);
+    assert.deepEqual(body.payload, intent);
+    created = true;
+    return { ok: true, status: 201, json: async () => deployment };
+  };
+  const initial = await readProductionRecordHistory({ token: 'test-token', fetchImpl });
+  assert.deepEqual(initial.map((item) => item.tag), ['v0.4.1', 'v0.4.2']);
+  await appendProductionRecordDeployment({ record: intent, token: 'test-token', fetchImpl });
+  const history = await readProductionRecordHistory({ token: 'test-token', fetchImpl });
+  assert.equal(history[2].event, 'release_started');
+  assert.deepEqual(requests, [
+    'GET /repos/herehigher/resume/deployments',
+    'GET /repos/herehigher/resume/deployments',
+    'POST /repos/herehigher/resume/deployments',
+    'GET /repos/herehigher/resume/deployments'
+  ]);
 });
 
 test('baseline must include the fixed v0.4.1 then current v0.4.2 identities', () => {

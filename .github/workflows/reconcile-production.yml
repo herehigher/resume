@@ -16,7 +16,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-      issues: write
+      deployments: write
     steps:
       - name: Checkout trusted reconciliation tooling from main
         uses: actions/checkout@v7
