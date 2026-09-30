@@ -87,12 +87,15 @@ test('production URLs use the custom-domain root without a legacy GitHub Pages m
   for (const file of [
     ...routes.map((route) => route.file), 'site/ja/index.html', 'site/editor/index.html',
     'site/sitemap.xml', 'site/schema/resume-studio-web-v4.schema.json',
-    'README.md', 'README.zh-CN.md', 'README.en.md', 'PRIVACY.md', 'docs/release-playbook.md',
+    'README.md', 'README.zh-CN.md', 'README.en.md', 'PRIVACY.md',
     'scripts/deployment-path-contract.mjs'
   ]) {
     assert.doesNotMatch(source(file), new RegExp(legacyProductionOrigin.replaceAll('.', '\\.').replaceAll('/', '\\/')),
       `${file} must not publish the legacy production origin`);
   }
+  const playbook = source('docs/release-playbook.md');
+  assert.match(playbook, /`https:\/\/herehigher\.github\.io\/resume\/` は 404/,
+    'the retired production URL may appear only as documented shutdown evidence');
 });
 
 function linkTarget(html, rel, language = '') {

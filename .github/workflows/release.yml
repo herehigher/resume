@@ -196,6 +196,7 @@ jobs:
     permissions:
       actions: read
       contents: write
+      issues: write
     steps:
       - name: Checkout trusted release tooling
         uses: actions/checkout@v7
@@ -254,6 +255,18 @@ jobs:
           prepared_version="$(jq -er '.packageVersion' "$EVIDENCE")"
           current_version="$(git show "origin/$DEFAULT_BRANCH:package.json" | jq -er '.version')"
           test "$prepared_version" = "$current_version"
+
+      - name: Verify durable production state and persist release intent
+        id: production_state_start
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
+          RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
+          ARTIFACT_DIGEST: ${{ steps.prepared.outputs.artifact_digest }}
+        run: node scripts/production-state.mjs start-release
 
       - name: Reverify bytes and create or resume the immutable tag
         id: tag
@@ -537,6 +550,20 @@ jobs:
           if ! run_smoke custom_domain "$PRODUCTION_ORIGIN"; then smoke_result=1; fi
           exit "$smoke_result"
 
+      - name: Record accepted or unverified production deployment
+        id: production_state_finish
+        if: ${{ always() && steps.production_state_start.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          RELEASE_PUBLICATION_SUCCESS: ${{ steps.production_deployment.outcome == 'success' }}
+          PRODUCTION_IDENTITY_OUTCOME: ${{ steps.production_identity.outcome }}
+          PRODUCTION_DEPLOYMENT_URL: ${{ steps.production_identity.outputs.deployment_url }}
+          PRODUCTION_SMOKE_OUTCOME: ${{ steps.production_smoke.outcome }}
+        run: node scripts/production-state.mjs finish-release
+
       - name: Record publication outcome
         if: ${{ always() }}
         env:
@@ -563,6 +590,7 @@ jobs:
           CUSTOM_DOMAIN_APPLICATION_SMOKE: ${{ steps.production_smoke.outputs.custom_domain_application }}
           CUSTOM_DOMAIN_EDITOR_SMOKE: ${{ steps.production_smoke.outputs.custom_domain_editor }}
           RELEASE_SHA: ${{ steps.prepared.outputs.release_sha }}
+          PRODUCTION_CURRENT_ID: ${{ steps.production_state_finish.outputs.current_id }}
           RELEASE_TAG: ${{ needs.authorize.outputs.release_tag }}
           PRODUCTION_SMOKE_OUTCOME: ${{ steps.production_smoke.outcome }}
           SMOKE_DEPENDENCIES_OUTCOME: ${{ steps.smoke_dependencies.outcome }}
@@ -600,6 +628,7 @@ jobs:
             echo "- Artifact reverify before production: ${artifact_verify_status}"
             echo "- Production Pages branch: \`${PRODUCTION_PAGES_BRANCH:-unavailable}\` (configured Cloudflare production route label)"
             echo "- Production Direct Upload: ${production_deployment_status}"
+            echo "- Current Cloudflare production deployment ID: \`${PRODUCTION_CURRENT_ID:-unverified}\`"
             echo "- Production Pages environment: \`${PRODUCTION_PAGES_ENVIRONMENT:-unavailable}\` (expected \`production\`; identity validation: ${PRODUCTION_IDENTITY_OUTCOME:-not-run})"
             echo "- Production Pages.dev URL (validated): ${PRODUCTION_DEPLOYMENT_URL:-not-accepted}"
             echo "- Custom domain URL: ${PRODUCTION_ORIGIN:-unavailable}"
@@ -607,5 +636,6 @@ jobs:
             echo "- Tag: ${{ steps.tag.outcome }}; smoke dependencies: ${SMOKE_DEPENDENCIES_OUTCOME:-not-run}; production smoke: ${production_smoke_status}"
             echo "- Production Pages.dev smoke: application ${PRODUCTION_PAGES_APPLICATION_SMOKE:-not-run}; online editor ${PRODUCTION_PAGES_EDITOR_SMOKE:-not-run}"
             echo "- Custom domain smoke: application ${CUSTOM_DOMAIN_APPLICATION_SMOKE:-not-run}; online editor ${CUSTOM_DOMAIN_EDITOR_SMOKE:-not-run}"
-            echo '- Unverified: manual browser acceptance and Cloudflare Web Analytics delivery.'
+            echo '- Cloudflare Pages deployment identity is recorded in the durable production ledger on issue #252.'
+            echo '- Source Analytics is disabled; Cloudflare delivery-layer Web Analytics injection is tracked in the release playbook.'
           } >> "$GITHUB_STEP_SUMMARY"
