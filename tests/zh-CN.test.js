@@ -17,7 +17,6 @@ import {
   formatChineseDate,
   formatChineseMonth,
   formatChineseRange,
-  newestFirst,
   renderChineseResume
 } from '../site/assets/js/templates/zh-CN.js';
 
@@ -51,18 +50,6 @@ test('Chinese dates use local notation and an explicit current-employment label'
   assert.equal(formatChineseRange('2024-03', ''), '2024.03 — 至今');
   assert.equal(formatChineseRange('2020-01', '2023-12'), '2020.01 — 2023.12');
   assert.equal(formatChineseRange('', ''), '');
-});
-
-test('Chinese education and work histories sort newest first without mutating state', () => {
-  const items = [
-    { startDate: '2018-01', endDate: '2020-01', company: '较早' },
-    { startDate: '2023-01', endDate: '', company: '在职' },
-    { startDate: '2021-01', endDate: '2022-01', company: '较新' }
-  ];
-  const sorted = newestFirst(items);
-
-  assert.deepEqual(sorted.map((item) => item.company), ['在职', '较新', '较早']);
-  assert.deepEqual(items.map((item) => item.company), ['较早', '在职', '较新']);
 });
 
 test('empty optional sensitive fields do not reserve markup in the Chinese template', () => {
@@ -155,7 +142,7 @@ test('opening the Chinese sample protects the existing persisted draft', async (
   assert.equal(snapshot.profile.fields.fullName, '需要保留的姓名');
 });
 
-test('Chinese sample renders current experience first and valid PDF links', () => {
+test('Chinese sample renders saved experience order and valid PDF links', () => {
   const html = renderChineseResume(createChineseSampleState(createDefaultState('zh-CN')));
 
   assert.match(html, /profile-link-icon--github/);
@@ -163,7 +150,7 @@ test('Chinese sample renders current experience first and valid PDF links', () =
   assert.match(html, /profile-link-icon--linkedin/);
   assert.match(html, /LinkedIn · www\.linkedin\.com\/in\/fictional-resume-profile/);
   assert.match(html, /Website · fictional-resume-profile\.example/);
-  assert.ok(html.indexOf('正儿数字科技有限公司') < html.indexOf('八经网络科技有限公司'));
+  assert.ok(html.indexOf('八经网络科技有限公司') < html.indexOf('正儿数字科技有限公司'));
   assert.match(html, /2022\.04 — 至今/);
   assert.match(html, /href="https:\/\/example\.com\/projects\/analytics"/);
   assert.match(html, /rel="noopener noreferrer"/);

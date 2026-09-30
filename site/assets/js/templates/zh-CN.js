@@ -41,19 +41,6 @@ export function formatChineseRange(startDate, endDate, currentLabel = '至今') 
   return `${start} — ${end}`;
 }
 
-function sortKey(item) {
-  if (!hasText(item.endDate) && hasText(item.startDate)) return '9999-99';
-  return String(item.endDate || item.startDate || '0000-00');
-}
-
-export function newestFirst(items) {
-  return [...items].sort((left, right) => {
-    const endOrder = sortKey(right).localeCompare(sortKey(left));
-    if (endOrder) return endOrder;
-    return String(right.startDate || '').localeCompare(String(left.startDate || ''));
-  });
-}
-
 export function getChineseFields(state) {
   return {
     ...state.profile.fields,
@@ -106,7 +93,7 @@ function isEntered(item, keys) {
 }
 
 function renderTimeline(title, items, { kind, keys }) {
-  const entered = newestFirst(items.filter((item) => isEntered(item, keys)));
+  const entered = items.filter((item) => isEntered(item, keys));
   if (!entered.length) return '';
   const rows = entered.map((item) => {
     const heading = kind === 'education' ? item.school : item.company;
@@ -127,9 +114,9 @@ function renderTimeline(title, items, { kind, keys }) {
 }
 
 function renderProjects(projects) {
-  const entered = newestFirst(projects.filter((item) => isEntered(item, [
+  const entered = projects.filter((item) => isEntered(item, [
     'startDate', 'endDate', 'name', 'role', 'details', 'url'
-  ])));
+  ]));
   if (!entered.length) return '';
   const rows = entered.map((project) => `
     <article class="zh-project">
@@ -145,8 +132,7 @@ function renderProjects(projects) {
 
 function renderCertifications(certifications) {
   const entered = certifications
-    .filter((item) => isEntered(item, ['date', 'name', 'url']))
-    .sort((left, right) => String(right.date || '').localeCompare(String(left.date || '')));
+    .filter((item) => isEntered(item, ['date', 'name', 'url']));
   if (!entered.length) return '';
   const rows = entered.map((item) => `
     <li>

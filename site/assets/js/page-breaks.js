@@ -301,6 +301,7 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
   const trustCapsule = document.getElementById('trustCapsule');
   let modeOpen = false;
   let feedbackTimer = null;
+  let feedbackVersion = 0;
   let geometryFrame = null;
   let lastFocusKey = null;
   let rovingFocusKey = null;
@@ -450,16 +451,21 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     syncTrustCapsule();
   }
   function clearFeedback() {
+    feedbackVersion += 1;
     window.clearTimeout(feedbackTimer);
     feedback.replaceChildren();
     feedback.hidden = true;
   }
   function showFeedback(message, undo, announcement = message) {
     clearFeedback();
+    const version = feedbackVersion;
     const text = document.createElement('span'); text.textContent = message;
     const undoButton = document.createElement('button');
     undoButton.type = 'button'; undoButton.className = 'page-break-undo'; undoButton.textContent = labels.undo;
-    undoButton.addEventListener('click', () => { undo(); clearFeedback(); });
+    undoButton.addEventListener('click', () => {
+      if (version !== feedbackVersion) return;
+      undo(); clearFeedback();
+    });
     feedback.append(text, undoButton); feedback.hidden = false;
     announceStatus(announcement);
     feedbackTimer = window.setTimeout(clearFeedback, 6000);
@@ -776,6 +782,12 @@ export function initPageBreakControls({ store, locale, preview, toolbar, getDocu
     if (event.propertyName === 'transform') scheduleGeometrySync();
   });
   preview.closest('.preview-scroll')?.addEventListener('scroll', scheduleGeometrySync, { passive: true });
+  store.subscribe((_state, event) => {
+    if (event.type === 'reorder') {
+      clearFeedback();
+      render();
+    }
+  });
   syncSurface();
   return { render, position: scheduleGeometrySync };
 }

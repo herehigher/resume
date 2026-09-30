@@ -52,23 +52,6 @@ export function hasEnglishEntry(type, entry) {
   return ENTRY_FIELDS[type].some((field) => String(entry?.[field] || '').trim());
 }
 
-export function sortEnglishEntriesDescending(items, type) {
-  const enteredItems = items.filter((item) => hasEnglishEntry(type, item));
-  const datedItems = enteredItems.map((item, index) => {
-    const endDate = type === 'certifications' ? item.date : item.endDate;
-    const startDate = type === 'certifications' ? item.date : item.startDate;
-    const sortDate = endDate || (startDate ? '9999-12' : '');
-    return { item, index, sortDate, startDate: startDate || '' };
-  });
-  return datedItems
-    .sort((left, right) => (
-      right.sortDate.localeCompare(left.sortDate)
-      || right.startDate.localeCompare(left.startDate)
-      || left.index - right.index
-    ))
-    .map(({ item }) => item);
-}
-
 function text(value) {
   return escapeHTML(String(value || '').trim());
 }
@@ -127,7 +110,7 @@ function renderOptionalPersonalDetails(profile, photoUrl) {
 }
 
 function renderExperience(entries) {
-  const items = sortEnglishEntriesDescending(entries, 'experience').map((entry) => {
+  const items = entries.filter((entry) => hasEnglishEntry('experience', entry)).map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
     const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.role || entry.company)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.company && entry.role ? `<p class="en-entry-organization">${text(entry.company)}</p>` : ''}</div>`;
     return `<article class="en-entry en-experience-entry" data-record-id="${escapeHTML(entry.id)}">
@@ -138,7 +121,7 @@ function renderExperience(entries) {
 }
 
 function renderProjects(entries) {
-  const items = sortEnglishEntriesDescending(entries, 'projects').map((entry) => {
+  const items = entries.filter((entry) => hasEnglishEntry('projects', entry)).map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
     const heading = `<div class="en-entry-heading-block"><div class="en-entry-heading"><h3>${text(entry.name || entry.role)}</h3>${date ? `<p class="en-entry-date">${escapeHTML(date)}</p>` : ''}</div>${entry.role && entry.name ? `<p class="en-entry-organization">${text(entry.role)}</p>` : ''}</div>`;
     return `<article class="en-entry en-project-entry">
@@ -150,7 +133,7 @@ function renderProjects(entries) {
 }
 
 function renderEducation(entries) {
-  const items = sortEnglishEntriesDescending(entries, 'education').map((entry) => {
+  const items = entries.filter((entry) => hasEnglishEntry('education', entry)).map((entry) => {
     const date = formatEnglishDateRange(entry.startDate, entry.endDate);
     return `<article class="en-entry en-education-entry">
       <div class="en-entry-heading">
@@ -165,7 +148,7 @@ function renderEducation(entries) {
 }
 
 function renderCertifications(entries) {
-  const items = sortEnglishEntriesDescending(entries, 'certifications').map((entry) => {
+  const items = entries.filter((entry) => hasEnglishEntry('certifications', entry)).map((entry) => {
     const date = formatEnglishMonth(entry.date);
     return `<li>
       <span class="en-certification-name">${text(entry.name)}</span>

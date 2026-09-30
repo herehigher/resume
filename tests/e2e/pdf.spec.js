@@ -289,7 +289,7 @@ test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と
     const endMarker = `EN-CERTIFICATION-END-${pageSize}`;
     state.documents.en.resume.certifications = Array.from({ length: 3 }, (_, index) => ({
       date: `202${index}-11`,
-      name: `Boundary Certification ${index + 1}${index === 0 ? ` ${endMarker}` : ''}`,
+      name: `Boundary Certification ${index + 1}${index === 2 ? ` ${endMarker}` : ''}`,
       url: `https://example.com/${'long-verification-path-'.repeat(8)}${index}`
     }));
     await openLocale(page, 'en');
@@ -314,7 +314,8 @@ test('PDF pagination: English の長い証書 URL は A4 と Letter で順序と
     expectPageSize(pages, expectedPageSize);
     expect(pages.every((item) => item.text.trim())).toBe(true);
     const text = pages.map((item) => item.text).join(' ');
-    expect(text.indexOf('Boundary Certification 3')).toBeLessThan(text.indexOf('Boundary Certification 2'));
+    expect(text.indexOf('Boundary Certification 1')).toBeLessThan(text.indexOf('Boundary Certification 2'));
+    expect(text.indexOf('Boundary Certification 2')).toBeLessThan(text.indexOf('Boundary Certification 3'));
     expect(text.indexOf('Boundary Certification 2')).toBeLessThan(text.indexOf(endMarker));
     expect(text.replace(/\s/g, '')).toContain('example.com/long-verification-path-');
     expect(pages.at(-1)?.text).toContain(endMarker);
