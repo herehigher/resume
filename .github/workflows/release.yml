@@ -196,7 +196,7 @@ jobs:
     permissions:
       actions: read
       contents: write
-      issues: write
+      deployments: write
     steps:
       - name: Checkout trusted release tooling
         uses: actions/checkout@v7
@@ -636,6 +636,6 @@ jobs:
             echo "- Tag: ${{ steps.tag.outcome }}; smoke dependencies: ${SMOKE_DEPENDENCIES_OUTCOME:-not-run}; production smoke: ${production_smoke_status}"
             echo "- Production Pages.dev smoke: application ${PRODUCTION_PAGES_APPLICATION_SMOKE:-not-run}; online editor ${PRODUCTION_PAGES_EDITOR_SMOKE:-not-run}"
             echo "- Custom domain smoke: application ${CUSTOM_DOMAIN_APPLICATION_SMOKE:-not-run}; online editor ${CUSTOM_DOMAIN_EDITOR_SMOKE:-not-run}"
-            echo '- Cloudflare Pages deployment identity is recorded in the durable production ledger on issue #252.'
+            echo '- Cloudflare Pages deployment identity is recorded in GitHub Deployments.'
             echo '- Source Analytics is disabled; Cloudflare delivery-layer Web Analytics injection is tracked in the release playbook.'
           } >> "$GITHUB_STEP_SUMMARY"

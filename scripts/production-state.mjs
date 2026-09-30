@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import {
   HISTORICAL_ACCEPTED_RELEASES,
-  appendProductionRecordComment,
+  appendProductionRecordDeployment,
   readProductionRecordHistory,
   resolveProductionRecordLedger,
   verifyRecordRunAuthenticity,
@@ -174,10 +174,7 @@ async function verifyLedgerTrust(records) {
 async function acceptBaseline() {
   assertOwnerDispatch();
   const records = await readProductionRecordHistory({ token: githubToken() });
-  if (records.length > HISTORICAL_ACCEPTED_RELEASES.length) {
-    fail('baseline record history is partial or contains later production records');
-  }
-  const context = workflowContext('accept-production-baseline.yml');
+  if (records.length !== HISTORICAL_ACCEPTED_RELEASES.length) fail('production has moved beyond the historical baseline');
   const client = cloudflareClient();
   const identities = [];
 
@@ -223,35 +220,8 @@ async function acceptBaseline() {
       fail('existing baseline record prefix does not match the fixed production identities');
     }
   }
-  if (records.length === HISTORICAL_ACCEPTED_RELEASES.length) {
-    const ledger = resolveProductionRecordLedger(records);
-    if (ledger.active.deploymentId !== HISTORICAL_ACCEPTED_RELEASES[1].deploymentId) fail('existing baseline ledger is not current at v0.4.2');
-    return;
-  }
-
-  for (const [index, { expected, runAttempt }] of identities.entries()) {
-    if (index < records.length) continue;
-    const record = recordBase({
-      sequence: index + 1,
-      event: 'release_accepted',
-      workflow: 'release.yml',
-      runId: expected.releaseRunId,
-      runAttempt,
-      tag: expected.tag,
-      sourceSha: expected.sourceSha,
-      artifactDigest: expected.artifactDigest,
-      artifactArchiveDigest: expected.artifactArchiveDigest,
-      deploymentId: expected.deploymentId,
-      deploymentUrl: expected.deploymentUrl,
-      fromDeploymentId: null,
-      currentDeploymentId: expected.deploymentId,
-      currentDeploymentUrl: expected.deploymentUrl,
-      recordedByRunId: context.runId,
-      recordedByRunAttempt: context.runAttempt,
-      recordedByWorkflow: context.workflow
-    });
-    await appendProductionRecordComment({ record, token: githubToken() });
-  }
+  const ledger = resolveProductionRecordLedger(records);
+  if (ledger.active.deploymentId !== HISTORICAL_ACCEPTED_RELEASES[1].deploymentId) fail('existing baseline is not current at v0.4.2');
 }
 
 async function startRelease() {
@@ -288,7 +258,7 @@ async function startRelease() {
     recordedByRunAttempt: context.runAttempt,
     recordedByWorkflow: workflow
   });
-  await appendProductionRecordComment({ record, token: githubToken() });
+  await appendProductionRecordDeployment({ record, token: githubToken() });
 }
 
 async function finishRelease() {
@@ -333,7 +303,7 @@ async function finishRelease() {
       recordedByRunAttempt: context.runAttempt,
       recordedByWorkflow: workflow
     });
-    await appendProductionRecordComment({ record, token: githubToken() });
+    await appendProductionRecordDeployment({ record, token: githubToken() });
     const { appendFile } = await import('node:fs/promises');
     await appendFile(required('GITHUB_OUTPUT'), `current_id=${currentId}\n`);
     return;
@@ -367,7 +337,7 @@ async function finishRelease() {
     recordedByRunAttempt: context.runAttempt,
     recordedByWorkflow: workflow
   });
-  await appendProductionRecordComment({ record, token: githubToken() });
+  await appendProductionRecordDeployment({ record, token: githubToken() });
   const { appendFile } = await import('node:fs/promises');
   await appendFile(required('GITHUB_OUTPUT'), `current_id=${currentId}\n`);
 }
@@ -405,7 +375,7 @@ async function startRollback() {
     recordedByRunAttempt: context.runAttempt,
     recordedByWorkflow: workflow
   });
-  await appendProductionRecordComment({ record, token: githubToken() });
+  await appendProductionRecordDeployment({ record, token: githubToken() });
   const output = required('GITHUB_OUTPUT');
   const lines = [
     `target_tag=${target.tag}`,
@@ -492,7 +462,7 @@ async function finishRollback() {
       recordedByRunAttempt: context.runAttempt,
       recordedByWorkflow: workflow
     });
-    await appendProductionRecordComment({ record, token: githubToken() });
+    await appendProductionRecordDeployment({ record, token: githubToken() });
     return;
   }
   if (!contentMatches) fail('Cloudflare current production identity does not match the accepted rollback content; intent remains unresolved');
@@ -528,7 +498,7 @@ async function finishRollback() {
     recordedByRunAttempt: context.runAttempt,
     recordedByWorkflow: workflow
   });
-  await appendProductionRecordComment({ record, token: githubToken() });
+  await appendProductionRecordDeployment({ record, token: githubToken() });
   await import('node:fs/promises').then(({ appendFile }) => appendFile(required('GITHUB_STEP_SUMMARY'), [
     '',
     '## Cloudflare rollback record',
@@ -582,7 +552,7 @@ async function inspectRecovery() {
       recordedByRunAttempt: context.runAttempt,
       recordedByWorkflow: context.workflow
     });
-    await appendProductionRecordComment({ record: intent, token: githubToken() });
+    await appendProductionRecordDeployment({ record: intent, token: githubToken() });
     pending = intent;
     operation = 'verification';
     resolution = 'switched';
@@ -701,7 +671,7 @@ async function finishRecovery() {
       recordedByRunAttempt: recorder.runAttempt,
       recordedByWorkflow: recorder.workflow
     });
-    await appendProductionRecordComment({ record, token: githubToken() });
+    await appendProductionRecordDeployment({ record, token: githubToken() });
     await import('node:fs/promises').then(({ appendFile }) => appendFile(required('GITHUB_STEP_SUMMARY'), [
       '',
       '## Production verification',
@@ -797,7 +767,7 @@ async function finishRecovery() {
     recordedByRunAttempt: recorder.runAttempt,
     recordedByWorkflow: recorder.workflow
   });
-  await appendProductionRecordComment({ record, token: githubToken() });
+  await appendProductionRecordDeployment({ record, token: githubToken() });
   if (event.endsWith('_unverified')) process.exitCode = 1;
   const { appendFile } = await import('node:fs/promises');
   await appendFile(required('GITHUB_STEP_SUMMARY'), [

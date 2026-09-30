@@ -8,7 +8,8 @@ const readWorkflow = (name) => readFileSync(new URL(name, root), 'utf8');
 test('release records the locked pre-state before creating a tag or changing production', () => {
   const release = readWorkflow('release.yml');
   assert.match(release, /group: pages-production[\s\S]+cancel-in-progress: false/);
-  assert.match(release, /permissions:[\s\S]+issues: write/);
+  assert.match(release, /permissions:[\s\S]+deployments: write/);
+  assert.doesNotMatch(release, /issues: write/);
   const intent = release.indexOf('name: Verify durable production state and persist release intent');
   const tag = release.indexOf('name: Reverify bytes and create or resume the immutable tag');
   const productionUpload = release.indexOf('name: Deploy the verified artifact to the Cloudflare production environment');
@@ -30,7 +31,12 @@ test('baseline, rollback, and reconciliation are owner-triggered main-only workf
     assert.match(workflow, /github\.triggering_actor == 'herehigher'/);
     assert.match(workflow, /group: pages-production[\s\S]+cancel-in-progress: false/);
     assert.match(workflow, /environment: production/);
-    assert.match(workflow, /issues: write/);
+  }
+  assert.match(baseline, /deployments: read/);
+  assert.doesNotMatch(baseline, /issues: write|deployments: write/);
+  for (const workflow of [rollback, reconcile]) {
+    assert.match(workflow, /deployments: write/);
+    assert.doesNotMatch(workflow, /issues: write/);
   }
   assert.match(baseline, /artifact-ids: '10788856459'[\s\S]+run-id: '35951587964'/);
   assert.match(baseline, /artifact-ids: '10799566904'[\s\S]+run-id: '35979958986'/);
