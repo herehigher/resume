@@ -111,7 +111,15 @@
           "required": ["nameKana", "addressKana", "createdDate", "motivation", "requests", "careerSummary", "skills", "selfPromotion"],
           "properties": {
             "nameKana": { "$ref": "#/$defs/string" }, "addressKana": { "$ref": "#/$defs/string" }, "createdDate": { "$ref": "#/$defs/string" }, "motivation": { "$ref": "#/$defs/string" },
-            "requests": { "$ref": "#/$defs/string" }, "careerSummary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" }, "selfPromotion": { "$ref": "#/$defs/string" }
+            "requests": { "$ref": "#/$defs/string" }, "careerSummary": { "$ref": "#/$defs/string" }, "skills": { "$ref": "#/$defs/string" }, "selfPromotion": { "$ref": "#/$defs/string" },
+            "residenceStatus": { "$ref": "#/$defs/string" },
+            "workRestriction": { "enum": ["", "none", "restricted"] },
+            "residenceExpiryDate": {
+              "anyOf": [
+                { "const": "" },
+                { "type": "string", "format": "date" }
+              ]
+            }
           }
         },
         "education": { "type": "array", "items": { "$ref": "#/$defs/japaneseLine" } },

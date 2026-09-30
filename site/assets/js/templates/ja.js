@@ -25,6 +25,27 @@ function japaneseDate(value) {
   return formatJapaneseDate(normalized);
 }
 
+function residenceInformation(fields) {
+  const restrictionLabel = { none: 'なし', restricted: 'あり' }[fields.workRestriction] || '';
+  return [
+    ['在留資格', String(fields.residenceStatus ?? '').trim()],
+    ['就労制限の有無', restrictionLabel],
+    ['在留期間（満了日）', japaneseDate(fields.residenceExpiryDate)]
+  ].filter(([, value]) => hasContent(value));
+}
+
+function renderResidenceRows(fields) {
+  return residenceInformation(fields).map(([label, value]) => (
+    `<div><span class="paper-label">${escapeHTML(label)}</span><span class="paper-value full-contact">${escapeHTML(value)}</span></div>`
+  )).join('');
+}
+
+function renderCareerResidenceInformation(fields) {
+  const rows = residenceInformation(fields);
+  if (!rows.length) return '';
+  return `<br>${rows.map(([label, value]) => `${escapeHTML(label)}：${escapeHTML(value)}`).join('<br>')}`;
+}
+
 function japaneseMonth(value) {
   const normalized = String(value ?? '').trim();
   if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(normalized)) return '';
@@ -118,6 +139,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <div><span class="paper-label">電話</span><span class="paper-value full-contact">${displayText(fields.phone)}</span></div>
         <div><span class="paper-label">E-mail</span><span class="paper-value full-contact">${displayText(fields.email)}</span></div>
         ${hasContent(fields.nationality) ? `<div><span class="paper-label">国籍</span><span class="paper-value full-contact">${escapeHTML(fields.nationality)}</span></div>` : ''}
+        ${renderResidenceRows(fields)}
       </section>
       ${renderResumeProfiles(fields)}
       <section class="paper-section" data-section-key="history">
@@ -172,7 +194,7 @@ export function renderJapaneseCareer(state) {
     <article class="document-page career-document">
       <header class="career-doc-header" data-section-key="identity">
         <h2>職務経歴書</h2>
-        <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '提出日')}<br>${displayText(fields.fullName, '氏名未入力')}${hasContent(fields.nationality) ? `<br>国籍：${escapeHTML(fields.nationality)}` : ''}</div>
+        <div class="career-doc-meta">${displayText(japaneseDate(fields.createdDate), '提出日')}<br>${displayText(fields.fullName, '氏名未入力')}${hasContent(fields.nationality) ? `<br>国籍：${escapeHTML(fields.nationality)}` : ''}${renderCareerResidenceInformation(fields)}</div>
         ${renderCareerProfiles(fields)}
       </header>
       <section class="career-section" data-section-key="summary"><h3 class="career-section-title">職務要約</h3><div class="career-body">${narrativeText(fields.careerSummary, '職務要約を入力してください')}</div></section>

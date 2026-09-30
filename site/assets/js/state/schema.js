@@ -3,6 +3,12 @@ import { createDefaultState } from './defaults.js';
 import { validatePageBreaks } from '../page-breaks.js';
 import { hasUniqueRecordIds, isRecordId } from './record-ids.js';
 
+const OPTIONAL_CURRENT_STATE_PATHS = new Set([
+  'state.documents.ja.fields.residenceStatus',
+  'state.documents.ja.fields.workRestriction',
+  'state.documents.ja.fields.residenceExpiryDate'
+]);
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -28,7 +34,9 @@ function compareShape(value, template, path, errors) {
     }
     Object.entries(template).forEach(([key, childTemplate]) => {
       if (!(key in value)) {
-        errors.push(`${path}.${key} is required`);
+        if (!OPTIONAL_CURRENT_STATE_PATHS.has(`${path}.${key}`)) {
+          errors.push(`${path}.${key} is required`);
+        }
         return;
       }
       compareShape(value[key], childTemplate, `${path}.${key}`, errors);
@@ -39,6 +47,20 @@ function compareShape(value, template, path, errors) {
   if (typeof value !== typeof template) {
     errors.push(`${path} must be ${typeof template}`);
   }
+}
+
+function isValidIsoDate(value) {
+  if (typeof value !== 'string') return false;
+  if (value === '') return true;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysByMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysByMonth[month - 1];
 }
 
 function validateStateShape(value) {
@@ -116,6 +138,15 @@ function validateStateShape(value) {
 
   if (!['', 'male', 'female', 'other'].includes(value.profile?.fields?.gender)) {
     errors.push('profile.fields.gender is not supported');
+  }
+
+  const japaneseFields = value.documents?.ja?.fields;
+  if (japaneseFields?.workRestriction !== undefined
+    && !['', 'none', 'restricted'].includes(japaneseFields.workRestriction)) {
+    errors.push('documents.ja.fields.workRestriction is not supported');
+  }
+  if (japaneseFields?.residenceExpiryDate !== undefined && !isValidIsoDate(japaneseFields.residenceExpiryDate)) {
+    errors.push('documents.ja.fields.residenceExpiryDate must be a valid date or empty');
   }
 
   return { valid: errors.length === 0, errors };
