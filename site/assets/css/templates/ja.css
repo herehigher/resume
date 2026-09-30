@@ -55,6 +55,14 @@
 .profile-url-link,
 .career-profile-link { align-items: baseline; color: var(--ja-link); display: inline-flex; font-size: 11.5px; gap: 4px; line-height: 1.45; max-width: 100%; min-width: 0; overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
 .profile-link-icon { fill: currentColor; flex: 0 0 auto; height: 11px; width: 11px; }
+.profile-link-icon--credly,
+.profile-link-icon--stackoverflow,
+.profile-link-icon--kaggle,
+.profile-link-icon--behance,
+.profile-link-icon--dribbble,
+.profile-link-icon--orcid,
+.profile-link-icon--google-scholar,
+.profile-link-icon--hugging-face { height: 13px; width: 13px; }
 
 .resume-section-title { align-items: center; border-bottom: 1px solid var(--ja-line-strong); color: var(--ja-text); display: flex; font-size: 13px; gap: 10px; margin: 16px 0 0; padding-bottom: 7px; }
 .resume-section-title::before { background: var(--ja-accent-blue); content: ""; height: 18px; width: 4px; }
