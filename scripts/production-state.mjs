@@ -347,7 +347,15 @@ async function startRollback() {
   const workflow = 'rollback-production.yml';
   const context = workflowContext(workflow);
   const { records, ledger } = await historyAndLedger();
-  if (!ledger || ledger.active.status === 'unverified') fail('production ledger is unavailable or unverified');
+  if (!ledger) fail('production ledger is unavailable');
+  const recoveryRequested = process.env.RECOVER_UNVERIFIED_RELEASE === 'true';
+  if (ledger.active.status === 'unverified') {
+    if (ledger.active.unverifiedOrigin !== 'release' || !recoveryRequested) {
+      fail('unverified release recovery requires the explicit owner rollback option');
+    }
+  } else if (recoveryRequested) {
+    fail('unverified release recovery was requested without an unverified release');
+  }
   await verifyLedgerTrust(records);
   const targetTag = required('TARGET_TAG');
   const target = ledger.accepted.find((entry) => entry.tag === targetTag);

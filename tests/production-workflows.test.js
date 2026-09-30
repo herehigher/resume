@@ -44,10 +44,13 @@ test('baseline, rollback, and reconciliation are owner-triggered main-only workf
   assert.match(rollback, /Validate accepted target and persist rollback intent[\s\S]+Request Cloudflare native rollback[\s\S]+Install smoke verification dependencies after the production switch[\s\S]+Smoke test the current Pages\.dev rollback deployment[\s\S]+Smoke test the custom-domain rollback deployment/);
   assert.match(rollback, /node scripts\/production-state\.mjs execute-rollback/);
   assert.match(rollback, /node scripts\/production-state\.mjs finish-rollback/);
+  assert.match(rollback, /recover_unverified_release:[\s\S]+default: false[\s\S]+type: boolean/);
+  assert.match(rollback, /RECOVER_UNVERIFIED_RELEASE: \$\{\{ inputs\.recover_unverified_release \}\}/);
   assert.doesNotMatch(rollback, /wrangler-action|pages deploy|actions\/deploy-pages/);
   assert.match(reconcile, /node scripts\/production-state\.mjs inspect-recovery/);
   assert.match(reconcile, /node scripts\/production-state\.mjs finish-recovery/);
   const state = readFileSync(new URL('../scripts/production-state.mjs', import.meta.url), 'utf8');
+  assert.match(state, /ledger\.active\.unverifiedOrigin !== 'release' \|\| !recoveryRequested/);
   assert.match(state, /validateReleaseDeploymentEvidence\(detail, \{[\s\S]+deploymentId: pending\.deploymentId[\s\S]+deploymentUrl: pending\.deploymentUrl/);
   assert.doesNotMatch(reconcile, /wrangler-action|pages deploy|execute-rollback/);
 });

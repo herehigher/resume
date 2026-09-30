@@ -4,30 +4,34 @@
 
 Public release、tag、Pages 設定、repository visibility の変更には owner の明示承認が必要です。通常公開では、version を更新した公開 PR を owner が merge する操作を、その merge 結果 commit の tag 作成と Pages 公開に対する明示承認とします。Merge 後に同じ対象への追加承認や ID・digest の転記は要求しません。Tag は移動・上書き・削除しません。
 
-## 公開の全体像
+## 実行入口を選ぶ
 
-「担当者」は開発者または依頼を受けた agent、「所有者」は production 公開を承認する人です。配布物は Pages に置く HTML / CSS / JavaScript 一式です。
-
-| 順番 | 担当 | 操作 | 次へ進む条件 |
+| 状態 | 入口 | 実行者 | 完了の判定 |
 | --- | --- | --- | --- |
-| 1 | 担当者 | 変更範囲と公開 version を決める | 安定版番号が決まっている |
-| 2 | 担当者 | 公式 repository の候補 branch で version、CHANGELOG、公開内容を commit する | 候補 source が40桁の commit SHAで固定されている |
-| 3 | CI・担当者 | 候補 asset を生成・取り込み、7 fileを目視して候補 branch へ commit する | 展示 asset が候補 version・site bytes・生成契約と一致する |
-| 4 | 担当者・CI | 完成した公開 PR を1件作り、`Quality` と review を完了する | `quality` に含まれる fresh 検証と候補 artifact の照合が成功する |
-| 5 | 所有者 | Version・変更内容・必要な目視結果を確認し、公開 PR を main へ merge して本番公開を承認する | 対象の merge 結果 commit が確定し、追加の公開承認なしで自動処理へ進める |
-| 6 | CI | Main Quality の成功後に `Release eligibility` が Quality run、merged PR、version を照合する | 承認済み公開 PR の source だけが `Release production` へ渡る |
-| 7 | CI | `Release production` が資格を再確認し、production lock 内で current Cloudflare deployment ID と受入済み台帳を照合してから durable intent を記録する。同じ commit の Quality 展示 asset を照合して配布物を生成・検査し、immutable tag を作成する。Cloudflare preview への Direct Upload と smoke が成功した後、同じ配布物を production へ Direct Upload する | Tag、commit、配布物が一致し、current deployment が台帳の許可状態と一致し、preview smoke が production deploy の前に成功する |
-| 8 | CI・担当者 | Pages.dev と custom domain の自動検査と summary を確認する | 両 URL の application・online editor smoke が成功する |
+| 新しい安定版を公開する | [通常公開](#通常公開の実行手順) | 担当者が準備し、owner が公開 PR を merge | 両公開 URL の smoke 成功と `release_accepted` |
+| 切替後の確認が未完了、または intent が未解決 | [照合](#production-の状態を照合する) | Owner | Identity と smoke の再確認結果が terminal record になる |
+| 受入済みの過去版に戻す | [Rollback](#前のバージョンへ戻す) | Owner | Target UUID と両公開 URL の smoke 成功、`rollback_completed` |
+| Cloudflare の現在値と記録が異なる | [停止して調査](#停止して調査する) | Owner | Identity と記録の不一致が解消されるまで停止 |
 
-通常公開で実行する full Quality 2回は、完成した公開 PR と merge 結果の main が対象です。候補生成 workflow は展示 asset だけを生成・検証し、product Quality や公開承認の代わりにはなりません。公開までの asset 生成は候補、最終 PR、main の3回です。
+通常公開の資格確認を手動の `Release production` 実行で迂回しません。未確認の状態を成功と推定して記録を修正しません。
 
-Version の基準は `package.json`。CHANGELOG の日付は RC を確定した日であり、実際の公開時刻は GitHub の実行記録を参照します。日付跨ぎだけで version や test をやり直しません。対象は GitHub が merged PR に記録した結果 commit であり、その後の main tip や PR head に切り替えません。
+## 公開対象
+
+公開先は Cloudflare Pages の Pages.dev と `https://rs.herehigher.com/` です。Version の基準は `package.json`。CHANGELOG の日付は候補を確定した日で、実際の公開時刻は GitHub Actions の run を参照します。日付を跨いだだけで version や test をやり直しません。公開対象は GitHub が記録した PR の merge 結果 commit です。
 
 ## 通常公開の実行手順
 
+**入力・開始条件：** 新しい stable SemVer の `VERSION`、候補に入れる変更、認証済み `gh`、公式 repository の最新 `main`、clean な tracked worktree を用意します。担当者が候補と PR を準備し、owner が最終 PR を確認して merge します。
+
 ### 1. 事前確認
 
-公開 version を決めたら、Version 更新前に `main` checkout で唯一の事前確認入口 `npm run release:preflight -- --target VERSION` を実行します。認証済み `gh` session、latest `origin/main` と同じ `main`、clean な tracked worktree、current version とそれより大きい stable SemVer の target version、remote tag、重複する open PR、untracked file を read-only で確認し、結果が `pass` になるまで次へ進みません。Untracked file は既定で停止し、利用者が必要性を確認した exact relative path だけ `--allow-untracked PATH` を繰り返して許可できます。`deferred` / `blocked` の扱いは「失敗したとき」を参照します。
+公開 version を決めたら、Version 更新前に `main` checkout で唯一の事前確認入口 `npm run release:preflight -- --target VERSION` を実行します。
+
+認証済み `gh` session、latest `origin/main` と同じ `main`、clean な tracked worktree、current version とそれより大きい stable SemVer の target version、remote tag、重複する open PR、untracked file を read-only で確認し、結果が `pass` になるまで次へ進みません。
+
+Untracked file は既定で停止し、利用者が必要性を確認した exact relative path だけ `--allow-untracked PATH` を繰り返して許可できます。
+
+`deferred` / `blocked` の扱いは[通常公開が失敗したとき](#通常公開が失敗したとき)を参照します。
 
 ### 2. Version と候補 branch
 
@@ -37,7 +41,17 @@ Repository root で `node scripts/set-release-version.mjs VERSION YYYY-MM-DD` �
 
 ### 3. 候補 asset を生成・取り込み
 
-固定した candidate SHA に対しては、候補 branch の clean な checkout で補助 CLI を実行します。これは official origin、candidate branch、40桁の HEAD、remote branch との一致を確認し、main の `Release candidate assets` を一度だけ起動します。起動ごとに予測不能な correlation ID を workflow の run title へ固定し、その ID の run だけを待機・照合します。反映待ち、複数一致、timeout は推測せず停止します。成功時に表示される run URL と promotion command をそのまま使います。補助 CLI は artifact を候補 checkout へ取り込まず、release state も保存しません。
+固定した candidate SHA に対しては、候補 branch の clean な checkout で補助 CLI を実行します。
+
+これは official origin、candidate branch、40桁の HEAD、remote branch との一致を確認し、main の `Release candidate assets` を一度だけ起動します。
+
+起動ごとに予測不能な correlation ID を workflow の run title へ固定し、その ID の run だけを待機・照合します。
+
+反映待ち、複数一致、timeout は推測せず停止します。
+
+成功時に表示される run URL と promotion command をそのまま使います。
+
+補助 CLI は artifact を候補 checkout へ取り込まず、release state も保存しません。
 
 ```bash
 npm run release:candidate-assets
@@ -68,7 +82,23 @@ Asset-only の追補 commit に fast path は設けません。最終 PR head �
 
 Version、変更内容、必要な目視結果、`Quality` を所有者が確認し、公開 PR を main へ merge します。この merge が、GitHub が記録した merge 結果 commit の tag 作成と Pages 公開に対する承認です。
 
-通常公開では [Release production](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。Merge 結果 commit の main Quality が成功すると `Release eligibility` が公開資格を確認し、該当する公開 PR の場合だけ `Release production` を開始します。通常の main 更新は資格確認で終了し、`Release production` の run を作りません。公開時は immutable tag、同じ workflow run が準備した単一の artifact、Cloudflare preview smoke、production Direct Upload、Pages.dev と custom domain の online smoke へ進みます。成功後に GitHub Deployments の production 記録へ tag、SHA、site artifact digest、run、Cloudflare deployment ID / URL を保存し、Summary で各 URL、結果、未確認事項を確認します。
+通常公開では [Release production](https://github.com/herehigher/resume/actions/workflows/release.yml) を手動実行しません。
+
+Merge 結果 commit の main Quality が成功すると `Release eligibility` が公開資格を確認し、該当する公開 PR の場合だけ `Release production` を開始します。
+
+通常の main 更新は資格確認で終了し、`Release production` の run を作りません。
+
+公開時は immutable tag、同じ workflow run が準備した単一の artifact、Cloudflare preview smoke、production Direct Upload、Pages.dev と custom domain の online smoke へ進みます。
+
+成功後に GitHub Deployments の production 記録へ tag、SHA、site artifact digest、run、Cloudflare deployment ID / URL を保存し、Summary で各 URL、結果、未確認事項を確認します。
+
+**成功判定：** 両公開 URL の application・online editor smoke が成功し、最新の production 記録が `release_accepted` なら完了です。
+
+候補生成や Quality の失敗は該当 step を修正し、候補 source を変えた場合は新しい SHA で候補生成からやり直します。
+
+Merge 後の一時的な実行障害は該当 run を再実行し、内容・契約の不一致は新しい修正 PR で直します。
+
+切替後の smoke failure は[照合](#production-の状態を照合する)または[前の版への復旧](#前のバージョンへ戻す)に進みます。
 
 ## 変更内容に応じた確認
 
@@ -81,67 +111,121 @@ Version、変更内容、必要な目視結果、`Quality` を所有者が確認
 
 詳しい確認条件と展示 sample の扱いは[開発ガイド](development-guide.md#表示pdf-の目視)を参照します。必要な結果と差異だけを PR / run に残し、自動 test、agent の目視、人の受入判断、未確認を分けます。確認用画像・PDF は CI artifact から取得します。通常の開発 PR では展示 sample を更新せず、安定版の公開 PR では tag 内の version と画面を一致させるため毎回 commit します。
 
-## 自動で確認・記録すること
+## Production の状態を照合する
 
-CI は保存・読込・言語分離・PDF・データ保護、version、source SHA、prepared site の source-identical digest、asset の生成・semantic contract と各 artifact 自身の digest を検証します。公開後は主要 path の HTTP、version、locale、metadata、sitemap、Schema、架空 example と editor の基本操作を確認します。
+**入口と入力：** Owner が `main` から [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) を起動します。
 
-PR の `quality` は manifest が示す候補 artifact を取得し、commit 済みの7 file が promotion 元 artifact の exact bytes と一致することを先に確認します。そのうえで、同じ job が fresh に生成した artifact を使い、version、site、generator、browser、PDF、screenshot の契約と照合します。別 run の Chromium rasterization bytes の完全一致は要求しません。Asset が未準備、不一致、失効している場合は `quality` を失敗させます。Version を変えない PR の展示 asset 変更も拒否します。
+対象は未解決 intent または `*_unverified` の状態です。
 
-Merge 後の `Release eligibility` は official main Quality の完了・成功、full Quality、対象 SHA、対応する唯一の merged PR、PR base からの version 変更、current main version を照合します。照合不能な状態は失敗し、通常の main 更新と current main version に一致しない release は `Release production` を開始しません。`Release production` は渡された Quality run ID から同じ資格を再確認します。Prepare、publish、deploy は同じ workflow run の exact artifact を再検証して使い、承認後に rebuild や差し替えを行いません。Production lock の取得後に main version、current Cloudflare deployment ID、production branch / source SHA / URL を GitHub Deployments の受入済み記録と照合します。古い release run、同じ tag の再配布、Cloudflare 外部変更、未解決 intent、記録の欠落・重複があれば production upload を止めます。Rollback 後に開始された release run ID より古い待機中の旧 release run も拒否します。
+[台帳の確認方法](#台帳の確認方法)で最後の event、対象 tag、current deployment ID を確認してから実行します。
 
-Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。Production の履歴は GitHub Deployments の `production-records` 環境、`production-record` task に保存します。これは公開先の `production` 環境とは別の監査記録です。Workflow は作成者が `github-actions[bot]` であること、Deployment の ref / SHA が記録の source SHA と一致すること、元 run / workflow / attempt が実在し一致すること、record sequence に欠落や重複がないことを再確認します。記録が削除された場合や intent の terminal record がない場合は後続の production 操作を fail-closed します。Issue #252 の二つの comment は既存 baseline の履歴証拠として保持し、通常の公開では読み書きしません。
+入力値の推測や record の手修正はしません。
 
-ここで intent は本番変更前に保存する開始記録、ledger は sequence 順に読む記録列です。最新状態を調べるときは、repository で認証済みの `gh` から監査用 Deployment だけを読みます。表示順には依存せず、sequence が最大の記録を確認します。その event が `*_started` なら処理は未解決、`*_unverified` なら切替後の確認が未完了です。Cloudflare の current deployment ID とその記録の `currentDeploymentId` も照合します。結果が空なら後続記録がない状態で、v0.4.1 / v0.4.2 の固定 baseline はこの一覧には表示されません。
+**操作：** Workflow は owner identity、production lock、台帳と Cloudflare current deployment を確認します。切替前なら元の identity を確認して失敗を terminal record に残します。切替後なら Pages.dev と custom domain の application・online editor smoke を再実行します。
+
+**成功判定・失敗時：** 最新 event が `production_verified`、`release_accepted`、`rollback_completed` なら切替後の確認が完了です。
+
+切替前なら `*_failed_before_*` と元の production identity を確認します。
+
+Smoke が再び失敗すれば `*_unverified` が残ります。
+
+恒久的な内容不良が `release_unverified` になった場合は[明示的な rollback](#前のバージョンへ戻す)を使います。
+
+`rollback_unverified`、不明な current identity、記録の欠落は自動復旧せず[停止して調査](#停止して調査する)します。
+
+## 通常公開が失敗したとき
+
+| 状態 | 次の操作 |
+| --- | --- |
+| Preflight が `deferred` / `blocked` | Summary の理由を直して再実行。`pass` まで version を変更しない |
+| 候補生成・promotion の失敗 | Candidate SHA、run ID、attempt、artifact provenance を確認。失効したら同じ SHA で再生成し、内容を直したら新しい SHA からやり直す |
+| 候補 CLI の待機中断 | Clean な候補 checkout で `npm run release:candidate-assets -- --run-id RUN_ID --source-sha CANDIDATE_SHA`。表示済みの同じ run だけを再照合する |
+| PR Quality の失敗 | 該当 step と summary を確認し、内容・7 file・候補 artifact を修正。Source SHA が変われば候補生成からやり直す |
+| Merge 後の Quality・準備失敗 | 一時障害は該当 run を再実行。内容・契約の不一致は新しい修正 PR を作る |
+| 資格・artifact・tag の不一致 | 手動 dispatch や別 artifact で迂回しない。修正 PR または同じ tag / commit の再開を、失敗した step に応じて選ぶ |
+| Production 切替後の smoke failure | [照合](#production-の状態を照合する)。恒久的な `release_unverified` は[明示的な rollback](#前のバージョンへ戻す) |
+| Record 書込み失敗・current identity の不一致 | [停止して調査](#停止して調査する)。SHA だけで accepted にしない |
+
+## 前のバージョンへ戻す
+
+**入口と入力：** Owner が `main` から [Roll back Cloudflare production](https://github.com/herehigher/resume/actions/workflows/rollback-production.yml) を実行します。
+
+`target_tag` は台帳中の受入済み過去版を指定します。
+
+通常時は `recover_unverified_release` を既定の `false` のままにします。
+
+恒久的な公開 smoke failure で `release_unverified` の場合だけ、この option を `true` にして明示的に復旧を選びます。
+
+未解決 intent と `rollback_unverified` は、この入口では拒否されます。
+
+**操作：** Owner identity と `main`、`pages-production` lock、`production` environment を使います。
+
+Workflow は台帳の完全性、Cloudflare の current UUID・URL・source SHA、target の受入済み UUID・URL・source SHA を確認します。
+
+`release_unverified` からの復旧では現在の deployment がその未確認 release の記録と完全一致すること、上記 option が `true` であることを追加で要求します。
+
+Rollback intent を記録してから Cloudflare Pages native rollback API を呼び、Pages.dev と custom domain の application・online editor smoke を実行します。
+
+**成功判定：** API 応答 ID と project の current `latest_deployment.id` が accepted target UUID に完全一致し、両 URL の smoke が成功して最新台帳 event が `rollback_completed` なら完了です。Summary の from/to tag、UUID、run URL も確認します。
+
+**失敗時：** 切替前なら `rollback_failed_before_switch` と元の production identity を確認します。切替後の smoke failure、ID 不一致、record 書込み障害は `rollback_unverified` または未解決 intent として後続の production 操作を止め、[照合](#production-の状態を照合する)します。自動でさらに戻しません。通常公開 run を再実行して既存 accepted tag を再配布しません。
+
+この入口は ledger に受入済みの Cloudflare production deployment だけを許可します。
+
+GitHub Pages 時代の `v0.2.2` は rollback 対象ではありません。
+
+旧 source の canonical / hreflang、旧 Analytics state と disclosure、schema v1 は現行 root hosting・privacy・schema v4 contract に適合しません。
+
+旧 tag と code は保持しますが、新しい公開 artifact として再配布しません。
+
+## 停止して調査する
+
+Cloudflare current deployment の ID・URL・source SHA と台帳が異なる場合、record が欠ける場合、または照合・rollback の intent が未解決のまま残る場合は production 操作を停止します。
+
+Owner は該当 Actions run、[台帳](#台帳の確認方法)、Cloudflare project の current deployment を照合します。
+
+推測で記録・tag・deployment を書き換えません。
+
+切替後の release の upload identity を記録できなかった場合、SHA だけで accepted にしません。
+
+Identity と記録を確定できなければ、この手順だけでは再開できません。
+
+## 初回設定・設定変更時だけ行うこと
+
+- Cloudflare Pages の Direct Upload project、production branch `main`、custom domain の DNS / HTTPS、Web Analytics 配信、GitHub Actions の account / project variables と API token secret を用意します。Git Integration による push deploy は使いません。通常公開では project 設定を変更しません。
+- Main の merge ruleset が要求する check は `quality` です。Workflow の environment は `production`。公開 PR の owner merge が通常公開の承認です。
+- GitHub Pages は停止済みで `github-pages` environment は削除済みです。旧 URL は 404、repository homepage は `https://rs.herehigher.com/`。設定の owner 記録は [#253](https://github.com/herehigher/resume/issues/253#issuecomment-5889977750) を参照します。
+- Local の GitHub 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は許可された sandbox 外で実行し、token は抽出・export・複製しません。
+
+原案は [#113](https://github.com/herehigher/resume/issues/113)、過去の障害・移行経緯は [#112](https://github.com/herehigher/resume/issues/112) にあります。
+
+## 自動化の契約（参照）
+
+- 候補生成 workflow は `main` の定義を使います。候補 branch、40桁の source SHA、run ID・attempt、artifact ID・digest を照合し、複数一致、失効、不一致は停止します。候補 workflow は product Quality や公開承認の代わりではありません。この経路の初導入時は、workflow の導入 PR を先に `main` へ merge します。
+- 公開 PR と merge 結果の `main` で full Quality を実行します。PR の `quality` は commit 済み7 file と候補 artifact の exact bytes を照合し、fresh に生成した version・site・generator・browser・PDF・screenshot の契約も確認します。別 run の Chromium raster bytes の完全一致は要求しません。Version を変えない PR の展示 asset 変更は拒否します。
+- `Release eligibility` は official main Quality、full Quality、merge 結果 SHA、唯一の merged PR、PR base からの version 変更、current main version を確認します。通常の main 更新では `Release production` を開始しません。公開時も後続の main tip や PR head に切り替えません。
+- `Release production` は資格を再確認し、同じ run の exact artifact を prepare・publish・deploy に使います。`site/` の path、file type、symlink、relative path を検査して exact copy し、source SHA、version、source digest、artifact digest を記録します。Source と artifact の digest が異なれば停止します。承認後の rebuild・差替えはありません。
+- Production lock 内で current Cloudflare deployment と受入済み台帳を照合し、切替前に durable intent を記録します。Preview branch への Direct Upload と smoke が成功してから production へ upload します。Cloudflare の production branch `main` は配信先の設定値で、公開 source は承認済み tag・SHA・artifact で固定します。
+- 公開後は Pages.dev と custom domain の HTTP、version、locale、metadata、sitemap、Schema、架空 example、online editor を確認します。配信先で加工された response bytes と artifact digest の完全一致は要求しません。Summary には tag、SHA、artifact digest、run URL、公開 URL、結果、未確認事項を残します。
+- GitHub Deployments の `production-records` 環境、`production-record` task が監査記録です。Workflow は Actions bot、record の ref / SHA、元 run / workflow / attempt、連続 sequence を検証します。欠落・重複・未解決 intent・外部変更は fail-closed です。Rollback 後に開始された release run より古い待機中 run も拒否します。
+
+### 台帳の確認方法
+
+Intent は本番変更前の開始記録、ledger は sequence 順の記録列です。認証済み `gh` で監査用 Deployment を読み、表示順に依存せず最大 sequence の event を確認します。`*_started` は未解決、`*_unverified` は切替後の確認未完了です。Cloudflare current ID と `currentDeploymentId` も照合します。固定 baseline の v0.4.1 / v0.4.2 はこの一覧には表示されません。
 
 ```bash
 gh api --paginate 'repos/herehigher/resume/deployments?environment=production-records&per_page=100' \
   --jq '.[] | select(.task == "production-record") | (.payload | if type == "string" then fromjson else . end) | {sequence,event,tag,runId,currentDeploymentId}'
 ```
 
-既存 baseline は 2026-09-30 に owner が main から実行した [Accept existing Cloudflare production baseline](https://github.com/herehigher/resume/actions/runs/36651727138) で受入済みです。v0.4.1 と v0.4.2 の tag、source、artifact、Cloudflare API identity、current/latest v0.4.2 を照合し、当時の受入結果を issue #252 に残しました。二つの固定済み identity は後続 workflow が読み込み、成功した baseline run と照合します。v0.4.1 の UUID は `6968466e-88e8-4156-94e7-39d81a45add8`、v0.4.2 の UUID は `571384f3-3869-46d3-9af3-80c364bc1ef2` です。旧 baseline workflow の再実行は現行 v0.4.2 と固定記録が一致する場合だけ read-only の確認になります。
+### 固定済み baseline
 
-## Analytics の扱い
+2026-09-30 に owner が [Accept existing Cloudflare production baseline](https://github.com/herehigher/resume/actions/runs/36651727138) で v0.4.1 と v0.4.2 の tag、source、artifact、Cloudflare identity、current v0.4.2 を受入れました。
 
-Repository source、clone、fork は Analytics beacon を含みません。2026-09-29 の確認では、公式 current v0.4.2 Pages.dev と custom domain の root、`/editor/` response に Cloudflare Pages delivery layer 由来の `beacon.min.js` と `data-cf-beacon` が各 1 件ありました。アプリは履歴書入力、写真、JSON、端末上の草稿を Analytics request に含めません。画面の説明は [PRIVACY.md](../PRIVACY.md) を参照します。
+固定 UUID は v0.4.1 が `6968466e-88e8-4156-94e7-39d81a45add8`、v0.4.2 が `571384f3-3869-46d3-9af3-80c364bc1ef2` です。Issue #252 の二つの comment は履歴証拠として保持し、通常公開では読み書きしません。旧 baseline workflow の再実行は現行 v0.4.2 と固定記録が一致するときの read-only 確認だけです。
 
-`PRODUCTION_ORIGIN` は GitHub Actions の repository variable と `scripts/deployment-path-contract.mjs` の両方で `https://rs.herehigher.com/` に固定します。公開 smoke は Pages.dev の deployment URL と custom domain の root URL で、app が管理する path / metadata / JSON contract と online editor を確認します。Analytics beacon の配信と provider-side processing は Cloudflare Pages の責任範囲です。
+### Analytics の扱い
 
-`Release production` は承認済み SHA から同じ run で準備・digest 照合した artifact を Cloudflare Pages に Direct Upload します。Tag から決まる preview branch へ明示的な source SHA とともに upload し、deployment identity と application・online editor smoke を検査します。成功後に artifact を再検証し、Cloudflare project の production branch を再確認して production へ upload します。Production の Pages.dev と custom domain の双方で同じ smoke を実行します。Cloudflare の production branch `main` は Direct Upload の配信先を選ぶ設定値であり、公開 source は認可済み tag / SHA と artifact で固定します。Deployment smoke は配信先で加工された response bytes と artifact digest の byte-for-byte 一致を要求しません。#251 の live hosting 完了判定には、この最初の正式 release run の preview・production smoke 成功が必要です。
+Repository source、clone、fork は Analytics beacon を含みません。2026-09-29 の公式 current v0.4.2 Pages.dev と custom domain の root、`/editor/` response には Cloudflare Pages delivery layer の `beacon.min.js` と `data-cf-beacon` が各1件ありました。履歴書入力、写真、JSON、端末内草稿は Analytics request に含めません。利用者向け説明は [PRIVACY.md](../PRIVACY.md) を参照します。
 
-Release artifact preparation は `site/` の HTML path、file type、symlink、relative path を検査し、source tree を output へ exact copy します。Preparation CLI は network request や provider credential を使いません。Evidence は authorized source SHA、package version、source digest、artifact digest の4項目を記録し、source と artifact digest が一致しない場合は公開を止めます。Artifact digest の事前計算、manifest 回写、再 merge、承認後の再 build は行いません。
-
-## 失敗したとき
-
-| 状態 | 次の操作 |
-| --- | --- |
-| Release preflight: `deferred` | summary の `check` / `reason` に従って local、target、または重複 object を修正して再実行する。`pass` になるまで Version 更新へ進まない |
-| Release preflight: `blocked` | `gh` / fetch / credential capability を復旧して再実行する。成功を推定せず、`pass` になるまで Version 更新へ進まない |
-| 候補生成 workflow の失敗 | Candidate SHA と branch、generator、依存関係を確認する。候補内容を直した場合は新しい SHA、run、attempt で生成し直す |
-| 候補生成 CLI の待機が中断 | 同じ clean な candidate checkout で、表示済みまたは Actions run URL の run ID と候補 SHA を明示して再開する。CLI は同じ repository、workflow、event、run が記録した main control ref、成功結果、attempt、artifact、manifest provenance を再照合する。再開時に current main が進んでいても、別の control ref へ置き換えない。例：`npm run release:candidate-assets -- --run-id RUN_ID --source-sha CANDIDATE_SHA` |
-| 候補 artifact が失効・不一致 | 同じ固定 SHA で候補生成 workflow を再実行し、新しい run と attempt を指定して promotion する。別 artifact を代用しない |
-| PR の Quality 失敗 | Product・test・generator、または release asset の source SHA、run、attempt、artifact、digest、7 fileの不一致を該当 step と summary で確認する。修正で candidate SHA が変わった場合は候補生成と promotion からやり直す |
-| Release eligibility の失敗 | Quality run、repository・workflow・SHA、full Quality、merged PR、base / current version の照合結果を確認する。Release production を手動で迂回しない |
-| Main Quality・公開準備の失敗 | Merge 後の一時的実行障害だけなら該当 run を再実行。内容・契約の不一致なら新しい修正 PR で直す |
-| 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release production を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
-| Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |
-| production state / deployment ID が台帳と不一致 | production upload は停止。Cloudflare current deployment と GitHub Deployments の履歴を owner が調査し、推測で記録を書き換えない |
-| Deploy 後の smoke failure | 「公開済み・確認未完了」として記録し、以降の production 操作を停止する。一時障害は owner が [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) を main から実行し、Cloudflare identity と両 URL の application・editor smoke を再確認する。内容不良で smoke が恒久的に失敗する場合、現行 workflow は修正版の release と rollback を拒否する。owner が current identity と記録を調査し、復旧入口を整えるまで新しい公開を開始しない |
-| rollback の current deployment ID が accepted target と異なる | Native API の応答を成功と扱わず「切替済み・確認未完了」を記録する。Ledger を unverified にして release / rollback を止め、owner が current identity を調査する |
-| GitHub Deployment record 書込みに失敗 | `production-records` の履歴を上記コマンドで確認する。Unresolved intent が後続 deploy を止める。Rollback は intent に記録した accepted target ID / URL と current API identity を [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) で照合・smoke できる。Release の切替後に upload identity を ledger へ記録できなかった場合は SHA だけで accepted にせず、intent を残して owner が手動調査する |
-| 公開内容の修正 | 修正 PR と新しい version を用意。既存 tag を変更しない |
-
-### 前のバージョンへ戻す
-
-通常公開 run を単純に rerun して既存 accepted tag を再配布しません。未公開・production switch 前の失敗は durable ledger に failed-before-deploy と記録され、次の eligible release が新しい tag / version として進められます。Production switch 後の結果不明は owner reconciliation が current API identity を確認して smoke を再実行するまで停止します。
-
-一時障害で previous accepted release へ戻すときは owner が main から [Roll back Cloudflare production](https://github.com/herehigher/resume/actions/workflows/rollback-production.yml) を実行し、`target_tag` に ledger 中の過去 production release を指定します。Workflow は既存 `pages-production` lock と `production` environment を使い、GitHub Deployments の記録、Cloudflare current UUID、target UUID、production/main/SHA/URL を確認し、rollback intent を記録してから Cloudflare Pages native rollback API だけを呼びます。API の応答 ID と project の current `latest_deployment.id` が accepted target UUID と完全一致して初めて切替を検査済みとします。その後 Pages.dev deployment URL と custom domain の双方で application と online editor smoke を実行し、from/to tag・UUID・run URL・結果を記録します。Smoke failure、current ID の不一致、または record 書込み障害は「切替済み・確認未完了」として保持され、後続 production operation は止まります。自動でさらに戻す動作はありません。
-
-この入口は ledger に受入済みの Cloudflare production deployment だけを許可します。GitHub Pages 時代の `v0.2.2` は rollback 対象ではありません。旧 source の canonical / hreflang、旧 Analytics state と disclosure、schema v1 は現行 root hosting・privacy・schema v4 contract に適合しません。旧 tag と code は保持しますが、新しい公開 artifact として再配布しません。
-
-## 初回設定・設定変更時だけ行うこと
-
-Cloudflare Pages の Direct Upload project、production branch、custom domain の DNS / HTTPS、Web Analytics の配信設定、GitHub Actions の account / project variables と API token secret を用意します。Cloudflare Git Integration による push deploy は使用しません。Main の merge ruleset が要求する check は `quality` です。通常公開では project 設定を変更しません。Workflow の environment は `production` です。公開 PR の owner merge が通常公開の承認で、Release production は承認済みの eligible Quality run だけを受け付けます。GitHub Pages は repository Settings で停止し、`github-pages` environment は削除済みです。`https://herehigher.github.io/resume/` は 404、repository homepage は `https://rs.herehigher.com/` です。設定確認は [#253 の owner 記録](https://github.com/herehigher/resume/issues/253#issuecomment-5889977750) にあります。
-
-Local の GitHub query / PR 操作には認証済み `gh` session を使います。Sandbox で credential provider を利用できない場合は、許可された sandbox 外の実行へ切り替えます。Token を抽出・export・複製せず、特定 OS の credential backend は要件にしません。
-
-この手順は [#113 の固定原稿](https://github.com/herehigher/resume/issues/113) を実装に合わせて採用したものです。過去の障害・移行経緯は [#112](https://github.com/herehigher/resume/issues/112) を参照します。
+`PRODUCTION_ORIGIN` は repository variable と `scripts/deployment-path-contract.mjs` の両方で `https://rs.herehigher.com/` に固定します。Smoke は app 管理の path・metadata・JSON・online editor を検証し、beacon の配信と provider-side processing は Cloudflare Pages の責任範囲です。#251 の live hosting 完了判定には、最初の正式 release run の preview・production smoke 成功が必要です。
