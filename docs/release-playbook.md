@@ -91,6 +91,13 @@ Merge 後の `Release eligibility` は official main Quality の完了・成功�
 
 Summary は tag、commit、artifact の識別情報・digest、run URL、公開 URL、結果、未確認事項を記録します。Production の履歴は GitHub Deployments の `production-records` 環境、`production-record` task に保存します。これは公開先の `production` 環境とは別の監査記録です。Workflow は作成者が `github-actions[bot]` であること、Deployment の ref / SHA が記録の source SHA と一致すること、元 run / workflow / attempt が実在し一致すること、record sequence に欠落や重複がないことを再確認します。記録が削除された場合や intent の terminal record がない場合は後続の production 操作を fail-closed します。Issue #252 の二つの comment は既存 baseline の履歴証拠として保持し、通常の公開では読み書きしません。
 
+ここで intent は本番変更前に保存する開始記録、ledger は sequence 順に読む記録列です。最新状態を調べるときは、repository で認証済みの `gh` から監査用 Deployment だけを読みます。表示順には依存せず、sequence が最大の記録を確認します。その event が `*_started` なら処理は未解決、`*_unverified` なら切替後の確認が未完了です。Cloudflare の current deployment ID とその記録の `currentDeploymentId` も照合します。結果が空なら後続記録がない状態で、v0.4.1 / v0.4.2 の固定 baseline はこの一覧には表示されません。
+
+```bash
+gh api --paginate 'repos/herehigher/resume/deployments?environment=production-records&per_page=100' \
+  --jq '.[] | select(.task == "production-record") | (.payload | if type == "string" then fromjson else . end) | {sequence,event,tag,runId,currentDeploymentId}'
+```
+
 既存 baseline は 2026-09-30 に owner が main から実行した [Accept existing Cloudflare production baseline](https://github.com/herehigher/resume/actions/runs/36651727138) で受入済みです。v0.4.1 と v0.4.2 の tag、source、artifact、Cloudflare API identity、current/latest v0.4.2 を照合し、当時の受入結果を issue #252 に残しました。二つの固定済み identity は後続 workflow が読み込み、成功した baseline run と照合します。v0.4.1 の UUID は `6968466e-88e8-4156-94e7-39d81a45add8`、v0.4.2 の UUID は `571384f3-3869-46d3-9af3-80c364bc1ef2` です。旧 baseline workflow の再実行は現行 v0.4.2 と固定記録が一致する場合だけ read-only の確認になります。
 
 ## Analytics の扱い
@@ -118,9 +125,9 @@ Release artifact preparation は `site/` の HTML path、file type、symlink、r
 | 準備済み artifact の失効・不一致 | 公開を停止。同じ release commit の Quality または Release production を再実行し、新しい run 内で準備からやり直す。別 artifact を黙って代用しない |
 | Tag 作成後の deploy failure | 同じ tag / commit / artifact で再開。別 SHA の同名 tag は拒否 |
 | production state / deployment ID が台帳と不一致 | production upload は停止。Cloudflare current deployment と GitHub Deployments の履歴を owner が調査し、推測で記録を書き換えない |
-| Deploy 後の smoke failure | 「公開済み・確認未完了」として記録し、以降の production 操作を停止する。一時障害は owner が [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) を main から実行し、Cloudflare identity と両 URL の application・editor smoke を再確認する。内容不良は新しい修正 version を公開する |
+| Deploy 後の smoke failure | 「公開済み・確認未完了」として記録し、以降の production 操作を停止する。一時障害は owner が [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) を main から実行し、Cloudflare identity と両 URL の application・editor smoke を再確認する。内容不良で smoke が恒久的に失敗する場合、現行 workflow は修正版の release と rollback を拒否する。owner が current identity と記録を調査し、復旧入口を整えるまで新しい公開を開始しない |
 | rollback の current deployment ID が accepted target と異なる | Native API の応答を成功と扱わず「切替済み・確認未完了」を記録する。Ledger を unverified にして release / rollback を止め、owner が current identity を調査する |
-| GitHub issue record 書込みに失敗 | unresolved intent が後続 deploy を止める。Rollback は intent に記録した accepted target ID / URL と current API identity を [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) で照合・smoke できる。Release の切替後に upload identity を ledger へ記録できなかった場合は SHA だけで accepted にせず、intent を残して owner が手動調査する |
+| GitHub Deployment record 書込みに失敗 | `production-records` の履歴を上記コマンドで確認する。Unresolved intent が後続 deploy を止める。Rollback は intent に記録した accepted target ID / URL と current API identity を [Reconcile Cloudflare production intent](https://github.com/herehigher/resume/actions/workflows/reconcile-production.yml) で照合・smoke できる。Release の切替後に upload identity を ledger へ記録できなかった場合は SHA だけで accepted にせず、intent を残して owner が手動調査する |
 | 公開内容の修正 | 修正 PR と新しい version を用意。既存 tag を変更しない |
 
 ### 前のバージョンへ戻す
