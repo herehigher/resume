@@ -28,22 +28,24 @@ function japaneseDate(value) {
 function residenceInformation(fields) {
   const restrictionLabel = { none: 'なし', restricted: 'あり' }[fields.workRestriction] || '';
   return [
-    ['在留資格', String(fields.residenceStatus ?? '').trim()],
-    ['就労制限の有無', restrictionLabel],
-    ['在留期間（満了日）', japaneseDate(fields.residenceExpiryDate)]
-  ].filter(([, value]) => hasContent(value));
+    { label: '在留資格', resumeLabel: '在留資格', value: String(fields.residenceStatus ?? '').trim() },
+    { label: '就労制限の有無', resumeLabel: '就労制限', value: restrictionLabel },
+    { label: '在留期間（満了日）', resumeLabel: '在留期間（満了日）', value: japaneseDate(fields.residenceExpiryDate) }
+  ].filter(({ value }) => hasContent(value));
 }
 
-function renderResidenceRows(fields) {
-  return residenceInformation(fields).map(([label, value]) => (
-    `<div><span class="paper-label">${escapeHTML(label)}</span><span class="paper-value full-contact">${escapeHTML(value)}</span></div>`
-  )).join('');
+function renderResidenceRow(fields) {
+  const entries = residenceInformation(fields);
+  if (!entries.length) return '';
+  return `<div><span class="paper-label">在留情報</span><span class="paper-value full-contact residence-info-value">${entries.map(({ resumeLabel, value }) => (
+    `<span class="residence-info-item">${escapeHTML(resumeLabel)}：${escapeHTML(value)}</span>`
+  )).join('')}</span></div>`;
 }
 
 function renderCareerResidenceInformation(fields) {
-  const rows = residenceInformation(fields);
-  if (!rows.length) return '';
-  return `<br>${rows.map(([label, value]) => `${escapeHTML(label)}：${escapeHTML(value)}`).join('<br>')}`;
+  const entries = residenceInformation(fields);
+  if (!entries.length) return '';
+  return `<br>${entries.map(({ label, value }) => `${escapeHTML(label)}：${escapeHTML(value)}`).join('<br>')}`;
 }
 
 function japaneseMonth(value) {
@@ -139,7 +141,7 @@ export function renderJapaneseResume(state, { photoUrl = '' } = {}) {
         <div><span class="paper-label">電話</span><span class="paper-value full-contact">${displayText(fields.phone)}</span></div>
         <div><span class="paper-label">E-mail</span><span class="paper-value full-contact">${displayText(fields.email)}</span></div>
         ${hasContent(fields.nationality) ? `<div><span class="paper-label">国籍</span><span class="paper-value full-contact">${escapeHTML(fields.nationality)}</span></div>` : ''}
-        ${renderResidenceRows(fields)}
+        ${renderResidenceRow(fields)}
       </section>
       ${renderResumeProfiles(fields)}
       <section class="paper-section" data-section-key="history">

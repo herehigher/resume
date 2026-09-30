@@ -199,7 +199,11 @@ test('日本語: 在留情報は任意入力で、履歴書・職務経歴書の
   const residenceExpiryDate = page.locator('#resumeForm [name="residenceExpiryDate"]');
 
   await expect(residenceStatus).toBeVisible();
+  const countResidenceRows = () => page.locator('.resume-contact > div').evaluateAll((rows) => (
+    rows.filter((row) => row.querySelector('.paper-label')?.textContent?.trim() === '在留情報').length
+  ));
   await expect(page.locator('.resume-contact')).not.toContainText('在留資格');
+  expect(await countResidenceRows()).toBe(0);
   await expect(page.locator('.resume-contact')).not.toContainText('就労制限の有無');
   await expect(page.locator('.resume-contact')).not.toContainText('在留期間（満了日）');
 
@@ -208,11 +212,14 @@ test('日本語: 在留情報は任意入力で、履歴書・職務経歴書の
   await workRestriction.selectOption('restricted');
   await residenceExpiryDate.fill('2028-02-29');
   await expect(page.locator('.resume-contact')).toContainText(longStatus);
+  await expect(page.locator('.resume-contact')).toContainText('在留情報');
   await expect(page.locator('.resume-contact')).toContainText('あり');
   await expect(page.locator('.resume-contact')).toContainText('2028年2月29日');
+  expect(await countResidenceRows()).toBe(1);
+  await expect(page.locator('.resume-contact .residence-info-item')).toHaveCount(3);
 
   const desktopGeometry = await screenGeometry(page, '.resume-document');
-  const valueWrap = await page.locator('.resume-contact .paper-value').last().evaluate((value) => getComputedStyle(value).overflowWrap);
+  const valueWrap = await page.locator('.resume-contact .residence-info-item').first().evaluate((value) => getComputedStyle(value).overflowWrap);
   expect(valueWrap).toBe('anywhere');
   await page.emulateMedia({ media: 'print' });
   const resumePdf = await inspectPdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
@@ -223,7 +230,8 @@ test('日本語: 在留情報は任意入力で、履歴書・職務経歴書の
   ]));
   const resumePdfText = normalizePdfText(resumePdf.flatMap((item) => item.items).map((item) => item.str).join(''));
   expect(resumePdfText).toContain(normalizePdfText(longStatus));
-  expect(resumePdfText).toContain(normalizePdfText('就労制限の有無'));
+  expect(resumePdfText).toContain(normalizePdfText('在留情報'));
+  expect(resumePdfText).toContain(normalizePdfText('就労制限'));
   expect(resumePdfText).toContain(normalizePdfText('在留期間（満了日）'));
   expect(resumePdfText).toContain(normalizePdfText('2028年2月29日'));
 
@@ -267,6 +275,8 @@ test('日本語: 在留情報は任意入力で、履歴書・職務経歴書の
   await residenceStatus.fill('');
   await workRestriction.selectOption('');
   await residenceExpiryDate.fill('');
+  expect(await countResidenceRows()).toBe(0);
+  await expect(page.locator('.resume-contact')).not.toContainText('在留情報');
   await expect(page.locator('.resume-contact')).not.toContainText('在留資格');
   await expect(page.locator('.resume-contact')).not.toContainText('就労制限の有無');
   await expect(page.locator('.resume-contact')).not.toContainText('在留期間（満了日）');
