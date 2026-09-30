@@ -7,6 +7,11 @@ on:
         description: Accepted prior Cloudflare production release
         required: true
         type: string
+      recover_unverified_release:
+        description: Explicitly recover a switched release whose smoke verification failed
+        required: true
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -43,6 +48,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
           TARGET_TAG: ${{ inputs.target_tag }}
+          RECOVER_UNVERIFIED_RELEASE: ${{ inputs.recover_unverified_release }}
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
         run: node scripts/production-state.mjs start-rollback
 

@@ -212,6 +212,84 @@ test('a rollback that reaches matching source bytes under a different deployment
   const ledger = resolveProductionRecordLedger(records);
   assert.equal(ledger.active.status, 'unverified');
   assert.equal(ledger.active.deploymentId, UUID_3);
+  assert.equal(ledger.active.unverifiedOrigin, 'rollback');
+});
+
+test('an exact unverified release can roll back to an earlier accepted deployment', () => {
+  const records = baselineRecords();
+  records.push(record({ sequence: 3 }));
+  records.push(record({
+    sequence: 4, event: 'release_unverified', deploymentId: UUID_3,
+    deploymentUrl: 'https://aaaaaaaa.herehigher-rs.pages.dev/',
+    currentDeploymentId: UUID_3, currentDeploymentUrl: 'https://aaaaaaaa.herehigher-rs.pages.dev/'
+  }));
+  const unverified = resolveProductionRecordLedger(records);
+  assert.equal(unverified.active.unverifiedOrigin, 'release');
+  const previous = HISTORICAL_ACCEPTED_RELEASES[1];
+  records.push(record({
+    sequence: 5, event: 'rollback_started', workflow: 'rollback-production.yml',
+    runId: '50000000010', recordedByRunId: '50000000010', recordedByWorkflow: 'rollback-production.yml',
+    tag: previous.tag, sourceSha: previous.sourceSha, artifactDigest: previous.artifactDigest,
+    deploymentId: previous.deploymentId, deploymentUrl: previous.deploymentUrl,
+    fromDeploymentId: UUID_3, currentDeploymentId: UUID_3,
+    currentDeploymentUrl: 'https://aaaaaaaa.herehigher-rs.pages.dev/'
+  }));
+  assert.equal(resolveProductionRecordLedger(records, { allowPending: true }).pending.operation, 'rollback');
+  records.push(record({
+    ...records[4], sequence: 6, event: 'rollback_completed',
+    currentDeploymentId: previous.deploymentId, currentDeploymentUrl: previous.deploymentUrl
+  }));
+  const completed = resolveProductionRecordLedger(records);
+  assert.equal(completed.active.status, 'rollback_completed');
+  assert.equal(completed.active.deploymentId, previous.deploymentId);
+  assert.equal(completed.latestRollbackRunId, '50000000010');
+});
+
+test('a release remains eligible for explicit rollback after a failed verification retry', () => {
+  const records = baselineRecords();
+  const url = 'https://aaaaaaaa.herehigher-rs.pages.dev/';
+  records.push(record({ sequence: 3 }));
+  records.push(record({
+    sequence: 4, event: 'release_unverified', deploymentId: UUID_3,
+    deploymentUrl: url, currentDeploymentId: UUID_3, currentDeploymentUrl: url
+  }));
+  records.push(record({
+    sequence: 5, event: 'production_verification_started', workflow: 'reconcile-production.yml',
+    runId: '50000000005', recordedByRunId: '50000000005', recordedByWorkflow: 'reconcile-production.yml',
+    deploymentId: UUID_3, deploymentUrl: url, fromDeploymentId: UUID_3,
+    currentDeploymentId: UUID_3, currentDeploymentUrl: url
+  }));
+  records.push(record({
+    ...records[4], sequence: 6, event: 'production_verification_unverified'
+  }));
+  const afterRetry = resolveProductionRecordLedger(records);
+  assert.equal(afterRetry.active.status, 'unverified');
+  assert.equal(afterRetry.active.unverifiedOrigin, 'release');
+  const target = HISTORICAL_ACCEPTED_RELEASES[1];
+  records.push(record({
+    sequence: 7, event: 'rollback_started', workflow: 'rollback-production.yml',
+    runId: '50000000010', recordedByRunId: '50000000010', recordedByWorkflow: 'rollback-production.yml',
+    tag: target.tag, sourceSha: target.sourceSha, artifactDigest: target.artifactDigest,
+    deploymentId: target.deploymentId, deploymentUrl: target.deploymentUrl,
+    fromDeploymentId: UUID_3, currentDeploymentId: UUID_3, currentDeploymentUrl: url
+  }));
+  assert.equal(resolveProductionRecordLedger(records, { allowPending: true }).pending.operation, 'rollback');
+});
+
+test('an unverified rollback cannot begin another rollback', () => {
+  const records = rollbackRecords();
+  records[3] = { ...records[3], event: 'rollback_unverified' };
+  const target = HISTORICAL_ACCEPTED_RELEASES[1];
+  records.push(record({
+    sequence: 5, event: 'rollback_started', workflow: 'rollback-production.yml',
+    runId: '50000000011', recordedByRunId: '50000000011', recordedByWorkflow: 'rollback-production.yml',
+    tag: target.tag, sourceSha: target.sourceSha, artifactDigest: target.artifactDigest,
+    deploymentId: target.deploymentId, deploymentUrl: target.deploymentUrl,
+    fromDeploymentId: HISTORICAL_ACCEPTED_RELEASES[0].deploymentId,
+    currentDeploymentId: HISTORICAL_ACCEPTED_RELEASES[0].deploymentId,
+    currentDeploymentUrl: HISTORICAL_ACCEPTED_RELEASES[0].deploymentUrl
+  }));
+  assert.throws(() => resolveProductionRecordLedger(records, { allowPending: true }), /only an unverified release/);
 });
 
 test('an old queued release cannot add an intent after a later rollback', () => {
