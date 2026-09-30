@@ -49,9 +49,9 @@
 .resume-contact > div:first-child { border-top: 0; }
 .resume-contact .paper-label { align-items: center; background: var(--ja-fill-label); border-right: .5pt solid var(--ja-line-default); display: flex; }
 .resume-contact .paper-value { align-items: center; display: flex; min-width: 0; overflow-wrap: anywhere; }
-.resume-contact .residence-info-value { align-content: center; flex-wrap: wrap; gap: 3px 10px; }
-.residence-info-item { min-width: 0; overflow-wrap: anywhere; }
-.residence-info-item + .residence-info-item::before { color: var(--ja-muted); content: "／ "; }
+.resume-contact .residence-info-value { display: block; }
+.residence-info-item { display: block; overflow-wrap: anywhere; }
+.residence-info-item + .residence-info-item { margin-top: 2px; }
 .resume-links { align-items: start; border: .75pt solid var(--ja-line-strong); border-top: 0; display: grid; grid-template-columns: var(--ja-key-column) minmax(0, 1fr); margin: 0 0 16px; }
 .resume-links-label { align-items: center; align-self: stretch; background: var(--ja-fill-label); border-right: .5pt solid var(--ja-line-default); color: var(--ja-accent); display: flex; font-size: 11.5px; font-weight: 700; padding: 8px 12px; }
 .resume-links-list { display: grid; gap: 4px; min-width: 0; padding: 8px 14px; }

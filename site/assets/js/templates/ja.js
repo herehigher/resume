@@ -28,17 +28,17 @@ function japaneseDate(value) {
 function residenceInformation(fields) {
   const restrictionLabel = { none: 'なし', restricted: 'あり' }[fields.workRestriction] || '';
   return [
-    { label: '在留資格', resumeLabel: '在留資格', value: String(fields.residenceStatus ?? '').trim() },
-    { label: '就労制限の有無', resumeLabel: '就労制限', value: restrictionLabel },
-    { label: '在留期間（満了日）', resumeLabel: '在留期間（満了日）', value: japaneseDate(fields.residenceExpiryDate) }
+    { label: '在留資格', value: String(fields.residenceStatus ?? '').trim() },
+    { label: '就労制限の有無', value: restrictionLabel },
+    { label: '在留期間（満了日）', value: japaneseDate(fields.residenceExpiryDate) }
   ].filter(({ value }) => hasContent(value));
 }
 
 function renderResidenceRow(fields) {
   const entries = residenceInformation(fields);
   if (!entries.length) return '';
-  return `<div><span class="paper-label">在留情報</span><span class="paper-value full-contact residence-info-value">${entries.map(({ resumeLabel, value }) => (
-    `<span class="residence-info-item">${escapeHTML(resumeLabel)}：${escapeHTML(value)}</span>`
+  return `<div><span class="paper-label">${escapeHTML(entries[0].label)}</span><span class="paper-value full-contact residence-info-value">${entries.map(({ label, value }, index) => (
+    `<span class="residence-info-item">${index === 0 ? escapeHTML(value) : `${escapeHTML(label)}：${escapeHTML(value)}`}</span>`
   )).join('')}</span></div>`;
 }
 
