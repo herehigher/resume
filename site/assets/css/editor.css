@@ -75,6 +75,10 @@
 .two-columns { grid-template-columns: 1fr 1fr; }
 .three-columns { grid-template-columns: 1.2fr .8fr 1.2fr; }
 .postal-grid { grid-template-columns: .8fr 1.6fr; }
+.residence-fields-section { display: grid; gap: 10px; padding-top: 3px; }
+.residence-fields-title { color: #526076; font-size: 10px; font-weight: 750; margin: 0; }
+.residence-fields-grid { min-width: 0; }
+.residence-fields-section .field-help { margin: -4px 0 0; }
 
 .input-field { display: block; min-width: 0; }
 .input-field > span { color: #526076; display: block; font-size: 9px; font-weight: 750; margin: 0 0 6px 1px; }

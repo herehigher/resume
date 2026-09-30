@@ -132,8 +132,21 @@ function resolvePointer(root, reference) {
   return reference.slice(1).split('/').filter(Boolean).reduce((value, part) => value[part], root);
 }
 
+function hasValidCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysByMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysByMonth[month - 1];
+}
+
 function validateSchema(schema, value, pointer = '#', root = schema) {
   if (schema.$ref) return validateSchema(resolvePointer(root, schema.$ref), value, schema.$ref, root);
+  if (schema.anyOf) return schema.anyOf.some((candidate) => validateSchema(candidate, value, pointer, root));
   if (schema.const !== undefined && value !== schema.const) return false;
   if (schema.enum && !schema.enum.includes(value)) return false;
   if (schema.type === 'object') {
@@ -149,7 +162,9 @@ function validateSchema(schema, value, pointer = '#', root = schema) {
     && (!schema.uniqueItems || new Set(value.map((item) => JSON.stringify(item))).size === value.length)
     && (!schema['x-resume-studio-uniqueBy'] || new Set(value.map((item) => item?.[schema['x-resume-studio-uniqueBy']])).size === value.length)
     && value.every((item) => validateSchema(schema.items, item, `${pointer}/items`, root));
-  if (schema.type === 'string') return typeof value === 'string' && (!schema.pattern || new RegExp(schema.pattern).test(value));
+  if (schema.type === 'string') return typeof value === 'string'
+    && (!schema.pattern || new RegExp(schema.pattern).test(value))
+    && (schema.format !== 'date' || hasValidCalendarDate(value));
   return true;
 }
 
@@ -422,6 +437,32 @@ test('published JSON Schema accepts exports and rejects primary invalid values',
   delete missingOptionalPersonalDetails.documents.en.resume.showOptionalPersonalDetails;
   assert.equal(validateSchema(schema, missingOptionalPersonalDetails), false);
   assert.equal(validateState(missingOptionalPersonalDetails).valid, false);
+
+  const earlierV4ResidenceShape = structuredClone(example);
+  for (const key of ['residenceStatus', 'workRestriction', 'residenceExpiryDate']) {
+    delete earlierV4ResidenceShape.documents.ja.fields[key];
+  }
+  assert.equal(validateSchema(schema, earlierV4ResidenceShape), true);
+  assert.equal(validateState(earlierV4ResidenceShape).valid, true);
+  const importedEarlierV4 = parseImportedState(JSON.stringify(earlierV4ResidenceShape));
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, importedEarlierV4.documents.ja.fields[key]])),
+    { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' }
+  );
+
+  const unsupportedWorkRestriction = structuredClone(example);
+  unsupportedWorkRestriction.documents.ja.fields.workRestriction = 'unknown';
+  assert.equal(validateSchema(schema, unsupportedWorkRestriction), false);
+  assert.equal(validateState(unsupportedWorkRestriction).valid, false);
+
+  const invalidResidenceExpiryDate = structuredClone(example);
+  invalidResidenceExpiryDate.documents.ja.fields.residenceExpiryDate = '2026/09/30';
+  assert.equal(validateSchema(schema, invalidResidenceExpiryDate), false);
+  assert.equal(validateState(invalidResidenceExpiryDate).valid, false);
+
+  invalidResidenceExpiryDate.documents.ja.fields.residenceExpiryDate = '2026-02-29';
+  assert.equal(validateSchema(schema, invalidResidenceExpiryDate), false);
+  assert.equal(validateState(invalidResidenceExpiryDate).valid, false);
 
   const unsafePhoto = structuredClone(example);
   unsafePhoto.profile.photo = 'https://example.test/photo.png';

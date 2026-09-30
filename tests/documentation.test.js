@@ -87,8 +87,11 @@ test('release version has one source of truth and a dated changelog entry', () =
 
 test('release instructions keep asset promotion and publication on the full verified path', () => {
   const playbook = readFileSync(path.join(root, 'docs/release-playbook.md'), 'utf8');
-  assert.match(playbook, /## 公開の全体像/);
+  assert.match(playbook, /## 実行入口を選ぶ/);
   assert.match(playbook, /## 通常公開の実行手順/);
+  assert.match(playbook, /## Production の状態を照合する/);
+  assert.match(playbook, /## 前のバージョンへ戻す/);
+  assert.match(playbook, /## 自動化の契約（参照）/);
   assert.match(playbook, /`docs\/screenshots\/\{en,ja,zh-CN\}\.png` の3 file/);
   assert.match(playbook, /`output\/pdf\/\{en-letter,ja-a4,zh-CN-a4\}\.pdf` の3 file/);
   assert.match(playbook, /`docs\/assets-manifest\.json` の計7 fileだけ/);
@@ -96,24 +99,25 @@ test('release instructions keep asset promotion and publication on the full veri
   assert.match(playbook, /最終 PR head の `Quality` を成功/);
   assert.match(playbook, /候補 asset を生成・取り込み/);
   assert.match(playbook, /候補生成 workflow/);
-  assert.match(playbook, /full Quality 2回/);
-  assert.match(playbook, /run.*attempt.*artifact.*digest/);
+  assert.match(playbook, /公開 PR と merge 結果の `main` で full Quality/);
+  assert.match(playbook, /run ID・attempt、artifact ID・digest/);
   assert.match(playbook, /導入 PR.*main/);
   assert.match(playbook, /Version を変えない PR で展示 asset を変更してはいけません/);
-  assert.match(playbook, /promotion 元 artifact の exact bytes/);
-  assert.match(playbook, /同じ job が fresh に生成した artifact/);
-  assert.match(playbook, /Release eligibility[\s\S]*通常の main 更新[\s\S]*`Release production` の run を作りません/);
-  assert.match(playbook, /immutable tag[\s\S]*単一の artifact[\s\S]*Cloudflare preview smoke[\s\S]*production Direct Upload[\s\S]*Pages\.dev と custom domain/);
-  assert.match(playbook, /production branch `main`[\s\S]*認可済み tag \/ SHA と artifact/);
+  assert.match(playbook, /commit 済み7 file と候補 artifact の exact bytes/);
+  assert.match(playbook, /fresh に生成した version・site・generator・browser・PDF・screenshot/);
+  assert.match(playbook, /`Release eligibility` は official main Quality[\s\S]*通常の main 更新では `Release production` を開始しません/);
+  assert.match(playbook, /Preview branch への Direct Upload と smoke が成功してから production へ upload/);
+  assert.match(playbook, /公開 source は承認済み tag・SHA・artifact で固定/);
   assert.doesNotMatch(playbook, /まだ GitHub Pages の deployment action/);
   assert.match(playbook, /#251 の live hosting 完了判定/);
-  assert.match(playbook, /Pages\.dev と custom domain の双方/);
+  assert.match(playbook, /Pages\.dev と custom domain の application・online editor smoke/);
   assert.match(playbook, /Accept existing Cloudflare production baseline[\s\S]+6968466e-88e8-4156-94e7-39d81a45add8[\s\S]+571384f3-3869-46d3-9af3-80c364bc1ef2/);
   assert.match(playbook, /Roll back Cloudflare production[\s\S]+current `latest_deployment\.id` が accepted target UUID/);
-  assert.match(playbook, /切替済み・確認未完了/);
+  assert.match(playbook, /`production_verification_unverified`[\s\S]*直近の verification より前の `release_unverified`/);
+  assert.match(playbook, /UUID 不一致、不明な current identity、記録の欠落は\[停止して調査\]/);
   assert.match(playbook, /github-pages` environment は削除済み/);
   assert.match(playbook, /issuecomment-5889977750/);
-  assert.match(playbook, /Release の切替後に upload identity を ledger へ記録できなかった場合は SHA だけで accepted にせず/);
+  assert.match(playbook, /切替後の release の upload identity を記録できなかった場合、SHA だけで accepted にしません/);
 });
 
 test('the public v4 JSON example remains importable under the runtime data contract', () => {

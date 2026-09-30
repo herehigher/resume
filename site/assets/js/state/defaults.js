@@ -58,7 +58,10 @@ export function createJapaneseDocument() {
       requests: '',
       careerSummary: '',
       skills: '',
-      selfPromotion: ''
+      selfPromotion: '',
+      residenceStatus: '',
+      workRestriction: '',
+      residenceExpiryDate: ''
     },
     education: [{ date: '', detail: '' }],
     employment: [{ date: '', detail: '' }],
@@ -151,7 +154,10 @@ export function createJapaneseSampleState(sourceState) {
       requests: '貴社規定に従います。',
       careerSummary: '大学卒業後、ITサービス企業にて**法人向けプロダクトの企画・運営**に従事してきました。顧客課題の分析、要件定義、開発チームとの連携、リリース後の改善まで一貫して担当しています。直近では5名のチームをリードし、主要指標を前年比125%まで改善しました。',
       skills: '- プロダクト企画、要件定義、ロードマップ策定\n- データ分析、KPI設計、ユーザーインタビュー\n- プロジェクト管理、チームマネジメント\n- 英語：ビジネスレベル',
-      selfPromotion: '**課題を構造化し、チームで成果に結び付ける推進力**が私の強みです。現職では、次の手順で改善を進めました。\n\n1. 利用データと顧客インタビューから離脱要因を特定\n2. 開発・営業・サポートと施策を設計・実行\n\nその結果、3か月で継続率を18ポイント改善しました。'
+      selfPromotion: '**課題を構造化し、チームで成果に結び付ける推進力**が私の強みです。現職では、次の手順で改善を進めました。\n\n1. 利用データと顧客インタビューから離脱要因を特定\n2. 開発・営業・サポートと施策を設計・実行\n\nその結果、3か月で継続率を18ポイント改善しました。',
+      residenceStatus: '',
+      workRestriction: '',
+      residenceExpiryDate: ''
     },
     education: [
       { date: '2011-04', detail: '○○大学 ○○学部 入学' },
