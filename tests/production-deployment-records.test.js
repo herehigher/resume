@@ -260,8 +260,7 @@ test('a release remains eligible for explicit rollback after a failed verificati
     currentDeploymentId: UUID_3, currentDeploymentUrl: url
   }));
   records.push(record({
-    ...records[4], sequence: 6, event: 'production_verification_unverified',
-    recordedByRunId: '50000000006'
+    ...records[4], sequence: 6, event: 'production_verification_unverified'
   }));
   const afterRetry = resolveProductionRecordLedger(records);
   assert.equal(afterRetry.active.status, 'unverified');
