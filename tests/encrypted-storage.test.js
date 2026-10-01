@@ -129,6 +129,49 @@ test('draft ciphertext contains no fixture name or email and reload restores it'
   assert.deepEqual(restored.settings.pageBreaks.en.LETTER.resume.sections, ['summary', 'experience']);
 });
 
+test('encrypted older v4 drafts load residence defaults without rewriting their raw value', async () => {
+  const original = createDefaultState('ja');
+  for (const key of ['residenceStatus', 'workRestriction', 'residenceExpiryDate']) {
+    delete original.documents.ja.fields[key];
+  }
+  original.profile.fields.fullName = 'Fictional Older Draft';
+  const storage = memoryStorage();
+  const keyStore = memoryKeyStore();
+  const writer = persistence(storage, keyStore);
+
+  await writer.save(original);
+  const originalRaw = storage.getItem(STORAGE_KEY);
+  const restored = await persistence(storage, keyStore).load();
+
+  assert.equal(restored.profile.fields.fullName, 'Fictional Older Draft');
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, restored.documents.ja.fields[key]])),
+    { residenceStatus: '', workRestriction: '', residenceExpiryDate: '' }
+  );
+  assert.equal(storage.getItem(STORAGE_KEY), originalRaw, 'reading an older encrypted v4 draft leaves the stored raw value untouched');
+  assert.equal(Object.hasOwn(original.documents.ja.fields, 'residenceStatus'), false);
+});
+
+test('Japanese residence values stay encrypted and survive draft reload', async () => {
+  const state = createDefaultState('ja');
+  Object.assign(state.documents.ja.fields, {
+    residenceStatus: '架空の在留資格',
+    workRestriction: 'restricted',
+    residenceExpiryDate: '2028-02-29'
+  });
+  const storage = memoryStorage();
+  const keyStore = memoryKeyStore();
+  await persistence(storage, keyStore).save(state);
+  const raw = storage.getItem(STORAGE_KEY);
+  assert.doesNotMatch(raw, /架空の在留資格|2028-02-29/);
+
+  const restored = await persistence(storage, keyStore).load();
+  assert.deepEqual(
+    Object.fromEntries(['residenceStatus', 'workRestriction', 'residenceExpiryDate'].map((key) => [key, restored.documents.ja.fields[key]])),
+    { residenceStatus: '架空の在留資格', workRestriction: 'restricted', residenceExpiryDate: '2028-02-29' }
+  );
+});
+
 test('a plaintext current-version draft is encrypted only after persistence succeeds', async () => {
   const original = createDefaultState('ja');
   original.profile.fields.fullName = 'Migration Fixture';

@@ -212,12 +212,16 @@ export function resolveProductionRecordLedger(inputRecords, { historical = HISTO
         pending = { operation: 'verification', record };
       } else if (record.event === 'release_started') {
         if (record.workflow !== 'release.yml' || record.recordedByWorkflow !== 'release.yml') fail('release operation workflow identity is invalid');
+        if (active.status === 'unverified') fail('an unverified deployment cannot start a release');
         if (latestRollbackRunId && BigInt(record.runId) <= BigInt(latestRollbackRunId)) {
           fail('release run started before or during a later rollback and cannot overwrite it');
         }
         pending = { operation: 'release', record };
       } else if (record.event === 'rollback_started') {
         if (record.workflow !== 'rollback-production.yml' || record.recordedByWorkflow !== 'rollback-production.yml') fail('rollback operation workflow identity is invalid');
+        if (active.status === 'unverified' && active.unverifiedOrigin !== 'release') {
+          fail('only an unverified release can be recovered by rollback');
+        }
         const target = accepted.find((item) => item.tag === record.tag && item.sourceSha === record.sourceSha
           && item.deploymentId === record.deploymentId && item.deploymentUrl === record.deploymentUrl);
         if (!target || target.deploymentId === active.deploymentId) fail('rollback target is not a previously accepted production deployment');
@@ -277,7 +281,7 @@ export function resolveProductionRecordLedger(inputRecords, { historical = HISTO
       }
       active = { tag: record.tag, sourceSha: record.sourceSha, deploymentId: record.currentDeploymentId,
         deploymentUrl: record.currentDeploymentUrl, acceptedDeploymentId: record.deploymentId,
-        artifactDigest: record.artifactDigest, status: 'unverified' };
+        artifactDigest: record.artifactDigest, status: 'unverified', unverifiedOrigin: 'release' };
     } else if (record.event === 'rollback_completed') {
       if (record.workflow !== 'rollback-production.yml' || record.currentDeploymentId !== record.deploymentId
         || record.currentDeploymentUrl !== record.deploymentUrl) {
@@ -293,7 +297,7 @@ export function resolveProductionRecordLedger(inputRecords, { historical = HISTO
       }
       active = { ...pending.target, deploymentId: record.currentDeploymentId,
         deploymentUrl: record.currentDeploymentUrl, acceptedDeploymentId: pending.target.deploymentId,
-        status: 'unverified' };
+        status: 'unverified', unverifiedOrigin: 'rollback' };
       latestRollbackRunId = record.runId;
     } else if (record.event === 'rollback_failed_before_switch' || record.event === 'rollback_rejected_before_switch') {
       if (record.workflow !== 'rollback-production.yml' || record.currentDeploymentId !== active.deploymentId

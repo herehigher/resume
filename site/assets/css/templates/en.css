@@ -64,6 +64,14 @@
 .en-profile-link-list li { display: block; min-width: 0; }
 .en-url { align-items: baseline; display: grid; gap: 4px; grid-template-columns: auto minmax(0, 1fr); max-width: 100%; min-width: 0; }
 .en-url .profile-link-icon { fill: currentColor; flex: 0 0 auto; height: 11px; width: 11px; }
+.en-url .profile-link-icon--credly,
+.en-url .profile-link-icon--stackoverflow,
+.en-url .profile-link-icon--kaggle,
+.en-url .profile-link-icon--behance,
+.en-url .profile-link-icon--dribbble,
+.en-url .profile-link-icon--orcid,
+.en-url .profile-link-icon--google-scholar,
+.en-url .profile-link-icon--hugging-face { height: 13px; width: 13px; }
 .en-url > span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 
 .english-document a {

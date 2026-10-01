@@ -385,16 +385,17 @@ test('1280pxの入力例モードでは状態文言を1行で表示する', asyn
   await expectNoPageOverflow(page);
 });
 
-test('[mobile] Links は最大3件まで追加・編集・削除でき、横にはみ出さない', async ({ page }) => {
+test('[mobile] profile links は最大3件まで追加・編集・削除でき、Credly アイコンが見える', async ({ page }) => {
   await openLocale(page, 'ja');
   const add = page.locator('#addProfileLinkButton');
   await revealField(add);
-  for (const url of ['https://github.com/mobile-example', 'https://www.linkedin.com/in/mobile-example', 'https://example.test/mobile']) {
+  for (const url of ['https://github.com/mobile-example', 'https://www.linkedin.com/in/mobile-example', 'https://www.credly.com/users/fictional-profile']) {
     await add.click();
     await page.locator('[data-profile-link-index]').last().fill(url);
   }
   await expect(add).toBeDisabled();
   await expect(page.locator('#documentPreview')).toContainText('GitHub');
+  await expect(page.locator('#documentPreview .profile-link-icon--credly')).toHaveCount(1);
   await page.locator('[data-remove-profile-link="1"]').click();
   await expect(page.locator('[data-profile-link-index]')).toHaveCount(2);
   await expect(add).toBeEnabled();

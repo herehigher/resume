@@ -16,7 +16,7 @@
   "documents": {
     "ja": {
       "activeDocument": "resume",
-      "fields": { "nameKana": "えぐざんぷる あべりー", "addressKana": "えぐざんぷるし えぐざんぷるく", "createdDate": "2026-09-01", "motivation": "架空の応募先に合わせた志望動機です。", "requests": "貴社規定に従います。", "careerSummary": "架空の職務要約です。", "skills": "企画、文章作成、プロジェクト進行", "selfPromotion": "架空の自己PRです。" },
+      "fields": { "nameKana": "えぐざんぷる あべりー", "addressKana": "えぐざんぷるし えぐざんぷるく", "createdDate": "2026-09-01", "motivation": "架空の応募先に合わせた志望動機です。", "requests": "貴社規定に従います。", "careerSummary": "架空の職務要約です。", "skills": "企画、文章作成、プロジェクト進行", "selfPromotion": "架空の自己PRです。", "residenceStatus": "", "workRestriction": "", "residenceExpiryDate": "" },
       "education": [{ "date": "2013-04", "detail": "Example University 入学" }],
       "employment": [{ "date": "2017-04", "detail": "Example Works 入社" }],
       "qualification": [{ "date": "2020-06", "detail": "Example Certification 取得", "url": "https://example.test/certification" }],
