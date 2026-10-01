@@ -263,3 +263,31 @@ dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px)
 .privacy-security-actions .primary-button { min-width: 112px; }
 
 @keyframes pulse { 50% { opacity: .35; } }
+
+/* Shared list controls; editor adapters supply existing forms unchanged. */
+.sortable-list-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.sortable-tool, .sortable-action { background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: 11px; min-height: 36px; padding: 6px 9px; }
+.sortable-row { min-width: 0; }
+.sortable-row-heading { align-items: center; background: var(--soft-surface); border: 1px solid var(--line); border-radius: 7px; display: grid; gap: 3px; grid-template-columns: 36px 36px auto minmax(0, 1fr) 36px; margin-bottom: 8px; min-width: 0; padding: 3px; }
+.sortable-handle, .sortable-toggle { background: transparent; border: 0; border-radius: 5px; color: var(--muted); font-size: 18px; height: 36px; padding: 0; width: 36px; }
+.sortable-handle { cursor: grab; }
+.sortable-position { color: var(--muted); font-size: 10px; padding: 0 4px; }
+.sortable-summary { color: var(--ink); font-size: 12px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sortable-actions { position: relative; }
+.sortable-actions > summary { align-items: center; border-radius: 5px; color: var(--muted); cursor: pointer; display: flex; font-size: 20px; height: 36px; justify-content: center; list-style: none; padding: 0; width: 36px; }
+.sortable-actions > summary::-webkit-details-marker { display: none; }
+.sortable-action-buttons { background: #fff; border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 4px 14px #23395622; display: grid; gap: 6px; padding: 8px; position: absolute; right: 0; top: 40px; width: 180px; z-index: 4; }
+.sortable-action-buttons > * { margin: 0; max-width: 100%; min-height: 36px; width: 100%; }
+.sortable-row.is-collapsed > .sortable-row-heading { margin-bottom: 0; }
+.sortable-row-moved > .sortable-row-heading { outline: 2px solid var(--blue); outline-offset: 1px; }
+.sortable-list-tools button:disabled, .sortable-row-heading button:disabled { cursor: default; opacity: .45; }
+.sortable-list-tools button:focus-visible, .sortable-row-heading button:focus-visible, .sortable-actions > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (max-width: 820px) {
+  .sortable-row-heading { grid-template-columns: 44px 44px auto minmax(0, 1fr) 44px; }
+  .sortable-handle, .sortable-toggle, .sortable-actions > summary { height: 44px; width: 44px; }
+  .sortable-tool, .sortable-action-buttons > * { min-height: 44px; }
+  .sortable-action-buttons { top: 48px; }
+}
+@media print {
+  .sortable-list-tools, .sortable-row-heading { display: none !important; }
+}

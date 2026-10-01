@@ -9,23 +9,23 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   let importPending = false;
   const listeners = new Set();
 
-  function notify(type) {
+  function notify(type, details = {}) {
     listeners.forEach((listener) => {
-      listener(state, { type });
+      listener(state, Object.freeze({ ...details, type }));
     });
   }
 
-  function replace(nextState, { persist = false, type = 'replace' } = {}) {
+  function replace(nextState, { persist = false, type = 'replace', eventDetails } = {}) {
     const next = cloneData(assertValidState(nextState));
     if (!persist) {
       state = next;
-      notify(type);
+      notify(type, eventDetails);
       return state;
     }
     return persistence.save(next).then(() => {
       state = next;
       stored = true;
-      notify(type);
+      notify(type, eventDetails);
       return state;
     });
   }
@@ -47,8 +47,13 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     },
     reorderList(target, operation) {
       const next = cloneData(state);
-      if (!applyListReorder(next, target, operation)) return false;
-      replace(next, { type: 'reorder' });
+      const permutation = applyListReorder(next, target, operation);
+      if (!permutation) return false;
+      const eventTarget = Object.freeze(target.key === 'ja.careerDetails'
+        ? { key: target.key, careerId: target.careerId } : { key: target.key });
+      const eventOperation = Object.freeze(operation.type === 'move'
+        ? { type: 'move', from: operation.from, to: operation.to } : { type: 'sort', direction: operation.direction });
+      replace(next, { type: 'reorder', eventDetails: { target: eventTarget, operation: eventOperation, permutation: Object.freeze(permutation) } });
       return true;
     },
     replace,
