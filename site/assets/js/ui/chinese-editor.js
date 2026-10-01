@@ -105,9 +105,9 @@ export function renderChineseEditorShell() {
           <summary><span class="section-number">02</span><span><strong>个人概述</strong><small>用 3–5 行概括经验、方向和优势</small></span><span aria-hidden="true">⌄</span></summary>
           <div class="section-content"><label class="input-field"><span>个人概述</span><textarea data-resume="summary" rows="6" placeholder="概括从业年限、专业领域和代表性成果。"></textarea></label></div>
         </details>
-        ${renderListSection('03', '工作经历', 'experience', '按结束时间自动倒序排列')}
+        ${renderListSection('03', '工作经历', 'experience', '按编辑顺序显示，可自由调整')}
         ${renderListSection('04', '项目经历', 'projects', '突出职责、方法和可量化结果')}
-        ${renderListSection('05', '教育经历', 'education', '按结束时间自动倒序排列')}
+        ${renderListSection('05', '教育经历', 'education', '按编辑顺序显示，可自由调整')}
         <details class="form-section">
           <summary><span class="section-number">06</span><span><strong>专业技能</strong><small>按类别组织工具、方法与语言能力</small></span><span aria-hidden="true">⌄</span></summary>
           <div class="section-content"><label class="input-field"><span>专业技能</span><textarea data-resume="skills" rows="7"></textarea></label></div>

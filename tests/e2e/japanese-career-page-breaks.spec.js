@@ -118,8 +118,9 @@ test('[mobile][mobile-webkit] Japanese career editor remains reachable without l
   await openLocale(page, 'ja');
   await importJapaneseState(page, createCareerState());
   await page.locator('#careerDocumentTab').click();
-  const header = page.locator('.career-editor-item').first().locator('.career-item-header');
+  const header = page.locator('.career-editor-item').first().locator(':scope > .sortable-row-heading');
   await expect(header.locator('[data-career-layout-controls], [data-career-layout]')).toHaveCount(0);
+  await header.locator('.sortable-actions > summary').click();
   await expect(header.locator('.remove-career-button')).toBeVisible();
   await expectNoPageOverflow(page);
 });

@@ -118,3 +118,9 @@ export async function expectNoPageOverflow(page) {
     document.documentElement.scrollWidth <= document.documentElement.clientWidth
   ))).toBe(true);
 }
+
+export async function clickListAction(action) {
+  const menu = action.locator('xpath=ancestor::details[contains(@class, "sortable-actions")][1]');
+  if (await menu.getAttribute('open') === null) await menu.locator(':scope > summary').click();
+  await action.click();
+}

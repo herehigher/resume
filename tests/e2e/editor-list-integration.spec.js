@@ -22,7 +22,7 @@ function fixture() {
   return state;
 }
 async function seed(page, state = fixture()) {
-  await page.addInitScript(({ key, state }) => localStorage.setItem(key, JSON.stringify(state)), { key: DRAFT_STORAGE_KEY, state });
+  await page.addInitScript(({ key, state }) => { if (!sessionStorage.getItem('fictitious-list-seeded')) { localStorage.setItem(key, JSON.stringify(state)); sessionStorage.setItem('fictitious-list-seeded', 'true'); } }, { key: DRAFT_STORAGE_KEY, state });
 }
 function heading(row) { return row.locator(':scope > .sortable-row-heading'); }
 async function down(row) {
@@ -75,3 +75,100 @@ test('Japanese company details preserve isolation, copied structure and stable f
   expect(await companies.nth(1).locator('[data-detail-key=content]').evaluateAll((fields) => fields.map((field) => field.value))).toEqual(['', '', '']);
   const ids = await companies.evaluateAll((rows) => rows.map((row) => row.dataset.careerId)); expect(new Set(ids).size).toBe(3);
 });
+
+test('shared links keep the moved identity through delete, encrypted reload and JSON roundtrip', async ({ page }) => {
+  await seed(page); await openLocale(page, 'ja');
+  const container = page.locator('#profileLinksEditor');
+  await container.evaluate((element) => { element.closest('.form-section').open = true; });
+  const rows = container.locator(':scope > .sortable-row');
+  await down(rows.nth(0));
+  await expect(rows.nth(0).locator('[data-profile-link-index="0"]')).toHaveValue('https://fictional.example/second');
+  await rows.nth(0).locator('[data-profile-link-index="0"]').fill('https://fictional.example/edited-second');
+  await heading(rows.nth(0)).locator('.sortable-actions > summary').click();
+  await heading(rows.nth(0)).locator('[data-remove-profile-link]').click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.nth(0).locator('[data-profile-link-index="0"]')).toHaveValue('https://fictional.example/first');
+  await expect(page.locator('#saveStatus')).toContainText('保存済み');
+  await page.reload();
+  await expect(page.locator('#profileLinksEditor [data-profile-link-index="0"]')).toHaveValue('https://fictional.example/first');
+  await page.locator('#localeSelect').selectOption('en');
+  await expect(page.locator('[data-en-profile-links] [data-profile-link-index="0"]')).toHaveValue('https://fictional.example/first');
+  await page.locator('[data-en-add-profile-link]').click();
+  await page.locator('[data-en-add-profile-link]').click();
+  await expect(page.locator('[data-en-add-profile-link]')).toBeDisabled();
+  await page.locator('#dataMenuSummary').click();
+  const downloading = page.waitForEvent('download'); await page.locator('#exportDataButton').click();
+  const stream = await (await downloading).createReadStream(); const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const exported = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  expect(exported.version).toBe(4); expect(exported.profile.fields.links).toEqual(['https://fictional.example/first', '', '']);
+  expect(JSON.stringify(exported)).not.toMatch(/sortState|foldStates|collapsed/);
+  await page.locator('#importDataInput').setInputFiles({ name: 'fictitious-order-roundtrip.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)) });
+  await page.locator('#confirmSampleAdoptButton').click();
+  await expect(page.locator('[data-en-profile-links] [data-profile-link-index="0"]')).toHaveValue('https://fictional.example/first');
+});
+
+test('date sort direction is transient; real date edits reset it without moving entries', async ({ page }) => {
+  await seed(page); await openLocale(page, 'en');
+  const container = page.locator('[data-en-list=certifications]');
+  await container.evaluate((node) => { node.closest('.form-section').open = true; });
+  const tools = container.locator('xpath=preceding-sibling::*[1]');
+  await tools.locator('.sortable-sort').click();
+  const rows = container.locator(':scope > .sortable-row');
+  const before = await rows.locator('.sortable-summary').allTextContents();
+  await rows.nth(0).locator('[data-en-item-field=name]').fill('Fictional revised title');
+  await expect(tools.locator('.sortable-sort')).toContainText('Newest first');
+  await rows.nth(0).locator('[data-en-item-field=date]').fill('2000-01');
+  await expect(tools.locator('.sortable-sort')).toContainText('Custom');
+  expect((await rows.locator('.sortable-summary').allTextContents()).slice(1)).toEqual(before.slice(1));
+  await tools.locator('.sortable-sort').click();
+  await expect(tools.locator('.sortable-sort')).toContainText('Newest first');
+  await page.locator('[data-en-add=certifications]').click();
+  await expect(tools.locator('.sortable-sort')).toContainText('Custom');
+});
+
+test('copying a company with no details uses the untouched default headings', async ({ page }) => {
+  const state = fixture(); state.documents.ja.careers[0].detailSections = [];
+  await seed(page, state); await openLocale(page, 'ja'); await page.locator('[data-document=career]').click();
+  const companies = page.locator('#careerList > .career-editor-item');
+  await heading(companies.nth(0)).locator('.sortable-actions > summary').click();
+  await heading(companies.nth(0)).getByText('この構成で勤務先を追加', { exact: true }).click();
+  expect(await companies.nth(1).locator('[data-detail-key=title]').evaluateAll((fields) => fields.map((field) => field.value))).toEqual(['担当業務', '実績・成果']);
+  await companies.nth(1).locator('[data-detail-key=title]').first().fill('架空の独立した見出し');
+  await expect(companies.nth(0).locator('[data-detail-key=title]')).toHaveCount(0);
+  await expect(companies.nth(2).locator('[data-detail-key=title]').first()).toHaveValue('');
+});
+
+for (const mobile of [false, true]) {
+  test(`Japanese product parent and detail pointer drags remain isolated ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page }) => {
+    await seed(page); await openLocale(page, 'ja'); await page.locator('[data-document=career]').click();
+    const companies = page.locator('#careerList > .career-editor-item');
+    const sourceId = await companies.nth(0).getAttribute('data-career-id');
+    const siblingId = await companies.nth(1).getAttribute('data-career-id');
+    const details = companies.nth(0).locator('[data-career-detail-list] > .career-detail-editor-item');
+    async function dragLast(rows) {
+      const handle = heading(rows.nth(0)).locator('.sortable-handle'); await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      const start = await handle.boundingBox(); const x = start.x + start.width / 2; const y = start.y + start.height / 2;
+      expect(await handle.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), { x, y })).toBe(true);
+      await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 8, y);
+      await expect(page.locator('.sortable-placeholder')).toBeVisible();
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      let target = await rows.last().boundingBox();
+      await page.mouse.move(target.x + target.width / 2, target.y + target.height - 4); await page.waitForTimeout(40);
+      target = await rows.last().boundingBox();
+      await page.mouse.move(target.x + target.width / 2, target.y + target.height - 4); await page.mouse.up();
+      await expect(page.locator('.sortable-placeholder, .sortable-drag-float')).toHaveCount(0);
+    }
+    await dragLast(details);
+    await expect(details.nth(2).locator('[data-detail-key=title]')).toHaveValue('');
+    await expect(companies.nth(0)).toHaveAttribute('data-career-id', sourceId);
+    await expect(companies.nth(1)).toHaveAttribute('data-career-id', siblingId);
+    await expect(companies.nth(1).locator('[data-detail-key=title]').first()).toHaveValue('');
+    await dragLast(companies);
+    await expect(companies.nth(1)).toHaveAttribute('data-career-id', sourceId);
+    await expect(companies.nth(0)).toHaveAttribute('data-career-id', siblingId);
+    await heading(companies.nth(1)).locator('.sortable-toggle').click();
+    await expect(companies.nth(1).locator('[data-career-detail-list] > .career-detail-editor-item').nth(2).locator('[data-detail-key=title]')).toHaveValue('');
+    await expect(companies.nth(1).locator('[data-career-detail-list] > .career-detail-editor-item').nth(0)).toHaveClass(/is-collapsed/);
+  });
+}

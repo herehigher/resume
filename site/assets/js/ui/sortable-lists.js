@@ -106,7 +106,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       for (const [key, entry] of foldStates) {
         const [listKey, careerId] = JSON.parse(key);
         if (listKey === 'ja.careerDetails' && !store.getState().documents.ja.careers.some((career) => career.id === careerId)) {
-          entry.reset(); foldStates.delete(key);
+          entry.reset(); foldStates.delete(key); sortStates.delete(key);
         }
       }
       lists.forEach((list) => { list.refresh(); });
@@ -131,8 +131,9 @@ export function createSortableLists({ store, locale, announce = announceStatus }
     if (sort) {
       tools.append(sort);
       const help = doc.createElement('span'); help.className = 'sortable-sort-help';
-      help.textContent = locale === 'ja' ? '日付で一度だけ整列。後から自由に調整できます。'
-        : locale === 'en' ? 'Sort once by date. You can reorder freely afterwards.' : '按时间排序一次，此后仍可自由调整。';
+      const range = currentInfo().descriptor.dateKind === 'range';
+      help.textContent = locale === 'ja' ? `${range ? '終了年月' : '年月'}で一度だけ整列。後から自由に調整できます。`
+        : locale === 'en' ? `Sort once by ${range ? 'end date' : 'date'}. You can reorder freely afterwards.` : `按${range ? '结束时间' : '时间'}排序一次，此后仍可自由调整。`;
       tools.append(help);
     }
     toolbar.append(tools);
@@ -184,7 +185,8 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       row.toggle.setAttribute('aria-label', `${folds.get(index) ? labels.expand : labels.collapse}: ${summary}`);
       row.toggle.setAttribute('aria-expanded', String(!folds.get(index)));
       setControlIcon(row.chevron, folds.get(index) ? 'right' : 'down');
-      row.meta.textContent = String(getMeta(currentInfo()?.items[index], index) || '');
+      const item = currentInfo()?.items[index];
+      row.meta.textContent = item === undefined ? '' : String(getMeta(item, index) || '');
       row.body.hidden = folds.get(index);
       row.element.classList.toggle('is-collapsed', folds.get(index));
       row.menuToggle.setAttribute('aria-label', `${labels.actions}: ${summary}, ${index + 1}/${rows.length}`);
@@ -321,12 +323,6 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       scheduleSave();
       const current = [...lists].find((list) => list.foldKey === foldKey);
       current?.focusRow(to);
-      const moved = rows[to];
-      if (bound && moved?.element.isConnected) {
-        moved.handle.focus();
-        moved.element.classList.add('sortable-row-moved');
-        highlightTimer = window.setTimeout(() => moved.element.classList.remove('sortable-row-moved'), 500);
-      }
       announce(`${labels.moved(summary, to + 1, count)}${cleared ? ` ${labels.cleared}` : ''}`);
       return true;
     }
