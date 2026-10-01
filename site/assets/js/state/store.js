@@ -45,11 +45,11 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       mutator(next);
       return replace(next, { persist, type });
     },
-    reorderList(target, operation, { persist = false } = {}) {
+    reorderList(target, operation) {
       const next = cloneData(state);
-      if (!applyListReorder(next, target, operation)) return persist ? Promise.resolve(false) : false;
-      const result = replace(next, { persist, type: 'reorder' });
-      return persist ? result.then(() => true) : true;
+      if (!applyListReorder(next, target, operation)) return false;
+      replace(next, { type: 'reorder' });
+      return true;
     },
     replace,
     prepareImport(text) {

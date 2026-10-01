@@ -73,7 +73,8 @@ for (const key of Object.keys(LIST_ORDER_REGISTRY)) {
     const { store, saved, events } = instrumentedStore(state);
     const original = cloneData(store.getState());
     const items = getItems(original);
-    assert.equal(await store.reorderList(target, { type: 'move', from: 0, to: 2 }, { persist: true }), true);
+    assert.equal(store.reorderList(target, { type: 'move', from: 0, to: 2 }), true);
+    await store.save();
     const expected = cloneData(original);
     getItems(expected).splice(0, 3, items[1], items[2], items[0]);
     for (const [locale, documents] of Object.entries(SECTION_REGISTRY)) {
@@ -87,7 +88,7 @@ for (const key of Object.keys(LIST_ORDER_REGISTRY)) {
     }
     assert.deepEqual(store.getState(), expected);
     assert.deepEqual(saved, [expected]);
-    assert.deepEqual(events, [{ state: expected, type: 'reorder' }]);
+    assert.deepEqual(events, [{ state: expected, type: 'reorder' }, { state: expected, type: 'save' }]);
   });
 
   test(`${key}: bounds, same position, empty/single lists never update or save`, async () => {
@@ -100,7 +101,9 @@ for (const key of Object.keys(LIST_ORDER_REGISTRY)) {
       events.length = 0;
       const before = store.getState();
       for (const [from, to] of [[0, 0], [-1, 0], [0, -1], [0, length], [length, 0], [0.5, 1], [0, NaN]]) {
-        assert.equal(await store.reorderList(target, { type: 'move', from, to }, { persist: true }), false);
+        const changed = store.reorderList(target, { type: 'move', from, to });
+        if (changed) await store.save();
+        assert.equal(changed, false);
         assert.equal(store.getState(), before);
       }
       assert.deepEqual(events, []);
@@ -115,7 +118,9 @@ for (const key of Object.keys(LIST_ORDER_REGISTRY)) {
     assert.equal(store.reorderList(target, { type: 'sort', direction: 'newest' }), true);
     assert.deepEqual(getItems(store.getState()), [...getItems(state)].reverse());
     const sorted = store.getState();
-    assert.equal(await store.reorderList(target, { type: 'sort', direction: 'newest' }, { persist: true }), false);
+    const changed = store.reorderList(target, { type: 'sort', direction: 'newest' });
+    if (changed) await store.save();
+    assert.equal(changed, false);
     assert.equal(store.getState(), sorted);
     assert.equal(events.length, 1);
     assert.equal(saved.length, 0);
@@ -139,7 +144,9 @@ for (const key of Object.keys(LIST_ORDER_REGISTRY)) {
       events.length = 0;
       const before = store.getState();
       for (const direction of ['newest', 'oldest']) {
-        assert.equal(await store.reorderList(target, { type: 'sort', direction }, { persist: true }), false);
+        const changed = store.reorderList(target, { type: 'sort', direction });
+        if (changed) await store.save();
+        assert.equal(changed, false);
         assert.equal(store.getState(), before);
       }
       assert.equal(events.length, 0);
@@ -198,7 +205,8 @@ test('reorder uses existing encrypted persistence and retains IDs/order across r
   const keyStore = { async read() { return key; }, async write(value) { key = value; } };
   const persistence = createDraftStorage(storage, { crypto: webcrypto, keyStore });
   const store = createStore({ initialState: state, persistence });
-  assert.equal(await store.reorderList(target, { type: 'move', from: 0, to: 2 }, { persist: true }), true);
+  assert.equal(store.reorderList(target, { type: 'move', from: 0, to: 2 }), true);
+  await store.save();
   const expected = cloneData(store.getState());
   assert.equal(expected.version, 4);
   const raw = values.get(STORAGE_KEY);
@@ -211,16 +219,41 @@ test('reorder uses existing encrypted persistence and retains IDs/order across r
   assert.deepEqual(getItems(imported.getState()).map((entry) => entry.id), ['record_fictional-1', 'record_fictional-2', 'record_fictional-0']);
 });
 
-test('failed/conflicting persistence never commits a reordered state or invalidates pagination undo', async () => {
+test('saving a reorder cannot overwrite later input or a second reorder while persistence waits', async () => {
+  const { state, target, getItems } = listFixture('en.experience');
+  let completeSave;
+  let saved;
+  const store = createStore({ initialState: state, persistence: {
+    save(next) { saved = next; return new Promise((resolve) => { completeSave = resolve; }); }
+  } });
+  assert.equal(store.reorderList(target, { type: 'move', from: 0, to: 2 }), true);
+  const saving = store.save();
+  store.update((next) => { next.profile.fields.fullName = 'Fictitious later edit'; });
+  assert.equal(store.reorderList(target, { type: 'move', from: 0, to: 1 }), true);
+  const latest = store.getState();
+  completeSave();
+  await saving;
+  assert.equal(store.getState(), latest);
+  assert.equal(store.getState().profile.fields.fullName, 'Fictitious later edit');
+  assert.deepEqual(getItems(store.getState()).map((entry) => entry.id), ['record_fictional-2', 'record_fictional-1', 'record_fictional-0']);
+  assert.equal(saved.profile.fields.fullName, '');
+  const nextSave = store.save();
+  completeSave();
+  await nextSave;
+  assert.deepEqual(saved, latest);
+});
+
+test('failed/conflicting saves leave the latest local reorder intact and report the existing persistence error', async () => {
   const { state, target } = listFixture('ja.education');
   for (const code of ['save-failed', 'conflict', 'lock-unavailable']) {
     const store = createStore({ initialState: state, persistence: { async save() { throw new DraftStorageError(code); } } });
-    const before = store.getState();
     const events = [];
     store.subscribe((_next, event) => events.push(event));
-    await assert.rejects(store.reorderList(target, { type: 'move', from: 0, to: 1 }, { persist: true }), DraftStorageError);
-    assert.equal(store.getState(), before);
-    assert.deepEqual(events, []);
+    assert.equal(store.reorderList(target, { type: 'move', from: 0, to: 1 }), true);
+    const reordered = store.getState();
+    await assert.rejects(store.save(), DraftStorageError);
+    assert.equal(store.getState(), reordered);
+    assert.deepEqual(events, [{ type: 'reorder' }]);
   }
 });
 

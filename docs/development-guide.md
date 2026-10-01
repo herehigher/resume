@@ -40,7 +40,7 @@ data format を更新するときは `STATE_VERSION` を増やし、直前 versi
 
 追加可能な項目は保存済みの配列順を編集・preview・PDF・JSON の唯一の順序にします。中文・English の既存 v4 草稿も読み込み時には並べ替えず、その配列順で表示するため、以前の自動日付順とは異なる場合があります。
 
-共通入口は `store.reorderList(target, operation, { persist })` です。`target.key` と移動範囲・対象文書は `state/list-order.js` の `LIST_ORDER_REGISTRY` で14種類を明示します。`ja.careerDetails` は `careerId` で会社ごとの独立リストを選びます。操作は `{ type: 'move', from, to }`（移動後の index）または `{ type: 'sort', direction: 'newest' | 'oldest' }`。同期操作は boolean、`persist: true` は保存成功後の boolean を返します。既存 editor の遅延保存を使う接続側は、戻り値が true のときだけ再描画・保存予約します。
+共通入口は `store.reorderList(target, operation)` です。`target.key` と移動範囲・対象文書は `state/list-order.js` の `LIST_ORDER_REGISTRY` で14種類を明示します。`ja.careerDetails` は `careerId` で会社ごとの独立リストを選びます。操作は `{ type: 'move', from, to }`（移動後の index）または `{ type: 'sort', direction: 'newest' | 'oldest' }`。操作は同期で boolean を返します。接続側は戻り値が true のときだけ再描画し、既存 editor の `scheduleSave` または `store.save()` で保存します。保存待ちの後続入力・再移動を古い state で上書きしません。
 
 日付のある12種類は年月を検証し、単一日付は `date`、期間は終了年月を優先します。終了が空で開始が有効なら「至今」、有効な終了だけでも整列対象とします。同じ終了では開始年月を同方向で比較し、不明な開始は後ろ、不明な終了は全体の末尾、同順位は元の順序を保ちます。空でない不正な終了を「至今」とは扱いません。日付編集後に自動整列しません。
 
