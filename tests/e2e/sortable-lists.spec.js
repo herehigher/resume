@@ -623,7 +623,10 @@ for (const mobile of [false, true]) {
     expect(animations).toEqual({ animation: 'none', transition: '0s' });
     await page.screenshot({ path: `/tmp/resume-272-${testInfo.project.name}-reduced.png` });
     const bottom = await point(targetRows.nth(2));
-    await page.mouse.move(bottom.x, bottom.y + 1); await page.waitForTimeout(40); await page.mouse.up();
+    await page.mouse.move(bottom.x, bottom.y + 1); await page.waitForTimeout(40);
+    // Edge autoscroll can move the compact list away from the old coordinate.
+    const destination = await point(targetRows.nth(2));
+    await page.mouse.move(destination.x, destination.y + 1); await page.mouse.up();
     await cleanDrag(page);
     expect(await page.evaluate(() => sortableHarness.items({ key: 'ja.careers' }).map((item) => item.id))).toEqual(before);
     await expect(targetRows.nth(2).locator(':scope > .sortable-row-heading .sortable-summary')).toHaveText('Fictional detail 0-0');

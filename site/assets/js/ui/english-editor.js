@@ -1,3 +1,4 @@
+import { createEditorLists } from './editor-lists.js';
 import en from '../i18n/en.js';
 import { createEnglishSampleState } from '../data/en-sample.js';
 import { cloneData } from '../state/defaults.js';
@@ -245,6 +246,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   let sampleRequestVersion = 0;
   let shouldPersistDraft = store.hasStoredState();
   let zoom = 1;
+  const sortable = createEditorLists({ store, locale: 'en', scheduleSave, renderPreview, isBlocked: () => importPending });
   const pageBreakControls = initPageBreakControls({
     store, locale: 'en', preview, toolbar: root.querySelector('.preview-toolbar'),
     getDocumentType: () => 'resume', scheduleSave
@@ -294,6 +296,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   }
 
   function renderList(type) {
+    sortable.release({ key: `en.${type}` });
     const container = root.querySelector(`[data-en-list="${type}"]`);
     const items = resume()[type];
     container.replaceChildren();
@@ -302,19 +305,33 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
       empty.className = 'empty-list';
       empty.textContent = 'No entries yet. Select Add to create one.';
       container.appendChild(empty);
+      bindList(type, container);
       return;
     }
     items.forEach((item, index) => {
       container.appendChild(renderEditorItem(type, item, index));
     });
+    bindList(type, container);
+  }
+
+  function bindList(type, container) {
+    sortable.bind({ target: { key: `en.${type}` }, container, rows: [...container.querySelectorAll(':scope > [data-en-item]')],
+      itemLabel: type === 'certifications' ? 'Certification' : 'Entry',
+      getSummary: (item) => item.company || item.name || item.school,
+      getMeta: (item) => item.date || [item.startDate, item.endDate || (item.startDate ? 'Present' : ''), item.role || item.degree].filter(Boolean).join(' · '),
+      render: () => renderList(type), actionSelector: '[data-en-remove]', headingSelector: '.english-editor-item-heading' });
   }
 
   function renderProfileLinks() {
+    sortable.release({ key: 'profile.links' });
     const links = store.getState().profile.fields.links;
     renderProfileLinksEditor(root.querySelector('[data-en-profile-links]'), links, { removeLabel: 'Remove link' });
     const addButton = root.querySelector('[data-en-add-profile-link]');
     addButton.disabled = !canAddProfileLink(links);
     addButton.textContent = canAddProfileLink(links) ? 'Add link' : 'Maximum of 3 links';
+    const container = root.querySelector('[data-en-profile-links]');
+    sortable.bind({ target: { key: 'profile.links' }, container, rows: [...container.children], itemLabel: 'Link',
+      getSummary: (link) => link, render: renderProfileLinks, actionSelector: '[data-remove-profile-link]' });
   }
 
   function updateCompletion() {
@@ -404,6 +421,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
 
   function setMobileView(view) {
     if (!['editor', 'preview'].includes(view)) return;
+    sortable.cancel();
     root.dataset.mobileMode = view;
     root.querySelectorAll('[data-en-mobile-view]').forEach((button) => {
       const selected = button.dataset.enMobileView === view;
@@ -565,6 +583,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
       return;
     }
     if (removeProfileLinkButton) {
+      sortable.removed({ key: 'profile.links' }, Number(removeProfileLinkButton.dataset.removeProfileLink));
       mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
       renderProfileLinks();
       renderPreview();
@@ -591,6 +610,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     if (removeButton) {
       const item = removeButton.closest('[data-en-item]');
       const type = item.dataset.enItem;
+      sortable.removed({ key: `en.${type}` }, Number(item.dataset.index));
       mutate((state) => state.documents.en.resume[type].splice(Number(item.dataset.index), 1));
       renderList(type);
       renderPreview();
@@ -612,6 +632,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   }
 
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;
       importPending = true;
@@ -658,6 +679,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     destroy() {
       window.clearTimeout(saveTimer);
       unsubscribe();
+      sortable.destroy();
       form.removeEventListener('input', onInput);
       root.removeEventListener('change', onChange);
       root.removeEventListener('click', onClick);

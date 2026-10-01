@@ -1,3 +1,4 @@
+import { createEditorLists } from './editor-lists.js';
 import zhCN from '../i18n/zh-CN.js';
 import { createChineseSampleState } from '../state/zh-CN.js';
 import { cloneData } from '../state/defaults.js';
@@ -231,6 +232,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   let sampleRequestVersion = 0;
+  const sortable = createEditorLists({ store, locale: 'zh-CN', scheduleSave, renderPreview, isBlocked: () => importPending });
   const pageBreakControls = initPageBreakControls({
     store, locale: 'zh-CN', preview, toolbar: rootElement.querySelector('.preview-toolbar'),
     getDocumentType: () => 'resume', scheduleSave
@@ -274,8 +276,9 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     scheduleSave();
   }
 
-  function renderLists() {
-    Object.keys(ITEM_FACTORIES).forEach((type) => {
+  function renderLists(onlyType) {
+    Object.keys(ITEM_FACTORIES).filter((type) => !onlyType || onlyType === type).forEach((type) => {
+      sortable.release({ key: `zh-CN.${type}` });
       const container = rootElement.querySelector(`[data-zh-list="${type}"]`);
       container.replaceChildren();
       const items = chineseResume()[type];
@@ -284,20 +287,33 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
         empty.className = 'empty-list';
         empty.textContent = '暂无内容，可点击“添加”。';
         container.append(empty);
+        bindList(type, container);
         return;
       }
       items.forEach((item, index) => {
         container.append(renderEntry(document, type, item, index));
       });
+      bindList(type, container);
     });
   }
 
+  function bindList(type, container) {
+    sortable.bind({ target: { key: `zh-CN.${type}` }, container, rows: [...container.querySelectorAll(':scope > [data-zh-type]')],
+      itemLabel: '条目', getSummary: (item) => item.company || item.name || item.school,
+      getMeta: (item) => item.date || [item.startDate, item.endDate || (item.startDate ? '至今' : ''), item.role || item.degree].filter(Boolean).join(' · '),
+      render: () => renderLists(type), actionSelector: '[data-zh-remove]', headingSelector: '.zh-entry-editor-header' });
+  }
+
   function renderProfileLinks() {
+    sortable.release({ key: 'profile.links' });
     const links = store.getState().profile.fields.links;
     renderProfileLinksEditor(rootElement.querySelector('[data-zh-profile-links]'), links, { removeLabel: '删除链接' });
     const addButton = rootElement.querySelector('[data-zh-add-profile-link]');
     addButton.disabled = !canAddProfileLink(links);
     addButton.textContent = canAddProfileLink(links) ? '添加链接' : '最多 3 条链接';
+    const container = rootElement.querySelector('[data-zh-profile-links]');
+    sortable.bind({ target: { key: 'profile.links' }, container, rows: [...container.children], itemLabel: '链接',
+      getSummary: (link) => link, render: renderProfileLinks, actionSelector: '[data-remove-profile-link]' });
   }
 
   function applyZoom() {
@@ -364,6 +380,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
 
   function setMobileView(view) {
     if (!['editor', 'preview'].includes(view)) return;
+    sortable.cancel();
     rootElement.dataset.mobileMode = view;
     rootElement.querySelectorAll('[data-zh-mobile-view]').forEach((button) => {
       const selected = button.dataset.zhMobileView === view;
@@ -511,6 +528,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     }
     if (remove) {
       const entry = remove.closest('[data-zh-type]');
+      sortable.removed({ key: `zh-CN.${entry.dataset.zhType}` }, Number(entry.dataset.zhIndex));
       mutate((state) => state.documents['zh-CN'].resume[entry.dataset.zhType].splice(Number(entry.dataset.zhIndex), 1));
       renderLists();
       renderPreview();
@@ -522,6 +540,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
       return;
     }
     if (removeProfileLinkButton) {
+      sortable.removed({ key: 'profile.links' }, Number(removeProfileLinkButton.dataset.removeProfileLink));
       mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
       renderProfileLinks();
       renderPreview();
@@ -569,6 +588,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   window.addEventListener('resize', fitPreview);
   window.addEventListener('pagehide', onPageHide);
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;
       importPending = true;
@@ -607,6 +627,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
     destroy() {
       window.clearTimeout(saveTimer);
       unsubscribe();
+      sortable.destroy();
       rootElement.removeEventListener('input', onInput);
       rootElement.removeEventListener('click', onClick);
       rootElement.removeEventListener('change', onPhotoChange);
