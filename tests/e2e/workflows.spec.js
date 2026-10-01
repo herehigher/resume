@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { DRAFT_KEY_DATABASE } from '../../site/assets/js/state/storage.js';
 import { FICTITIOUS_TRANSPARENT_PROFILE_PHOTO_BASE64 } from '../fixtures/fictitious-transparent-profile-photo.mjs';
-import { DRAFT_STORAGE_KEY as STORAGE_KEY, expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
+import { DRAFT_STORAGE_KEY as STORAGE_KEY, clickListAction, expect, expectNoPageOverflow, openLocale, revealField, test } from './fixtures.js';
 
 const PHOTO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const PHOTO_DATA_URL = `data:image/png;base64,${PHOTO_BASE64}`;
@@ -104,7 +104,7 @@ test('日本語: 自動保存・例示保護・削除・安全なプレビュー
   await page.locator('#restoreDraftButton').click();
   await expect(name).toHaveValue(maliciousName);
 
-  await education.locator('.remove-row-button').click();
+  await clickListAction(education.locator('.remove-row-button'));
   await expect(preview).not.toContainText('E2E大学 入学');
 
   await page.locator('#dataMenuSummary').click();
@@ -396,7 +396,7 @@ test('[mobile] profile links は最大3件まで追加・編集・削除でき�
   await expect(add).toBeDisabled();
   await expect(page.locator('#documentPreview')).toContainText('GitHub');
   await expect(page.locator('#documentPreview .profile-link-icon--credly')).toHaveCount(1);
-  await page.locator('[data-remove-profile-link="1"]').click();
+  await clickListAction(page.locator('[data-remove-profile-link="1"]'));
   await expect(page.locator('[data-profile-link-index]')).toHaveCount(2);
   await expect(add).toBeEnabled();
   await expectNoPageOverflow(page);
@@ -607,7 +607,7 @@ test('简体中文: 完整编辑流程可保存、恢复、示例保护和删除
   await workspace.locator('[data-zh-action="restore"]').click();
   await expect(name).toHaveValue('简立 E2E');
 
-  await experience.locator('[data-zh-remove]').click();
+  await clickListAction(experience.locator('[data-zh-remove]'));
   await expect(workspace.locator('[data-zh-preview]')).not.toContainText('E2E科技');
 });
 
@@ -782,7 +782,7 @@ test('English: complete editing flow auto-saves, restores, protects samples, and
   await workspace.locator('[data-en-restore-sample]').click();
   await expect(name).toHaveValue('Alex E2E');
 
-  await experience.locator('[data-en-remove]').click();
+  await clickListAction(experience.locator('[data-en-remove]'));
   await expect(workspace.locator('[data-en-preview]')).not.toContainText('E2E Labs');
 });
 
@@ -793,7 +793,7 @@ test('English: native month inputs keep their own English language metadata and 
   const workspace = page.locator('[data-english-editor]');
   for (const type of ['experience', 'projects', 'education', 'certifications']) {
     const section = workspace.locator(`[data-en-add="${type}"]`).locator('xpath=ancestor::details[1]');
-    if (!(await section.evaluate((element) => element.open))) await section.locator('summary').click();
+    if (!(await section.evaluate((element) => element.open))) await section.locator(':scope > summary').click();
   }
   const initialMonthInputs = workspace.locator('input[type="month"]');
   await expect(initialMonthInputs).toHaveCount(7);
@@ -998,7 +998,7 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
       const layout = await row.evaluate((element) => {
         const fieldRect = (selector) => element.querySelector(selector).closest('label').getBoundingClientRect().toJSON();
         const inputRect = (selector) => element.querySelector(selector).getBoundingClientRect().toJSON();
-        const remove = element.querySelector('.remove-row-button').getBoundingClientRect().toJSON();
+        const remove = element.querySelector('.sortable-actions > summary').getBoundingClientRect().toJSON();
         return {
           clientWidth: element.clientWidth,
           date: fieldRect('[data-key="date"]'),
@@ -1018,14 +1018,12 @@ test('[mobile] [mobile-webkit] 日本語の年月・内容・確認URLの行は�
       expect(layout.remove.height).toBeGreaterThanOrEqual(44);
       if (width <= 520) {
         expect(layout.dateInput.bottom).toBeLessThanOrEqual(layout.detail.top);
-        expect(layout.remove.top).toBeGreaterThanOrEqual(layout.detail.top);
-        expect(layout.remove.bottom).toBeLessThanOrEqual(layout.detail.bottom);
-        expect(layout.remove.left - layout.detailInput.right).toBeCloseTo(8, 1);
+        expect(layout.remove.bottom).toBeLessThanOrEqual(layout.date.top);
         if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(layout.detailInput.bottom);
       } else {
         expect(layout.date.top).toBe(layout.detail.top);
         expect(layout.dateInput.right).toBeLessThanOrEqual(layout.detailInput.left);
-        expect(layout.detailInput.right).toBeLessThanOrEqual(layout.remove.left);
+        expect(layout.remove.bottom).toBeLessThanOrEqual(layout.date.top);
         if (layout.url) expect(layout.urlInput.top).toBeGreaterThanOrEqual(Math.max(layout.dateInput.bottom, layout.detailInput.bottom));
       }
     }

@@ -1,4 +1,4 @@
-import { expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
+import { clickListAction, expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
 
 test('document tabs expose synchronized selection state and keyboard navigation', async ({ page }) => {
   await openLocale(page, 'ja');
@@ -52,15 +52,15 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
   await thirdContent.fill('HTML, CSS, JavaScript');
   await expect(page.locator('#documentPreview')).toContainText('使用技術');
 
-  const firstRemove = firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' });
-  await firstRemove.click();
+  const firstRemove = firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除', includeHidden: true });
+  await clickListAction(firstRemove);
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
   await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
   await expect(firstTitle).toHaveValue('プロジェクト概要');
 
-  await firstRemove.click();
+  await clickListAction(firstRemove);
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toHaveValue('実績・成果');
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toBeFocused();
@@ -68,8 +68,8 @@ test('日本語の勤務先詳細項目は編集・追加・確認付き削除�
 
   const emptyAdd = firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' });
   await emptyAdd.click();
-  const emptyRemove = firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 3 を削除' });
-  await emptyRemove.click();
+  const emptyRemove = firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 3 を削除', includeHidden: true });
+  await clickListAction(emptyRemove);
   await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 2 の項目名' })).toBeFocused();
 
@@ -85,7 +85,7 @@ test('日本語の詳細項目操作は連続した状態通知で追加・削�
   await page.locator('#loadSampleButton').click();
   await page.locator('#careerDocumentTab').click();
   const sampleCareer = page.locator('#careerList .career-editor-item').first();
-  await sampleCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await clickListAction(sampleCareer.getByRole('button', { name: '勤務先 1 を削除', includeHidden: true }));
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator('[data-add="career"]')).toBeFocused();
@@ -140,7 +140,7 @@ test('日本語の詳細項目操作は連続した状態通知で追加・削�
   const deleteFirstDetailMessage = '勤務先 1 の詳細項目 1 を削除しました。';
   for (let deletion = 0; deletion < 2; deletion += 1) {
     const transition = await observeStatusTransition(deleteFirstDetailMessage, async () => {
-      await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' }).click();
+      await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除', includeHidden: true }));
       await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
       await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toBeFocused();
     });
@@ -152,7 +152,7 @@ test('日本語の詳細項目操作は連続した状態通知で追加・削�
   await thirdTitle.fill('架空の詳細項目');
   const thirdDeleteMessage = '勤務先 1 の詳細項目 3 を削除しました。';
   const transition = await observeStatusTransition(thirdDeleteMessage, async () => {
-    await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 3 を削除' }).click();
+    await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 3 を削除', includeHidden: true }));
     await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
     await expect(page.locator('#cancelSampleAdoptButton')).toBeFocused();
     await page.locator('#confirmSampleAdoptButton').click();
@@ -169,14 +169,14 @@ test('日本語の勤務先は確認後にだけ削除される', async ({ page 
   const firstCareer = careerList.locator('.career-editor-item').first();
   await firstCareer.locator('[data-key="company"]').fill('架空株式会社');
 
-  await firstCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 を削除', includeHidden: true }));
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
   await expect(page.locator('#sampleAdoptDialogTitle')).toHaveText('「架空株式会社」を削除しますか？');
   await page.keyboard.press('Escape');
   await expect(careerList.locator('.career-editor-item')).toHaveCount(1);
   await expect(firstCareer.locator('[data-key="company"]')).toHaveValue('架空株式会社');
 
-  await firstCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 を削除', includeHidden: true }));
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(careerList.locator('.career-editor-item')).toHaveCount(0);
   await expect(page.locator('[data-add="career"]')).toBeFocused();
@@ -188,7 +188,7 @@ test('日本語の空の勤務先と既定の空詳細項目は確認なしで�
   await page.locator('#careerDocumentTab').click();
   const firstCareer = page.locator('#careerList .career-editor-item').first();
 
-  await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' }).click();
+  await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除', includeHidden: true }));
   await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
   await expect(firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 1 の項目名' })).toHaveValue('実績・成果');
 
@@ -196,14 +196,14 @@ test('日本語の空の勤務先と既定の空詳細項目は確認なしで�
   const customTitle = firstCareer.getByRole('textbox', { name: '勤務先 1 の詳細項目 2 の項目名' });
   await customTitle.fill('本文なしのカスタム見出し');
   await expect(page.locator('#documentPreview')).not.toContainText('本文なしのカスタム見出し');
-  await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 2 を削除' }).click();
+  await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 2 を削除', includeHidden: true }));
   await expect(page.locator('#sampleAdoptDialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(customTitle).toHaveValue('本文なしのカスタム見出し');
-  await firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 2 を削除' }).click();
+  await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 2 を削除', includeHidden: true }));
   await page.locator('#confirmSampleAdoptButton').click();
 
-  await firstCareer.getByRole('button', { name: '勤務先 1 を削除' }).click();
+  await clickListAction(firstCareer.getByRole('button', { name: '勤務先 1 を削除', includeHidden: true }));
   await expect(page.locator('#sampleAdoptDialog')).not.toBeVisible();
   await expect(page.locator('#careerList .career-editor-item')).toHaveCount(0);
 });
@@ -214,12 +214,14 @@ test('[mobile] 日本語の勤務先詳細操作は十分なタッチ領域を�
   await page.locator('#careerDocumentTab').click();
   const firstCareer = page.locator('#careerList .career-editor-item').first();
   const controls = [
-    firstCareer.getByRole('button', { name: '勤務先 1 を削除' }),
-    firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除' }),
+    firstCareer.getByRole('button', { name: '勤務先 1 を削除', includeHidden: true }),
+    firstCareer.getByRole('button', { name: '勤務先 1 の詳細項目 1 を削除', includeHidden: true }),
     firstCareer.getByRole('button', { name: '勤務先 1 に詳細項目を追加' })
   ];
 
   for (const control of controls) {
+    const menu = control.locator('xpath=ancestor::details[contains(@class, "sortable-actions")][1]');
+    if (await menu.count() && await menu.getAttribute('open') === null) await menu.locator(':scope > summary').click();
     const box = await control.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }

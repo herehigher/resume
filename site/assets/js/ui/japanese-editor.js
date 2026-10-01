@@ -1,3 +1,4 @@
+import { createEditorLists } from './editor-lists.js';
 import { createJapaneseCareer, createJapaneseSampleState, cloneData } from '../state/defaults.js';
 import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
@@ -64,6 +65,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   let sampleRequestVersion = 0;
+  const sortable = createEditorLists({ store, locale: 'ja', scheduleSave, renderPreview, isBlocked: () => store.isImportPending() });
   const pageBreakControls = initPageBreakControls({
     store, locale: 'ja', preview, toolbar: document.querySelector('#japaneseWorkspace .preview-toolbar'),
     getDocumentType: () => japaneseDocument().activeDocument, scheduleSave
@@ -188,10 +190,12 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
 
   function renderSimpleList(type, containerId) {
     const container = document.getElementById(containerId);
+    sortable.release({ key: `ja.${type}` });
     const items = japaneseDocument()[type];
     container.innerHTML = '';
     if (!items.length) {
       container.innerHTML = '<div class="empty-list">項目がありません。「追加」から入力できます。</div>';
+      bindSimpleList(type, containerId);
       return;
     }
     items.forEach((item, index) => {
@@ -208,14 +212,26 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       }
       container.appendChild(row);
     });
+    bindSimpleList(type, containerId);
+  }
+
+  function bindSimpleList(type, containerId) {
+    const container = document.getElementById(containerId);
+    sortable.bind({ target: { key: `ja.${type}` }, container, rows: [...container.querySelectorAll(':scope > .repeating-row')],
+      itemLabel: { education: '学歴', employment: '職歴', qualification: '資格' }[type],
+      getSummary: (item) => item.detail, getMeta: (item) => item.date,
+      render: () => renderSimpleList(type, containerId), actionSelector: '.remove-row-button' });
   }
 
   function renderCareerList() {
     const container = document.getElementById('careerList');
+    sortable.release({ key: 'ja.careers' });
     const careers = japaneseDocument().careers;
+    sortable.releaseDetails();
     container.innerHTML = '';
     if (!careers.length) {
       container.innerHTML = '<div class="empty-list">勤務先がありません。「追加」から入力できます。</div>';
+      bindCareers(container);
       return;
     }
     careers.forEach((career, index) => {
@@ -246,8 +262,22 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       });
       item.querySelector('.remove-career-button').setAttribute('aria-label', `勤務先 ${index + 1} を削除`);
       item.querySelector('[data-add-detail-section]').setAttribute('aria-label', `勤務先 ${index + 1} に詳細項目を追加`);
+      const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'sortable-action';
+      copy.dataset.copyCareerStructure = career.id; copy.textContent = 'この構成で勤務先を追加';
+      item.querySelector('.career-item-actions').prepend(copy);
       container.appendChild(item);
+      sortable.bind({ target: { key: 'ja.careerDetails', careerId: career.id }, container: detailContainer,
+        rows: [...detailContainer.children], itemLabel: '詳細項目', getSummary: (section) => section.title,
+        render: renderCareerList, actionSelector: '.remove-career-detail-button', headingSelector: '.career-detail-item-header' });
     });
+    bindCareers(container);
+  }
+
+  function bindCareers(container) {
+    sortable.bind({ target: { key: 'ja.careers' }, container, rows: [...container.querySelectorAll(':scope > .career-editor-item')],
+      itemLabel: '勤務先', getSummary: (career) => career.company,
+      getMeta: (career) => [career.startDate, career.endDate || (career.startDate ? '在職中' : ''), career.role].filter(Boolean).join(' · '),
+      render: renderCareerList, actionSelector: '.remove-career-button, [data-copy-career-structure]', headingSelector: '.career-item-header' });
   }
 
   function renderLists() {
@@ -258,6 +288,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   }
 
   function renderProfileLinks() {
+    sortable.release({ key: 'profile.links' });
     const links = store.getState().profile.fields.links;
     renderProfileLinksEditor(document.getElementById('profileLinksEditor'), links, {
       placeholder: 'https://example.com',
@@ -266,6 +297,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     const addButton = document.getElementById('addProfileLinkButton');
     addButton.disabled = !canAddProfileLink(links);
     addButton.textContent = canAddProfileLink(links) ? '＋ リンクを追加' : 'リンクは最大3件です';
+    const container = document.getElementById('profileLinksEditor');
+    sortable.bind({ target: { key: 'profile.links' }, container, rows: [...container.children], itemLabel: 'リンク',
+      getSummary: (link) => link, render: renderProfileLinks, actionSelector: '[data-remove-profile-link]' });
   }
 
   function updatePhotoUI() {
@@ -306,6 +340,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
 
   function setMobileView(view) {
     if (!['editor', 'preview'].includes(view)) return;
+    sortable.cancel();
     document.querySelectorAll('[data-mobile-view]').forEach((button) => {
       const selected = button.dataset.mobileView === view;
       button.classList.toggle('is-active', selected);
@@ -474,7 +509,10 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
           cancel: 'キャンセル',
           confirm: '削除する'
         });
-        if (!confirmed) return;
+        if (!confirmed) {
+          focusCareerMenu(careerItem);
+          return;
+        }
       }
       let nextCareerIndex;
       let focusAddButton = false;
@@ -487,11 +525,12 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       renderPreview();
       window.requestAnimationFrame(() => {
         if (focusAddButton) document.querySelector('[data-add="career"]')?.focus();
-        else document.querySelector(`.career-editor-item[data-index="${nextCareerIndex}"] [data-key="company"]`)?.focus();
+        else focusVisibleCareerRow(document.querySelector(`.career-editor-item[data-index="${nextCareerIndex}"]`), '[data-key="company"]');
       });
       announceCareerDetail(`勤務先 ${careerIndex + 1} を削除しました。`);
       return;
     }
+    if (simpleRow) sortable.removed({ key: `ja.${simpleRow.dataset.type}` }, Number(simpleRow.dataset.index));
     mutate((state) => {
       if (simpleRow) state.documents.ja[simpleRow.dataset.type].splice(Number(simpleRow.dataset.index), 1);
     });
@@ -503,9 +542,20 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     announceStatus(message);
   }
 
+  function focusCareerMenu(row) {
+    window.requestAnimationFrame(() => row?.querySelector(':scope > .sortable-row-heading .sortable-actions > summary')?.focus());
+  }
+
+  function focusVisibleCareerRow(row, selector) {
+    const target = row?.classList.contains('is-collapsed')
+      ? row.querySelector(':scope > .sortable-row-heading .sortable-toggle')
+      : row?.querySelector(selector);
+    target?.focus();
+  }
+
   function focusCareerDetail(careerIndex, detailIndex, selector = '[data-detail-key="title"]') {
     window.requestAnimationFrame(() => {
-      document.querySelector(`.career-editor-item[data-index="${careerIndex}"] .career-detail-editor-item[data-detail-index="${detailIndex}"] ${selector}`)?.focus();
+      focusVisibleCareerRow(document.querySelector(`.career-editor-item[data-index="${careerIndex}"] .career-detail-editor-item[data-detail-index="${detailIndex}"]`), selector);
     });
   }
 
@@ -539,8 +589,12 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
         cancel: 'キャンセル',
         confirm: '削除する'
       });
-      if (!confirmed) return;
+      if (!confirmed) {
+        focusCareerMenu(detailItem);
+        return;
+      }
     }
+    sortable.removed({ key: 'ja.careerDetails', careerId: careerItem.dataset.careerId }, detailIndex);
     let nextDetailIndex;
     let focusAddButton = false;
     mutate((state) => {
@@ -595,6 +649,22 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       }
       return;
     }
+    const copyStructure = event.target.closest('[data-copy-career-structure]');
+    if (copyStructure) {
+      const sourceId = copyStructure.dataset.copyCareerStructure;
+      let newId;
+      mutate((state) => {
+        const index = state.documents.ja.careers.findIndex((career) => career.id === sourceId);
+        if (index < 0) return;
+        const source = state.documents.ja.careers[index];
+        const career = createJapaneseCareer(); newId = career.id;
+        if (source.detailSections.length) career.detailSections = source.detailSections.map(({ title }) => ({ title, content: '' }));
+        state.documents.ja.careers.splice(index + 1, 0, career);
+      });
+      renderCareerList(); renderPreview();
+      workspace.querySelector(`[data-career-id="${newId}"] [data-key="company"]`)?.focus();
+      return;
+    }
     const documentTab = event.target.closest('[data-document]');
     const addButton = event.target.closest('[data-add]');
     const removeButton = event.target.closest('.remove-row-button, .remove-career-button');
@@ -608,6 +678,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     if (addCareerDetailButton) addCareerDetailSection(addCareerDetailButton);
     if (removeCareerDetailButton) void removeCareerDetailSection(removeCareerDetailButton);
     if (removeProfileLinkButton) {
+      sortable.removed({ key: 'profile.links' }, Number(removeProfileLinkButton.dataset.removeProfileLink));
       mutate((state) => removeProfileLink(state.profile.fields, Number(removeProfileLinkButton.dataset.removeProfileLink)));
       renderProfileLinks();
       renderPreview();
@@ -689,6 +760,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   });
 
   store.subscribe((_state, event) => {
+    if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;
       importPending = true;

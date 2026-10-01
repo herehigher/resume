@@ -23,7 +23,7 @@ const LABELS = {
     cleared: 'Manual page breaks cleared for the affected documents.'
   }
 };
-const REPLACEMENTS = new Set(['replace', 'import', 'reload', 'reset', 'sample', 'restore']);
+const REPLACEMENTS = new Set(['replace', 'import', 'reload', 'reset', 'sample', 'restore', 'en-sample', 'en-restore', 'zh-sample', 'zh-restore']);
 let nextBodyId = 0;
 
 function targetInfo(state, target) {
@@ -53,6 +53,21 @@ function button(document, text, className) {
   return element;
 }
 
+function setControlIcon(element, kind, text = '') {
+  const paths = {
+    right: 'm9 5 7 7-7 7', down: 'm5 9 7 7 7-7',
+    custom: 'M8 3v18m-4-4 4 4 4-4M16 21V3m-4 4 4-4 4 4',
+    newest: 'M6 3v18m-4-4 4 4 4-4M13 5h9M13 10h7M13 15h5M13 20h3',
+    oldest: 'M6 21V3m-4 4 4-4 4 4M13 5h3M13 10h5M13 15h7M13 20h9'
+  };
+  const svg = element.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  const path = element.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', paths[kind]); svg.append(path);
+  element.replaceChildren(svg);
+  if (text) { const label = element.ownerDocument.createElement('span'); label.textContent = text; element.append(label); }
+}
+
 // Editors supply existing row/body/action nodes and re-render only the affected
 // list after a successful transaction. This module never writes arbitrary paths.
 export function createSortableLists({ store, locale, announce = announceStatus }) {
@@ -61,6 +76,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
   const lists = new Set();
   const foldStates = new Map();
   const composing = new Set();
+  const sortStates = new Map();
   const drag = createSortableDrag();
   let committing = false;
   let destroyed = false;
@@ -74,6 +90,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
     if (!committing && event.type !== 'save') drag.cancel();
     if (REPLACEMENTS.has(event.type)) {
       clearComposition();
+      sortStates.clear();
       foldStates.forEach((folds) => { folds.reset(); });
       lists.forEach((list) => { list.invalidate(true); });
     } else if (event.type === 'reorder' && !committing) {
@@ -81,22 +98,22 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       const folds = foldStates.get(key);
       if (folds && event.permutation?.length === folds.length) folds.reorder(event.permutation);
       else folds?.reset();
-      lists.forEach((list) => {
-        if (list.foldKey === key) list.invalidate(false);
+      [...lists].forEach((list) => {
+        if (list.foldKey === key) { list.acceptDates(); list.setSortState(event.operation.type === 'sort' ? event.operation.direction : 'custom'); list.invalidate(false); list.renderCurrent(); }
         else list.refresh();
       });
     } else if (event.type === 'update' || event.type === 'import-pending' || event.type === 'import-cancel' || event.type === 'import-failed') {
       for (const [key, entry] of foldStates) {
         const [listKey, careerId] = JSON.parse(key);
         if (listKey === 'ja.careerDetails' && !store.getState().documents.ja.careers.some((career) => career.id === careerId)) {
-          entry.reset(); foldStates.delete(key);
+          entry.reset(); foldStates.delete(key); sortStates.delete(key);
         }
       }
       lists.forEach((list) => { list.refresh(); });
     }
   });
 
-  function registerList({ target, container, toolbar, itemLabel, getSummary, render, scheduleSave, isBlocked = () => false }) {
+  function registerList({ target, container, toolbar, itemLabel, getSummary, getMeta = () => '', render, scheduleSave, isBlocked = () => false }) {
     if (destroyed) throw new TypeError('The sortable controller was destroyed.');
     target = Object.freeze({ ...target });
     if (!targetInfo(store.getState(), target)) throw new TypeError('The parent career must exist.');
@@ -108,9 +125,36 @@ export function createSortableLists({ store, locale, announce = announceStatus }
     const folds = foldStates.get(foldKey) || createListFoldState();
     foldStates.set(foldKey, folds);
     const tools = doc.createElement('div'); tools.className = 'sortable-list-tools'; tools.lang = locale;
-    const collapseAll = button(doc, labels.collapseAll, 'sortable-tool');
-    const expandAll = button(doc, labels.expandAll, 'sortable-tool');
-    tools.append(collapseAll, expandAll); toolbar.append(tools);
+    const foldAll = button(doc, '', 'sortable-tool sortable-fold-all');
+    const sort = currentInfo().descriptor.dateKind ? button(doc, '', 'sortable-tool sortable-sort') : null;
+    tools.append(foldAll);
+    if (sort) {
+      tools.append(sort);
+      const help = doc.createElement('span'); help.className = 'sortable-sort-help';
+      const range = currentInfo().descriptor.dateKind === 'range';
+      help.textContent = locale === 'ja' ? `${range ? '終了年月' : '年月'}で一度だけ整列。後から自由に調整できます。`
+        : locale === 'en' ? `Sort once by ${range ? 'end date' : 'date'}. You can reorder freely afterwards.` : `按${range ? '结束时间' : '时间'}排序一次，此后仍可自由调整。`;
+      tools.append(help);
+    }
+    toolbar.append(tools);
+    let dateSnapshot = dateSignature();
+    function dateSignature() {
+      const info = currentInfo();
+      return info?.descriptor.dateKind ? JSON.stringify(info.items.map((item) => [item.date || '', item.startDate || '', item.endDate || ''])) : '';
+    }
+    function setSortState(direction) { sortStates.set(foldKey, direction); paintTools(); }
+    function paintTools() {
+      const collapsed = rows.length > 0 && rows.every((_row, index) => folds.get(index));
+      foldAll.setAttribute('aria-label', collapsed ? labels.expandAll : labels.collapseAll);
+      setControlIcon(foldAll, collapsed ? 'right' : 'down', collapsed ? labels.expandAll : labels.collapseAll);
+      if (sort) {
+        const direction = sortStates.get(foldKey) || 'custom';
+        const texts = locale === 'ja' ? ['カスタム', '新しい順', '古い順'] : locale === 'en' ? ['Custom', 'Newest first', 'Oldest first'] : ['自定义', '倒序', '正序'];
+        setControlIcon(sort, direction, texts[direction === 'custom' ? 0 : direction === 'newest' ? 1 : 2]);
+        sort.setAttribute('aria-label', `${sort.textContent}. ${locale === 'ja' ? '一度だけ整列' : locale === 'en' ? 'Sort once' : '排序一次'}`);
+        sort.disabled = blocked() || rows.length < 2;
+      }
+    }
     let rows = [];
     let rowIds = [];
     let bound = false;
@@ -140,7 +184,9 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       row.handle.setAttribute('aria-label', `${labels.handle}: ${summary}, ${index + 1}/${rows.length}`);
       row.toggle.setAttribute('aria-label', `${folds.get(index) ? labels.expand : labels.collapse}: ${summary}`);
       row.toggle.setAttribute('aria-expanded', String(!folds.get(index)));
-      row.toggle.textContent = folds.get(index) ? '▸' : '▾';
+      setControlIcon(row.chevron, folds.get(index) ? 'right' : 'down');
+      const item = currentInfo()?.items[index];
+      row.meta.textContent = item === undefined ? '' : String(getMeta(item, index) || '');
       row.body.hidden = folds.get(index);
       row.element.classList.toggle('is-collapsed', folds.get(index));
       row.menuToggle.setAttribute('aria-label', `${labels.actions}: ${summary}, ${index + 1}/${rows.length}`);
@@ -155,8 +201,11 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       if (!valid()) bound = false;
       rows.forEach(paintRow);
       tools.hidden = rows.length === 0;
-      collapseAll.disabled = !bound;
-      expandAll.disabled = !bound;
+      const dates = dateSignature();
+      if (dates !== dateSnapshot) sortStates.set(foldKey, 'custom');
+      dateSnapshot = dates;
+      foldAll.disabled = !bound;
+      paintTools();
     }
     function setCollapsed(index, collapsed) {
       const row = rows[index];
@@ -165,6 +214,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       folds.set(index, collapsed);
       row.menu.open = false;
       paintRow(row, index);
+      paintTools();
     }
     function setAllCollapsed(collapsed) { rows.forEach((_row, index) => { setCollapsed(index, collapsed); }); }
     function releaseRows() {
@@ -191,6 +241,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       releaseRows();
       rowIds = info.items.map((item) => keyed ? item.id : null);
       folds.sync(rowIds, change);
+      if (change) sortStates.set(foldKey, 'custom');
       rows = descriptors.map(({ element, body, actions = [] }) => {
         const header = doc.createElement('div'); header.className = 'sortable-row-heading'; header.lang = locale;
         const handle = button(doc, '⠿', 'sortable-handle'); handle.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown');
@@ -200,6 +251,10 @@ export function createSortableLists({ store, locale, announce = announceStatus }
         toggle.setAttribute('aria-controls', body.id);
         const position = doc.createElement('span'); position.className = 'sortable-position'; position.setAttribute('aria-hidden', 'true');
         const summary = doc.createElement('span'); summary.className = 'sortable-summary';
+        const chevron = doc.createElement('span'); chevron.className = 'sortable-chevron';
+        const meta = doc.createElement('span'); meta.className = 'sortable-meta';
+        const title = doc.createElement('span'); title.className = 'sortable-title'; title.append(summary, meta);
+        toggle.append(chevron, position, title);
         const menu = doc.createElement('details'); menu.className = 'sortable-actions';
         const menuToggle = doc.createElement('summary'); menuToggle.textContent = '⋯';
         const menuBody = doc.createElement('div'); menuBody.className = 'sortable-action-buttons'; menuBody.setAttribute('role', 'group');
@@ -208,9 +263,9 @@ export function createSortableLists({ store, locale, announce = announceStatus }
         menuBody.append(up, down);
         const savedActions = actions.map((action) => ({ element: action, parent: action.parentNode, next: action.nextSibling }));
         actions.forEach((action) => { menuBody.append(action); });
-        menu.append(menuToggle, menuBody); header.append(handle, toggle, position, summary, menu); element.prepend(header);
+        menu.append(menuToggle, menuBody); header.append(handle, toggle, menu); element.prepend(header);
         element.classList.add('sortable-row');
-        const row = { element, body, header, handle, toggle, position, summary, menu, menuBody, menuToggle, up, down,
+        const row = { element, body, header, handle, toggle, position, summary, chevron, meta, menu, menuBody, menuToggle, up, down,
           previousBodyId, wasHidden: body.hidden, actions: savedActions };
         const index = () => rows.indexOf(row);
         toggle.addEventListener('click', () => { drag.cancel(); if (index() >= 0) setCollapsed(index(), !folds.get(index())); });
@@ -221,7 +276,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
           const snapshot = store.getState();
           drag.begin(event, { container, locale, rows: () => rows,
             valid: () => !blocked() && valid() && store.getState() === snapshot,
-            collapse: () => setAllCollapsed(true), summary: () => name(index()), move, row: (position) => rows[position] }, index());
+            collapse: () => setAllCollapsed(true), summary: () => name(index()), move, row: (position) => [...lists].find((list) => list.foldKey === foldKey)?.rowAt(position) }, index());
         });
         handle.addEventListener('keydown', (event) => {
           if (drag.busy) return;
@@ -262,20 +317,17 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       finally { committing = false; }
       if (!changed) return false;
       folds.move(from, to);
+      sortStates.set(foldKey, 'custom');
       bound = false;
       render({ from, to });
       scheduleSave();
-      const moved = rows[to];
-      if (bound && moved?.element.isConnected) {
-        moved.handle.focus();
-        moved.element.classList.add('sortable-row-moved');
-        highlightTimer = window.setTimeout(() => moved.element.classList.remove('sortable-row-moved'), 500);
-      }
+      const current = [...lists].find((list) => list.foldKey === foldKey);
+      current?.focusRow(to);
       announce(`${labels.moved(summary, to + 1, count)}${cleared ? ` ${labels.cleared}` : ''}`);
       return true;
     }
     function invalidate(reset) {
-      if (reset) folds.reset();
+      if (reset) { folds.reset(); sortStates.set(foldKey, 'custom'); }
       // Editor subscribers may have already drawn the new snapshot. Keep those
       // controls usable regardless of listener registration order.
       bound = syncedState === store.getState() && Boolean(valid());
@@ -283,8 +335,20 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       rows.forEach((row) => { row.menu.open = false; });
       refresh();
     }
-    collapseAll.addEventListener('click', () => { drag.cancel(); setAllCollapsed(true); });
-    expandAll.addEventListener('click', () => { drag.cancel(); setAllCollapsed(false); });
+    foldAll.addEventListener('click', () => { drag.cancel(); setAllCollapsed(rows.some((_row, index) => !folds.get(index))); });
+    sort?.addEventListener('click', () => {
+      if (drag.busy || blocked() || !valid() || rows.length < 2) return;
+      const direction = sortStates.get(foldKey) === 'newest' ? 'oldest' : 'newest';
+      const before = currentInfo();
+      const cleared = hasAffectedBreaks(store.getState(), before.descriptor);
+      // Let the reorder notification synchronize the same positional folds.
+      const changed = store.reorderList(target, { type: 'sort', direction });
+      dateSnapshot = dateSignature();
+      setSortState(direction);
+      if (changed) scheduleSave();
+      [...lists].find((list) => list.foldKey === foldKey)?.focusSort();
+      announce(`${sort.textContent}${changed && cleared ? ` ${labels.cleared}` : ''}`);
+    });
     function onComposition() { refresh(); }
     doc.addEventListener('compositionstart', onComposition);
     doc.addEventListener('compositionend', onComposition);
@@ -294,7 +358,9 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       });
     }
     doc.addEventListener('click', closeMenus);
-    const api = { sync, refresh, move, setCollapsed, setAllCollapsed, foldKey,
+    const api = { sync, refresh, move, container, prepare() { releaseRows(); bound = false; }, rowAt: (index) => rows[index], acceptDates() { dateSnapshot = dateSignature(); }, setSortState, renderCurrent: () => render({}),
+      focusSort: () => sort?.focus(),
+      focusRow(index) { const row = rows[index]; if (bound && row?.element.isConnected) { row.handle.focus(); row.element.classList.add('sortable-row-moved'); highlightTimer = window.setTimeout(() => row.element.classList.remove('sortable-row-moved'), 500); } }, setCollapsed, setAllCollapsed, foldKey,
       getCollapsed: (index) => folds.get(index),
       invalidate,
       destroy() {
@@ -310,7 +376,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
     return api;
   }
 
-  return { registerList,
+  return { registerList, cancel: () => drag.cancel(),
     destroy() {
       if (destroyed) return;
       destroyed = true; drag.destroy(); unsubscribe();
