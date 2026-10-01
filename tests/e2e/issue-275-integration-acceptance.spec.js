@@ -289,6 +289,7 @@ for (const [locale, type, paper] of [['ja', 'resume', 'A4'], ['ja', 'career', 'A
         for (const type of ['experience', 'projects', 'education']) items(state, targets.find((target) => target.key === `${locale}.${type}`)).forEach((item) => { item.details = body; });
       }
       if (length !== 'short') {
+        if (locale === 'en') state.documents.en.resume.showOptionalPersonalDetails = true;
         state.profile.photo = await page.evaluate(() => {
           const canvas = document.createElement('canvas'); canvas.width = 90; canvas.height = 120;
           const paint = canvas.getContext('2d'); paint.fillStyle = '#dce7fa'; paint.fillRect(0, 0, 90, 120);
@@ -315,6 +316,8 @@ for (const [locale, type, paper] of [['ja', 'resume', 'A4'], ['ja', 'career', 'A
         await action(container.locator(':scope > .sortable-row').first(), 1);
       }
       const preview = page.locator(locale === 'ja' ? '#documentPreview' : `[data-${locale === 'en' ? 'en' : 'zh'}-preview]`);
+      const photoRendered = length !== 'short' && !(locale === 'ja' && type === 'career');
+      await expect(preview.locator('img')).toHaveCount(photoRendered ? 1 : 0);
       const final = await exportState(page);
       const markers = chosen.filter((target) => target.key !== 'ja.careerDetails').map((target) => items(final, target).map((item) => label(item, target).split(' ')[0]));
       if (type === 'career') {
@@ -353,7 +356,7 @@ for (const [locale, type, paper] of [['ja', 'resume', 'A4'], ['ja', 'career', 'A
         expect(pages.at(-1).replace(/\s/g, '')).toContain(endMarker);
         expect(text).not.toMatch(/Move down|Move up|項目を移動|sortable-/);
       } finally { await task.destroy(); }
-      await writeEvidence(page, testInfo, { locale, documentType: type, paper, input: 'reordered-v4', length, photo: length !== 'short' });
+      await writeEvidence(page, testInfo, { locale, documentType: type, paper, input: 'reordered-v4', length, photoProvided: length !== 'short', photoRendered });
     });
   }
 }
