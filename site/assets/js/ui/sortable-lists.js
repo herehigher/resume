@@ -82,7 +82,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
         if (list.foldKey === key) list.invalidate(false);
         else list.refresh();
       });
-    } else if (event.type === 'update' || event.type === 'import-pending' || event.type === 'import-cancel') {
+    } else if (event.type === 'update' || event.type === 'import-pending' || event.type === 'import-cancel' || event.type === 'import-failed') {
       for (const [key, entry] of foldStates) {
         const [listKey, careerId] = JSON.parse(key);
         if (listKey === 'ja.careerDetails' && !store.getState().documents.ja.careers.some((career) => career.id === careerId)) {

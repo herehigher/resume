@@ -54,7 +54,7 @@ data format を更新するときは `STATE_VERSION` を増やし、直前 versi
 
 勤務先と中英文職歴の折りたたみは既存 record ID、ID のない行は一時配列で保持します。追加／削除した adapter は更新後の `sync` に `{ change: { type: 'insert' | 'remove', index } }` を渡します。移動は共通側で同じ一時配列を移動します。匿名行の不明な構造変更は全展開へ戻し、同じ本文を identity として推測しません。会社詳細の状態は `careerId` ごとに分離し、親行の折りたたみは詳細を変えません。親の再描画で詳細 binding を破棄・再登録しても同じ controller 内の状態は保持し、会社削除時には消します。
 
-`replace`・import・reload・sample・restore・reset で旧状態を破棄します。再描画前の古い行では移動できず、単なる保存完了では折りたたみを変更しません。`list.destroy()` は行装飾と listener を外し既存操作を元へ戻し、controller の `destroy()` は全登録と一時状態を破棄します。controller を維持した普通の再描画と破棄を区別してください。fold 情報は v4・JSON・保存に入りません。reorder 通知の読み取り専用 `target`・`operation`・`permutation` は移動に伴う一時状態の同期だけに使い、保存 data に入りません。別 controller からの移動・日付整列でも位置 permutation と同じ fold を動かし、無関係なリストを無効にしません。日付整列／pointer drag の追加と三言語 editor への接続は後続子 Issue で行います。本コンポーネントの browser test は test 内で架空 adapter を組み立て、公開 product route は追加しません。
+`replace`・import・reload・sample・restore・reset で旧状態を破棄します。再描画前の古い行では移動できず、単なる保存完了では折りたたみを変更しません。import の保存失敗では草稿と fold を維持し、pending 解除後に移動操作を復帰させます。`list.destroy()` は行装飾と listener を外し既存操作を元へ戻し、controller の `destroy()` は全登録と一時状態を破棄します。controller を維持した普通の再描画と破棄を区別してください。fold 情報は v4・JSON・保存に入りません。reorder 通知の読み取り専用 `target`・`operation`・`permutation` は移動に伴う一時状態の同期だけに使い、保存 data に入りません。別 controller からの移動・日付整列でも位置 permutation と同じ fold を動かし、無関係なリストを無効にしません。日付整列／pointer drag の追加と三言語 editor への接続は後続子 Issue で行います。本コンポーネントの browser test は test 内で架空 adapter を組み立て、公開 product route は追加しません。
 
 ## Open Graph 共有画像
 

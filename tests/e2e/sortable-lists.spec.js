@@ -43,10 +43,14 @@ async function mount(page, locale = 'en') {
     const { LIST_ORDER_REGISTRY } = await import('/assets/js/state/list-order.js');
     const { createSortableLists } = await import('/assets/js/ui/sortable-lists.js');
     let scheduled = 0;
+    let rejectSaves = false;
     const saved = [];
     const messages = [];
     const store = createStore({ initialState: state, persistence: {
-      async save(value) { saved.push(structuredClone(value)); },
+      async save(value) {
+        if (rejectSaves) throw new Error('Fictitious import persistence failure');
+        saved.push(structuredClone(value));
+      },
       async load() { return structuredClone(state); }
     } });
     document.body.replaceChildren();
@@ -126,6 +130,7 @@ async function mount(page, locale = 'en') {
     }
     keys.forEach((key) => { mountList({ key }); });
     window.sortableHarness = { store, controller, bindings, items, draw, messages, saved,
+      failSaves: (value) => { rejectSaves = value; },
       counts: () => ({ scheduled, saved: saved.length }), original: structuredClone(state),
       replacement(type) {
         store.replace(structuredClone(state), { type });
@@ -426,3 +431,35 @@ test('duplicate primitive links and date permutations move folds, and real reloa
   });
   expect(result).toEqual({ duplicateMoved: true, duplicateFold: true, sortFold: true, importReset: true, reloadReset: true });
 });
+
+
+for (const device of ['desktop', 'mobile']) {
+  test(`failed import restores movement controls and retains the draft and folds ${device === 'mobile' ? '[mobile]' : ''}`, async ({ page }) => {
+    await mount(page);
+    const result = await page.evaluate(async () => {
+      const h = sortableHarness;
+      const binding = h.bindings.get('profile.links');
+      binding.api.setCollapsed(1, true);
+      const before = h.store.getState();
+      h.failSaves(true);
+      const prepared = h.store.prepareImport(h.store.exportJson());
+      const disabledDuringImport = binding.container.children[1].querySelector('.sortable-handle').disabled;
+      let rejected = false;
+      try { await h.store.importPrepared(prepared); }
+      catch { rejected = true; }
+      h.failSaves(false);
+      return { disabledDuringImport, rejected, pending: h.store.isImportPending(),
+        handleEnabled: !binding.container.children[1].querySelector('.sortable-handle').disabled,
+        upEnabled: !binding.container.children[1].querySelector('.sortable-action').disabled,
+        sameDraft: h.store.getState() === before, sameFold: binding.api.getCollapsed(1), counts: h.counts() };
+    });
+    expect(result).toEqual({ disabledDuringImport: true, rejected: true, pending: false,
+      handleEnabled: true, upEnabled: true, sameDraft: true, sameFold: true, counts: { scheduled: 0, saved: 0 } });
+    const targetRows = rows(page, 'profile.links');
+    await targetRows.nth(1).locator('.sortable-handle').focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(targetRows.nth(0).locator('.sortable-handle')).toBeFocused();
+    await expect(targetRows.nth(0).locator('[data-harness-body]')).toBeHidden();
+    expect(await page.evaluate(() => sortableHarness.counts())).toEqual({ scheduled: 1, saved: 1 });
+  });
+}
