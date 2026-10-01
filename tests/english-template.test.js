@@ -7,8 +7,7 @@ import { createDefaultState } from '../site/assets/js/state/defaults.js';
 import {
   formatEnglishDateRange,
   formatEnglishMonth,
-  renderEnglishResume,
-  sortEnglishEntriesDescending
+  renderEnglishResume
 } from '../site/assets/js/templates/en.js';
 import { createEnglishItem, renderEnglishWorkspace } from '../site/assets/js/ui/english-editor.js';
 
@@ -33,25 +32,6 @@ test('English resume follows the natural ATS reading order and omits empty secti
     assert.ok(index > previousIndex, `${heading} should follow the previous section`);
     previousIndex = index;
   }
-});
-
-test('experience entries render in reverse chronological order without changing state order', () => {
-  const state = createDefaultState('en');
-  state.documents.en.resume.experience = [
-    { startDate: '2018-01', endDate: '2020-12', company: 'Earlier Co', role: 'Analyst', details: 'Earlier work' },
-    { startDate: '2020-01', endDate: '', company: 'Earlier Current Co', role: 'Advisor', details: 'Ongoing work' },
-    { startDate: '2023-01', endDate: '', company: 'Current Co', role: 'Lead', details: 'Current work' },
-    { startDate: '2021-01', endDate: '2022-12', company: 'Middle Co', role: 'Manager', details: 'Middle work' }
-  ];
-
-  const sorted = sortEnglishEntriesDescending(state.documents.en.resume.experience, 'experience');
-  assert.deepEqual(sorted.map((item) => item.company), ['Current Co', 'Earlier Current Co', 'Middle Co', 'Earlier Co']);
-  assert.equal(state.documents.en.resume.experience[0].company, 'Earlier Co');
-
-  const html = renderEnglishResume(state);
-  assert.ok(html.indexOf('Current Co') < html.indexOf('Middle Co'));
-  assert.ok(html.indexOf('Earlier Current Co') < html.indexOf('Middle Co'));
-  assert.ok(html.indexOf('Middle Co') < html.indexOf('Earlier Co'));
 });
 
 test('English optional personal details stay out of the template while the switch is off', () => {

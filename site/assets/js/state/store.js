@@ -1,6 +1,7 @@
 import { createDefaultState, cloneData } from './defaults.js';
 import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js';
 import { assertValidState } from './schema.js';
+import { applyListReorder } from './list-order.js';
 
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
   let state = cloneData(assertValidState(initialState));
@@ -43,6 +44,12 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       const next = cloneData(state);
       mutator(next);
       return replace(next, { persist, type });
+    },
+    reorderList(target, operation) {
+      const next = cloneData(state);
+      if (!applyListReorder(next, target, operation)) return false;
+      replace(next, { type: 'reorder' });
+      return true;
     },
     replace,
     prepareImport(text) {

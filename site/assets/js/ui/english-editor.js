@@ -109,7 +109,7 @@ export function renderEnglishWorkspace() {
         <details class="form-section" open>
           <summary>
             <span class="section-number">03</span>
-            <span><strong>Experience</strong><small>Displayed in reverse chronological order</small></span>
+            <span><strong>Experience</strong><small>Displayed in the order entered</small></span>
             <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
           </summary>
           <div class="section-content">
