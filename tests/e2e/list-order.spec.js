@@ -1,5 +1,6 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
+import { LIST_ORDER_REGISTRY } from '../../site/assets/js/state/list-order.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
 import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
@@ -8,6 +9,12 @@ function sharedControllerState() {
   const state = createDefaultState();
   for (const locale of ['ja', 'zh-CN', 'en']) {
     state.documents[locale] = createPdfFixture({ locale, length: 'standard', documentType: locale === 'ja' ? 'career' : 'resume' }).state.documents[locale];
+  }
+  for (const locale of ['zh-CN', 'en']) {
+    for (const type of ['education', 'certifications']) {
+      const list = state.documents[locale].resume[type];
+      list.push({ ...list[0] });
+    }
   }
   state.profile.fields.links = ['https://fictional.example/first', 'https://fictional.example/second'];
   for (const locale of ['ja', 'zh-CN', 'en']) {
@@ -23,17 +30,13 @@ function sharedControllerState() {
 for (const mode of ['desktop', 'mobile']) {
   test(`reorder invalidates all initialized pagination feedback and detached undo callbacks ${mode === 'mobile' ? '[mobile]' : ''}`, async ({ page }) => {
     await page.goto('/');
-    const result = await page.evaluate(async (initialState) => {
+    const result = await page.evaluate(async ({ initialState, keys }) => {
       const { createStore } = await import('/assets/js/state/store.js');
       const { initPageBreakControls } = await import('/assets/js/page-breaks.js');
       const { renderJapaneseCareer, renderJapaneseResume } = await import('/assets/js/templates/ja.js');
       const { renderChineseResume } = await import('/assets/js/templates/zh-CN.js');
       const { renderEnglishResume } = await import('/assets/js/templates/en.js');
-      const targets = [
-        { key: 'ja.education' }, { key: 'ja.careers' },
-        { key: 'ja.careerDetails', careerId: initialState.documents.ja.careers[0].id },
-        { key: 'zh-CN.experience' }, { key: 'en.experience' }, { key: 'profile.links' }
-      ];
+      const targets = keys.map((key) => ({ key, ...(key === 'ja.careerDetails' ? { careerId: initialState.documents.ja.careers[0].id } : {}) }));
       const results = [];
       for (const target of targets) {
         let saves = 0;
@@ -58,6 +61,7 @@ for (const mode of ['desktop', 'mobile']) {
           const key = locale === 'ja' && type === 'resume' ? 'qualifications' : 'skills';
           surface.querySelector(`button[data-page-break-key="${key}"]`).click();
         }
+        if (target.key === 'profile.links') hosts.slice(0, -1).forEach((host) => { host.hidden = true; });
         const undos = [...document.querySelectorAll('.page-break-feedback .page-break-undo')];
         const before = JSON.stringify(store.getState());
         const savesBefore = saves;
@@ -74,7 +78,7 @@ for (const mode of ['desktop', 'mobile']) {
         document.querySelectorAll('.page-break-feedback, .page-break-overlay').forEach((element) => { element.remove(); });
       }
       return results;
-    }, sharedControllerState());
+    }, { initialState: sharedControllerState(), keys: Object.keys(LIST_ORDER_REGISTRY) });
     for (const resultItem of result) {
       expect(resultItem, resultItem.key).toMatchObject({ noChange: false, preserved: true, changed: true, feedbackCount: 0, oldUndoCannotRestore: true });
     }
