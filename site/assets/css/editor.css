@@ -270,7 +270,7 @@ dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px)
 .sortable-row { min-width: 0; }
 .sortable-row-heading { align-items: center; background: var(--soft-surface); border: 1px solid var(--line); border-radius: 7px; display: grid; gap: 3px; grid-template-columns: 36px 36px auto minmax(0, 1fr) 36px; margin-bottom: 8px; min-width: 0; padding: 3px; }
 .sortable-handle, .sortable-toggle { background: transparent; border: 0; border-radius: 5px; color: var(--muted); font-size: 18px; height: 36px; padding: 0; width: 36px; }
-.sortable-handle { cursor: grab; }
+.sortable-handle { cursor: grab; touch-action: none; }
 .sortable-position { color: var(--muted); font-size: 10px; padding: 0 4px; }
 .sortable-summary { color: var(--ink); font-size: 12px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sortable-actions { position: relative; }
@@ -290,4 +290,22 @@ dialog::backdrop { background: rgba(12, 20, 35, .52); backdrop-filter: blur(2px)
 }
 @media print {
   .sortable-list-tools, .sortable-row-heading { display: none !important; }
+}
+
+/* Drag geometry comes from unchanged row boxes, never these animated headings. */
+.sortable-drag-panel { overflow-anchor: none; }
+.sortable-drag-list { user-select: none; }
+.sortable-drag-heading { transition: transform 140ms ease; }
+.sortable-drag-source { visibility: hidden; }
+.sortable-placeholder, .sortable-drag-float { box-sizing: border-box; border-radius: 7px; pointer-events: none; position: fixed; z-index: 1000; }
+.sortable-placeholder { background: #2457d615; border: 2px dashed var(--blue); }
+.sortable-placeholder.is-outside { opacity: .35; }
+.sortable-drag-float { align-items: center; background: var(--soft-surface); border: 1px solid var(--blue); box-shadow: 0 8px 20px #23395633; color: var(--ink); display: flex; font-size: 12px; font-weight: 700; overflow: hidden; padding: 8px 14px; text-overflow: ellipsis; white-space: nowrap; animation: sortable-lift 120ms ease; }
+.sortable-drag-float.is-landing { box-shadow: 0 2px 6px #23395622; transition: left 160ms ease, top 160ms ease, width 160ms ease, height 160ms ease, box-shadow 160ms ease; }
+@keyframes sortable-lift { from { opacity: .65; transform: scale(.99); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .sortable-drag-heading, .sortable-drag-float, .sortable-drag-float.is-landing { animation: none; transition: none; }
+}
+@media print {
+  .sortable-placeholder, .sortable-drag-float, .sortable-anchor-space { display: none !important; }
 }

@@ -1,23 +1,24 @@
 import { LIST_ORDER_REGISTRY } from '../state/list-order.js';
+import { createSortableDrag } from './sortable-drag.js';
 import { createListFoldState } from './list-fold-state.js';
 import { announceStatus } from './status-controller.js';
 
 const LABELS = {
   ja: {
     collapse: '折りたたむ', expand: '展開する', collapseAll: 'すべて折りたたむ', expandAll: 'すべて展開する',
-    up: '上へ移動', down: '下へ移動', actions: '項目の操作', handle: '並べ替え（上下キーで移動）',
+    up: '上へ移動', down: '下へ移動', actions: '項目の操作', handle: '並べ替え（ドラッグ、上下キーで移動）',
     moved: (name, position, count) => `${name}を ${count} 件中 ${position} 番目に移動しました。`,
     cleared: '関連文書の改ページを解除しました。'
   },
   'zh-CN': {
     collapse: '收起', expand: '展开', collapseAll: '全部收起', expandAll: '全部展开',
-    up: '上移', down: '下移', actions: '条目操作', handle: '排序（用上下方向键移动）',
+    up: '上移', down: '下移', actions: '条目操作', handle: '排序（拖动或用上下方向键移动）',
     moved: (name, position, count) => `${name}已移到第 ${position} 项，共 ${count} 项。`,
     cleared: '已清除相关文书的手动分页。'
   },
   en: {
     collapse: 'Collapse', expand: 'Expand', collapseAll: 'Collapse all', expandAll: 'Expand all',
-    up: 'Move up', down: 'Move down', actions: 'Item actions', handle: 'Reorder (use up/down arrow keys)',
+    up: 'Move up', down: 'Move down', actions: 'Item actions', handle: 'Reorder (drag or use up/down arrow keys)',
     moved: (name, position, count) => `${name} moved to position ${position} of ${count}.`,
     cleared: 'Manual page breaks cleared for the affected documents.'
   }
@@ -60,15 +61,17 @@ export function createSortableLists({ store, locale, announce = announceStatus }
   const lists = new Set();
   const foldStates = new Map();
   const composing = new Set();
+  const drag = createSortableDrag();
   let committing = false;
   let destroyed = false;
-  function compositionStart(event) { composing.add(event.target); }
+  function compositionStart(event) { drag.cancel(); composing.add(event.target); }
   function compositionEnd(event) { composing.delete(event.target); }
   function clearComposition() { composing.clear(); lists.forEach((list) => { list.refresh(); }); }
   document.addEventListener('compositionstart', compositionStart, true);
   document.addEventListener('compositionend', compositionEnd, true);
   window.addEventListener('blur', clearComposition);
   const unsubscribe = store.subscribe((_state, event) => {
+    if (!committing && event.type !== 'save') drag.cancel();
     if (REPLACEMENTS.has(event.type)) {
       clearComposition();
       foldStates.forEach((folds) => { folds.reset(); });
@@ -165,6 +168,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
     }
     function setAllCollapsed(collapsed) { rows.forEach((_row, index) => { setCollapsed(index, collapsed); }); }
     function releaseRows() {
+      drag.cancelList(container);
       window.clearTimeout(highlightTimer);
       rows.forEach((row) => {
         row.element.removeEventListener('input', row.onInput);
@@ -209,10 +213,18 @@ export function createSortableLists({ store, locale, announce = announceStatus }
         const row = { element, body, header, handle, toggle, position, summary, menu, menuBody, menuToggle, up, down,
           previousBodyId, wasHidden: body.hidden, actions: savedActions };
         const index = () => rows.indexOf(row);
-        toggle.addEventListener('click', () => { if (index() >= 0) setCollapsed(index(), !folds.get(index())); });
+        toggle.addEventListener('click', () => { drag.cancel(); if (index() >= 0) setCollapsed(index(), !folds.get(index())); });
         up.addEventListener('click', () => move(index(), index() - 1));
         down.addEventListener('click', () => move(index(), index() + 1));
+        handle.addEventListener('pointerdown', (event) => {
+          if (blocked() || !valid()) return;
+          const snapshot = store.getState();
+          drag.begin(event, { container, locale, rows: () => rows,
+            valid: () => !blocked() && valid() && store.getState() === snapshot,
+            collapse: () => setAllCollapsed(true), summary: () => name(index()), move, row: (position) => rows[position] }, index());
+        });
         handle.addEventListener('keydown', (event) => {
+          if (drag.busy) return;
           if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault();
@@ -235,7 +247,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       refresh();
     }
     function move(from, to) {
-      if (blocked() || !valid() || !Number.isInteger(from) || !Number.isInteger(to)
+      if (drag.busy || blocked() || !valid() || !Number.isInteger(from) || !Number.isInteger(to)
         || from < 0 || to < 0 || from >= rows.length || to >= rows.length || from === to) return false;
       const before = store.getState();
       const info = currentInfo();
@@ -271,8 +283,8 @@ export function createSortableLists({ store, locale, announce = announceStatus }
       rows.forEach((row) => { row.menu.open = false; });
       refresh();
     }
-    collapseAll.addEventListener('click', () => setAllCollapsed(true));
-    expandAll.addEventListener('click', () => setAllCollapsed(false));
+    collapseAll.addEventListener('click', () => { drag.cancel(); setAllCollapsed(true); });
+    expandAll.addEventListener('click', () => { drag.cancel(); setAllCollapsed(false); });
     function onComposition() { refresh(); }
     doc.addEventListener('compositionstart', onComposition);
     doc.addEventListener('compositionend', onComposition);
@@ -301,7 +313,7 @@ export function createSortableLists({ store, locale, announce = announceStatus }
   return { registerList,
     destroy() {
       if (destroyed) return;
-      destroyed = true; unsubscribe();
+      destroyed = true; drag.destroy(); unsubscribe();
       [...lists].forEach((list) => { list.destroy(); });
       document.removeEventListener('compositionstart', compositionStart, true);
       document.removeEventListener('compositionend', compositionEnd, true);

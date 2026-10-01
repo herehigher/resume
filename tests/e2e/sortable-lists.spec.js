@@ -463,3 +463,251 @@ for (const device of ['desktop', 'mobile']) {
     expect(await page.evaluate(() => sortableHarness.counts())).toEqual({ scheduled: 1, saved: 1 });
   });
 }
+
+async function dragFixture(page, { count = 6, long = false, nested = false } = {}) {
+  await mount(page, nested ? 'ja' : 'en');
+  await page.evaluate(({ count, long, nested }) => {
+    const h = sortableHarness;
+    const binding = h.bindings.get(nested ? 'ja.careers' : 'en.projects');
+    if (!nested) {
+      h.store.update((state) => {
+        const template = state.documents.en.resume.projects[0];
+        state.documents.en.resume.projects = Array.from({ length: count }, (_entry, index) => ({ ...template,
+          name: index < 2 ? 'Fictional duplicate' : `Fictional project ${index}`, description: `Fictitious body ${index}` }));
+      });
+      h.draw(binding);
+    }
+    const root = binding.section.parentElement;
+    root.replaceChildren(binding.section);
+    root.style.height = `${Math.min(650, innerHeight - 20)}px`;
+    root.style.padding = '10px'; root.style.margin = '0 auto'; root.style.overflowAnchor = 'none';
+    if (long) [...binding.container.children].forEach((row, index) => {
+      row.querySelector('[data-harness-body]').style.height = `${index % 2 ? 800 : 1200}px`;
+    });
+    window.dragBefore = h.store.getState();
+    window.dragForm = binding.container.children[0].querySelector('textarea');
+    window.dragBinding = binding;
+  }, { count, long, nested });
+}
+function handle(row) { return row.locator(':scope > .sortable-row-heading > .sortable-handle'); }
+async function point(locator) {
+  const rect = await locator.boundingBox();
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+}
+async function beginMouse(page, locator) {
+  await locator.scrollIntoViewIfNeeded();
+  const start = await point(locator);
+  await page.mouse.move(start.x, start.y); await page.mouse.down();
+  await page.mouse.move(start.x + 8, start.y);
+  await expect(page.locator('.sortable-placeholder')).toBeVisible();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  return start;
+}
+async function cleanDrag(page) {
+  await expect(page.locator('.sortable-drag-float, .sortable-placeholder, .sortable-anchor-space')).toHaveCount(0);
+  await expect(page.locator('.sortable-drag-heading, .sortable-drag-source, .sortable-drag-list, .sortable-drag-panel')).toHaveCount(0);
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+}
+
+for (const mobile of [false, true]) {
+  const tags = mobile ? '[mobile] [mobile-webkit]' : '';
+  test(`pointer drag preserves forms and commits duplicate no-ID rows immediately ${tags}`, async ({ page }, testInfo) => {
+    await dragFixture(page, { long: true });
+    const targetRows = rows(page, 'en.projects');
+    const start = await point(handle(targetRows.nth(0)));
+    await page.mouse.move(start.x, start.y); await page.mouse.down();
+    await page.mouse.move(start.x + 3, start.y);
+    await expect(targetRows.nth(0).locator('[data-harness-body]')).toBeVisible();
+    await page.mouse.up();
+    expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(0);
+    await beginMouse(page, handle(targetRows.nth(0)));
+    expect(await page.evaluate(() => dragForm === dragBinding.container.children[0].querySelector('textarea'))).toBe(true);
+    await expect(targetRows.nth(0).locator('[data-harness-body]')).toBeHidden();
+    // Activation alone must leave the original slot, including after several frames.
+    await page.waitForTimeout(80);
+    await page.mouse.up();
+    expect(await page.evaluate(() => sortableHarness.store.getState() === dragBefore)).toBe(true);
+    expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(0);
+    await cleanDrag(page);
+    await beginMouse(page, handle(targetRows.nth(0)));
+    for (const index of [3, 1, 4, 2, 5]) {
+      const destination = await point(targetRows.nth(index));
+      await page.mouse.move(destination.x, destination.y + 2);
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const rowBox = await targetRows.nth(index).boundingBox();
+      const placeholder = await page.locator('.sortable-placeholder').boundingBox();
+      expect(Math.abs(placeholder.y - rowBox.y)).toBeLessThan(1);
+    }
+    const floating = await page.locator('.sortable-drag-float').boundingBox();
+    expect(floating.x).toBeGreaterThanOrEqual(0);
+    expect(floating.x + floating.width).toBeLessThanOrEqual(page.viewportSize().width);
+    const bottom = await point(targetRows.nth(5));
+    await page.mouse.move(bottom.x, bottom.y + 2); await page.waitForTimeout(50);
+    await page.screenshot({ path: `/tmp/resume-272-${testInfo.project.name}-drag.png` });
+    await page.mouse.up();
+    expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(1);
+    expect(await page.evaluate(() => sortableHarness.items({ key: 'en.projects' }).map((item) => item.description))).toEqual([
+      'Fictitious body 1', 'Fictitious body 2', 'Fictitious body 3', 'Fictitious body 4', 'Fictitious body 5', 'Fictitious body 0'
+    ]);
+    await expect(handle(targetRows.nth(5))).toBeFocused();
+    await cleanDrag(page);
+    await beginMouse(page, handle(targetRows.nth(5)));
+    const top = await point(targetRows.nth(0));
+    await page.mouse.move(top.x, top.y - 1); await page.waitForTimeout(50); await page.mouse.up();
+    expect(await page.evaluate(() => sortableHarness.items({ key: 'en.projects' })[0].description)).toBe('Fictitious body 0');
+    expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(2);
+    await cleanDrag(page); await expectNoPageOverflow(page);
+  });
+
+  test(`long-card viewport anchor and cross-screen panel autoscroll ${tags}`, async ({ page }) => {
+    await dragFixture(page, { count: 28, long: true });
+    const targetRows = rows(page, 'en.projects');
+    await handle(targetRows.nth(14)).scrollIntoViewIfNeeded();
+    const before = await handle(targetRows.nth(14)).boundingBox();
+    await beginMouse(page, handle(targetRows.nth(14)));
+    const after = await handle(targetRows.nth(14)).boundingBox();
+    expect(Math.abs(after.y - before.y)).toBeLessThan(2);
+    const panel = await page.locator('.editor-panel').boundingBox();
+    await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height - 8);
+    await expect.poll(() => page.evaluate(() => dragBinding.container.lastElementChild.getBoundingClientRect().bottom
+      <= document.querySelector('.editor-panel').getBoundingClientRect().bottom)).toBe(true);
+    const end = await point(targetRows.nth(27));
+    await page.mouse.move(end.x, end.y + 2); await page.waitForTimeout(50); await page.mouse.up();
+    expect(await page.evaluate(() => sortableHarness.items({ key: 'en.projects' }).at(-1).description)).toBe('Fictitious body 14');
+    await cleanDrag(page);
+  });
+
+  test(`cancel, no-op, updates and view changes never save or leave drag UI ${tags}`, async ({ page }) => {
+    for (const reason of ['outside', 'Escape', 'pointercancel', 'capture', 'blur', 'update', 'import', 'hide', 'mobileView', 'sync', 'print', 'destroy']) {
+      await dragFixture(page);
+      const targetRows = rows(page, 'en.projects');
+      await beginMouse(page, handle(targetRows.nth(0)));
+      const destination = await point(targetRows.nth(3));
+      await page.mouse.move(destination.x, destination.y); await page.waitForTimeout(25);
+      if (reason === 'outside') { await page.mouse.move(1, 1); await page.mouse.up(); }
+      else if (reason === 'Escape') await page.keyboard.press('Escape');
+      else await page.evaluate((reason) => {
+        const h = sortableHarness;
+        const source = dragBinding.container.children[0].querySelector('.sortable-handle');
+        if (reason === 'pointercancel') source.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 }));
+        if (reason === 'capture') source.releasePointerCapture(1);
+        if (reason === 'blur') window.dispatchEvent(new Event('blur'));
+        if (reason === 'update') h.store.update((state) => { state.profile.fields.name = 'Fictitious updated name'; });
+        if (reason === 'import') h.store.prepareImport(h.store.exportJson());
+        if (reason === 'hide') dragBinding.section.hidden = true;
+        if (reason === 'mobileView') {
+          dragBinding.section.dataset.mobileMode = 'preview'; dragBinding.section.hidden = true;
+        }
+        if (reason === 'sync') h.draw(dragBinding);
+        if (reason === 'print') window.dispatchEvent(new Event('beforeprint'));
+        if (reason === 'destroy') h.controller.destroy();
+      }, reason);
+      await page.mouse.up(); await cleanDrag(page);
+      expect(await page.evaluate(() => sortableHarness.counts().scheduled), reason).toBe(0);
+      expect(await page.evaluate(() => sortableHarness.items({ key: 'en.projects' }).map((item) => item.description)), reason).toEqual([
+        'Fictitious body 0', 'Fictitious body 1', 'Fictitious body 2', 'Fictitious body 3', 'Fictitious body 4', 'Fictitious body 5'
+      ]);
+    }
+  });
+
+  test(`nested pointer lists remain isolated and reduced motion retains static feedback ${tags}`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await dragFixture(page, { nested: true });
+    const key = await page.evaluate(() => [...sortableHarness.bindings.keys()].find((key) => key.startsWith('ja.careerDetails')));
+    const targetRows = rows(page, key);
+    const before = await page.evaluate(() => sortableHarness.items({ key: 'ja.careers' }).map((item) => item.id));
+    await beginMouse(page, handle(targetRows.nth(0)));
+    await expect(rows(page, 'ja.careers').nth(0).locator(':scope > [data-harness-body]')).toBeVisible();
+    const animations = await page.evaluate(() => ({ animation: getComputedStyle(document.querySelector('.sortable-drag-float')).animationName,
+      transition: getComputedStyle(document.querySelector('.sortable-drag-heading')).transitionDuration }));
+    expect(animations).toEqual({ animation: 'none', transition: '0s' });
+    await page.screenshot({ path: `/tmp/resume-272-${testInfo.project.name}-reduced.png` });
+    const bottom = await point(targetRows.nth(2));
+    await page.mouse.move(bottom.x, bottom.y + 1); await page.waitForTimeout(40); await page.mouse.up();
+    await cleanDrag(page);
+    expect(await page.evaluate(() => sortableHarness.items({ key: 'ja.careers' }).map((item) => item.id))).toEqual(before);
+    await expect(targetRows.nth(2).locator(':scope > .sortable-row-heading .sortable-summary')).toHaveText('Fictional detail 0-0');
+    expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(1);
+    await handle(targetRows.nth(2)).focus(); await page.keyboard.press('ArrowUp');
+    await expect(handle(targetRows.nth(1))).toBeFocused();
+    await expect(targetRows.nth(1)).toHaveClass(/sortable-row-moved/);
+  });
+}
+
+test('native Chromium touch dragging handles scrolling while body retains touch scrolling [mobile]', async ({ page, context }) => {
+  await dragFixture(page, { count: 25 });
+  await page.evaluate(() => dragBinding.api.setAllCollapsed(true));
+  const targetRows = rows(page, 'en.projects');
+  const start = await point(handle(targetRows.nth(0)));
+  const session = await context.newCDPSession(page);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...start, id: 0 }] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + 12, y: start.y, id: 0 }] });
+  await expect(page.locator('.sortable-placeholder')).toBeVisible();
+  const panel = await page.locator('.editor-panel').boundingBox();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x, y: panel.y + panel.height - 8, id: 0 }] });
+  await expect.poll(() => page.evaluate(() => document.querySelector('.editor-panel').scrollTop)).toBeGreaterThan(250);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(1);
+  await cleanDrag(page);
+  await page.evaluate(() => { dragBinding.api.setAllCollapsed(false); document.querySelector('.editor-panel').scrollTop = 0; });
+  const body = await point(targetRows.nth(0).locator('textarea'));
+  const touchAction = await targetRows.nth(0).locator('textarea').evaluate((element) => getComputedStyle(element).touchAction);
+  expect(touchAction).toBe('auto');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...body, id: 1 }] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: body.x, y: body.y - 80, id: 1 }] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('.sortable-placeholder')).toHaveCount(0);
+  expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(1);
+  await session.detach();
+});
+
+test('pen and touch pointer paths share the threshold and transaction [mobile] [mobile-webkit]', async ({ page }) => {
+  for (const pointerType of ['pen', 'touch']) {
+    await dragFixture(page);
+    await page.evaluate(() => dragBinding.api.setAllCollapsed(true));
+    const result = await page.evaluate(async (pointerType) => {
+      const source = dragBinding.container.firstElementChild.querySelector('.sortable-handle');
+      const from = source.getBoundingClientRect();
+      const dispatch = (type, x, y) => source.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true,
+        pointerType, isPrimary: true, pointerId: 29, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y }));
+      // Synthetic PointerEvents cannot create browser capture. The native mouse
+      // cases above separately exercise real capture/loss in mobile WebKit.
+      source.setPointerCapture = () => {}; source.hasPointerCapture = () => false;
+      dispatch('pointerdown', from.x + 20, from.y + 20);
+      dispatch('pointermove', from.x + 28, from.y + 20);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const to = dragBinding.container.lastElementChild.getBoundingClientRect();
+      dispatch('pointermove', to.x + 30, to.y + to.height / 2 + 2);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      dispatch('pointerup', to.x + 30, to.y + to.height / 2 + 2);
+      return sortableHarness.counts().scheduled;
+    }, pointerType);
+    expect(result).toBe(1); await cleanDrag(page);
+  }
+});
+
+
+test('all registered list types use the same pointer transaction [mobile] [mobile-webkit]', async ({ page }) => {
+  await mount(page);
+  await page.evaluate(() => {
+    const root = document.querySelector('.editor-panel');
+    root.style.height = `${Math.min(650, innerHeight - 20)}px`; root.style.padding = '10px';
+  });
+  for (const key of mainKeys) {
+    const before = await page.evaluate((key) => {
+      const h = sortableHarness; const binding = h.bindings.get(key);
+      document.querySelector('.editor-panel').replaceChildren(binding.section);
+      binding.api.setAllCollapsed(true);
+      return structuredClone(h.items({ key }));
+    }, key);
+    const targetRows = rows(page, key);
+    await beginMouse(page, handle(targetRows.nth(0)));
+    const end = await point(targetRows.nth(2));
+    await page.mouse.move(end.x, end.y + 2);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.mouse.up();
+    expect(await page.evaluate((key) => sortableHarness.items({ key }), key)).toEqual([before[1], before[2], before[0]]);
+    await cleanDrag(page);
+  }
+  expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(mainKeys.length);
+});
