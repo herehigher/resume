@@ -246,7 +246,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   let sampleRequestVersion = 0;
   let shouldPersistDraft = store.hasStoredState();
   let zoom = 1;
-  const sortable = createEditorLists({ store, locale: 'en', scheduleSave, renderPreview, isBlocked: () => importPending });
+  const sortable = createEditorLists({ store, locale: 'en', scheduleSave, renderPreview, isBlocked: () => store.isImportPending() });
   const pageBreakControls = initPageBreakControls({
     store, locale: 'en', preview, toolbar: root.querySelector('.preview-toolbar'),
     getDocumentType: () => 'resume', scheduleSave

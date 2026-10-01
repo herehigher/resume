@@ -172,3 +172,72 @@ for (const mobile of [false, true]) {
     await expect(companies.nth(1).locator('[data-career-detail-list] > .career-detail-editor-item').nth(0)).toHaveClass(/is-collapsed/);
   });
 }
+
+for (const target of ['company', 'detail']) {
+  test(`deletion focuses a collapsed surviving Japanese ${target} without opening it`, async ({ page }) => {
+    const state = createDefaultState();
+    state.documents.ja.careers = [createJapaneseCareer(), createJapaneseCareer()];
+    if (target === 'detail') state.documents.ja.careers = [createJapaneseCareer()];
+    await seed(page, state); await openLocale(page, 'ja'); await page.locator('[data-document=career]').click();
+    const companies = page.locator('#careerList > .career-editor-item');
+    const rows = target === 'company' ? companies : companies.first().locator('[data-career-detail-list] > .career-detail-editor-item');
+    await heading(rows.nth(1)).locator('.sortable-toggle').click();
+    await heading(rows.first()).locator('.sortable-actions > summary').click();
+    await heading(rows.first()).locator(target === 'company' ? '.remove-career-button' : '.remove-career-detail-button').click();
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toHaveClass(/is-collapsed/);
+    await expect(heading(rows.first()).locator('.sortable-toggle')).toBeFocused();
+  });
+}
+
+for (const locale of ['ja', 'zh-CN', 'en']) {
+  test(`cancelled and failed imports immediately unblock ${locale} list controls`, async ({ page }) => {
+    await seed(page); await openLocale(page, locale);
+    const list = page.locator(locale === 'ja' ? '#educationList' : `[data-${locale === 'en' ? 'en' : 'zh'}-list=experience]`);
+    await list.evaluate((element) => { element.closest('.form-section').open = true; });
+    const rows = list.locator(':scope > .sortable-row');
+    const sort = list.locator('xpath=preceding-sibling::*[1]').locator('.sortable-sort');
+    for (const outcome of ['cancel', 'failed']) {
+      await page.locator('#importDataInput').setInputFiles({ name: 'fictional-import.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(createDefaultState(locale))) });
+      await expect(sort).toBeDisabled();
+      if (outcome === 'failed') {
+        await page.evaluate((key) => {
+          const original = Storage.prototype.setItem;
+          Storage.prototype.setItem = function (name, value) {
+            if (name === key) throw new DOMException('Fictitious quota failure', 'QuotaExceededError');
+            return original.call(this, name, value);
+          };
+          window.__restoreFictitiousStorage = () => { Storage.prototype.setItem = original; };
+        }, DRAFT_STORAGE_KEY);
+      }
+      await page.locator(outcome === 'cancel' ? '#cancelSampleAdoptButton' : '#confirmSampleAdoptButton').click();
+      await expect(page.locator('#importDataInput')).toHaveValue('');
+      await expect(sort).toBeEnabled();
+      await expect(rows).toHaveCount(3);
+      await expect(heading(rows.first()).locator('.sortable-handle')).toBeEnabled();
+      await heading(rows.first()).locator('.sortable-actions > summary').click();
+      await expect(heading(rows.first()).locator('.sortable-action-buttons > button').nth(1)).toBeEnabled();
+      await heading(rows.first()).locator('.sortable-actions > summary').click();
+      if (outcome === 'failed') await page.evaluate(() => window.__restoreFictitiousStorage());
+    }
+    await sort.click();
+    await expect(sort).toContainText(locale === 'ja' ? '新しい順' : locale === 'en' ? 'Newest first' : '倒序');
+  });
+}
+
+for (const target of ['company', 'detail']) {
+  test(`mouse cancellation restores the visible Japanese ${target} menu focus`, async ({ page }) => {
+    await seed(page); await openLocale(page, 'ja'); await page.locator('[data-document=career]').click();
+    const company = page.locator('#careerList > .career-editor-item').first();
+    const row = target === 'company' ? company : company.locator('[data-career-detail-list] > .career-detail-editor-item').first();
+    await heading(row).locator('.sortable-toggle').click();
+    const menu = heading(row).locator('.sortable-actions > summary');
+    await menu.click();
+    await heading(row).locator(target === 'company' ? '.remove-career-button' : '.remove-career-detail-button').click();
+    await page.locator('#cancelSampleAdoptButton').click();
+    await expect(menu).toBeFocused();
+    await expect(row).toHaveClass(/is-collapsed/);
+    await expect(page.locator('#careerList > .career-editor-item')).toHaveCount(2);
+    await expect(company.locator('[data-career-detail-list] > .career-detail-editor-item')).toHaveCount(3);
+  });
+}

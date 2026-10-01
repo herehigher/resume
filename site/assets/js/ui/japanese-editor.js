@@ -65,7 +65,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   let sampleRequestVersion = 0;
-  const sortable = createEditorLists({ store, locale: 'ja', scheduleSave, renderPreview, isBlocked: () => importPending });
+  const sortable = createEditorLists({ store, locale: 'ja', scheduleSave, renderPreview, isBlocked: () => store.isImportPending() });
   const pageBreakControls = initPageBreakControls({
     store, locale: 'ja', preview, toolbar: document.querySelector('#japaneseWorkspace .preview-toolbar'),
     getDocumentType: () => japaneseDocument().activeDocument, scheduleSave
@@ -509,7 +509,10 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
           cancel: 'キャンセル',
           confirm: '削除する'
         });
-        if (!confirmed) return;
+        if (!confirmed) {
+          focusCareerMenu(careerItem);
+          return;
+        }
       }
       let nextCareerIndex;
       let focusAddButton = false;
@@ -522,7 +525,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       renderPreview();
       window.requestAnimationFrame(() => {
         if (focusAddButton) document.querySelector('[data-add="career"]')?.focus();
-        else document.querySelector(`.career-editor-item[data-index="${nextCareerIndex}"] [data-key="company"]`)?.focus();
+        else focusVisibleCareerRow(document.querySelector(`.career-editor-item[data-index="${nextCareerIndex}"]`), '[data-key="company"]');
       });
       announceCareerDetail(`勤務先 ${careerIndex + 1} を削除しました。`);
       return;
@@ -539,9 +542,20 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     announceStatus(message);
   }
 
+  function focusCareerMenu(row) {
+    window.requestAnimationFrame(() => row?.querySelector(':scope > .sortable-row-heading .sortable-actions > summary')?.focus());
+  }
+
+  function focusVisibleCareerRow(row, selector) {
+    const target = row?.classList.contains('is-collapsed')
+      ? row.querySelector(':scope > .sortable-row-heading .sortable-toggle')
+      : row?.querySelector(selector);
+    target?.focus();
+  }
+
   function focusCareerDetail(careerIndex, detailIndex, selector = '[data-detail-key="title"]') {
     window.requestAnimationFrame(() => {
-      document.querySelector(`.career-editor-item[data-index="${careerIndex}"] .career-detail-editor-item[data-detail-index="${detailIndex}"] ${selector}`)?.focus();
+      focusVisibleCareerRow(document.querySelector(`.career-editor-item[data-index="${careerIndex}"] .career-detail-editor-item[data-detail-index="${detailIndex}"]`), selector);
     });
   }
 
@@ -575,7 +589,10 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
         cancel: 'キャンセル',
         confirm: '削除する'
       });
-      if (!confirmed) return;
+      if (!confirmed) {
+        focusCareerMenu(detailItem);
+        return;
+      }
     }
     sortable.removed({ key: 'ja.careerDetails', careerId: careerItem.dataset.careerId }, detailIndex);
     let nextDetailIndex;

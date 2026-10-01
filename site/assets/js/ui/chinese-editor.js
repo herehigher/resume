@@ -232,7 +232,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   let draftBeforeSample = null;
   let draftBeforeSampleWasStored = false;
   let sampleRequestVersion = 0;
-  const sortable = createEditorLists({ store, locale: 'zh-CN', scheduleSave, renderPreview, isBlocked: () => importPending });
+  const sortable = createEditorLists({ store, locale: 'zh-CN', scheduleSave, renderPreview, isBlocked: () => store.isImportPending() });
   const pageBreakControls = initPageBreakControls({
     store, locale: 'zh-CN', preview, toolbar: rootElement.querySelector('.preview-toolbar'),
     getDocumentType: () => 'resume', scheduleSave
