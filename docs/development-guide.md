@@ -46,6 +46,16 @@ data format を更新するときは `STATE_VERSION` を増やし、直前 versi
 
 実際の順序変更だけが対象言語・文書の A4／LETTER の sections・records を同じ state 更新で空にし、全ての初期化済み改ページコントローラーの一時フィードバックと旧 undo を失効させます。共有リンクの場合は全言語・全文書・全用紙を空にします。無変化の操作は state・通知・保存・改ページに触れません。UI 接続と表示の統合受入は親 Issue の後続子 Issue で実施します。
 
+### 共通の折りたたみ・キーボード操作
+
+`createSortableLists({ store, locale, announce })`（`ui/sortable-lists.js`）は14種類の登録済みリストだけを扱います。`registerList({ target, container, toolbar, itemLabel, getSummary, render, scheduleSave, isBlocked })` で editor adapter を登録し（controller 内で同じ target の有効 binding は一つ）、`sync([{ element, body, actions }], { change })` へ現在の直属行・既存の本文 node・既存操作 button を渡します。見出しと操作入口だけを追加し、入力欄や削除確認 callback を作り直しません。入力時の摘要は state から純粋な文字列を返す `getSummary` で更新します。
+
+`move(from, to)` と手柄の上下キー／操作入口の上・下 button は `store.reorderList` を呼びます。実変更時だけ `render({ from, to })` が対象リストを同期再描画して `sync` を呼び、その後に従来の `scheduleSave` を呼びます。移動先の手柄へ focus と番号を戻し、対象範囲に実際の改ページがあったときだけ解除を通知します。`isBlocked` は後続のドラッグ等の adapter 側処理、import pending と composition は共通側で検査します。本文の方向キーは取り扱いません。
+
+勤務先と中英文職歴の折りたたみは既存 record ID、ID のない行は一時配列で保持します。追加／削除した adapter は更新後の `sync` に `{ change: { type: 'insert' | 'remove', index } }` を渡します。移動は共通側で同じ一時配列を移動します。匿名行の不明な構造変更は全展開へ戻し、同じ本文を identity として推測しません。会社詳細の状態は `careerId` ごとに分離し、親行の折りたたみは詳細を変えません。親の再描画で詳細 binding を破棄・再登録しても同じ controller 内の状態は保持し、会社削除時には消します。
+
+`replace`・import・reload・sample・restore・reset で旧状態を破棄します。再描画前の古い行では移動できず、単なる保存完了では折りたたみを変更しません。import の保存失敗では草稿と fold を維持し、pending 解除後に移動操作を復帰させます。`list.destroy()` は行装飾と listener を外し既存操作を元へ戻し、controller の `destroy()` は全登録と一時状態を破棄します。controller を維持した普通の再描画と破棄を区別してください。fold 情報は v4・JSON・保存に入りません。reorder 通知の読み取り専用 `target`・`operation`・`permutation` は移動に伴う一時状態の同期だけに使い、保存 data に入りません。別 controller からの移動・日付整列でも位置 permutation と同じ fold を動かし、無関係なリストを無効にしません。日付整列／pointer drag の追加と三言語 editor への接続は後続子 Issue で行います。本コンポーネントの browser test は test 内で架空 adapter を組み立て、公開 product route は追加しません。
+
 ## Open Graph 共有画像
 
 日本語・简体中文・English の公開入口で使う 1200 × 630 の共有画像は、repository root から次の command で3言語分をまとめて再生成します。

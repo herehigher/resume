@@ -253,7 +253,7 @@ test('failed/conflicting saves leave the latest local reorder intact and report 
     const reordered = store.getState();
     await assert.rejects(store.save(), DraftStorageError);
     assert.equal(store.getState(), reordered);
-    assert.deepEqual(events, [{ type: 'reorder' }]);
+    assert.deepEqual(events, [{ type: 'reorder', target, operation: { type: 'move', from: 0, to: 1 }, permutation: [1, 0, 2] }]);
   }
 });
 
@@ -276,3 +276,21 @@ for (const [locale, render] of [['en', renderEnglishResume], ['zh-CN', renderChi
     }
   });
 }
+
+
+test('identical primitive links still change positions and report a frozen UI permutation without payload metadata', () => {
+  const state = createDefaultState();
+  state.profile.fields.links = ['https://fictional.example/duplicate', 'https://fictional.example/duplicate'];
+  const store = createStore({ initialState: state, persistence: { async save() {} } });
+  const before = store.getState();
+  let event;
+  store.subscribe((_value, value) => { event = value; });
+  assert.equal(store.reorderList({ key: 'profile.links' }, { type: 'move', from: 0, to: 1 }), true);
+  assert.notEqual(store.getState(), before);
+  assert.deepEqual(event.permutation, [1, 0]);
+  assert.equal(Object.isFrozen(event), true);
+  assert.equal(Object.isFrozen(event.target), true);
+  assert.equal(Object.isFrozen(event.operation), true);
+  assert.equal(Object.isFrozen(event.permutation), true);
+  assert.equal(store.exportJson().includes('permutation'), false);
+});

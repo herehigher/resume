@@ -46,7 +46,7 @@ function compareDate(left, right, direction) {
   return (left < right ? -1 : 1) * direction;
 }
 
-export function orderListByDate(items, dateKind, direction) {
+function datePermutation(items, dateKind, direction) {
   if (!['date', 'range'].includes(dateKind) || !['newest', 'oldest'].includes(direction)) {
     throw new TypeError('A supported date kind and direction are required.');
   }
@@ -55,7 +55,11 @@ export function orderListByDate(items, dateKind, direction) {
     .sort((left, right) => compareDate(left.end, right.end, sign)
       || (left.end !== null ? compareDate(left.start, right.start, sign) : 0)
       || left.index - right.index)
-    .map(({ item }) => item);
+    .map(({ index }) => index);
+}
+
+export function orderListByDate(items, dateKind, direction) {
+  return datePermutation(items, dateKind, direction).map((index) => items[index]);
 }
 
 function resolveList(state, target) {
@@ -82,24 +86,24 @@ function clearDocumentBreaks(pageBreaks, locale, documentType) {
   }
 }
 
-// Mutates only a caller-owned state copy. False means no observable change;
+// Mutates only a caller-owned state copy. Null means no observable change;
 // the store must retain its original state and skip notifications/persistence.
 export function applyListReorder(state, target, operation) {
   const { descriptor, parent, field, items } = resolveList(state, target);
-  let ordered;
+  let permutation;
   if (operation?.type === 'move') {
     const { from, to } = operation;
     if (!Number.isInteger(from) || !Number.isInteger(to)
-      || from < 0 || to < 0 || from >= items.length || to >= items.length || from === to) return false;
-    ordered = [...items];
-    ordered.splice(to, 0, ordered.splice(from, 1)[0]);
+      || from < 0 || to < 0 || from >= items.length || to >= items.length || from === to) return null;
+    permutation = items.map((_item, index) => index);
+    permutation.splice(to, 0, permutation.splice(from, 1)[0]);
   } else if (operation?.type === 'sort') {
-    ordered = orderListByDate(items, descriptor.dateKind, operation.direction);
+    permutation = datePermutation(items, descriptor.dateKind, operation.direction);
   } else {
     throw new TypeError('A move or sort operation is required.');
   }
-  if (ordered.every((item, index) => item === items[index])) return false;
-  parent[field] = ordered;
+  if (permutation.every((position, index) => position === index)) return null;
+  parent[field] = permutation.map((index) => items[index]);
   const pageBreaks = state.settings.pageBreaks;
   if (descriptor.locale) {
     clearDocumentBreaks(pageBreaks, descriptor.locale, descriptor.documentType);
@@ -110,5 +114,5 @@ export function applyListReorder(state, target, operation) {
       }
     }
   }
-  return true;
+  return permutation;
 }
