@@ -110,8 +110,8 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     shouldPersistDraft = true;
     setDraftStatus('暗号化して保存中…', 'saving');
     saveTimer = window.setTimeout(async () => {
-      const savedState = store.getState();
-      const isCurrent = () => requestVersion === saveRequestVersion && store.getState() === savedState && !sampleMode && !importPending;
+      const savedRevision = store.getDraftRevision();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getDraftRevision() === savedRevision && !sampleMode && !importPending;
       try {
         if (!await store.save() || !isCurrent()) return;
         setDraftStatus('暗号化してこの端末に保存済み', 'success');
@@ -767,6 +767,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   });
 
   store.subscribe((_state, event) => {
+    if (event.type === 'save' && !sampleMode && !importPending && saveStatus.classList.contains('is-saving')) {
+      setDraftStatus('暗号化してこの端末に保存済み', 'success', { announce: false });
+    }
     if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;

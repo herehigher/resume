@@ -75,3 +75,30 @@ test('a newer request for the same state invalidates older completion', async ()
   assert.equal(await first, false);
   assert.deepEqual(events, []);
 });
+
+
+test('display locale-only changes do not invalidate the current draft save', async () => {
+  const { store, saves, events, edit } = controlledStore();
+  edit('Fictional A before locale change');
+  const revision = store.getDraftRevision();
+  const first = store.save();
+  store.update((state) => { state.settings.locale = 'en'; }, { type: 'locale' });
+  assert.equal(store.getDraftRevision(), revision);
+  saves[0].complete();
+  assert.equal(await first, true);
+  assert.deepEqual(events, ['save']);
+  assert.equal(store.getState().settings.locale, 'en');
+  assert.equal(saves[0].snapshot.settings.locale, 'ja', 'display preference does not rewrite the saved snapshot');
+});
+
+test('a locale event containing a draft edit still invalidates the prior save', async () => {
+  const { store, saves, events } = controlledStore();
+  const first = store.save();
+  store.update((state) => {
+    state.settings.locale = 'en';
+    state.profile.fields.fullName = 'Fictional B with locale event';
+  }, { type: 'locale' });
+  saves[0].complete();
+  assert.equal(await first, false);
+  assert.deepEqual(events, []);
+});
