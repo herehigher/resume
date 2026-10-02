@@ -88,11 +88,11 @@ test('日本語PDF: 両書類・A4/Letter・短文/長文/手動改ページの�
 test('日本語PDF: 空の末尾項目・未記入section・予約空白行を本文末尾と混同しない', async ({ page }, testInfo) => {
   await openLocale(page, 'ja');
   const evidence = [];
-  for (const tail of ['detail', 'long-label', 'role', 'companyInfo', 'company', 'skills', 'summary', 'identity']) {
+  for (const tail of ['detail', 'long-label', 'role', 'companyInfo', 'company', 'skills', 'summary', 'identity', 'identity-links']) {
     const state = createDefaultState('ja');
     state.documents.ja.activeDocument = 'career';
     state.profile.fields.fullName = '架空 太郎';
-    state.profile.fields.links = [];
+    state.profile.fields.links = tail === 'identity-links' ? [`https://example.invalid/${'long-profile-path/'.repeat(30)}`, 'https://example.invalid/short'] : [];
     state.documents.ja.fields.careerSummary = tail === 'summary' ? '最後の要約 END-SUMMARY' : '';
     state.documents.ja.fields.skills = tail === 'skills' ? '最後の技術 END-SKILLS' : '';
     state.documents.ja.careers = ['detail', 'long-label', 'role', 'companyInfo', 'company'].includes(tail) ? [{
