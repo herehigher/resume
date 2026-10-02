@@ -116,24 +116,28 @@ test('v3 migration connects locale/paper page breaks to one real print without e
   const cases = [
     {
       locale: 'ja',
+      workspace: '#japaneseWorkspace',
       selectDocument: async () => page.locator('#careerDocumentTab').click(),
       target: '#japaneseWorkspace [data-section-key="career-history"]',
       pageRule: 'size: A4 portrait'
     },
     {
       locale: 'zh-CN',
+      workspace: '#chineseWorkspace',
       selectDocument: async () => {},
       target: '#chineseWorkspace [data-section-key="experience"]',
       pageRule: 'size: A4 portrait'
     },
     {
       locale: 'en',
+      workspace: '[data-english-editor]',
       selectDocument: async () => page.locator('[data-en-page-size]').selectOption('A4'),
       target: '[data-english-editor] [data-section-key="projects"]',
       pageRule: 'size: A4 portrait'
     },
     {
       locale: 'en',
+      workspace: '[data-english-editor]',
       selectDocument: async () => page.locator('[data-en-page-size]').selectOption('LETTER'),
       target: '[data-english-editor] [data-section-key="skills"]',
       pageRule: 'size: Letter portrait'
@@ -146,9 +150,16 @@ test('v3 migration connects locale/paper page breaks to one real print without e
     await item.selectDocument();
     await expect(page.locator(item.target).first()).toHaveClass(/has-manual-page-break/);
     await expect.poll(() => page.locator('#activePrintPageStyle').textContent()).toContain(item.pageRule);
+    const toolbar = page.locator(`${item.workspace} .preview-toolbar`);
+    const menu = toolbar.locator('.page-break-menu');
+    await expect(toolbar).toHaveCount(1);
+    await expect(menu).toHaveCount(1);
+    await expect(toolbar).toBeVisible();
+    await expect(menu).toBeVisible();
     await page.emulateMedia({ media: 'print' });
     expect(await page.locator(item.target).first().evaluate((element) => getComputedStyle(element).breakBefore)).toBe('page');
-    await expect(page.locator('.page-break-boundary').first()).toBeHidden();
+    await expect(toolbar).toBeHidden();
+    await expect(menu).toBeHidden();
   }
 
   // A single migrated Letter print checks the storage -> rendering -> PDF connection.
