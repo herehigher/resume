@@ -239,6 +239,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   const completionLabel = root.querySelector('[data-en-completion-label]');
   const optionalDetailsSwitch = root.querySelector('[data-en-optional-details-switch]');
   let saveTimer;
+  let saveRequestVersion = 0;
   let sampleMode = false;
   let importPending = false;
   let draftBeforeSample = null;
@@ -272,6 +273,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   statusController?.registerDraftStatus('en', saveStatus, root.querySelector('.draft-controls'));
 
   function scheduleSave() {
+    const requestVersion = ++saveRequestVersion;
     window.clearTimeout(saveTimer);
     if (sampleMode) {
       setStatus('The example is not being saved.');
@@ -281,10 +283,13 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     shouldPersistDraft = true;
     setStatus('Encrypting and saving…', 'saving');
     saveTimer = window.setTimeout(async () => {
+      const savedState = store.getState();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getState() === savedState && !sampleMode && !importPending;
       try {
-        await store.save();
+        if (!await store.save() || !isCurrent()) return;
         setStatus('Encrypted and saved on this device.', 'success');
       } catch (error) {
+        if (!isCurrent()) return;
         setStatus(draftStatusMessageForError(error, 'en', 'Your changes could not be saved on this device.'), true);
       }
     }, 300);

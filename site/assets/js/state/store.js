@@ -7,6 +7,7 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   let state = cloneData(assertValidState(initialState));
   let stored = hasStoredState;
   let importPending = false;
+  let saveRequestVersion = 0;
   const listeners = new Set();
 
   function notify(type, details = {}) {
@@ -84,10 +85,15 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       return importPending;
     },
     save() {
-      const snapshot = cloneData(state);
+      const savedState = state;
+      const requestVersion = ++saveRequestVersion;
+      const snapshot = cloneData(savedState);
       return persistence.save(snapshot).then(() => {
         stored = true;
+        // Persistence of an older snapshot does not mean the current draft is saved.
+        if (state !== savedState || requestVersion !== saveRequestVersion) return false;
         notify('save');
+        return true;
       });
     },
     async reload() {

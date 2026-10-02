@@ -226,6 +226,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   const saveStatus = rootElement.querySelector('[data-zh-draft-message]');
   let zoom = 1;
   let saveTimer;
+  let saveRequestVersion = 0;
   let shouldPersistDraft = store.hasStoredState();
   let sampleMode = false;
   let importPending = false;
@@ -257,15 +258,19 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   statusController?.registerDraftStatus('zh-CN', saveStatus, rootElement.querySelector('[data-zh-draft-controls]'));
 
   function scheduleSave() {
+    const requestVersion = ++saveRequestVersion;
     window.clearTimeout(saveTimer);
     if (sampleMode || importPending) return;
     shouldPersistDraft = true;
     setStatus(zhCN.savingStatus, 'saving');
     saveTimer = window.setTimeout(async () => {
+      const savedState = store.getState();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getState() === savedState && !sampleMode && !importPending;
       try {
-        await store.save();
+        if (!await store.save() || !isCurrent()) return;
         setStatus(zhCN.savedStatus, 'success');
       } catch (error) {
+        if (!isCurrent()) return;
         setStatus(draftStatusMessageForError(error, 'zh-CN', zhCN.saveError), 'error');
       }
     }, 300);
