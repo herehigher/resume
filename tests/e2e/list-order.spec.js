@@ -1,9 +1,8 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-import { LIST_ORDER_REGISTRY } from '../../site/assets/js/state/list-order.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
-import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
+import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test, waitForPersistedState } from './fixtures.js';
 
 function sharedControllerState() {
   const state = createDefaultState();
@@ -78,7 +77,7 @@ for (const mode of ['desktop', 'mobile']) {
         document.querySelectorAll('.page-break-feedback, .page-break-overlay').forEach((element) => { element.remove(); });
       }
       return results;
-    }, { initialState: sharedControllerState(), keys: Object.keys(LIST_ORDER_REGISTRY) });
+    }, { initialState: sharedControllerState(), keys: ['ja.education', 'ja.careers', 'ja.careerDetails', 'zh-CN.experience', 'en.experience', 'profile.links'] });
     for (const resultItem of result) {
       expect(resultItem, resultItem.key).toMatchObject({ noChange: false, preserved: true, changed: true, feedbackCount: 0, oldUndoCannotRestore: true });
     }
@@ -105,12 +104,12 @@ function savedOrderFixture(locale, paper) {
 
 for (const [locale, paper] of [['zh-CN', 'A4'], ['en', 'A4'], ['en', 'LETTER']]) {
   for (const mode of ['desktop', 'mobile']) {
-    test(`${locale} ${paper} saved array order survives encrypted reload, preview and PDF ${mode === 'mobile' ? '[mobile]' : ''}`, async ({ page }, testInfo) => {
+    test(`${locale} ${paper} saved array order survives encrypted reload, preview and PDF ${mode === 'mobile' ? '[mobile]' : ''}`, async ({ page }) => {
       const state = savedOrderFixture(locale, paper);
       await openLocale(page, locale);
       await page.locator('#importDataInput').setInputFiles({ name: 'fictitious-list-order.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state)) });
       await page.locator('#confirmSampleAdoptButton').click();
-      await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY)).not.toBeNull();
+      await waitForPersistedState(page, { documents: { [locale]: { resume: state.documents[locale].resume } } });
       const raw = await page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY);
       expect(raw).not.toContain('EXPERIENCE-FIRST');
       await page.reload();
@@ -123,10 +122,9 @@ for (const [locale, paper] of [['zh-CN', 'A4'], ['en', 'A4'], ['en', 'LETTER']])
         expect(text.indexOf(`${type.toUpperCase()}-FIRST`)).toBeLessThan(text.indexOf(`${type.toUpperCase()}-SECOND`));
       }
       await expectNoPageOverflow(page);
-      await page.screenshot({ path: testInfo.outputPath('saved-order-preview.png'), fullPage: true });
       if (mode === 'mobile') return;
       await page.emulateMedia({ media: 'print' });
-      const buffer = await page.pdf({ path: testInfo.outputPath('saved-order.pdf'), preferCSSPageSize: true, printBackground: true });
+      const buffer = await page.pdf({ preferCSSPageSize: true, printBackground: true });
       const loadingTask = getDocument({ data: new Uint8Array(buffer), disableFontFace: true, isEvalSupported: false, useSystemFonts: true });
       try {
         const pdf = await loadingTask.promise;

@@ -239,6 +239,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   const completionLabel = root.querySelector('[data-en-completion-label]');
   const optionalDetailsSwitch = root.querySelector('[data-en-optional-details-switch]');
   let saveTimer;
+  let saveRequestVersion = 0;
   let sampleMode = false;
   let importPending = false;
   let draftBeforeSample = null;
@@ -272,6 +273,7 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   statusController?.registerDraftStatus('en', saveStatus, root.querySelector('.draft-controls'));
 
   function scheduleSave() {
+    const requestVersion = ++saveRequestVersion;
     window.clearTimeout(saveTimer);
     if (sampleMode) {
       setStatus('The example is not being saved.');
@@ -281,10 +283,13 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     shouldPersistDraft = true;
     setStatus('Encrypting and saving…', 'saving');
     saveTimer = window.setTimeout(async () => {
+      const savedRevision = store.getDraftRevision();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getDraftRevision() === savedRevision && !sampleMode && !importPending;
       try {
-        await store.save();
+        if (!await store.save() || !isCurrent()) return;
         setStatus('Encrypted and saved on this device.', 'success');
       } catch (error) {
+        if (!isCurrent()) return;
         setStatus(draftStatusMessageForError(error, 'en', 'Your changes could not be saved on this device.'), true);
       }
     }, 300);
@@ -632,6 +637,9 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   }
 
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'save' && !sampleMode && !importPending && saveStatus.classList.contains('is-saving')) {
+      setStatus('Encrypted and saved on this device.', 'success', { announce: false });
+    }
     if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;

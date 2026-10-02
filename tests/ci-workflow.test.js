@@ -220,15 +220,10 @@ test('CI installs only the browser binaries required by headless execution', () 
   assert.doesNotMatch(playwrightConfig, /\bheadless\s*:\s*false/);
 });
 
-test('Quality retains successful reorder visual evidence with source identity and bounded retention', () => {
-  const step = workflowStep(qualityJob, 'Upload list reorder acceptance evidence');
-  assert.match(workflowStepField(step, 'if'), /success\(\)/);
-  assert.match(workflowStepField(step, 'if'), /docs_only != 'true'/);
-  assert.match(step.body, /list-reorder-acceptance-\$\{\{ inputs\.checkout_ref \|\| github\.sha \}\}/);
-  for (const suffix of ['*.png', '*.pdf', 'evidence.json']) {
-    assert.ok(step.body.includes(`playwright-results/issue-275-*/${suffix}`));
-  }
-  assert.match(step.body, /if-no-files-found: error/);
-  assert.match(step.body, /retention-days: 7/);
-  assert.doesNotMatch(step.body, /trace\.zip|test-failed/);
+test('Quality keeps failure and release artifacts without a successful reorder upload', () => {
+  assert.doesNotMatch(qualityJob, /- name: Upload list reorder acceptance evidence/);
+  const failure = workflowStep(qualityJob, 'Upload Playwright failure evidence');
+  assert.equal(workflowStepField(failure, 'if'), 'failure()');
+  assert.match(failure.body, /path: node_modules\/\.cache\/resume-studio\/playwright-results\//);
+  assert.match(workflowStep(qualityJob, 'Upload documentation asset evidence').body, /documentation-assets-/);
 });
