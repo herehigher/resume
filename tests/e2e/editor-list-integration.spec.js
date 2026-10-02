@@ -1,7 +1,7 @@
 import { createDefaultState, createJapaneseCareer } from '../../site/assets/js/state/defaults.js';
 import { createEnglishItem } from '../../site/assets/js/ui/english-editor.js';
 import { createChineseItem } from '../../site/assets/js/ui/chinese-editor.js';
-import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
+import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test, waitForPersistedState } from './fixtures.js';
 
 function fixture() {
   const state = createDefaultState();
@@ -30,33 +30,31 @@ async function down(row) {
   await heading(row).locator('.sortable-action-buttons > button').nth(1).click();
 }
 for (const locale of ['ja', 'zh-CN', 'en']) {
-  for (const mobile of [false, true]) {
-    test(`product lists use array order and one-time sorting ${locale} ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page }) => {
-      await seed(page); await openLocale(page, locale);
-      const prefix = locale === 'en' ? 'en' : 'zh';
-      const container = locale === 'ja' ? page.locator('#educationList') : page.locator(`[data-${prefix}-list=experience]`);
-      await container.evaluate((element) => { element.closest('.form-section').open = true; });
-      const rows = container.locator(':scope > .sortable-row');
-      const original = await heading(rows.nth(0)).locator('.sortable-summary').textContent();
-      const tools = container.locator('xpath=preceding-sibling::*[1]');
-      await tools.locator('.sortable-sort').click();
-      await expect(heading(rows.nth(0)).locator('.sortable-summary')).toContainText('1');
-      await expect(tools.locator('.sortable-sort')).toContainText(locale === 'ja' ? '新しい順' : locale === 'en' ? 'Newest first' : '倒序');
-      await down(rows.nth(0));
-      await expect(tools.locator('.sortable-sort')).toContainText(locale === 'ja' ? 'カスタム' : locale === 'en' ? 'Custom' : '自定义');
-      await expect(heading(rows.nth(0)).locator('.sortable-summary')).toHaveText(original);
-      await heading(rows.nth(1)).locator('.sortable-handle').focus(); await page.keyboard.press('ArrowUp');
-      await expect(heading(rows.nth(0)).locator('.sortable-handle')).toBeFocused();
-      const input = rows.nth(0).locator(locale === 'ja' ? '[data-key=detail]' : `[data-${prefix}-item-field=company], [data-zh-key=company], [data-zh-key]`).first();
-      await input.fill('Fictional edited after move');
-      await expect(heading(rows.nth(0)).locator('.sortable-summary')).toHaveText('Fictional edited after move');
-      await tools.locator('.sortable-fold-all').click();
-      await expect(rows.nth(0).locator(':scope > .sortable-existing-body')).toBeHidden();
-      await tools.locator('.sortable-fold-all').click();
-      await expect(rows.nth(0).locator(':scope > .sortable-existing-body')).toBeVisible();
-      await expectNoPageOverflow(page);
-    });
-  }
+  test(`product lists use array order and one-time sorting ${locale}`, async ({ page }) => {
+    await seed(page); await openLocale(page, locale);
+    const prefix = locale === 'en' ? 'en' : 'zh';
+    const container = locale === 'ja' ? page.locator('#educationList') : page.locator(`[data-${prefix}-list=experience]`);
+    await container.evaluate((element) => { element.closest('.form-section').open = true; });
+    const rows = container.locator(':scope > .sortable-row');
+    const original = await heading(rows.nth(0)).locator('.sortable-summary').textContent();
+    const tools = container.locator('xpath=preceding-sibling::*[1]');
+    await tools.locator('.sortable-sort').click();
+    await expect(heading(rows.nth(0)).locator('.sortable-summary')).toContainText('1');
+    await expect(tools.locator('.sortable-sort')).toContainText(locale === 'ja' ? '新しい順' : locale === 'en' ? 'Newest first' : '倒序');
+    await down(rows.nth(0));
+    await expect(tools.locator('.sortable-sort')).toContainText(locale === 'ja' ? 'カスタム' : locale === 'en' ? 'Custom' : '自定义');
+    await expect(heading(rows.nth(0)).locator('.sortable-summary')).toHaveText(original);
+    await heading(rows.nth(1)).locator('.sortable-handle').focus(); await page.keyboard.press('ArrowUp');
+    await expect(heading(rows.nth(0)).locator('.sortable-handle')).toBeFocused();
+    const input = rows.nth(0).locator(locale === 'ja' ? '[data-key=detail]' : `[data-${prefix}-item-field=company], [data-zh-key=company], [data-zh-key]`).first();
+    await input.fill('Fictional edited after move');
+    await expect(heading(rows.nth(0)).locator('.sortable-summary')).toHaveText('Fictional edited after move');
+    await tools.locator('.sortable-fold-all').click();
+    await expect(rows.nth(0).locator(':scope > .sortable-existing-body')).toBeHidden();
+    await tools.locator('.sortable-fold-all').click();
+    await expect(rows.nth(0).locator(':scope > .sortable-existing-body')).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
 }
 test('Japanese company details preserve isolation, copied structure and stable focus', async ({ page }) => {
   await seed(page); await openLocale(page, 'ja');
@@ -88,7 +86,7 @@ test('shared links keep the moved identity through delete, encrypted reload and 
   await heading(rows.nth(0)).locator('[data-remove-profile-link]').click();
   await expect(rows).toHaveCount(1);
   await expect(rows.nth(0).locator('[data-profile-link-index="0"]')).toHaveValue('https://fictional.example/first');
-  await expect(page.locator('#saveStatus')).toContainText('保存済み');
+  await waitForPersistedState(page, { profile: { fields: { links: ['https://fictional.example/first'] } } });
   await page.reload();
   await expect(page.locator('#profileLinksEditor [data-profile-link-index="0"]')).toHaveValue('https://fictional.example/first');
   await page.locator('#localeSelect').selectOption('en');

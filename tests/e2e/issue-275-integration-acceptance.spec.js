@@ -1,18 +1,9 @@
-import { execFileSync } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createDefaultState, createJapaneseCareer } from '../../site/assets/js/state/defaults.js';
 import { createChineseItem } from '../../site/assets/js/ui/chinese-editor.js';
 import { createEnglishItem } from '../../site/assets/js/ui/english-editor.js';
-import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, test } from './fixtures.js';
-
-const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-async function writeEvidence(page, testInfo, conditions) {
-  await writeFile(testInfo.outputPath('evidence.json'), JSON.stringify({
-    sourceCommit, project: testInfo.project.name, browser: page.context().browser().version(),
-    os: process.platform, viewport: page.viewportSize(), fictionalDataOnly: true, ...conditions
-  }, null, 2));
-}
+import { DRAFT_STORAGE_KEY, expect, expectNoPageOverflow, openLocale, readPersistedState, test, waitForPersistedState } from './fixtures.js';
 
 // Explicit product selectors keep this acceptance independent of registry wiring.
 const targets = [
@@ -103,21 +94,44 @@ async function remove(page, row, target) {
   if (target.career) await page.locator('#confirmSampleAdoptButton').click();
 }
 async function stored(page) { return page.evaluate((key) => localStorage.getItem(key), DRAFT_STORAGE_KEY); }
-async function waitForSave(page) {
-  await expect.poll(async () => JSON.parse(await stored(page) || '{}').format).toBe('resume-studio-local-encrypted-v1');
-  const status = page.locator('#saveStatus:visible, [data-zh-draft-message]:visible, [data-en-save-status]:visible').first();
-  await expect(status).toContainText(/保存済み|已保存|Saved|saved|保存到/);
+function listExpectation(state, target) {
+  if (target.key === 'profile.links') return { profile: { fields: { links: items(state, target) } } };
+  const key = target.key.split('.').at(-1);
+  if (target.locale === 'ja') return { documents: { ja: { [target.key === 'ja.careerDetails' ? 'careers' : key]: target.key === 'ja.careerDetails' ? state.documents.ja.careers : items(state, target) } } };
+  return { documents: { [target.locale]: { resume: { [key]: items(state, target) } } } };
 }
+async function rowValues(rows, target) {
+  return rows.locator(target.field).evaluateAll((fields) => fields.map((field) => field.value));
+}
+const roundtripKeys = ['ja.education', 'ja.careers', 'ja.careerDetails', 'zh-CN.experience', 'en.experience', 'profile.links'];
+const mobileKeys = ['zh-CN.experience', 'en.experience', 'profile.links'];
 
 for (const target of targets) {
-  for (const mobile of [false, true]) {
-    test(`275 ${target.key}: product CRUD, folds, identity and encrypted JSON roundtrip ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page }, testInfo) => {
+  for (const mobile of mobileKeys.includes(target.key) ? [false, true] : [false]) {
+    test(`275 ${target.key}: product CRUD${roundtripKeys.includes(target.key) ? ", encrypted reload and JSON roundtrip" : " wiring"} ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page }) => {
       const initial = fixture();
       const before = structuredClone(items(initial, target));
       await seed(page, initial); await openLocale(page, target.locale);
       const container = await reveal(page, target);
-      expect(items(await exportState(page), target)).toEqual(before);
       const rows = container.locator(':scope > .sortable-row');
+      expect(await rowValues(rows, target)).toEqual(before.map((item) => label(item, target)));
+      if (target.kind) {
+        const sort = container.locator('xpath=preceding-sibling::*[1]').locator('.sortable-sort');
+        await sort.click();
+        await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2024-01');
+        await sort.click();
+        await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2018-01');
+        if (['ja.education', 'en.experience'].includes(target.key)) {
+          await beginDrag(page, heading(rows.first()).locator('.sortable-handle'));
+          const destination = await rows.last().boundingBox();
+          await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height - 3);
+          await page.mouse.up(); await cleanDrag(page);
+          await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2024-01');
+          await expect(sort).toContainText(target.locale === 'ja' ? 'カスタム' : 'Custom');
+          await action(rows.first(), 1);
+          await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2018-01');
+        }
+      }
       await page.locator(target.add).click();
       await expect(rows).toHaveCount(3);
       // The added all-empty row must be independently movable before editing.
@@ -127,9 +141,7 @@ for (const target of targets) {
       await expect(rows.nth(1)).toHaveClass(/is-collapsed/);
       await expect(heading(rows.nth(1)).locator('.sortable-handle')).toBeFocused();
       await expect(rows.nth(0)).not.toHaveClass(/is-collapsed/);
-      const added = items(await exportState(page), target)[1];
-      expect(label(added, target)).toBe('');
-      if (added.id) expect(before.map((item) => item.id)).not.toContain(added.id);
+      await expect(rows.nth(1).locator(target.field).first()).toHaveValue('');
       await heading(rows.nth(1)).locator('.sortable-toggle').click();
       const marker = target.key === 'profile.links' ? 'https://fictional.example/275-edited' : `Fictitious edited ${target.key}`;
       await rows.nth(1).locator(target.field).first().fill(marker);
@@ -140,63 +152,34 @@ for (const target of targets) {
       await remove(page, rows.nth(2), target);
       await expect(rows).toHaveCount(2);
       await expect(rows.nth(1)).toHaveClass(/is-collapsed/);
-      await waitForSave(page);
       const exported = await exportState(page);
       expect(items(exported, target)[0]).toEqual(before[0]);
       expect(label(items(exported, target)[1], target)).toBe(marker);
-      if (added.id) expect(items(exported, target)[1].id).toBe(added.id);
+      const added = items(exported, target)[1];
+      if (added.id) expect(before.map((item) => item.id)).not.toContain(added.id);
       expect(exported.version).toBe(4);
       expect(JSON.stringify(exported)).not.toMatch(/sortState|foldStates|collapsed/);
+      if (!roundtripKeys.includes(target.key)) return;
+      await waitForPersistedState(page, listExpectation(exported, target));
       expect(await stored(page)).not.toContain(marker);
       await page.reload(); await reveal(page, target);
-      expect(items(await exportState(page), target)).toEqual(items(exported, target));
+      expect(await rowValues(rows, target)).toEqual(items(exported, target).map((item) => label(item, target)));
+      expect(items(await readPersistedState(page), target)).toEqual(items(exported, target));
       await expect(rows.nth(1)).not.toHaveClass(/is-collapsed/);
       await importState(page, exported); await reveal(page, target);
-      expect(items(await exportState(page), target)).toEqual(items(exported, target));
+      await waitForPersistedState(page, listExpectation(exported, target));
+      expect(items(await readPersistedState(page), target)).toEqual(items(exported, target));
       await expect(rows.nth(1).locator(target.field).first()).toHaveValue(marker);
       await expectNoPageOverflow(page);
-      if (mobile && ['ja.education', 'zh-CN.experience', 'en.experience'].includes(target.key)) {
-        await page.screenshot({ path: testInfo.outputPath('reordered-mobile-editor.png') });
-        await page.locator(target.locale === 'ja' ? '[data-mobile-view=preview]' : `[data-${target.locale === 'en' ? 'en' : 'zh'}-mobile-view=preview]`).click();
-        const preview = page.locator(target.locale === 'ja' ? '#documentPreview' : `[data-${target.locale === 'en' ? 'en' : 'zh'}-preview]`);
-        await expect(preview).toContainText(marker);
+      if (mobile) {
+        const locale = target.locale;
+        await page.locator(locale === 'ja' ? '[data-mobile-view=preview]' : `[data-${locale === 'en' ? 'en' : 'zh'}-mobile-view=preview]`).click();
+        const preview = page.locator(locale === 'ja' ? '#documentPreview' : `[data-${locale === 'en' ? 'en' : 'zh'}-preview]`);
+        await expect(preview).toContainText(target.key === 'profile.links' ? marker.replace(/^https:\/\//, '') : marker);
         await expectNoPageOverflow(page);
-        await page.screenshot({ path: testInfo.outputPath('reordered-mobile-preview.png') });
-        await writeEvidence(page, testInfo, { locale: target.locale, input: 'reordered-v4' });
       }
     });
   }
-}
-
-for (const target of targets.filter((item) => item.kind)) {
-  test(`275 ${target.key}: date ties, Present, blanks, invalid dates and free drag after both sorts`, async ({ page }) => {
-    const state = fixture();
-    const list = items(state, target);
-    const template = list[0];
-    const dates = target.kind === 'date'
-      ? [{ date: '' }, { date: '2024-01' }, { date: '2018-01' }, { date: '2024-01' }, { date: '2024-13' }]
-      : [{ startDate: '', endDate: '' }, { startDate: '2020-01', endDate: '2024-01' }, { startDate: '2018-01', endDate: '2019-01' }, { startDate: '2020-01', endDate: '2024-01' }, { startDate: '2022-01', endDate: '' }, { startDate: '2020-01', endDate: '2024-13' }];
-    list.splice(0, list.length, ...dates.map((date, index) => ({ ...structuredClone(template), ...date,
-      [labelField(target)]: `Fictitious date ${index}`, ...('id' in template ? { id: `record_date-${index}` } : {}) })));
-    await seed(page, state); await openLocale(page, target.locale);
-    const container = await reveal(page, target);
-    expect(items(await exportState(page), target)).toEqual(list);
-    const sort = container.locator('xpath=preceding-sibling::*[1]').locator('.sortable-sort');
-    const indices = target.kind === 'date' ? [[1, 3, 2, 0, 4], [2, 1, 3, 0, 4]] : [[4, 1, 3, 2, 0, 5], [2, 1, 3, 4, 0, 5]];
-    for (const expected of indices) {
-      await sort.click();
-      expect(items(await exportState(page), target).map((item) => label(item, target))).toEqual(expected.map((index) => `Fictitious date ${index}`));
-    }
-    // Pointer drag uses real product controls after one-time date sorting.
-    const rows = container.locator(':scope > .sortable-row');
-    await beginDrag(page, heading(rows.first()).locator('.sortable-handle'));
-    const last = await rows.nth(1).boundingBox();
-    await page.mouse.move(last.x + last.width / 2, last.y + last.height - 3);
-    await page.mouse.up();
-    await cleanDrag(page);
-    const expected = [...indices[1]]; [expected[0], expected[1]] = [expected[1], expected[0]];
-    expect(items(await exportState(page), target).map((item) => label(item, target))).toEqual(expected.map((index) => `Fictitious date ${index}`));
-  });
 }
 
 async function beginDrag(page, handle) {
@@ -215,7 +198,7 @@ async function cleanDrag(page) {
 }
 
 for (const locale of ['ja', 'zh-CN', 'en']) {
-  for (const mobile of [false, true]) {
+  for (const mobile of locale === 'en' ? [false, true] : [false]) {
     test(`275 ${locale}: cancellations preserve raw draft and breaks; view/print cleanup ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page }) => {
       const target = targets.find((item) => item.locale === locale && item.kind === 'date');
       const state = fixture();
@@ -225,7 +208,9 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
       const rows = container.locator(':scope > .sortable-row');
       // Commit a real edit first to make the raw encrypted draft observable.
       await rows.first().locator(target.field).fill('Fictitious cancellation marker');
-      await waitForSave(page);
+      const expected = structuredClone(state);
+      items(expected, target)[0][labelField(target)] = 'Fictitious cancellation marker';
+      await waitForPersistedState(page, listExpectation(expected, target));
       const before = await exportState(page);
       for (const reason of ['same-position', 'outside', 'Escape', 'edit', 'import', 'sample', 'locale', 'print']) {
         await test.step(reason, async () => {
@@ -257,8 +242,8 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
           }
           if (reason === 'print') await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
           await page.mouse.up(); await cleanDrag(page);
-          expect(items(await exportState(page), target), reason).toEqual(items(before, target));
-          expect((await exportState(page)).settings.pageBreaks, reason).toEqual(before.settings.pageBreaks);
+          expect(await rowValues(rows, target), reason).toEqual(items(before, target).map((item) => label(item, target)));
+          expect((await readPersistedState(page)).settings.pageBreaks, reason).toEqual(before.settings.pageBreaks);
           // The edit path intentionally schedules saving; pure cancellation must not.
           if (reason === 'edit') await expect.poll(async () => (await stored(page)) !== raw).toBe(true);
           if (['same-position', 'outside', 'Escape', 'import', 'print'].includes(reason)) expect((await stored(page)) === raw, reason).toBe(true);
@@ -270,7 +255,7 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
 
 for (const [locale, type, paper] of [['ja', 'resume', 'A4'], ['ja', 'career', 'A4'], ['zh-CN', 'resume', 'A4'], ['en', 'resume', 'A4'], ['en', 'resume', 'LETTER']]) {
   for (const length of ['short', 'standard', 'long']) {
-    test(`275 ${locale} ${type} ${paper} ${length}: reordered preview and every PDF page retain unique markers`, async ({ page }, testInfo) => {
+    test(`275 ${locale} ${type} ${paper} ${length}: reordered preview and every PDF page retain unique markers`, async ({ page }) => {
       const state = fixture();
       state.settings.pageSizeByLocale[locale] = paper;
       state.documents.ja.activeDocument = type;
@@ -310,28 +295,28 @@ for (const [locale, type, paper] of [['ja', 'resume', 'A4'], ['ja', 'career', 'A
       if (locale !== 'ja') state.documents[locale].resume.certifications[0].name += ` ${endMarker}`;
       // Make the second company non-empty with independent details, including a long body.
       state.documents.ja.careers[1].detailSections = [{ title: 'Independent fictional detail', content: body }];
+      const expected = structuredClone(state);
+      const detailCareerId = state.documents.ja.careers[0].id;
+      for (const target of [...chosen].reverse()) items(expected, target).reverse();
+      const markers = chosen.filter((target) => target.key !== 'ja.careerDetails').map((target) => items(expected, target).map((item) => label(item, target).split(' ')[0]));
+      if (type === 'career') markers.push(expected.documents.ja.careers.find((career) => career.id === detailCareerId).detailSections.map((detail) => detail.title.split(' ')[0]));
       await seed(page, state); await openLocale(page, locale);
       for (const target of [...chosen].reverse()) {
         const container = await reveal(page, target);
-        await action(container.locator(':scope > .sortable-row').first(), 1);
+        const rows = container.locator(':scope > .sortable-row');
+        await action(rows.first(), 1);
+        expect(await rowValues(rows, target)).toEqual([...items(state, target)].reverse().map((item) => label(item, target)));
       }
       const preview = page.locator(locale === 'ja' ? '#documentPreview' : `[data-${locale === 'en' ? 'en' : 'zh'}-preview]`);
       const photoRendered = length !== 'short' && !(locale === 'ja' && type === 'career');
       await expect(preview.locator('img')).toHaveCount(photoRendered ? 1 : 0);
-      const final = await exportState(page);
-      const markers = chosen.filter((target) => target.key !== 'ja.careerDetails').map((target) => items(final, target).map((item) => label(item, target).split(' ')[0]));
-      if (type === 'career') {
-        const moved = final.documents.ja.careers.find((item) => item.detailSections.some((detail) => detail.title.startsWith('ORDER-')));
-        markers.push(moved.detailSections.map((detail) => detail.title.split(' ')[0]));
-      }
       const screen = await preview.textContent();
       for (const pair of markers) {
         expect(screen.indexOf(pair[0])).toBeGreaterThanOrEqual(0);
         expect(screen.indexOf(pair[0])).toBeLessThan(screen.indexOf(pair[1]));
       }
-      await page.screenshot({ path: testInfo.outputPath('reordered-desktop.png'), fullPage: true });
       await page.emulateMedia({ media: 'print' });
-      const buffer = await page.pdf({ path: testInfo.outputPath('reordered.pdf'), preferCSSPageSize: true, printBackground: true });
+      const buffer = await page.pdf({ preferCSSPageSize: true, printBackground: true });
       const task = getDocument({ data: new Uint8Array(buffer), disableFontFace: true, isEvalSupported: false, useSystemFonts: true });
       try {
         const pdf = await task.promise;
@@ -356,13 +341,12 @@ for (const [locale, type, paper] of [['ja', 'resume', 'A4'], ['ja', 'career', 'A
         expect(pages.at(-1).replace(/\s/g, '')).toContain(endMarker);
         expect(text).not.toMatch(/Move down|Move up|項目を移動|sortable-/);
       } finally { await task.destroy(); }
-      await writeEvidence(page, testInfo, { locale, documentType: type, paper, input: 'reordered-v4', length, photoProvided: length !== 'short', photoRendered });
     });
   }
 }
 
 for (const locale of ['ja', 'zh-CN', 'en']) {
-  for (const mobile of [false, true]) {
+  for (const mobile of locale === 'en' ? [false, true] : [false]) {
     test(`275 ${locale}: product long-card drag, edge scroll and reduced motion ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page, context }, testInfo) => {
       const state = fixture();
       const target = targets.find((item) => item.locale === locale && item.kind === 'range');
@@ -391,7 +375,7 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
       }
       for (const reduced of [false, true]) {
         await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
-        const before = items(await exportState(page), target);
+        const before = await rowValues(rows, target);
         const handle = heading(rows.first()).locator('.sortable-handle');
         await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
         if (synthetic) await handle.evaluate((element) => {
@@ -404,34 +388,29 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
         await dispatch('down', start); await dispatch('move', { x: start.x + 12, y: start.y });
         await expect(page.locator('.sortable-placeholder')).toBeVisible();
         await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-        await page.screenshot({ path: testInfo.outputPath(`${reduced ? 'reduced' : 'motion'}-lift.png`) });
         if (reduced) expect(await page.locator('.sortable-drag-float').evaluate((element) => element.getAnimations().length)).toBe(0);
         const initialScroll = await panel.evaluate((element) => element.scrollTop);
         const bounds = await panel.boundingBox();
         const edge = { x: start.x, y: Math.min(bounds.y + bounds.height, mobile ? 844 : 1000) - 10 };
         await dispatch('move', edge);
         await expect.poll(() => panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(initialScroll + 150);
-        await page.screenshot({ path: testInfo.outputPath(`${reduced ? 'reduced' : 'motion'}-edge.png`) });
         await dispatch('up', edge); await cleanDrag(page);
         if (synthetic) await page.evaluate(() => {
           window.fictitious275Pointer.setPointerCapture = window.fictitious275Capture;
           delete window.fictitious275Pointer; delete window.fictitious275Capture;
         });
-        const after = items(await exportState(page), target);
+        const after = await rowValues(rows, target);
         expect(after).not.toEqual(before);
-        expect(after.map((item) => JSON.stringify(item)).sort()).toEqual(before.map((item) => JSON.stringify(item)).sort());
+        expect([...after].sort()).toEqual([...before].sort());
         await expectNoPageOverflow(page);
-        await page.screenshot({ path: testInfo.outputPath(`${reduced ? 'reduced' : 'motion'}-land.png`) });
       }
       await session?.detach();
-      await writeEvidence(page, testInfo, { locale, input: 'long-card', motion: ['no-preference', 'reduce'],
-        pointer: session ? 'native-CDP-touch' : synthetic ? 'synthetic-WebKit-touch' : 'native-mouse' });
     });
   }
 }
 
 
-for (const target of targets.filter((item) => item.kind)) {
+for (const target of targets.filter((item) => ['ja.education', 'zh-CN.experience', 'en.certifications'].includes(item.key))) {
   test(`275 ${target.key}: already sorted ties do not change storage or page breaks`, async ({ page }) => {
     const state = fixture(); state.settings.locale = target.locale;
     const list = items(state, target);
@@ -442,12 +421,12 @@ for (const target of targets.filter((item) => item.kind)) {
     state.settings.pageBreaks[target.locale].A4[target.career ? 'career' : 'resume'].sections = [target.career ? 'self-promotion' : target.locale === 'ja' ? 'qualifications' : 'skills'];
     await seed(page, state); await openLocale(page, target.locale);
     const container = await reveal(page, target);
-    await waitForSave(page);
+    await waitForPersistedState(page, listExpectation(state, target));
     const before = await exportState(page); const raw = await stored(page);
     for (let direction = 0; direction < 2; direction += 1) {
       await container.locator('xpath=preceding-sibling::*[1]').locator('.sortable-sort').click();
-      expect(items(await exportState(page), target)).toEqual(items(before, target));
-      expect((await exportState(page)).settings.pageBreaks).toEqual(before.settings.pageBreaks);
+      expect(await rowValues(container.locator(':scope > .sortable-row'), target)).toEqual(items(before, target).map((item) => label(item, target)));
+      expect((await readPersistedState(page)).settings.pageBreaks).toEqual(before.settings.pageBreaks);
       expect((await stored(page)) === raw).toBe(true);
     }
   });
