@@ -51,6 +51,8 @@ function assertEnding(pages) {
 }
 
 test('日本語PDF: 両書類・A4/Letter・短文/長文/手動改ページの実本文直下に結びを一度表示', async ({ page }, testInfo) => {
+  // This case generates and parses twelve PDFs, including multi-page fixtures.
+  test.setTimeout(120_000);
   await openLocale(page, 'ja');
   const evidence = [];
   for (const documentType of ['resume', 'career']) {
