@@ -57,14 +57,9 @@ function pdfPageIndex(pages, expected) {
   return pages.findIndex((page) => page.text.normalize('NFKC').replace(/\s/g, '').includes(needle));
 }
 
-const pdfOutputCounts = new WeakMap();
-
 async function printPdf(page) {
   await page.emulateMedia({ media: 'print' });
-  const outputNumber = (pdfOutputCounts.get(page) || 0) + 1;
-  pdfOutputCounts.set(page, outputNumber);
   return page.pdf({
-    path: test.info().outputPath(`pdf-${outputNumber}.pdf`),
     displayHeaderFooter: false,
     preferCSSPageSize: true,
     printBackground: true

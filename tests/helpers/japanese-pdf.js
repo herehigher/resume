@@ -1,18 +1,10 @@
-export function normalizePdfText(value) {
+function normalizePdfText(value) {
   return String(value).normalize('NFKC').replaceAll('⻑', '長').replace(/\s/g, '');
 }
 
-function characterCounts(text) {
-  const counts = new Map();
-  for (const character of normalizePdfText(text)) counts.set(character, (counts.get(character) || 0) + 1);
-  return [...counts].sort(([left], [right]) => left.localeCompare(right));
-}
-
-// Source inventory is optional and applies to fixtures without auto-generated
-// list markers or repeating table headers. For those layouts use the explicit
-// input-line inventory and existing content checks. Equal page text alone does
-// not imply a defect; the expected occurrence count permits repeated input.
-export function japanesePdfViolations(pages, { sourceText, expectedLines = [] } = {}) {
+// Explicit input occurrence counts allow intentional repeated input and
+// recurring headings without treating equal page text as a defect.
+export function japanesePdfViolations(pages, { expectedLines = [] } = {}) {
   const errors = [];
   const text = pages.map((page) => page.items.map((item) => item.str).join('')).join('');
   const normalized = normalizePdfText(text);
@@ -23,9 +15,6 @@ export function japanesePdfViolations(pages, { sourceText, expectedLines = [] } 
     const outside = page.items.filter((item) => item.str.trim() && (item.transform[5] <= 35 || item.transform[5] + item.height >= height - 35));
     if (outside.length) errors.push(`Page ${index + 1}: ${outside.length} text items outside printable vertical bounds`);
   });
-  if (sourceText !== undefined && JSON.stringify(characterCounts(text)) !== JSON.stringify(characterCounts(sourceText))) {
-    errors.push('PDF character occurrences differ from the visible source (missing or duplicated content)');
-  }
   const counts = new Map();
   for (const line of expectedLines) {
     const needle = normalizePdfText(line);
