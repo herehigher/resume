@@ -8,6 +8,7 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   let stored = hasStoredState;
   let importPending = false;
   let saveRequestVersion = 0;
+  let draftRevision = 0;
   const listeners = new Set();
 
   function notify(type, details = {}) {
@@ -19,11 +20,18 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   function replace(nextState, { persist = false, type = 'replace', eventDetails } = {}) {
     const next = cloneData(assertValidState(nextState));
     if (!persist) {
+      // Display locale is saved independently; only a verified locale-only update
+      // may keep an in-flight draft save current.
+      const localeOnly = type === 'locale' && JSON.stringify(next) === JSON.stringify({
+        ...state, settings: { ...state.settings, locale: next.settings.locale }
+      });
+      if (!localeOnly) draftRevision += 1;
       state = next;
       notify(type, eventDetails);
       return state;
     }
     return persistence.save(next).then(() => {
+      draftRevision += 1;
       state = next;
       stored = true;
       notify(type, eventDetails);
@@ -40,6 +48,9 @@ export function createStore({ storage, initialState, persistence = createDraftSt
   return {
     getState() {
       return state;
+    },
+    getDraftRevision() {
+      return draftRevision;
     },
     update(mutator, { persist = false, type = 'update' } = {}) {
       const next = cloneData(state);
@@ -73,6 +84,7 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       let completion = 'import-failed';
       try {
         await persistence.save(next);
+        draftRevision += 1;
         state = next;
         stored = true;
         completion = 'import';
@@ -85,13 +97,13 @@ export function createStore({ storage, initialState, persistence = createDraftSt
       return importPending;
     },
     save() {
-      const savedState = state;
+      const savedRevision = draftRevision;
       const requestVersion = ++saveRequestVersion;
-      const snapshot = cloneData(savedState);
+      const snapshot = cloneData(state);
       return persistence.save(snapshot).then(() => {
         stored = true;
         // Persistence of an older snapshot does not mean the current draft is saved.
-        if (state !== savedState || requestVersion !== saveRequestVersion) return false;
+        if (draftRevision !== savedRevision || requestVersion !== saveRequestVersion) return false;
         notify('save');
         return true;
       });
@@ -99,6 +111,7 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     async reload() {
       const next = await persistence.load();
       if (!next) return false;
+      draftRevision += 1;
       state = cloneData(next);
       stored = true;
       notify('reload');
@@ -109,6 +122,7 @@ export function createStore({ storage, initialState, persistence = createDraftSt
     },
     async clearPersisted() {
       await persistence.remove();
+      draftRevision += 1;
       stored = false;
       notify('clear');
     },

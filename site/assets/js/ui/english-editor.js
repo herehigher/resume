@@ -283,8 +283,8 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
     shouldPersistDraft = true;
     setStatus('Encrypting and saving…', 'saving');
     saveTimer = window.setTimeout(async () => {
-      const savedState = store.getState();
-      const isCurrent = () => requestVersion === saveRequestVersion && store.getState() === savedState && !sampleMode && !importPending;
+      const savedRevision = store.getDraftRevision();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getDraftRevision() === savedRevision && !sampleMode && !importPending;
       try {
         if (!await store.save() || !isCurrent()) return;
         setStatus('Encrypted and saved on this device.', 'success');
@@ -637,6 +637,9 @@ export function initEnglishEditor(store, { embeddedPhotoUrl, root = document.que
   }
 
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'save' && !sampleMode && !importPending && saveStatus.classList.contains('is-saving')) {
+      setStatus('Encrypted and saved on this device.', 'success', { announce: false });
+    }
     if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;
