@@ -123,6 +123,9 @@
 .paper-section-first .resume-section-title { margin-top: 0; }
 .requests-section { border-bottom: 0; min-height: 145px; }
 
+.ja-document-ending { display: none; }
+.ja-ending-source { display: contents; }
+
 @media screen {
   #japaneseWorkspace .document-page { min-height: 297mm; padding: 14mm 15mm; width: 210mm; }
   #japaneseWorkspace .paper-text-section,
@@ -135,6 +138,19 @@
 #japaneseWorkspace.is-printing .requests-section { min-height: 0 !important; }
 
 @media print {
+  #japaneseWorkspace .ja-ending-empty { display: none; }
+  #japaneseWorkspace .ja-ending-source { break-after: avoid-page; display: block; }
+  #japaneseWorkspace .ja-ending-source .ja-markdown > :last-child,
+  #japaneseWorkspace .ja-ending-source .ja-markdown li:last-child { break-after: avoid-page; margin-bottom: 0; }
+  #japaneseWorkspace .ja-document-ending { break-before: avoid-page; display: block; line-height: inherit; margin: 0; text-align: right; white-space: normal; }
+  #japaneseWorkspace .ja-ending-host.career-company-heading,
+  #japaneseWorkspace .ja-ending-host.career-profile-links { display: block; }
+  #japaneseWorkspace .career-company-heading .ja-ending-source { display: flex; gap: 12px; justify-content: space-between; }
+  #japaneseWorkspace .ja-ending-host.career-profile-links { font-size: 11.5px; line-height: 1.45; }
+  #japaneseWorkspace .career-profile-links .ja-ending-source { display: flex; flex-wrap: wrap; gap: inherit; justify-content: flex-end; }
+  /* A wrapping label also needs room for the final body line and its ending. */
+  #japaneseWorkspace .career-company-grid > .ja-ending-label { padding-bottom: calc(9px + 23.625px); }
+  #japaneseWorkspace .career-company-grid > .ja-ending-host { align-self: end; }
   #japaneseWorkspace .document-page {
     height: auto;
     overflow: visible;
