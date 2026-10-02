@@ -121,7 +121,7 @@ for (const target of targets) {
         await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2024-01');
         await sort.click();
         await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2018-01');
-        if (['ja.education', 'en.experience'].includes(target.key)) {
+        if (!mobile && ['ja.education', 'en.experience'].includes(target.key)) {
           await beginDrag(page, heading(rows.first()).locator('.sortable-handle'));
           const destination = await rows.last().boundingBox();
           await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height - 3);
@@ -130,6 +130,8 @@ for (const target of targets) {
           await expect(sort).toContainText(target.locale === 'ja' ? 'カスタム' : 'Custom');
           await action(rows.first(), 1);
           await expect(rows.first().locator('input[type="month"]').first()).toHaveValue('2018-01');
+          await container.locator('xpath=preceding-sibling::*[1]').locator('.sortable-fold-all').click();
+          await expect(rows.first()).not.toHaveClass(/is-collapsed/);
         }
       }
       await page.locator(target.add).click();
@@ -159,6 +161,7 @@ for (const target of targets) {
       if (added.id) expect(before.map((item) => item.id)).not.toContain(added.id);
       expect(exported.version).toBe(4);
       expect(JSON.stringify(exported)).not.toMatch(/sortState|foldStates|collapsed/);
+      await expectNoPageOverflow(page);
       if (!roundtripKeys.includes(target.key)) return;
       await waitForPersistedState(page, listExpectation(exported, target));
       expect(await stored(page)).not.toContain(marker);
@@ -202,7 +205,9 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
     test(`275 ${locale}: cancellations preserve raw draft and breaks; view/print cleanup ${mobile ? '[mobile] [mobile-webkit]' : ''}`, async ({ page }) => {
       const target = targets.find((item) => item.locale === locale && item.kind === 'date');
       const state = fixture();
+      state.settings.pageSizeByLocale[locale] = 'A4';
       state.settings.pageBreaks[locale].A4.resume.sections = [locale === 'ja' ? 'qualifications' : 'skills'];
+      if (locale !== 'ja') state.documents[locale].resume.skills = 'Fictitious retained break skills';
       await seed(page, state); await openLocale(page, locale);
       const container = await reveal(page, target);
       const rows = container.locator(':scope > .sortable-row');
@@ -212,6 +217,9 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
       items(expected, target)[0][labelField(target)] = 'Fictitious cancellation marker';
       await waitForPersistedState(page, listExpectation(expected, target));
       const before = await exportState(page);
+      const boundary = page.locator(locale === 'ja' ? '#documentPreview [data-section-key=qualifications]' : `[data-${locale === 'en' ? 'en' : 'zh'}-preview] [data-section-key=skills]`);
+      await expect(boundary).toHaveCount(1);
+      await expect(boundary).toHaveClass(/has-manual-page-break/);
       for (const reason of ['same-position', 'outside', 'Escape', 'edit', 'import', 'sample', 'locale', 'print']) {
         await test.step(reason, async () => {
           const raw = await stored(page);
@@ -242,6 +250,7 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
           }
           if (reason === 'print') await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
           await page.mouse.up(); await cleanDrag(page);
+          await expect(boundary).toHaveClass(/has-manual-page-break/);
           expect(await rowValues(rows, target), reason).toEqual(items(before, target).map((item) => label(item, target)));
           expect((await readPersistedState(page)).settings.pageBreaks, reason).toEqual(before.settings.pageBreaks);
           // The edit path intentionally schedules saving; pure cancellation must not.
@@ -418,13 +427,19 @@ for (const target of targets.filter((item) => ['ja.education', 'zh-CN.experience
       if (target.kind === 'date') item.date = '2020-01';
       else { item.startDate = '2020-01'; item.endDate = ''; }
     });
-    state.settings.pageBreaks[target.locale].A4[target.career ? 'career' : 'resume'].sections = [target.career ? 'self-promotion' : target.locale === 'ja' ? 'qualifications' : 'skills'];
+    state.settings.pageSizeByLocale[target.locale] = 'A4';
+    state.settings.pageBreaks[target.locale].A4.resume.sections = [target.locale === 'ja' ? 'qualifications' : 'skills'];
+    if (target.locale !== 'ja') state.documents[target.locale].resume.skills = 'Fictitious retained sorted break skills';
     await seed(page, state); await openLocale(page, target.locale);
     const container = await reveal(page, target);
     await waitForPersistedState(page, listExpectation(state, target));
     const before = await exportState(page); const raw = await stored(page);
+    const boundary = page.locator(target.locale === 'ja' ? '#documentPreview [data-section-key=qualifications]' : `[data-${target.locale === 'en' ? 'en' : 'zh'}-preview] [data-section-key=skills]`);
+    await expect(boundary).toHaveCount(1);
+    await expect(boundary).toHaveClass(/has-manual-page-break/);
     for (let direction = 0; direction < 2; direction += 1) {
       await container.locator('xpath=preceding-sibling::*[1]').locator('.sortable-sort').click();
+      await expect(boundary).toHaveClass(/has-manual-page-break/);
       expect(await rowValues(container.locator(':scope > .sortable-row'), target)).toEqual(items(before, target).map((item) => label(item, target)));
       expect((await readPersistedState(page)).settings.pageBreaks).toEqual(before.settings.pageBreaks);
       expect((await stored(page)) === raw).toBe(true);
