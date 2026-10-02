@@ -20,8 +20,8 @@ test('privacy UI switches immediately across all locales and exposes safe source
   await expect.poll(() => page.locator('#trustCapsule').evaluate((capsule) => (
     [...capsule.children].map((element) => element.id)
   ))).toEqual(['privacySecurityButton', 'repositoryLink', 'privacySecurityVersion']);
-  await expect(page.locator('#privacySecurityButton')).toHaveCSS('border-right-width', '1px');
-  await expect(page.locator('#repositoryLink')).toHaveCSS('border-right-width', '0px');
+  await expect(badge).toBeVisible();
+  await page.locator('#repositoryLink').click({ trial: true });
   await expect(page.locator('#repositoryLink')).toHaveAttribute('href', REPOSITORY_URL);
   await expect(page.locator('#repositoryLink')).toHaveAttribute('target', '_blank');
   await expect(page.locator('#repositoryLink')).toHaveAttribute('rel', 'noopener noreferrer');
@@ -106,7 +106,10 @@ test('source, badge, and open privacy dialog are excluded from print', async ({ 
   await expect(page.locator('#privacySecurityDialog')).toBeHidden();
 });
 
-test('[mobile] privacy UI hides its label and stays reachable without overflow', async ({ page }) => {
+test('[mobile] privacy UI hides its label and stays reachable without overflow', async ({ browserName, page }) => {
+  // Safari uses Option+Tab to include links and buttons in keyboard navigation.
+  const nextControl = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
+  const previousControl = browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab';
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     for (const locale of ['ja', 'zh-CN', 'en']) {
@@ -118,12 +121,25 @@ test('[mobile] privacy UI hides its label and stays reachable without overflow',
       await expect.poll(() => page.locator('#trustCapsule').evaluate((capsule) => (
         capsule.getBoundingClientRect().right <= window.innerWidth
       ))).toBe(true);
-      await expect(page.locator('#privacySecurityButton')).toHaveCSS('border-right-width', '1px');
-      await expect(page.locator('#repositoryLink')).toHaveCSS('border-right-width', '0px');
+      const badge = page.locator('#privacySecurityButton');
+      const repository = page.locator('#repositoryLink');
+      await badge.click({ trial: true });
+      await repository.click({ trial: true });
+      await badge.focus();
+      await page.keyboard.press(nextControl);
+      await expect(repository).toBeFocused();
+      await page.keyboard.press(previousControl);
+      await expect(badge).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#privacySecurityDialog')).toHaveAttribute('open', '');
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#privacySecurityDialog')).not.toHaveAttribute('open', '');
+      await expect(badge).toBeFocused();
     }
   }
 
-  await page.locator('#privacySecurityButton').click();
+  await page.locator('#privacySecurityButton').focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#privacySecurityDialog')).toHaveAttribute('open', '');
   await expect(page.locator('#privacyRepositoryLink')).toBeVisible();
   await expectNoPageOverflow(page);

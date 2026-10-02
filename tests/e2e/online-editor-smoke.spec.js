@@ -2,8 +2,6 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 
-import { checkOnlineEditor } from '../../scripts/check-online-editor.mjs';
-
 test('online editor smoke runs its real CLI against the served site', async ({ baseURL }) => {
   const result = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [
@@ -17,10 +15,6 @@ test('online editor smoke runs its real CLI against the served site', async ({ b
     child.once('close', (code) => resolve({ code, output }));
   });
   expect(result.code, result.output).toBe(0);
-});
-
-test('online editor smoke validates the provider-neutral source site', async ({ baseURL }) => {
-  await checkOnlineEditor(`${baseURL}/`);
 });
 
 test('online editor smoke CLI rejects legacy mounted production bases', async () => {
