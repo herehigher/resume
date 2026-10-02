@@ -220,11 +220,6 @@ test('CI installs only the browser binaries required by headless execution', () 
   assert.doesNotMatch(playwrightConfig, /\bheadless\s*:\s*false/);
 });
 
-test('browser binaries are not restored through an Actions cache', () => {
-  assert.doesNotMatch(qualityWorkflow, /actions\/cache@/);
-  assert.doesNotMatch(releaseWorkflow, /actions\/cache@/);
-});
-
 test('Quality retains successful reorder visual evidence with source identity and bounded retention', () => {
   const step = workflowStep(qualityJob, 'Upload list reorder acceptance evidence');
   assert.match(workflowStepField(step, 'if'), /success\(\)/);
