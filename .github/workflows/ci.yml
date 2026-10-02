@@ -229,6 +229,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload Japanese PDF ending evidence
+        if: ${{ (github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true') && success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: japanese-pdf-ending-${{ inputs.checkout_ref || github.sha }}
+          path: |
+            node_modules/.cache/resume-studio/playwright-results/japanese-document-ending-*/*.pdf
+            node_modules/.cache/resume-studio/playwright-results/japanese-document-ending-*/evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Playwright failure evidence
         if: failure()
         uses: actions/upload-artifact@v7

@@ -1,4 +1,5 @@
 import { createEditorLists } from './editor-lists.js';
+import { addJapaneseDocumentEnding } from './japanese-document-ending.js';
 import { createJapaneseCareer, createJapaneseSampleState, cloneData } from '../state/defaults.js';
 import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
 import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
@@ -390,6 +391,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
     preview.innerHTML = renderJapaneseDocument(state, {
       photoUrl: embeddedPhotoUrl.resolve(state.profile.photo)
     });
+    addJapaneseDocumentEnding(preview, state);
     pageBreakControls.render();
     updateCompletion();
     window.requestAnimationFrame(fitPreviewForViewport);
