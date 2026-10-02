@@ -3,11 +3,15 @@ import { execFileSync } from 'node:child_process';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
+import { japanesePdfViolations } from '../helpers/japanese-pdf.js';
 import { expect, openLocale, test } from './fixtures.js';
 
-async function importState(page, state) {
+async function importState(page, state, expectedContent) {
   await page.locator('#importDataInput').setInputFiles({ name: 'fictional-ending.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state)) });
   await page.locator('#confirmSampleAdoptButton').click();
+  // The previous success toast can remain visible while this import encrypts.
+  await expect(page.locator('#importDataInput')).toHaveValue('');
+  await expect(page.locator('#documentPreview')).toContainText(expectedContent);
   await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
 }
 
@@ -22,122 +26,175 @@ async function inspectPdf(buffer) {
   } finally { await task.destroy(); }
 }
 
+async function printAndCheck(page, testInfo, name, expectedLines = []) {
+  await page.emulateMedia({ media: 'print' });
+  const sourceText = await page.locator('#documentPreview').innerText();
+  const pdfPath = testInfo.outputPath(`${name}.pdf`);
+  const pages = await inspectPdf(await page.pdf({ path: pdfPath, preferCSSPageSize: true, printBackground: true }));
+  expect(japanesePdfViolations(pages, { sourceText, expectedLines }), name).toEqual([]);
+  return { pages, pdfPath };
+}
+
 function writeEvidence(page, testInfo, cases, data) {
   writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({ sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), platform: process.platform, browser: page.context().browser().version(), viewport: page.viewportSize(), data, cases }, null, 2));
 }
 
-function assertEnding(pages) {
-  const endings = pages.flatMap((page) => page.items.filter((item) => item.str === '以上'));
-  expect(endings).toHaveLength(1);
-  const last = pages.at(-1);
-  const ending = last.items.find((item) => item.str === '以上');
-  expect(ending).toBeTruthy();
-  const body = last.items.filter((item) => item !== ending);
-  expect(body.length).toBeGreaterThan(0);
-  const lastBaseline = Math.min(...body.map((item) => item.transform[5]));
-  const gap = lastBaseline - ending.transform[5];
-  expect(gap).toBeGreaterThan(ending.height);
-  expect(gap).toBeLessThanOrEqual(ending.height * 2.1);
-  // All source characters, including the ending, must fit the printable box.
-  for (const page of pages) {
-    for (const item of page.items) {
-      expect(item.transform[5]).toBeGreaterThan(35);
-      expect(item.transform[5] + item.height).toBeLessThan(page.size.height - 35);
-    }
-  }
-  const right = ending.transform[4] + ending.width;
-  expect(right).toBeGreaterThan(last.size.width - 60);
-  expect(right).toBeLessThan(last.size.width - 40);
+function tailState(tail) {
+  const state = createDefaultState('ja');
+  state.documents.ja.activeDocument = 'career';
+  state.profile.fields.fullName = '架空 太郎';
+  state.profile.fields.links = tail === 'identity-links' ? [`https://example.invalid/${'long-profile-path/'.repeat(30)}`, 'https://example.invalid/short'] : [];
+  state.documents.ja.fields.careerSummary = tail === 'summary' ? '最後の要約 END-SUMMARY' : '';
+  state.documents.ja.fields.skills = tail === 'skills' ? '最後の技術 END-SKILLS' : '';
+  state.documents.ja.careers = ['detail', 'long-label', 'role', 'companyInfo', 'company'].includes(tail) ? [{
+    id: 'record_ending-company', company: '架空会社 END-COMPANY', role: tail === 'role' ? '架空役職 END-ROLE\n\n  ' : '',
+    companyInfo: tail === 'companyInfo' ? '架空事業 END-INFO' : '', startDate: '', endDate: '',
+    detailSections: [{ title: tail === 'long-label' ? '長い架空項目タイトル'.repeat(8) : '架空項目', content: tail === 'detail' ? '- 第一行\n- 最後の項目 END-DETAIL\n\n' : tail === 'long-label' ? '本文 END-LABEL' : '' }, { title: '空の末尾項目', content: '' }]
+  }, { id: 'record_ending-empty', company: '', role: '', companyInfo: '', startDate: '', endDate: '', detailSections: [] }] : [];
+  return state;
 }
 
-test('日本語PDF: 両書類・A4/Letter・短文/長文/手動改ページの実本文直下に結びを一度表示', async ({ page }, testInfo) => {
-  // This case generates and parses twelve PDFs, including multi-page fixtures.
-  test.setTimeout(120_000);
+test('結びDOM: 空末尾を除き実本文コンテナーを選び、末尾改行だけを取り除く（PDF生成なし）', async ({ page }) => {
   await openLocale(page, 'ja');
-  const evidence = [];
-  for (const documentType of ['resume', 'career']) {
-    for (const paper of ['A4', 'LETTER']) {
-      for (const length of ['short', 'standard', 'extra-long']) {
-        const { state, endMarker } = createPdfFixture({ locale: 'ja', documentType, pageSize: paper, length });
-        state.documents.ja.fields[documentType === 'resume' ? 'requests' : 'selfPromotion'] += '\n\n  ';
-        if (length === 'standard') {
-          state.settings.pageBreaks.ja.A4[documentType].sections = [documentType === 'resume' ? 'requests' : 'self-promotion'];
-        }
-        await page.emulateMedia({ media: 'screen' });
-        await importState(page, state);
-        await expect(page.locator('.ja-document-ending')).toBeHidden();
-        await page.emulateMedia({ media: 'print' });
-        // Japanese UI currently fixes A4. Exercise Letter through the browser's
-        // page rule, without introducing a new product paper-size setting.
-        await page.locator('#activePrintPageStyle').evaluate((style, paper) => {
-          style.textContent = `@page { margin: 14mm 15mm; size: ${paper === 'A4' ? 'A4' : 'Letter'} portrait; }`;
-        }, paper);
-        const name = `${documentType}-${paper}-${length}`;
-        const pdfPath = testInfo.outputPath(`${name}.pdf`);
-        const buffer = await page.pdf({ path: pdfPath, preferCSSPageSize: true, printBackground: true });
-        const pages = await inspectPdf(buffer);
-        assertEnding(pages);
-        const lastText = pages.at(-1).items.map((item) => item.str).join('');
-        expect(lastText).toContain(endMarker);
-        expect(pages[0].size.width).toBeCloseTo(paper === 'A4' ? 595.28 : 612, 0);
-        evidence.push({ name, pages: pages.length, pdfPath });
+  const result = await page.evaluate(async () => {
+    const { createDefaultState } = await import('/assets/js/state/defaults.js');
+    const { renderJapaneseDocument } = await import('/assets/js/templates/ja.js');
+    const { addJapaneseDocumentEnding } = await import('/assets/js/ui/japanese-document-ending.js');
+    const rows = [];
+    for (const tail of ['resume', 'self-promotion', 'detail', 'long-label', 'role', 'companyInfo', 'company', 'skills', 'summary', 'identity', 'identity-links']) {
+      const state = createDefaultState('ja');
+      const doc = state.documents.ja;
+      doc.activeDocument = tail === 'resume' ? 'resume' : 'career';
+      state.profile.fields.links = tail === 'identity-links' ? ['https://example.invalid/fictional'] : [];
+      doc.fields.requests = 'FIRST\nLAST\n\n  ';
+      doc.fields.selfPromotion = tail === 'self-promotion' ? 'FIRST\nLAST\n\n  ' : '';
+      doc.fields.skills = tail === 'skills' ? 'FIRST\nLAST\n\n  ' : '';
+      doc.fields.careerSummary = tail === 'summary' ? 'FIRST\nLAST\n\n  ' : '';
+      doc.careers = ['detail', 'long-label', 'role', 'companyInfo', 'company'].includes(tail) ? [{
+        id: 'record_dom-tail', company: 'Fictional Company', role: tail === 'role' ? 'FIRST\nLAST\n\n  ' : '',
+        companyInfo: tail === 'companyInfo' ? 'FIRST\nLAST\n\n  ' : '', startDate: '', endDate: '',
+        detailSections: [{ title: tail === 'long-label' ? '架空項目'.repeat(50) : 'Fictional Detail', content: ['detail', 'long-label'].includes(tail) ? '- FIRST\n- LAST\n\n  ' : '' }, { title: 'EMPTY-TAIL', content: '' }]
+      }, { id: 'record_dom-empty', company: '', role: '', companyInfo: '', startDate: '', endDate: '', detailSections: [] }] : [];
+      const preview = document.createElement('div');
+      preview.innerHTML = renderJapaneseDocument(state);
+      addJapaneseDocumentEnding(preview, state);
+      const host = preview.querySelector('.ja-ending-host');
+      const selectors = {
+        resume: '.requests-section .paper-text-content', 'self-promotion': '[data-section-key="self-promotion"] .career-body',
+        detail: '.career-company-grid > div:last-child', 'long-label': '.career-company-grid > div:last-child', role: '.career-company-grid > div:last-child',
+        companyInfo: '.career-company-info', company: '.career-company-heading', skills: '[data-section-key="skills"] .career-body',
+        summary: '[data-section-key="summary"] .career-body', identity: '.career-doc-meta', 'identity-links': '.career-profile-links'
+      };
+      const source = host.querySelector('.ja-ending-source');
+      let terminal = source;
+      while (terminal.lastChild) terminal = terminal.lastChild;
+      rows.push({ tail, correctHost: host.matches(selectors[tail]), endings: preview.querySelectorAll('.ja-document-ending').length,
+        emptyItemPrinted: preview.textContent.includes('EMPTY-TAIL'), trailingSpace: /\s$/.test(source.textContent),
+        breaksAfterLast: terminal.nodeName === 'BR',
+        firstLinePreserved: !source.textContent.includes('LAST') || source.textContent.includes('FIRST') });
+    }
+    return rows;
+  });
+  expect(result).toEqual(result.map(({ tail }) => ({ tail, correctHost: true, endings: 1, emptyItemPrinted: false, trailingSpace: false, breaksAfterLast: false, firstLinePreserved: true })));
+});
+
+test('結びPDFのimport待機: 前回toastと暗号化中の旧previewで完了扱いしない（PDF生成なし）', async ({ page }) => {
+  await openLocale(page, 'ja');
+  const state = createDefaultState('ja');
+  state.documents.ja.fields.requests = 'OLD-IMPORT-CONTENT';
+  await importState(page, state, 'OLD-IMPORT-CONTENT');
+  await page.evaluate(() => {
+    const original = crypto.subtle.encrypt.bind(crypto.subtle);
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    window.endingImportGate = { entered: false, release };
+    crypto.subtle.encrypt = async (...args) => {
+      window.endingImportGate.entered = true;
+      await gate;
+      return original(...args);
+    };
+  });
+  state.documents.ja.fields.requests = 'NEW-IMPORT-CONTENT';
+  let finished = false;
+  const importing = importState(page, state, 'NEW-IMPORT-CONTENT').then(() => { finished = true; });
+  await expect.poll(() => page.evaluate(() => window.endingImportGate.entered)).toBe(true);
+  await expect(page.locator('#globalMessage')).toHaveText('データを読み込みました。');
+  await expect(page.locator('#importDataInput')).not.toHaveValue('');
+  await expect(page.locator('#documentPreview')).toContainText('OLD-IMPORT-CONTENT');
+  expect(finished).toBe(false);
+  await page.evaluate(() => window.endingImportGate.release());
+  await importing;
+  expect(finished).toBe(true);
+});
+
+for (const documentType of ['resume', 'career']) {
+  for (const paper of ['A4', 'LETTER']) {
+    test(`日本語PDF ${documentType}: 短文 ${paper} の本文直下に結びを一度表示`, async ({ page }, testInfo) => {
+      const { state, endMarker } = createPdfFixture({ locale: 'ja', documentType, pageSize: 'A4', length: 'short' });
+      state.documents.ja.fields[documentType === 'resume' ? 'requests' : 'selfPromotion'] += '\n\n  ';
+      await openLocale(page, 'ja');
+      await importState(page, state, endMarker);
+      await expect(page.locator('.ja-document-ending')).toBeHidden();
+      if (paper === 'LETTER') {
+        // The product UI fixes Japanese A4. Override only the browser page rule,
+        // after this import completes, for one compatibility PDF per document.
+        await page.locator('#activePrintPageStyle').evaluate((style) => { style.textContent = '@page { margin: 14mm 15mm; size: Letter portrait; }'; });
       }
-    }
+      const { pages, pdfPath } = await printAndCheck(page, testInfo, `${documentType}-${paper}-short`);
+      expect(pages[0].size.width).toBeCloseTo(paper === 'A4' ? 595.28 : 612, 0);
+      expect(pages[0].size.height).toBeCloseTo(paper === 'A4' ? 841.89 : 792, 0);
+      writeEvidence(page, testInfo, [{ documentType, paper, pages: pages.length, pdfPath }], 'fictional short fixture; trailing whitespace; Japanese Letter uses a browser page-rule override');
+    });
   }
-  writeEvidence(page, testInfo, evidence, 'fictional PDF pagination fixtures; trailing whitespace; standard cases have manual section breaks; Letter is a browser page-rule override');
-});
 
-test('日本語PDF: 空の末尾項目・未記入section・予約空白行を本文末尾と混同しない', async ({ page }, testInfo) => {
-  await openLocale(page, 'ja');
-  const evidence = [];
-  for (const tail of ['detail', 'long-label', 'role', 'companyInfo', 'company', 'skills', 'summary', 'identity', 'identity-links']) {
-    const state = createDefaultState('ja');
-    state.documents.ja.activeDocument = 'career';
-    state.profile.fields.fullName = '架空 太郎';
-    state.profile.fields.links = tail === 'identity-links' ? [`https://example.invalid/${'long-profile-path/'.repeat(30)}`, 'https://example.invalid/short'] : [];
-    state.documents.ja.fields.careerSummary = tail === 'summary' ? '最後の要約 END-SUMMARY' : '';
-    state.documents.ja.fields.skills = tail === 'skills' ? '最後の技術 END-SKILLS' : '';
-    state.documents.ja.careers = ['detail', 'long-label', 'role', 'companyInfo', 'company'].includes(tail) ? [{
-      id: 'record_ending-company', company: '架空会社 END-COMPANY', role: tail === 'role' ? '架空役職 END-ROLE\n\n  ' : '',
-      companyInfo: tail === 'companyInfo' ? '架空事業 END-INFO' : '', startDate: '', endDate: '',
-      detailSections: [{ title: tail === 'long-label' ? '長い架空項目タイトル'.repeat(8) : '架空項目', content: tail === 'detail' ? '- 第一行\n- 最後の項目 END-DETAIL\n\n' : tail === 'long-label' ? '本文 END-LABEL' : '' }, { title: '空の末尾項目', content: '' }]
-    }, { id: 'record_ending-empty', company: '', role: '', companyInfo: '', startDate: '', endDate: '', detailSections: [] }] : [];
-    await page.emulateMedia({ media: 'screen' });
-    await importState(page, state);
+  test(`日本語PDF ${documentType}: 相隣る行数で実際にページ境界を跨ぎ末行と結びを同頁に保つ`, async ({ page }, testInfo) => {
+    await openLocale(page, 'ja');
+    const evidence = [];
+    // Calibrate with one unprinted line at the actual A4 printable width.
+    // Font metrics may differ between local macOS and CI Linux; no PDF scan or
+    // artificial height is needed to choose the adjacent boundary fixtures.
+    await page.setViewportSize({ width: Math.ceil(180 * 96 / 25.4), height: 1000 });
+    const calibration = createDefaultState('ja');
+    calibration.documents.ja.activeDocument = documentType;
+    calibration.documents.ja.fields[documentType === 'resume' ? 'requests' : 'selfPromotion'] = 'BOUNDARY-CALIBRATION-END';
+    await importState(page, calibration, 'BOUNDARY-CALIBRATION-END');
     await page.emulateMedia({ media: 'print' });
-    await page.addStyleTag({ content: '.career-company-grid { min-height: 300px; }' });
-    const pdfPath = testInfo.outputPath(`empty-tail-${tail}.pdf`);
-    const pages = await inspectPdf(await page.pdf({ path: pdfPath, preferCSSPageSize: true, printBackground: true }));
-    assertEnding(pages);
-    expect(pages).toHaveLength(1);
-    expect(pages.flatMap((page) => page.items).map((item) => item.str).join('')).not.toContain('自己PRを入力');
-    evidence.push({ tail, pages: pages.length, pdfPath });
-  }
-  writeEvidence(page, testInfo, evidence, 'fictional empty records and detail sections, trailing empty sections, list ending, long label, role whitespace; a 300px grid reservation is injected only in this test');
-});
-
-test('日本語PDF: ページ境界で本文と結びを一緒に送り、結びだけの追加ページを作らない', async ({ page }) => {
-  await openLocale(page, 'ja');
-  for (const documentType of ['resume', 'career']) {
-    const state = createDefaultState('ja');
-    state.documents.ja.activeDocument = documentType;
-    const field = documentType === 'resume' ? 'requests' : 'selfPromotion';
-    for (const lines of [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) {
-      state.documents.ja.fields[field] = Array.from({ length: lines }, (_, index) => `架空の境界検証行 ${index + 1}`).join('\n');
+    await expect(page.locator('#documentPreview')).toHaveCSS('transform', 'none');
+    const geometry = await page.locator('.ja-ending-host').evaluate((host) => ({
+      bottom: host.getBoundingClientRect().bottom - host.closest('.document-page').getBoundingClientRect().top,
+      lineHeight: Number.parseFloat(getComputedStyle(host.querySelector('.ja-document-ending')).lineHeight)
+    }));
+    const fittingLines = 1 + Math.floor((269 * 96 / 25.4 - geometry.bottom) / geometry.lineHeight);
+    expect(fittingLines).toBeGreaterThan(0);
+    expect(fittingLines).toBeLessThan(100);
+    for (const count of [fittingLines, fittingLines + 1]) {
+      const state = createDefaultState('ja');
+      state.documents.ja.activeDocument = documentType;
+      const lines = Array.from({ length: count }, (_, index) => `BOUNDARY-${documentType}-${String(index + 1).padStart(3, '0')}-END`);
+      state.documents.ja.fields[documentType === 'resume' ? 'requests' : 'selfPromotion'] = lines.join('\n');
       await page.emulateMedia({ media: 'screen' });
-      await importState(page, state);
-      await page.emulateMedia({ media: 'print' });
-      assertEnding(await inspectPdf(await page.pdf({ preferCSSPageSize: true })));
+      await importState(page, state, lines.at(-1));
+      const { pages, pdfPath } = await printAndCheck(page, testInfo, `${documentType}-boundary-${count}`, lines);
+      expect(pages.at(-1).items.map((item) => item.str).join('')).toContain(lines.at(-1));
+      evidence.push({ count, pages: pages.length, lastBodyPage: pages.findIndex((item) => item.items.map((text) => text.str).join('').includes(lines.at(-1))), pdfPath });
     }
-  }
-});
+    expect(evidence[0].pages).toBe(1);
+    expect(evidence[1].pages).toBe(2);
+    expect(evidence[1].pages).toBe(evidence[0].pages + 1);
+    expect(evidence[1].lastBodyPage).toBe(evidence[0].lastBodyPage + 1);
+    writeEvidence(page, testInfo, evidence, { description: 'fictional adjacent boundary line counts; unmodified product print styles; DOM calibration without PDF generation', geometry });
+  });
+}
 
-test('中文・English PDF には日本語の結びを追加しない', async ({ page }) => {
-  for (const locale of ['zh-CN', 'en']) {
-    await page.emulateMedia({ media: 'screen' });
-    await openLocale(page, locale);
-    await page.locator(locale === 'en' ? '[data-en-load-sample]' : '[data-zh-action="sample"]').click();
-    const pages = await inspectPdf(await page.pdf({ preferCSSPageSize: true }));
-    expect(pages.flatMap((page) => page.items).some((item) => item.str === '以上')).toBe(false);
-  }
-});
+for (const tail of ['long-label', 'identity-links']) {
+  test(`日本語PDF: 空末尾の代表 ${tail} を印刷する`, async ({ page }, testInfo) => {
+    await openLocale(page, 'ja');
+    const state = tailState(tail);
+    await importState(page, state, tail === 'long-label' ? 'END-LABEL' : 'example.invalid/short');
+    // Only this explicit reservation stress case changes the product styles.
+    if (tail === 'long-label') await page.addStyleTag({ content: '.career-company-grid { min-height: 300px; }' });
+    const { pages, pdfPath } = await printAndCheck(page, testInfo, `empty-tail-${tail}`);
+    expect(pages).toHaveLength(1);
+    writeEvidence(page, testInfo, [{ tail, pages: pages.length, pdfPath }], tail === 'long-label' ? 'fictional long label and empty detail/record; explicit 300px grid reservation stress' : 'fictional identity with wrapping profile links; unmodified product styles');
+  });
+}

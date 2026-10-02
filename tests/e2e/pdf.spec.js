@@ -1,6 +1,7 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createEnglishSampleState } from '../../site/assets/js/data/en-sample.js';
 import { createDefaultState } from '../../site/assets/js/state/defaults.js';
+import { japanesePdfViolations } from '../helpers/japanese-pdf.js';
 import { createPdfFixture } from '../fixtures/pdf-pagination.mjs';
 import { expect, openLocale, revealField, test } from './fixtures.js';
 
@@ -56,9 +57,14 @@ function pdfPageIndex(pages, expected) {
   return pages.findIndex((page) => page.text.normalize('NFKC').replace(/\s/g, '').includes(needle));
 }
 
+const pdfOutputCounts = new WeakMap();
+
 async function printPdf(page) {
   await page.emulateMedia({ media: 'print' });
+  const outputNumber = (pdfOutputCounts.get(page) || 0) + 1;
+  pdfOutputCounts.set(page, outputNumber);
   return page.pdf({
+    path: test.info().outputPath(`pdf-${outputNumber}.pdf`),
     displayHeaderFooter: false,
     preferCSSPageSize: true,
     printBackground: true
@@ -79,6 +85,10 @@ async function printFixturePdf(page, fixtureCase) {
   await page.locator('#confirmSampleAdoptButton').click();
   await expect(page.locator(previewSelector)).toContainText(endMarker);
   return { endMarker, pages: await inspectPdf(await printPdf(page)) };
+}
+
+function expectJapaneseEnding(pages, expectedLines = []) {
+  expect(japanesePdfViolations(pages, { expectedLines })).toEqual([]);
 }
 
 async function activePrintPageText(page) {
@@ -164,6 +174,8 @@ test('PDF pagination: 三言語のページ境界データは末尾内容を保�
     expect(pages.every((item) => item.text.trim())).toBe(true);
     expect(pages.at(-1)?.text.trim()).not.toBe('');
     expect(pages.at(-1)?.text).toContain(endMarker);
+    if (expected.fixtureCase.locale === 'ja') expectJapaneseEnding(pages);
+    else expect(pages.flatMap((item) => item.items).some((item) => item.str === '以上')).toBe(false);
   }
 });
 
@@ -238,6 +250,7 @@ test('Japanese manual page break starts the resume target on a later non-empty A
   expect(pages.every((pdfPage) => pdfPage.text.trim())).toBe(true);
   expect(pdfPageIndex(pages, '免許・資格')).toBeGreaterThan(0);
   expect(pdfPageIndex(pages, endMarker)).toBeGreaterThanOrEqual(0);
+  expectJapaneseEnding(pages);
 });
 
 test('Japanese history break keeps contact details on the preceding PDF page', async ({ page }) => {
@@ -401,6 +414,7 @@ test('PDF ja Markdown: A4 resume と career の標準出力でリスト末尾・
   expect(resumeText.match(new RegExp(resumeEnd, 'g'))).toHaveLength(1);
   expect(resumeText.replace(/\s/g, '')).toContain('markdown-resume-path-');
   expect(resumePages.flatMap((item) => item.annotations).some((item) => item.url === 'https://example.test/resume-markdown-reference')).toBe(true);
+  expectJapaneseEnding(resumePages);
 
   const careerCase = { locale: 'ja', length: 'standard', documentType: 'career', pageSize: 'A4' };
   const careerFixture = createPdfFixture(careerCase);
@@ -436,6 +450,7 @@ test('PDF ja Markdown: A4 resume と career の標準出力でリスト末尾・
   expect(careerText.match(new RegExp(careerEnd, 'g'))).toHaveLength(1);
   expect(careerText.replace(/\s/g, '')).toContain('markdown-career-path-');
   expect(careerPages.flatMap((item) => item.annotations).some((item) => item.url === 'https://example.test/career-markdown-reference')).toBe(true);
+  expectJapaneseEnding(careerPages);
 });
 
 test('PDF long record: 四書類は95行を保持し、読みやすい文字サイズを保つ', async ({ page }) => {
@@ -515,6 +530,8 @@ test('PDF long record: 四書類は95行を保持し、読みやすい文字サ�
     expect(text).not.toMatch(fixture.automaticLabel);
     const sampleItem = pages.flatMap((item) => item.items).find((item) => item.str.includes('SYNTHETIC-ENTRY-'));
     expect(Math.abs(sampleItem?.transform?.[3] || 0)).toBeGreaterThanOrEqual(9.5);
+    if (fixture.locale === 'ja') expectJapaneseEnding(pages, details.split('\n'));
+    else expect(pages.flatMap((item) => item.items).some((item) => item.str === '以上')).toBe(false);
   }
 });
 
