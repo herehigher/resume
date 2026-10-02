@@ -54,7 +54,7 @@ data format を更新するときは `STATE_VERSION` を増やし、直前 versi
 
 勤務先と中英文職歴の折りたたみは既存 record ID、ID のない行は一時配列で保持します。追加／削除した adapter は更新後の `sync` に `{ change: { type: 'insert' | 'remove', index } }` を渡します。移動は共通側で同じ一時配列を移動します。匿名行の不明な構造変更は全展開へ戻し、同じ本文を identity として推測しません。会社詳細の状態は `careerId` ごとに分離し、親行の折りたたみは詳細を変えません。親の再描画で詳細 binding を破棄・再登録しても同じ controller 内の状態は保持し、会社削除時には消します。
 
-`replace`・import・reload・sample・restore・reset で旧状態を破棄します。再描画前の古い行では移動できず、単なる保存完了では折りたたみを変更しません。import の保存失敗では草稿と fold を維持し、pending 解除後に移動操作を復帰させます。`list.destroy()` は行装飾と listener を外し既存操作を元へ戻し、controller の `destroy()` は全登録と一時状態を破棄します。controller を維持した普通の再描画と破棄を区別してください。fold 情報は v4・JSON・保存に入りません。reorder 通知の読み取り専用 `target`・`operation`・`permutation` は移動に伴う一時状態の同期だけに使い、保存 data に入りません。別 controller からの移動・日付整列でも位置 permutation と同じ fold を動かし、無関係なリストを無効にしません。日付整列の UI と三言語 editor への接続は後続子 Issue で行います。本コンポーネントの browser test は test 内で架空 adapter を組み立て、公開 product route は追加しません。
+`replace`・import・reload・sample・restore・reset で旧状態を破棄します。再描画前の古い行では移動できず、単なる保存完了では折りたたみを変更しません。import の保存失敗では草稿と fold を維持し、pending 解除後に移動操作を復帰させます。`list.destroy()` は行装飾と listener を外し既存操作を元へ戻し、controller の `destroy()` は全登録と一時状態を破棄します。controller を維持した普通の再描画と破棄を区別してください。fold 情報は v4・JSON・保存に入りません。reorder 通知の読み取り専用 `target`・`operation`・`permutation` は移動に伴う一時状態の同期だけに使い、保存 data に入りません。別 controller からの移動・日付整列でも位置 permutation と同じ fold を動かし、無関係なリストを無効にしません。日付整列の UI と三言語 editor は `createEditorLists`（`ui/editor-lists.js`）を通して同じ controller へ接続します。本コンポーネントの browser test は test 内で架空 adapter を組み立て、公開 product route は追加しません。
 
 ### 共通の pointer drag
 
@@ -65,6 +65,18 @@ data format を更新するときは `STATE_VERSION` を増やし、直前 versi
 Escape とリスト外 drop は元のコンパクト行へ戻ります。pointercancel・capture 喪失・blur・import・store 更新・再描画・view 切替・印刷・破棄では安全を優先して即時に浮層／占位／capture／animation を除去します。単なる save 通知は継続できます。reduced motion は移動・拡大 animation を止め、静的な占位と既存の移動結果の強調を残します。手柄の上下キーと操作 menu の上／下へ移動が同じ transaction の代替です。
 
 Browser test は架空 adapter で desktop Chromium、mobile Chromium／WebKit の長いカード・連続移動・首尾・auto scroll・取消・無 ID／重複・nested isolation を確認します。Chromium の touch は CDP の native input、WebKit の touch／pen 経路は synthetic PointerEvents と区別し、実機の指／pen や性能測定を実施したとは扱いません。
+
+### 三言語の統合受入
+
+`tests/e2e/issue-275-integration-acceptance.spec.js` は公開 editor の実フォームを使い、14種類の追加・編集・折りたたみ・上下移動・削除・暗号化再読込・JSON 往復を desktop Chromium と mobile Chromium／WebKit で確認します。12種類の日付整列は同日・至今・空／不正年月・既に整列済み・両方向の整列後の pointer drag を扱います。重複名・URL、全空の追加行、取消時の草稿／改ページ保持、編集・import・sample・言語変更・印刷での drag cleanup、長いカードと端の自動 scroll、reduced motion を確認します。
+
+改ページの対象範囲と非表示言語を含む旧 undo は `list-order.spec.js` の全14種類の controller test、勤務先の独立構成は `editor-list-integration.spec.js`、privacy と競合保護は既存の対応 suite と併せて受け入れます。実フォームの WebKit touch は合成 PointerEvents、Chromium touch は CDP の native input です。実機の指／pen と性能測定は別の確認として記録します。
+
+```bash
+CI=1 npx playwright test tests/e2e/issue-275-integration-acceptance.spec.js tests/e2e/editor-list-integration.spec.js tests/e2e/list-order.spec.js tests/e2e/sortable-lists.spec.js
+```
+
+Quality は成功時の三言語の motion／reduced motion 画面と、並べ替え後の日本語 A4 両書類・中文 A4・English A4／Letter の PDF／preview を `list-reorder-acceptance-SOURCE_SHA` artifact に7日間残します。各出力の `evidence.json` に checkout commit、browser、OS、viewport、架空 data の条件を記録します。自動 test 成功は目視の代用にせず、確認者は対象 artifact／commit と全ページの目視結果・未確認を PR に記録します。
 
 ## Open Graph 共有画像
 

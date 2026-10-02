@@ -217,6 +217,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload list reorder acceptance evidence
+        if: ${{ (github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true') && success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: list-reorder-acceptance-${{ inputs.checkout_ref || github.sha }}
+          path: |
+            node_modules/.cache/resume-studio/playwright-results/issue-275-*/*.png
+            node_modules/.cache/resume-studio/playwright-results/issue-275-*/*.pdf
+            node_modules/.cache/resume-studio/playwright-results/issue-275-*/evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Playwright failure evidence
         if: failure()
         uses: actions/upload-artifact@v7

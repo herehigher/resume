@@ -224,3 +224,16 @@ test('browser binaries are not restored through an Actions cache', () => {
   assert.doesNotMatch(qualityWorkflow, /actions\/cache@/);
   assert.doesNotMatch(releaseWorkflow, /actions\/cache@/);
 });
+
+test('Quality retains successful reorder visual evidence with source identity and bounded retention', () => {
+  const step = workflowStep(qualityJob, 'Upload list reorder acceptance evidence');
+  assert.match(workflowStepField(step, 'if'), /success\(\)/);
+  assert.match(workflowStepField(step, 'if'), /docs_only != 'true'/);
+  assert.match(step.body, /list-reorder-acceptance-\$\{\{ inputs\.checkout_ref \|\| github\.sha \}\}/);
+  for (const suffix of ['*.png', '*.pdf', 'evidence.json']) {
+    assert.ok(step.body.includes(`playwright-results/issue-275-*/${suffix}`));
+  }
+  assert.match(step.body, /if-no-files-found: error/);
+  assert.match(step.body, /retention-days: 7/);
+  assert.doesNotMatch(step.body, /trace\.zip|test-failed/);
+});
