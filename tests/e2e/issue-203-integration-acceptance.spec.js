@@ -5,7 +5,6 @@ import { STORAGE_KEY } from '../../site/assets/js/config.js';
 import { createV3Fixture } from '../fixtures/resume-studio-web-v3.js';
 import { expect, openLocale, test } from './fixtures.js';
 
-const A4 = { width: 595.28, height: 841.89 };
 const LETTER = { width: 612, height: 792 };
 
 async function inspectPdf(buffer) {
@@ -88,7 +87,7 @@ function expectPageSize(pages, expectedSize) {
   }
 }
 
-test('v3 migration integrates three locale/paper PDF page breaks without printing editor controls', async ({ page }) => {
+test('v3 migration connects locale/paper page breaks to one real print without editor controls', async ({ page }) => {
   const v3 = createMigratableV3Fixture();
   await page.addInitScript((raw) => localStorage.setItem('resume-studio-web-v3', raw), JSON.stringify(v3));
   await openLocale(page, 'en');
@@ -117,44 +116,59 @@ test('v3 migration integrates three locale/paper PDF page breaks without printin
   const cases = [
     {
       locale: 'ja',
-      beforePrint: async () => page.locator('#careerDocumentTab').click(),
+      workspace: '#japaneseWorkspace',
+      selectDocument: async () => page.locator('#careerDocumentTab').click(),
       target: '#japaneseWorkspace [data-section-key="career-history"]',
-      targetText: 'Fictional v3 Japan',
-      paper: A4
+      pageRule: 'size: A4 portrait'
     },
     {
       locale: 'zh-CN',
-      beforePrint: async () => {},
+      workspace: '#chineseWorkspace',
+      selectDocument: async () => {},
       target: '#chineseWorkspace [data-section-key="experience"]',
-      targetText: 'Fictional v3 China',
-      paper: A4
+      pageRule: 'size: A4 portrait'
     },
     {
       locale: 'en',
-      beforePrint: async () => page.locator('[data-en-page-size]').selectOption('A4'),
+      workspace: '[data-english-editor]',
+      selectDocument: async () => page.locator('[data-en-page-size]').selectOption('A4'),
       target: '[data-english-editor] [data-section-key="projects"]',
-      targetText: 'Migrated v3 project',
-      paper: A4
+      pageRule: 'size: A4 portrait'
     },
     {
       locale: 'en',
-      beforePrint: async () => page.locator('[data-en-page-size]').selectOption('LETTER'),
+      workspace: '[data-english-editor]',
+      selectDocument: async () => page.locator('[data-en-page-size]').selectOption('LETTER'),
       target: '[data-english-editor] [data-section-key="skills"]',
-      targetText: 'Migrated v3 English skills',
-      paper: LETTER
+      pageRule: 'size: Letter portrait'
     }
   ];
 
   for (const item of cases) {
     await page.emulateMedia({ media: 'screen' });
     await page.locator('#localeSelect').selectOption(item.locale);
-    await item.beforePrint();
+    await item.selectDocument();
     await expect(page.locator(item.target).first()).toHaveClass(/has-manual-page-break/);
-    const pages = await printPdf(page);
-    expectPageSize(pages, item.paper);
-    const targetPage = pages.findIndex((pdfPage) => pdfPage.text.includes(item.targetText));
-    expect(targetPage).toBeGreaterThan(0);
-    const text = pages.map((pdfPage) => pdfPage.text).join(' ');
-    expect(text).not.toMatch(/Page break positions|改ページ位置|分页位置/);
+    await expect.poll(() => page.locator('#activePrintPageStyle').textContent()).toContain(item.pageRule);
+    const toolbar = page.locator(`${item.workspace} .preview-toolbar`);
+    const menu = toolbar.locator('.page-break-menu');
+    await expect(toolbar).toHaveCount(1);
+    await expect(menu).toHaveCount(1);
+    await expect(toolbar).toBeVisible();
+    await expect(menu).toBeVisible();
+    await page.emulateMedia({ media: 'print' });
+    expect(await page.locator(item.target).first().evaluate((element) => getComputedStyle(element).breakBefore)).toBe('page');
+    await expect(toolbar).toBeHidden();
+    await expect(menu).toBeHidden();
   }
+
+  // A single migrated Letter print checks the storage -> rendering -> PDF connection.
+  const pages = await printPdf(page);
+  expectPageSize(pages, LETTER);
+  const targetPage = pages.findIndex((pdfPage) => pdfPage.text.includes('Migrated v3 English skills'));
+  expect(targetPage).toBeGreaterThan(0);
+  expect(pages.at(-1)?.text).toContain('Migrated v3 English skills');
+  const text = pages.map((pdfPage) => pdfPage.text).join(' ');
+  expect(text.match(/Migrated v3 English skills/g)).toHaveLength(1);
+  expect(text).not.toMatch(/Page break positions|改ページ位置|分页位置/);
 });

@@ -226,6 +226,7 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   const saveStatus = rootElement.querySelector('[data-zh-draft-message]');
   let zoom = 1;
   let saveTimer;
+  let saveRequestVersion = 0;
   let shouldPersistDraft = store.hasStoredState();
   let sampleMode = false;
   let importPending = false;
@@ -257,15 +258,19 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   statusController?.registerDraftStatus('zh-CN', saveStatus, rootElement.querySelector('[data-zh-draft-controls]'));
 
   function scheduleSave() {
+    const requestVersion = ++saveRequestVersion;
     window.clearTimeout(saveTimer);
     if (sampleMode || importPending) return;
     shouldPersistDraft = true;
     setStatus(zhCN.savingStatus, 'saving');
     saveTimer = window.setTimeout(async () => {
+      const savedRevision = store.getDraftRevision();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getDraftRevision() === savedRevision && !sampleMode && !importPending;
       try {
-        await store.save();
+        if (!await store.save() || !isCurrent()) return;
         setStatus(zhCN.savedStatus, 'success');
       } catch (error) {
+        if (!isCurrent()) return;
         setStatus(draftStatusMessageForError(error, 'zh-CN', zhCN.saveError), 'error');
       }
     }, 300);
@@ -588,6 +593,9 @@ export function initChineseEditor(store, { embeddedPhotoUrl, root = '#chineseWor
   window.addEventListener('resize', fitPreview);
   window.addEventListener('pagehide', onPageHide);
   const unsubscribe = store.subscribe((_state, event) => {
+    if (event.type === 'save' && !sampleMode && !importPending && saveStatus.classList.contains('is-saving')) {
+      setStatus(zhCN.savedStatus, 'success', { announce: false });
+    }
     if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;
