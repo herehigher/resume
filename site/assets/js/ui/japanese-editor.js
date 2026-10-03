@@ -59,6 +59,7 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   const workspace = document.getElementById('japaneseWorkspace');
   let zoom = 1;
   let saveTimer;
+  let saveRequestVersion = 0;
   let draftMessageTimer;
   let shouldPersistDraft = store.hasStoredState();
   let sampleMode = false;
@@ -103,15 +104,19 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   }
 
   function scheduleSave() {
+    const requestVersion = ++saveRequestVersion;
     window.clearTimeout(saveTimer);
     if (sampleMode || importPending) return;
     shouldPersistDraft = true;
     setDraftStatus('暗号化して保存中…', 'saving');
     saveTimer = window.setTimeout(async () => {
+      const savedRevision = store.getDraftRevision();
+      const isCurrent = () => requestVersion === saveRequestVersion && store.getDraftRevision() === savedRevision && !sampleMode && !importPending;
       try {
-        await store.save();
+        if (!await store.save() || !isCurrent()) return;
         setDraftStatus('暗号化してこの端末に保存済み', 'success');
       } catch (error) {
+        if (!isCurrent()) return;
         setDraftStatus(draftStatusMessageForError(error, 'ja', '暗号化した下書きを保存できませんでした'), 'error');
       }
     }, 300);
@@ -762,6 +767,9 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
   });
 
   store.subscribe((_state, event) => {
+    if (event.type === 'save' && !sampleMode && !importPending && saveStatus.classList.contains('is-saving')) {
+      setDraftStatus('暗号化してこの端末に保存済み', 'success', { announce: false });
+    }
     if (event.type === 'reorder') renderPreview();
     if (event.type === 'import-pending') {
       sampleRequestVersion += 1;

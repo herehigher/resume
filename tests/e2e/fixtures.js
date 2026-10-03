@@ -124,3 +124,21 @@ export async function clickListAction(action) {
   if (await menu.getAttribute('open') === null) await menu.locator(':scope > summary').click();
   await action.click();
 }
+
+// Read only: never migrate, rewrite, or remove the encrypted draft while waiting.
+export async function readPersistedState(page) {
+  return page.evaluate(async () => {
+    const { STORAGE_KEY } = await import('/assets/js/config.js');
+    const { createDraftStorage, ENCRYPTED_DRAFT_FORMAT } = await import('/assets/js/state/storage.js');
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw || JSON.parse(raw).format !== ENCRYPTED_DRAFT_FORMAT) return null;
+    return createDraftStorage(localStorage).loadReadOnly();
+  });
+}
+
+// Match the changed fields (including complete list arrays), not just an old envelope or status text.
+export async function waitForPersistedState(page, expected) {
+  await expect.poll(() => readPersistedState(page), {
+    message: '今回変更した内容が暗号化草稿へ永続化されること'
+  }).toMatchObject(expected);
+}
