@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { authorizeReleaseEligibility, validateRunIdentity } from '../scripts/validate-release-run.mjs';
+import { authorizeReleaseEligibility, validateFullQualityJobs, validateRunIdentity } from '../scripts/validate-release-run.mjs';
 
 const sha = 'a'.repeat(40);
 const repository = { id: 123, full_name: 'herehigher/resume' };
@@ -14,6 +14,59 @@ const workflow = { id: 456, path: '.github/workflows/ci.yml' };
 const run = { id: 789, repository, head_repository: repository, workflow_id: workflow.id,
   path: workflow.path, head_branch: 'main', event: 'push', status: 'completed',
   conclusion: 'success', head_sha: sha };
+
+function fullQualityJobs() {
+  return Object.entries({
+    scope: [],
+    'unit-static': ['Unit and static tests', 'Lint'],
+    'browser-chromium-1': ['Browser and PDF acceptance tests'],
+    'browser-chromium-2': ['Browser and PDF acceptance tests'],
+    'browser-chromium-3': ['Browser and PDF acceptance tests'],
+    'browser-webkit': ['Browser and PDF acceptance tests'],
+    'documentation-assets': ['Generate temporary documentation assets', 'Verify temporary documentation assets', 'Upload documentation asset evidence'],
+    quality: ['Verify required Quality jobs']
+  }).map(([name, steps]) => ({
+    name, conclusion: 'success', steps: steps.map((name) => ({ name, conclusion: 'success' }))
+  }));
+}
+
+test('full Quality binds every partition and real acceptance step across paginated jobs', () => {
+  const jobs = fullQualityJobs();
+  validateFullQualityJobs([{ jobs: jobs.slice(0, 3) }, { jobs: jobs.slice(3) }]);
+  for (let index = 0; index < jobs.length; index += 1) {
+    assert.throws(() => validateFullQualityJobs([{ jobs: jobs.filter((_, i) => i !== index) }]));
+    assert.throws(() => validateFullQualityJobs([{ jobs: [...jobs, jobs[index]] }]));
+    for (const conclusion of ['failure', 'cancelled', 'skipped', null]) {
+      const changed = structuredClone(jobs);
+      changed[index].conclusion = conclusion;
+      assert.throws(() => validateFullQualityJobs([{ jobs: changed }]));
+    }
+    for (let stepIndex = 0; stepIndex < jobs[index].steps.length; stepIndex += 1) {
+      for (const conclusion of ['skipped', 'failure', 'cancelled', undefined]) {
+        const changed = structuredClone(jobs);
+        changed[index].steps[stepIndex].conclusion = conclusion;
+        assert.throws(() => validateFullQualityJobs([{ jobs: changed }]), /full Quality step/);
+      }
+      const changed = structuredClone(jobs);
+      changed[index].steps.push(changed[index].steps[stepIndex]);
+      assert.throws(() => validateFullQualityJobs([{ jobs: changed }]), /full Quality step/);
+    }
+  }
+  assert.throws(() => validateFullQualityJobs(null), /job lookup/);
+  assert.throws(() => validateFullQualityJobs([{ jobs: [{ name: 'quality', conclusion: 'success' }] }]), /full Quality step/);
+});
+
+test('only the single historical Quality job can use legacy browser evidence', () => {
+  const legacy = { name: 'quality', conclusion: 'success', steps: [
+    { name: 'Browser and PDF acceptance tests', conclusion: 'success' }
+  ] };
+  validateFullQualityJobs([{ jobs: [legacy] }]);
+  for (const job of fullQualityJobs().filter((job) => job.name !== 'quality')) {
+    assert.throws(() => validateFullQualityJobs([{ jobs: [legacy, job] }]), /job did not succeed|full Quality step/);
+  }
+  // Rerunning failed jobs can legitimately retain successful jobs from a prior attempt.
+  validateFullQualityJobs([{ jobs: fullQualityJobs().map((job, index) => ({ ...job, run_attempt: index % 2 + 1 })) }]);
+});
 
 test('publication rejects wrong workflow, branch, repository, SHA, and incomplete runs', () => {
   const expected = { event: 'push', sha, runId: 789 };
@@ -34,9 +87,7 @@ test('release eligibility only accepts one merged version pull request at the cu
     base: { ref: 'main', repo: repository, sha: baseSha }, merge_commit_sha: sha,
     merged_at: '2026-09-13T00:00:00Z', number: 198, state: 'closed'
   };
-  const jobs = [{ jobs: [{ name: 'quality', conclusion: 'success', steps: [
-    { name: 'Browser and PDF acceptance tests', conclusion: 'success' }
-  ] }] }];
+  const jobs = [{ jobs: fullQualityJobs() }];
   const responses = new Map([
     ['actions/workflows/ci.yml', workflow], ['actions/runs/789', run],
     ['actions/runs/789/jobs?filter=latest&per_page=100', jobs],
@@ -121,7 +172,7 @@ process.stdout.write(JSON.stringify(response));
   qualityJob.steps[0].conclusion = 'skipped';
   result = execute(['quality', '--sha', sha]);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /full browser quality was not executed/);
+  assert.match(result.stderr, /full Quality step was not executed/);
   qualityJob.steps[0].conclusion = 'success';
   result = execute(['eligibility', '--run-id', '789', '--sha', sha]);
   assert.equal(result.status, 0, result.stderr);

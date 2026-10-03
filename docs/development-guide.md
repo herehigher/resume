@@ -124,6 +124,8 @@ node scripts/render-open-graph-cards.mjs --locale zh-CN --output-dir /tmp/resume
 
 CI は文書だけの変更でも Quality の結果を返します。確認を実行せず required check を pending のまま残す path filter は使いません。GitHub の branch protection は別設定です。Playwright の失敗証拠は Actions artifact に残します。
 
+Quality は scope、unit/static/lint、browser、documentation-assets を分離し、必須 check `quality` が結果を集約します。Browser は desktop/mobile Chromium を3分片、desktop/mobile WebKit を1 jobで実行し、各 runner は2 workers・retryなしです。全分片を完走させ、分片ごとの blob report と失敗時 screenshot/trace を7日間保存します。通常の docs-only PR は scope 内の文書検証だけを実行します。Main push と明示 SHA の workflow call は常に full gate を実行し、scope failure、取消、意図しない skip は集約で拒否します。
+
 Local で複数 worktree の E2E を実行する場合、既定 port 4183 / 4184 の利用を直列化し、`CI=1` で別 checkout の server を誤って再利用しないようにします。依存関係は `package-lock.json` で固定し、更新は dependency の目的を確認した PR で行います。
 
 ## 表示・PDF の目視
@@ -150,7 +152,9 @@ README の screenshot / PDF は安定版ごとの長期参照用展示物です�
 
 CI の確認用出力は一時 directory から Actions artifact に保存し、通常の開発 PR では source / 展示物へ promote しません。Version を変えずに展示 asset だけを変更した PR は拒否します。安定版は公開 PR を作る前に、公式候補 branch の commit を40桁の SHAで固定し、main の `Release candidate assets` workflow で候補 asset を生成します。候補 branch の clean checkout で `npm run promote:candidate-doc-assets -- --source-sha SOURCE_SHA --run-id RUN_ID --run-attempt RUN_ATTEMPT` を実行し、検証済みの screenshot 3件、PDF 3件、manifest の7 fileだけを取り込みます。候補の `site/`・package・generator input は commit 済みでなければならず、変更した場合は新しい固定 SHA から生成し直します。
 
-候補生成は product Quality や公開承認ではありません。完成した公開 PR の `quality` job は unit/static、lint、browser/PDF acceptance、fresh asset 生成・検証に加え、commit 済み LFS object と候補 artifact の exact bytes、version、site、generator/browser、PDF、screenshot の semantic contract を照合します。Merge 後の公開準備は最終 main Quality に対し、各 file と manifest digest、候補 version、site・generator contract、PDF 全文・page、screenshot visual を再検査します。別 browser run の raw bytes 完全一致は要求せず、自動 commit も行いません。
+候補生成は product Quality や公開承認ではありません。完成した公開 PR の Quality は unit/static、lint、browser/PDF acceptance と、documentation-assets job 内の fresh asset 生成・検証、commit 済み LFS object と候補 artifact の exact bytes、version、site、generator/browser、PDF、screenshot の semantic contract を照合します。Asset が先に upload されても、consumer は `quality` 集約の成功を確認するまで採用しません。Merge 後の公開準備は最終 main Quality に対し、各 file と manifest digest、候補 version、site・generator contract、PDF 全文・page、screenshot visual を再検査します。別 browser run の raw bytes 完全一致は要求せず、自動 commit も行いません。
+
+失敗 job だけの再実行では、同じ固定 source SHA の成功済み job と Quality asset を前 attempt から再利用できます。全 job 再実行では同一 run の SHA 名 artifact を新しい生成物で置き換え、manifest は実際に生成した attempt を記録します。候補 asset の厳密な run/attempt/ID/digest 検証は維持します。
 
 Documentation asset manifest の current schema は v4 です。Producer kind、workflow、control SHA、実際の source SHA、run ID、attempt を記録し、artifact ID と archive digest は GitHub API の identity と照合します。Upload 後に決まる値を同じ artifact 内の manifest へ書き戻しません。Release comparison は既存 v3 manifest を従来の Quality producer として read-only で受け取りますが、候補 producer としては扱わず、v3 を更新・再保存しません。この schema は履歴書 data format の `version` とは別契約です。
 
