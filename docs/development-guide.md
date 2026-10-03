@@ -68,15 +68,23 @@ Browser test は架空 adapter で desktop Chromium、mobile Chromium／WebKit �
 
 ### 三言語の統合受入
 
-`tests/e2e/issue-275-integration-acceptance.spec.js` は公開 editor の実フォームを使い、14種類の追加・編集・折りたたみ・上下移動・削除・暗号化再読込・JSON 往復を desktop Chromium と mobile Chromium／WebKit で確認します。12種類の日付整列は同日・至今・空／不正年月・既に整列済み・両方向の整列後の pointer drag を扱います。重複名・URL、全空の追加行、取消時の草稿／改ページ保持、編集・import・sample・言語変更・印刷での drag cleanup、長いカードと端の自動 scroll、reduced motion を確認します。
+同じ順序操作を全リスト・全ブラウザーで繰り返す代わりに、リスクごとに以下の層で確認します。自動 test と人の目視受入は別に記録します。
 
-改ページの対象範囲と非表示言語を含む旧 undo は `list-order.spec.js` の全14種類の controller test、勤務先の独立構成は `editor-list-integration.spec.js`、privacy と競合保護は既存の対応 suite と併せて受け入れます。実フォームの WebKit touch は合成 PointerEvents、Chromium touch は CDP の native input です。実機の指／pen と性能測定は別の確認として記録します。
+| リスク | Test と確認内容 | Locale / browser |
+| --- | --- | --- |
+| 14配列の移動範囲・12日付リストの同日／至今／空／不正年月・無変更 | `tests/list-order.test.js` の各KEYのmove／bounds／date sortingと`period dates rank Present...`／`single dates retain ties...` | 三言語・共有links、Node |
+| 実フォームadapterの追加・空行移動・編集・上下移動・削除・日付sort接続 | `issue-275-integration-acceptance.spec.js` の`275 KEY: product CRUD...`。14 targetで実際のadd／入力／move／delete、日付12 targetは2方向buttonと表示年月、ja.education／en.experienceはsort後のpointer dragとCustom復帰 | 三言語・nested detail・共有links、desktop Chromium |
+| 有ID／無ID・nested detail・共有linksの暗号化保存／再読込／JSON往復 | 同suiteの`product CRUD, encrypted reload and JSON roundtrip`：ja.education／ja.careers／ja.careerDetails／zh-CN.experience／en.experience／profile.links。完全な変更後配列の永続化後にrefresh | desktop Chromiumの代表6構造、三言語mobile Chromium／WebKitの職歴・links代表 |
+| focus・fold・keyboard・composition・重複内容・差し替え／失敗import | `sortable-lists.spec.js` の`shared compact rows...`／`anonymous duplicate rows...`／`company and independent detail folds...`。`editor-list-integration.spec.js` の`product lists use array order and one-time sorting`、会社構成copy・共有linksの固有test | 三言語labels、desktop Chromium・mobile Chromium／WebKit。共通のDOM transactionは代表browser |
+| drag閾値・連続移動・首尾・auto scroll・取消後の遅延no-save・motion | `sortable-lists.spec.js` の`pointer drag preserves forms...`／`cancel, no-op, updates and view changes...`／`native Chromium touch...`／`pen and touch pointer paths...`。時計を進めた取消後も保存なし。`275 LOCALE: product long-card drag...`は三言語desktop・English mobile代表 | desktop Chromium・mobile Chromiumのnative CDP touch・mobile WebKitのsynthetic touch／pen |
+| 改ページ解除・無変更時保持・非表示controllerの旧undo失効 | `list-order.spec.js` の`reorder invalidates all initialized pagination feedback and detached undo callbacks`：ja.education／ja.careers／ja.careerDetails／zh-CN.experience／en.experience／profile.linksごとに四controllerを初期化し、no-change保持と旧undoを確認。sharedは他の三hostをhiddenにする。issue-275の`already sorted ties...`三言語代表と`cancellations preserve...`はlive previewの改ページclass保持も確認。全14のscopeはNodeで確認 | 三言語、desktop／mobile Chromium |
+| 操作後のpreview／PDF順序・末尾・重複・空白／サイズ | issue-275の`275 LOCALE TYPE PAPER LENGTH: reordered preview and every PDF page retain unique markers`はfixtureとmoveから独立に期待を作り、移動結果を先に確認。`list-order.spec.js` の`LOCALE PAPER saved array order survives encrypted reload, preview and PDF`は日付逆順のimportを自動sortしない別前提 | 日本語A4両書類・中文A4・English A4／Letter、desktop Chromium。import順previewはmobile Chromiumも確認 |
 
 ```bash
 CI=1 npx playwright test tests/e2e/issue-275-integration-acceptance.spec.js tests/e2e/editor-list-integration.spec.js tests/e2e/list-order.spec.js tests/e2e/sortable-lists.spec.js
 ```
 
-Quality は成功時の三言語の motion／reduced motion 画面と、並べ替え後の日本語 A4 両書類・中文 A4・English A4／Letter の PDF／preview を `list-reorder-acceptance-SOURCE_SHA` artifact に7日間残します。各出力の `evidence.json` に checkout commit、browser、OS、viewport、架空 data の条件を記録します。自動 test 成功は目視の代用にせず、確認者は対象 artifact／commit と全ページの目視結果・未確認を PR に記録します。
+Quality は並べ替え受入の成功時 screenshot／preview／PDF／evidence を生成・uploadしません。必須の自動PDF断言はmemory内の生成・解析で続け、失敗時の screenshot／traceとrelease用artifactは保持します。人の確認は機能実装または関連する表示・印刷変更のPRで対象commit・言語・用紙・画面幅と結果を一度記録し、毎CI後の目視を義務にしません。実機の指／penや性能測定を、自動のnative Chromium touchや合成WebKit PointerEventsの確認として報告しません。
 
 ## Open Graph 共有画像
 

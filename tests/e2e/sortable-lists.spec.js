@@ -2,7 +2,7 @@ import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { LIST_ORDER_REGISTRY } from '../../site/assets/js/state/list-order.js';
 import { expect, expectNoPageOverflow, test } from './fixtures.js';
 
-const mainKeys = Object.keys(LIST_ORDER_REGISTRY).filter((key) => key !== 'ja.careerDetails');
+const harnessKeys = ['en.experience', 'en.projects', 'en.education', 'ja.careers', 'profile.links'];
 const words = {
   ja: { collapse: '折りたたむ', expand: '展開する', up: '上へ移動', down: '下へ移動', collapseAll: 'すべて折りたたむ', expandAll: 'すべて展開する' },
   'zh-CN': { collapse: '收起', expand: '展开', up: '上移', down: '下移', collapseAll: '全部收起', expandAll: '全部展开' },
@@ -10,7 +10,7 @@ const words = {
 };
 function initialState() {
   const state = createDefaultState();
-  for (const key of mainKeys) {
+  for (const key of harnessKeys) {
     const path = LIST_ORDER_REGISTRY[key].path;
     const parent = path.slice(0, -1).reduce((value, part) => value[part], state);
     const field = path.at(-1);
@@ -137,7 +137,7 @@ async function mount(page, locale = 'en') {
         for (const binding of [...bindings.values()]) if (!binding.target.careerId) draw(binding);
       }
     };
-  }, { state: initialState(), locale, keys: mainKeys });
+  }, { state: initialState(), locale, keys: harnessKeys });
 }
 
 function list(page, key) { return page.locator(`[data-harness-list="${key}"]`).first(); }
@@ -146,10 +146,10 @@ async function openActions(row) { await row.locator(':scope > .sortable-row-head
 
 for (const locale of ['ja', 'zh-CN', 'en']) {
   for (const device of ['desktop', 'mobile']) {
-    test(`shared compact rows cover all 14 targets in ${locale} ${device === 'desktop' ? '' : '[mobile] [mobile-webkit]'}`, async ({ page }, testInfo) => {
+    test(`shared compact rows cover ID, anonymous, nested and primitive targets in ${locale} ${device === 'desktop' ? '' : '[mobile] [mobile-webkit]'}`, async ({ page }) => {
       await mount(page, locale);
       const labels = words[locale];
-      const keys = [...mainKeys, 'ja.careerDetails:record_fictional-ja-careers-0'];
+      const keys = ['en.experience', 'en.projects', 'ja.careers', 'ja.careerDetails:record_fictional-ja-careers-0', 'profile.links'];
       for (const key of keys) {
         const targetRows = rows(page, key);
         const source = targetRows.nth(1);
@@ -169,8 +169,8 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
         await expect(targetRows.nth(1).locator(':scope > [data-harness-body]')).toBeHidden();
       }
       const result = await page.evaluate(() => ({ counts: sortableHarness.counts(), messages: sortableHarness.messages, json: sortableHarness.store.exportJson() }));
-      expect(result.counts).toEqual({ scheduled: 28, saved: 28 });
-      expect(result.messages).toHaveLength(28);
+      expect(result.counts).toEqual({ scheduled: keys.length * 2, saved: keys.length * 2 });
+      expect(result.messages).toHaveLength(keys.length * 2);
       expect(result.json).not.toMatch(/collapsed|sortable|fold/);
       await expectNoPageOverflow(page);
       const companies = list(page, 'ja.careers');
@@ -178,7 +178,6 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
       await companies.scrollIntoViewIfNeeded();
       await openActions(rows(page, 'ja.careers').nth(1));
       await expectNoPageOverflow(page);
-      await page.screenshot({ path: testInfo.outputPath(`compact-${locale}-${device}.png`) });
     });
   }
 }
@@ -511,7 +510,7 @@ async function cleanDrag(page) {
 
 for (const mobile of [false, true]) {
   const tags = mobile ? '[mobile] [mobile-webkit]' : '';
-  test(`pointer drag preserves forms and commits duplicate no-ID rows immediately ${tags}`, async ({ page }, testInfo) => {
+  test(`pointer drag preserves forms and commits duplicate no-ID rows immediately ${tags}`, async ({ page }) => {
     await dragFixture(page, { long: true });
     const targetRows = rows(page, 'en.projects');
     const start = await point(handle(targetRows.nth(0)));
@@ -543,7 +542,6 @@ for (const mobile of [false, true]) {
     expect(floating.x + floating.width).toBeLessThanOrEqual(page.viewportSize().width);
     const bottom = await point(targetRows.nth(5));
     await page.mouse.move(bottom.x, bottom.y + 2); await page.waitForTimeout(50);
-    await page.screenshot({ path: `/tmp/resume-272-${testInfo.project.name}-drag.png` });
     await page.mouse.up();
     expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(1);
     expect(await page.evaluate(() => sortableHarness.items({ key: 'en.projects' }).map((item) => item.description))).toEqual([
@@ -578,13 +576,15 @@ for (const mobile of [false, true]) {
   });
 
   test(`cancel, no-op, updates and view changes never save or leave drag UI ${tags}`, async ({ page }) => {
-    for (const reason of ['outside', 'Escape', 'pointercancel', 'capture', 'blur', 'update', 'import', 'hide', 'mobileView', 'sync', 'print', 'destroy']) {
+    for (const reason of ['same-position', 'outside', 'Escape', 'pointercancel', 'capture', 'blur', 'update', 'import', 'hide', 'mobileView', 'sync', 'print', 'destroy']) {
       await dragFixture(page);
+      await page.clock.install();
       const targetRows = rows(page, 'en.projects');
       await beginMouse(page, handle(targetRows.nth(0)));
       const destination = await point(targetRows.nth(3));
       await page.mouse.move(destination.x, destination.y); await page.waitForTimeout(25);
-      if (reason === 'outside') { await page.mouse.move(1, 1); await page.mouse.up(); }
+      if (reason === 'same-position') { const start = await point(targetRows.first()); await page.mouse.move(start.x, start.y); await page.mouse.up(); }
+      else if (reason === 'outside') { await page.mouse.move(1, 1); await page.mouse.up(); }
       else if (reason === 'Escape') await page.keyboard.press('Escape');
       else await page.evaluate((reason) => {
         const h = sortableHarness;
@@ -603,14 +603,17 @@ for (const mobile of [false, true]) {
         if (reason === 'destroy') h.controller.destroy();
       }, reason);
       await page.mouse.up(); await cleanDrag(page);
-      expect(await page.evaluate(() => sortableHarness.counts().scheduled), reason).toBe(0);
+      await page.clock.runFor(2_000);
+      expect(await page.evaluate(() => sortableHarness.counts()), reason).toEqual({ scheduled: 0, saved: 0 });
+      await cleanDrag(page);
+      expect(await page.evaluate(() => sortableHarness.store.getState().settings.pageBreaks), reason).toEqual(await page.evaluate(() => dragBefore.settings.pageBreaks));
       expect(await page.evaluate(() => sortableHarness.items({ key: 'en.projects' }).map((item) => item.description)), reason).toEqual([
         'Fictitious body 0', 'Fictitious body 1', 'Fictitious body 2', 'Fictitious body 3', 'Fictitious body 4', 'Fictitious body 5'
       ]);
     }
   });
 
-  test(`nested pointer lists remain isolated and reduced motion retains static feedback ${tags}`, async ({ page }, testInfo) => {
+  test(`nested pointer lists remain isolated and reduced motion retains static feedback ${tags}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await dragFixture(page, { nested: true });
     const key = await page.evaluate(() => [...sortableHarness.bindings.keys()].find((key) => key.startsWith('ja.careerDetails')));
@@ -621,7 +624,6 @@ for (const mobile of [false, true]) {
     const animations = await page.evaluate(() => ({ animation: getComputedStyle(document.querySelector('.sortable-drag-float')).animationName,
       transition: getComputedStyle(document.querySelector('.sortable-drag-heading')).transitionDuration }));
     expect(animations).toEqual({ animation: 'none', transition: '0s' });
-    await page.screenshot({ path: `/tmp/resume-272-${testInfo.project.name}-reduced.png` });
     const bottom = await point(targetRows.nth(2));
     await page.mouse.move(bottom.x, bottom.y + 1); await page.waitForTimeout(40);
     // Edge autoscroll can move the compact list away from the old coordinate.
@@ -690,13 +692,14 @@ test('pen and touch pointer paths share the threshold and transaction [mobile] [
 });
 
 
-test('all registered list types use the same pointer transaction [mobile] [mobile-webkit]', async ({ page }) => {
+test('ID, anonymous, nested-parent and primitive lists use the same pointer transaction [mobile] [mobile-webkit]', async ({ page }) => {
   await mount(page);
   await page.evaluate(() => {
     const root = document.querySelector('.editor-panel');
     root.style.height = `${Math.min(650, innerHeight - 20)}px`; root.style.padding = '10px';
   });
-  for (const key of mainKeys) {
+  const pointerKeys = ['en.experience', 'en.projects', 'ja.careers', 'profile.links'];
+  for (const key of pointerKeys) {
     const before = await page.evaluate((key) => {
       const h = sortableHarness; const binding = h.bindings.get(key);
       document.querySelector('.editor-panel').replaceChildren(binding.section);
@@ -712,5 +715,5 @@ test('all registered list types use the same pointer transaction [mobile] [mobil
     expect(await page.evaluate((key) => sortableHarness.items({ key }), key)).toEqual([before[1], before[2], before[0]]);
     await cleanDrag(page);
   }
-  expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(mainKeys.length);
+  expect(await page.evaluate(() => sortableHarness.counts().scheduled)).toBe(pointerKeys.length);
 });
