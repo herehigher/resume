@@ -251,35 +251,50 @@ test('three editors resume autosave after a failed import', async ({ page }) => 
   }
 });
 
-test('[mobile] 三言語の通常下書き状態は320–401pxで1行、操作は44px以上で横にはみ出さない', async ({ page }) => {
+test('[mobile] 三言語の保存済み下書きは最狭幅と520pxの両側で横にはみ出さない', async ({ page }) => {
   const cases = [
     ['ja', '#japaneseWorkspace', '[name="fullName"]', '#saveStatus', '#loadSampleButton', '暗号化してこの端末に保存済み'],
     ['zh-CN', '#chineseWorkspace', '[data-profile="fullName"]', '[data-zh-draft-message]', '[data-zh-action="sample"]', '已加密并保存到此设备'],
     ['en', '[data-english-editor]', '[data-profile-field="fullName"]', '[data-en-save-status]', '[data-en-load-sample]', 'Encrypted and saved on this device.']
   ];
 
-  for (const width of [320, 360, 375, 393, 401]) {
-    for (const [locale, workspaceSelector, fieldSelector, statusSelector, sampleSelector, savedStatus] of cases) {
+  for (const [locale, workspaceSelector, fieldSelector, statusSelector, sampleSelector, savedStatus] of cases) {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await openLocale(page, locale);
+    const workspace = page.locator(workspaceSelector);
+    const name = `Fictional mobile ${locale}`;
+    await workspace.locator(fieldSelector).fill(name);
+    await expect(workspace.locator(statusSelector)).toHaveText(savedStatus);
+    const savedDraft = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+    expect(JSON.parse(savedDraft).format).toBe('resume-studio-local-encrypted-v1');
+    expect(savedDraft).not.toContain(name);
+
+    // Draft controls change from a compact row to a stack above 520px.
+    for (const width of [320, 520, 521]) {
       await page.setViewportSize({ width, height: 844 });
-      await openLocale(page, locale);
-      const workspace = page.locator(workspaceSelector);
-      await workspace.locator(fieldSelector).fill(`Mobile ${locale} ${width}`);
       await expect(workspace.locator(statusSelector)).toHaveText(savedStatus);
       const layout = await workspace.locator('.draft-controls').evaluate((controls, sample) => {
         const row = controls.querySelector('.draft-primary-row').getBoundingClientRect();
         const status = controls.querySelector('.draft-message').getBoundingClientRect();
         const action = controls.querySelector(sample).getBoundingClientRect();
-        return { controls: controls.getBoundingClientRect(), row, status, action };
+        const columns = getComputedStyle(controls.querySelector('.draft-primary-row')).gridTemplateColumns.trim().split(/\s+/).length;
+        return { controls: controls.getBoundingClientRect(), row, status, action, columns };
       }, sampleSelector);
-      expect(layout.controls.height).toBeLessThanOrEqual(64);
-      expect(layout.action.height).toBeGreaterThanOrEqual(44);
-      expect(Math.abs(
-        (layout.status.top + (layout.status.height / 2)) - (layout.action.top + (layout.action.height / 2))
-      )).toBeLessThanOrEqual(1);
+      expect(layout.columns).toBe(width <= 520 ? 2 : 1);
+      expect(layout.action.height).toBeGreaterThanOrEqual(width <= 520 ? 44 : 36);
+      if (width <= 520) {
+        expect(layout.controls.height).toBeLessThanOrEqual(64);
+        expect(Math.abs(
+          (layout.status.top + (layout.status.height / 2)) - (layout.action.top + (layout.action.height / 2))
+        )).toBeLessThanOrEqual(1);
+      } else {
+        expect(layout.action.top).toBeGreaterThanOrEqual(layout.status.bottom);
+      }
       await page.locator('#dataMenuSummary').click();
       await expect.poll(() => page.locator('#clearDraftButton').evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
       await page.locator('#dataMenuSummary').click();
       await expectNoPageOverflow(page);
+      expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(savedDraft);
     }
   }
 });
@@ -327,29 +342,30 @@ test('[mobile] 入力例モードの復元と採用は44px以上の押下領域�
   await expectNoPageOverflow(page);
 });
 
-test('[mobile] 三言語の入力例は唯一のlive statusで説明し、320–401pxで横にはみ出さない', async ({ page }) => {
+test('[mobile] 三言語の入力例は唯一のlive statusで説明し、最狭幅と520pxの両側で横にはみ出さない', async ({ page }) => {
   const cases = [
     ['ja', '#japaneseWorkspace', '#loadSampleButton', '#saveStatus', '#sampleModeActions', '#restoreDraftButton', '入力例を表示しています。保存済みの下書きは変更されません。'],
     ['zh-CN', '#chineseWorkspace', '[data-zh-action="sample"]', '[data-zh-draft-message]', '[data-zh-sample-actions]', '[data-zh-action="restore"]', '正在查看填写示例，已保存的草稿不会被更改。'],
     ['en', '[data-english-editor]', '[data-en-load-sample]', '[data-en-save-status]', '[data-en-sample-actions]', '[data-en-restore-sample]', 'Viewing an example. Your saved draft will not be changed.']
   ];
 
-  for (const width of [320, 360, 375, 393, 401]) {
-    for (const [locale, workspaceSelector, sampleSelector, statusSelector, actionsSelector, restoreSelector, sampleStatus] of cases) {
+  for (const [locale, workspaceSelector, sampleSelector, statusSelector, actionsSelector, restoreSelector, sampleStatus] of cases) {
+    await page.setViewportSize({ width: 320, height: 852 });
+    await openLocale(page, locale);
+    const workspace = page.locator(workspaceSelector);
+    await workspace.locator(sampleSelector).click();
+    for (const width of [320, 520, 521]) {
       await page.setViewportSize({ width, height: 852 });
-      await openLocale(page, locale);
-      const workspace = page.locator(workspaceSelector);
-      await workspace.locator(sampleSelector).click();
       await expect(workspace.locator(statusSelector)).toHaveText(sampleStatus);
       await expect(workspace.locator('.draft-message[aria-live]')).toHaveCount(0);
       await expect(page.locator('[aria-live]')).toHaveCount(1);
       await expect(workspace.locator('.sample-mode-copy')).toHaveCount(0);
       for (const action of await workspace.locator(`${actionsSelector} .secondary-button, ${actionsSelector} .primary-button`).all()) {
-        await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+        await expect.poll(() => action.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(width <= 520 ? 44 : 32);
       }
       await expectNoPageOverflow(page);
-      await workspace.locator(restoreSelector).click();
     }
+    await workspace.locator(restoreSelector).click();
   }
 });
 

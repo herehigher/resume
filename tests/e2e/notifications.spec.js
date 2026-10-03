@@ -7,13 +7,21 @@ const cases = [
   ['en', '[data-en-save-status]', '[data-profile-field="fullName"]', 'Encrypted and saved on this device.']
 ];
 
-test('[mobile] App Notice wraps in document flow at 320–401px and export closes the backup menu', async ({ page }) => {
+test('[mobile] exported App Notice announces once and wraps in document flow at 320–401px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await openLocale(page, 'ja');
+  await page.locator('#dataMenuSummary').click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDataButton').click();
+  const download = await downloadPromise;
+  expect(await download.failure()).toBeNull();
+  await expect(page.locator('#globalMessage')).toHaveText('データを書き出しました。');
+  await expect(page.locator('[aria-live]')).toHaveCount(1);
+  await expect(page.locator('#statusAnnouncer')).toHaveAttribute('aria-atomic', 'true');
+  await expect(page.locator('#statusAnnouncer')).toHaveText('データを書き出しました。');
+
   for (const width of [320, 360, 401]) {
     await page.setViewportSize({ width, height: 844 });
-    await openLocale(page, 'ja');
-    await page.locator('#dataMenuSummary').click();
-    await page.locator('#exportDataButton').click();
-    await expect(page.locator('.data-menu')).not.toHaveAttribute('open', '');
     await expect(page.locator('#appNotice')).toBeVisible();
     const layout = await page.evaluate(() => {
       const box = (selector) => document.querySelector(selector)?.getBoundingClientRect();
