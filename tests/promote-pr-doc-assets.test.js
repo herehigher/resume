@@ -382,6 +382,16 @@ test('promotion refuses empty, multiple, and expired run or artifact selections'
   assert.throws(() => selectExactArtifact([{ ...artifact, expired: true }], run.id, mergeSha, candidateSha), /has expired/);
 });
 
+test('promotion selects the successful quality aggregate rather than an early assets or browser job', () => {
+  const children = ['scope', 'unit-static', 'documentation-assets', 'browser-chromium-1',
+    'browser-chromium-2', 'browser-chromium-3', 'browser-webkit'].map((name) => ({ ...qualityJob, name }));
+  assert.equal(selectExactQualityJob([...children, qualityJob], run.id, candidateSha), qualityJob);
+  assert.throws(() => selectExactQualityJob(children, run.id, candidateSha), /exactly one Quality job/);
+  assert.throws(() => selectExactQualityJob([
+    ...children, { ...qualityJob, conclusion: 'failure' }
+  ], run.id, candidateSha), /Quality job does not match/);
+});
+
 test('candidate evidence binds the trusted control workflow, source SHA, run attempt, artifact ID, and digest', () => {
   const controlSha = 'c'.repeat(40);
   const candidateWorkflow = { id: 18, path: '.github/workflows/release-candidate-assets.yml' };

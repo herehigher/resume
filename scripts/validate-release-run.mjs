@@ -40,14 +40,34 @@ export function validateRunIdentity(run, workflow, { event, sha, runId }) {
   if (sha) requireValue(run.head_sha === sha, 'source SHA mismatch');
 }
 
-function successfulJob(api, runId, name, requiredStep) {
-  const pages = api(`actions/runs/${runId}/jobs?filter=latest&per_page=100`, true);
+export function validateFullQualityJobs(pages) {
   requireValue(Array.isArray(pages), 'job lookup is invalid');
-  const matching = pages.flatMap((page) => page.jobs || []).filter((job) => job.name === name);
-  requireValue(matching.length === 1 && matching[0].conclusion === 'success', `${name} job did not succeed`);
-  if (requiredStep) requireValue(matching[0].steps?.some((step) => (
-    step.name === requiredStep && step.conclusion === 'success'
-  )), 'full browser quality was not executed');
+  const jobs = pages.flatMap((page) => page.jobs || []);
+  // Historical runs had a single job. A partial new layout must never use this fallback.
+  const legacy = jobs.length === 1 && jobs[0].name === 'quality';
+  const required = legacy ? { quality: ['Browser and PDF acceptance tests'] } : {
+    scope: [],
+    'unit-static': ['Unit and static tests', 'Lint'],
+    'browser-chromium-1': ['Browser and PDF acceptance tests'],
+    'browser-chromium-2': ['Browser and PDF acceptance tests'],
+    'browser-chromium-3': ['Browser and PDF acceptance tests'],
+    'browser-webkit': ['Browser and PDF acceptance tests'],
+    'documentation-assets': ['Generate temporary documentation assets', 'Verify temporary documentation assets', 'Upload documentation asset evidence'],
+    quality: ['Verify required Quality jobs']
+  };
+  for (const [name, steps] of Object.entries(required)) {
+    const matching = jobs.filter((job) => job.name === name);
+    requireValue(matching.length === 1 && matching[0].conclusion === 'success', `${name} job did not succeed`);
+    for (const stepName of steps) {
+      const matchingSteps = matching[0].steps?.filter((step) => step.name === stepName) || [];
+      requireValue(matchingSteps.length === 1 && matchingSteps[0].conclusion === 'success',
+        `full Quality step was not executed: ${name} / ${stepName}`);
+    }
+  }
+}
+
+function successfulFullQuality(api, runId) {
+  validateFullQualityJobs(api(`actions/runs/${runId}/jobs?filter=latest&per_page=100`, true));
 }
 
 function parsePackageVersion(contents, label) {
@@ -97,7 +117,7 @@ function resolveQualityRun(api, workflow, values) {
   }
   const run = api(`actions/runs/${runId}`);
   validateRunIdentity(run, workflow, { event: 'push', sha: values.sha, runId });
-  successfulJob(api, runId, 'quality', 'Browser and PDF acceptance tests');
+  successfulFullQuality(api, runId);
   return { run, runId };
 }
 
@@ -110,7 +130,7 @@ export function authorizeReleaseEligibility({ api = githubApi, environment = pro
   const workflow = workflowIdentity(api);
   const run = api(`actions/runs/${values['run-id']}`);
   validateRunIdentity(run, workflow, { event: 'push', sha: values.sha, runId: values['run-id'] });
-  successfulJob(api, values['run-id'], 'quality', 'Browser and PDF acceptance tests');
+  successfulFullQuality(api, values['run-id']);
   const pullRequest = exactMergedPullRequest(api(`commits/${run.head_sha}/pulls`), run);
   const result = {
     quality_run_id: String(run.id), release_required: 'false', release_sha: run.head_sha,

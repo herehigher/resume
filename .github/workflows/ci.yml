@@ -19,20 +19,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  quality:
+  scope:
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
     outputs:
-      release_assets_changed: ${{ steps.release_assets.outputs.changed }}
-      release_assets_required: ${{ steps.release_assets.outputs.required }}
-      quality_run_id: ${{ steps.quality_identity.outputs.run_id }}
+      docs_only: ${{ steps.scope.outputs.docs_only || 'false' }}
     steps:
-      - name: Record actual Quality run identity
-        id: quality_identity
-        run: echo "run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -40,14 +33,144 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       - name: Classify pull request scope
         id: scope
-        if: ${{ github.event_name == 'pull_request' }}
-        continue-on-error: true
+        if: ${{ github.event_name == 'pull_request' && !inputs.checkout_ref }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/quality-scope.mjs "$BASE_SHA" "$HEAD_SHA"
+
+      - name: Verify documentation-only pull request
+        if: ${{ steps.scope.outputs.docs_only == 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+          node --test tests/documentation.test.js tests/quality-scope.test.js
+
+  unit-static:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs_only == 'false' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit and static tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+  browser:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs_only == 'false' }}
+    name: browser-${{ matrix.partition }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - partition: chromium-1
+            browser: chromium
+            projects: --project=desktop-chromium --project=mobile-chromium
+            shard: 1/3
+          - partition: chromium-2
+            browser: chromium
+            projects: --project=desktop-chromium --project=mobile-chromium
+            shard: 2/3
+          - partition: chromium-3
+            browser: chromium
+            projects: --project=desktop-chromium --project=mobile-chromium
+            shard: 3/3
+          - partition: webkit
+            browser: webkit
+            projects: --project=mobile-webkit --project=webkit
+            shard: 1/1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install required browser
+        run: npx playwright install --with-deps --only-shell ${{ matrix.browser }}
+
+      - name: Browser and PDF acceptance tests
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_DIR: node_modules/.cache/resume-studio/playwright-reports
+        run: npm run test:e2e -- ${{ matrix.projects }} --shard=${{ matrix.shard }} --reporter=line,blob
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ matrix.partition }}-attempt-${{ github.run_attempt }}
+          path: node_modules/.cache/resume-studio/playwright-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results-${{ matrix.partition }}-attempt-${{ github.run_attempt }}
+          path: node_modules/.cache/resume-studio/playwright-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  documentation-assets:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs_only == 'false' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      release_assets_changed: ${{ steps.release_assets.outputs.changed }}
+      release_assets_required: ${{ steps.release_assets.outputs.required }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Classify release documentation asset requirement
         id: release_assets
@@ -64,27 +187,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
         run: npm ci
 
-      - name: Unit and static tests
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
-        run: npm test
-
-      - name: Lint
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
-        run: npm run lint
-
-      - name: Install Chromium and WebKit
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
-        run: npx playwright install --with-deps --only-shell chromium webkit
-
-      - name: Browser and PDF acceptance tests
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
-        run: npm run test:e2e
+      - name: Install Chromium
+        run: npx playwright install --with-deps --only-shell chromium
 
       - name: Generate temporary documentation assets
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
           QUALITY_RUN_ID: ${{ github.run_id }}
@@ -100,7 +208,6 @@ jobs:
           --producer-control-sha "${{ github.sha }}"
 
       - name: Verify temporary documentation assets
-        if: ${{ github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true' }}
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
           SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
@@ -182,7 +289,7 @@ jobs:
         env:
           DOCUMENTATION_ASSET_DIRECTORY: ${{ runner.temp }}/resume-documentation-assets
           PROMOTED_ASSET_DIRECTORY: ${{ runner.temp }}/promoted-documentation-assets
-          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_SHA: ${{ inputs.checkout_ref || github.sha }}
         run: >-
           node scripts/release-doc-assets.mjs compare
           --committed-root "${GITHUB_WORKSPACE}"
@@ -209,29 +316,42 @@ jobs:
           exit 1
 
       - name: Upload documentation asset evidence
-        if: ${{ (github.event_name != 'pull_request' || steps.scope.outcome != 'success' || steps.scope.outputs.docs_only != 'true') && success() }}
         uses: actions/upload-artifact@v7
         with:
           name: documentation-assets-${{ inputs.checkout_ref || github.sha }}
           path: ${{ runner.temp }}/resume-documentation-assets/
           if-no-files-found: error
+          overwrite: true
           retention-days: 7
 
-      - name: Upload Playwright failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v7
+  quality:
+    needs: [scope, unit-static, browser, documentation-assets]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_assets_changed: ${{ needs.documentation-assets.outputs.release_assets_changed }}
+      release_assets_required: ${{ needs.documentation-assets.outputs.release_assets_required }}
+      quality_run_id: ${{ steps.quality_identity.outputs.run_id }}
+    steps:
+      - name: Record actual Quality run identity
+        id: quality_identity
+        run: echo "run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
-          name: playwright-results
-          path: node_modules/.cache/resume-studio/playwright-results/
-          if-no-files-found: ignore
-          retention-days: 7
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Verify documentation-only pull request
-        if: ${{ github.event_name == 'pull_request' && steps.scope.outcome == 'success' && steps.scope.outputs.docs_only == 'true' }}
-        run: |
-          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
-          node --test tests/documentation.test.js tests/quality-scope.test.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
 
-      - name: Reject pull request scope classification failure
-        if: ${{ always() && github.event_name == 'pull_request' && steps.scope.outcome == 'failure' }}
-        run: exit 1
+      - name: Verify required Quality jobs
+        env:
+          QUALITY_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/quality-results.mjs

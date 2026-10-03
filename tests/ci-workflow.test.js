@@ -19,6 +19,9 @@ function workflowJobBlock(workflow, name) {
 }
 
 const qualityJob = workflowJobBlock(qualityWorkflow, 'quality');
+const scopeJob = workflowJobBlock(qualityWorkflow, 'scope');
+const browserJob = workflowJobBlock(qualityWorkflow, 'browser');
+const assetsJob = workflowJobBlock(qualityWorkflow, 'documentation-assets');
 
 function workflowStep(job, name) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -36,14 +39,41 @@ test('quality cancels superseded pull request runs without grouping main runs', 
   assert.match(qualityWorkflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
 });
 
-test('quality classifies scope after its primary checkout', () => {
-  assert.ok(workflowStep(qualityJob, 'Checkout').index < workflowStep(qualityJob, 'Classify pull request scope').index);
-  assert.doesNotMatch(qualityWorkflow, /^ {2}scope:\s*$/m);
-  assert.match(qualityWorkflow, /quality:[\s\S]+- name: Checkout[\s\S]+- name: Classify pull request scope[\s\S]+- name: Setup Node\.js/);
-  assert.doesNotMatch(qualityWorkflow, /needs\.scope/);
-  assert.match(qualityWorkflow, /steps\.scope\.outputs\.docs_only/);
-  assert.match(qualityWorkflow, /id: scope\s+if: [^\n]+\s+continue-on-error: true/);
-  assert.match(qualityWorkflow, /always\(\) && github\.event_name == 'pull_request' && steps\.scope\.outcome == 'failure'/);
+test('scope permits the documentation fast path only for a PR without an explicit checkout SHA', () => {
+  assert.ok(workflowStep(scopeJob, 'Checkout').index < workflowStep(scopeJob, 'Classify pull request scope').index);
+  assert.match(workflowStepField(workflowStep(scopeJob, 'Classify pull request scope'), 'if'), /github\.event_name == 'pull_request' && !inputs\.checkout_ref/);
+  assert.match(scopeJob, /docs_only: \$\{\{ steps\.scope\.outputs\.docs_only \|\| 'false' \}\}/);
+  assert.doesNotMatch(scopeJob, /continue-on-error/);
+  assert.match(workflowStep(scopeJob, 'Verify documentation-only pull request').body, /git diff --check[\s\S]+tests\/documentation\.test\.js tests\/quality-scope\.test\.js/);
+});
+
+test('quality aggregates every required job even when dependencies fail or are skipped', () => {
+  assert.match(qualityJob, /needs: \[scope, unit-static, browser, documentation-assets\]/);
+  assert.match(qualityJob, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflowStep(qualityJob, 'Verify required Quality jobs').body, /QUALITY_NEEDS: \$\{\{ toJSON\(needs\) \}\}[\s\S]+node scripts\/quality-results\.mjs/);
+  for (const job of ['unit-static', 'browser', 'documentation-assets']) {
+    const block = workflowJobBlock(qualityWorkflow, job);
+    assert.match(block, /needs: scope/);
+    assert.match(block, /if: \$\{\{ needs\.scope\.outputs\.docs_only == 'false' \}\}/);
+  }
+  for (const job of ['scope', 'unit-static', 'browser', 'documentation-assets', 'quality']) {
+    assert.match(workflowStep(workflowJobBlock(qualityWorkflow, job), 'Checkout').body, /ref: \$\{\{ inputs\.checkout_ref \|\| github\.sha \}\}/);
+  }
+});
+
+test('browser partitions select every Chromium shard and both WebKit projects without failing siblings early', () => {
+  assert.match(browserJob, /name: browser-\$\{\{ matrix\.partition \}\}/);
+  assert.match(browserJob, /fail-fast: false/);
+  const partitions = [...browserJob.matchAll(/- partition: (\S+)\s+browser: (\S+)\s+projects: ([^\n]+)\s+shard: (\S+)/g)]
+    .map(([, partition, browser, projects, shard]) => ({ partition, browser, projects, shard }));
+  assert.deepEqual(partitions, [
+    ...[1, 2, 3].map((n) => ({ partition: `chromium-${n}`, browser: 'chromium', projects: '--project=desktop-chromium --project=mobile-chromium', shard: `${n}/3` })),
+    { partition: 'webkit', browser: 'webkit', projects: '--project=mobile-webkit --project=webkit', shard: '1/1' }
+  ]);
+  assert.match(workflowStep(browserJob, 'Browser and PDF acceptance tests').body, /npm run test:e2e -- \$\{\{ matrix\.projects \}\} --shard=\$\{\{ matrix\.shard \}\} --reporter=line,blob/);
+  assert.match(playwrightConfig, /fullyParallel: true/);
+  assert.match(playwrightConfig, /workers: process\.env\.CI \? 2 : undefined/);
+  assert.match(playwrightConfig, /retries: 0/);
 });
 
 test('candidate generation is a separate trusted workflow and does not claim product Quality', () => {
@@ -61,9 +91,9 @@ test('candidate generation is a separate trusted workflow and does not claim pro
 test('quality owns release asset currentness and reuses its fresh temporary evidence', () => {
   assert.match(qualityWorkflow, /Classify release documentation asset requirement/);
   assert.match(qualityWorkflow, /release-doc-assets\.mjs required/);
-  assert.match(qualityWorkflow, /quality:[\s\S]+outputs:[\s\S]+release_assets_required:[\s\S]+Upload documentation asset evidence/);
+  assert.match(qualityWorkflow, /documentation-assets:[\s\S]+outputs:[\s\S]+release_assets_required:[\s\S]+Upload documentation asset evidence/);
   assert.match(qualityWorkflow, /release_assets_changed: \$\{\{ steps\.release_assets\.outputs\.changed \}\}/);
-  assert.match(qualityWorkflow, /quality:[\s\S]+Classify release asset check[\s\S]+Materialize release asset LFS files[\s\S]+Download the originally promoted candidate artifact[\s\S]+Verify release documentation assets are current[\s\S]+Upload documentation asset evidence/);
+  assert.match(qualityWorkflow, /documentation-assets:[\s\S]+Classify release asset check[\s\S]+Materialize release asset LFS files[\s\S]+Download the originally promoted candidate artifact[\s\S]+Verify release documentation assets are current[\s\S]+Upload documentation asset evidence/);
   assert.match(qualityWorkflow, /steps\.release_asset_check\.outputs\.classification == 'verification-required'/);
   assert.match(qualityWorkflow, /--quality-run-id "\$\{QUALITY_RUN_ID\}"/);
   assert.match(qualityWorkflow, /Resolve promoted candidate artifact provenance[\s\S]+Resolve exact candidate artifact identity[\s\S]+artifact-ids: \$\{\{ steps\.candidate_evidence\.outputs\.artifact_id \}\}/);
@@ -80,17 +110,21 @@ test('release asset status treats missing assets as a real failure and skips dup
   assert.match(qualityWorkflow, /Report invalid committed provenance[\s\S]+failure provenance-invalid[\s\S]+Report unavailable candidate artifact evidence[\s\S]+failure promoted-evidence-unavailable[\s\S]+Report release asset integrity mismatch[\s\S]+failure asset-integrity-mismatch/);
 });
 
-test('quality is the only required workflow job and materializes release assets only when needed', () => {
+test('assets materializes only required release files and preserves evidence identity across reruns', () => {
   assert.doesNotMatch(qualityWorkflow, /^ {2}release-assets-current:\s*$/m);
   assert.doesNotMatch(qualityWorkflow, /Release assets current/);
-  const lfsMaterialization = workflowStep(qualityJob, 'Materialize release asset LFS files');
+  const lfsMaterialization = workflowStep(assetsJob, 'Materialize release asset LFS files');
   assert.match(workflowStepField(lfsMaterialization, 'if'), /classification == 'verification-required'/);
   for (const asset of [
     'docs/screenshots/en.png', 'docs/screenshots/ja.png', 'docs/screenshots/zh-CN.png',
     'output/pdf/en-letter.pdf', 'output/pdf/ja-a4.pdf', 'output/pdf/zh-CN-a4.pdf'
   ]) assert.match(lfsMaterialization.body, new RegExp(asset.replaceAll('.', '\\.')));
   assert.match(lfsMaterialization.body, /git lfs pull/);
-  assert.doesNotMatch(qualityJob, /lfs: true|git lfs checkout/);
+  assert.doesNotMatch(assetsJob, /lfs: true|git lfs checkout/);
+  const upload = workflowStep(assetsJob, 'Upload documentation asset evidence');
+  assert.match(upload.body, /name: documentation-assets-\$\{\{ inputs\.checkout_ref \|\| github\.sha \}\}/);
+  assert.match(upload.body, /overwrite: true/);
+  assert.match(workflowStep(assetsJob, 'Generate temporary documentation assets').body, /--producer-kind quality[\s\S]+--producer-workflow \.github\/workflows\/ci\.yml[\s\S]+--producer-run-attempt/);
 });
 
 test('release preparation checks committed assets against the final Quality evidence', () => {
@@ -214,16 +248,19 @@ test('deployment and online editor smoke use provider-neutral contracts', () => 
 });
 
 test('CI installs only the browser binaries required by headless execution', () => {
-  assert.match(qualityWorkflow, /npx playwright install --with-deps --only-shell chromium webkit/);
+  assert.match(browserJob, /npx playwright install --with-deps --only-shell \$\{\{ matrix\.browser \}\}/);
+  assert.match(assetsJob, /npx playwright install --with-deps --only-shell chromium/);
   assert.equal(releaseWorkflow.match(/npx playwright install --with-deps --only-shell chromium/g)?.length, 1);
   assert.doesNotMatch(playwrightConfig, /\bchannel\s*:/);
   assert.doesNotMatch(playwrightConfig, /\bheadless\s*:\s*false/);
 });
 
 test('Quality keeps failure and release artifacts without a successful reorder upload', () => {
-  assert.doesNotMatch(qualityJob, /- name: Upload list reorder acceptance evidence/);
-  const failure = workflowStep(qualityJob, 'Upload Playwright failure evidence');
+  assert.doesNotMatch(qualityWorkflow, /- name: Upload list reorder acceptance evidence/);
+  const failure = workflowStep(browserJob, 'Upload Playwright failure evidence');
   assert.equal(workflowStepField(failure, 'if'), 'failure()');
+  assert.match(failure.body, /name: playwright-results-\$\{\{ matrix\.partition \}\}-attempt-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(workflowStep(browserJob, 'Upload Playwright report').body, /name: playwright-report-\$\{\{ matrix\.partition \}\}-attempt-\$\{\{ github\.run_attempt \}\}/);
   assert.match(failure.body, /path: node_modules\/\.cache\/resume-studio\/playwright-results\//);
-  assert.match(workflowStep(qualityJob, 'Upload documentation asset evidence').body, /documentation-assets-/);
+  assert.match(workflowStep(assetsJob, 'Upload documentation asset evidence').body, /documentation-assets-/);
 });
