@@ -77,9 +77,9 @@ test('prepared deployment smoke detects locale, URL, indexability, sitemap, Sche
   const temporary = temporaryDirectory(t);
   const cases = [
     ['locale', 'en/index.html', (content) => content.replace('lang="en"', 'lang="ja"'), /language is invalid/],
-    ['canonical', 'index.html', (content) => content.replace(
+    ['retired canonical mount', 'index.html', (content) => content.replace(
       '<link rel="canonical" href="https://rs.herehigher.com/">',
-      '<link rel="canonical" href="https://example.invalid/">'
+      '<link rel="canonical" href="https://herehigher.github.io/resume/">'
     ), /canonical URL is invalid/],
     ['hreflang cluster', 'index.html', (content) => content.replace(
       '</head>', '<link rel="alternate" hreflang="fr" href="https://example.invalid/">\n</head>'

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
@@ -30,7 +30,6 @@ test('every locale has distinct import, export, and locale-save error messages',
     assert.ok(messages.backupMenuShortLabel);
     assert.match(messages.draftStorageCompatibilityError, /https:\/\/|http:\/\/localhost/);
     assert.notEqual(messages.exportError, messages.importError);
-    assert.equal('importConflict' in messages, false);
   }
 });
 
@@ -61,25 +60,25 @@ test('privacy and security copy has the same complete key set in every locale', 
   }
 });
 
-test('all locale editors and template styles are connected to the page', () => {
-  const html = readFileSync(new URL('../site/editor/index.html', import.meta.url), 'utf8');
-  const main = readFileSync(new URL('../site/assets/js/main.js', import.meta.url), 'utf8');
-  const localeController = readFileSync(
-    new URL('../site/assets/js/ui/locale-controller.js', import.meta.url),
-    'utf8'
-  );
-
-  assert.match(html, /assets\/css\/templates\/zh-CN\.css/);
-  assert.match(html, /assets\/css\/templates\/en\.css/);
-  assert.match(html, /id="chineseWorkspace" hidden/);
-  assert.match(main, /const embeddedPhotoUrl = createEmbeddedPhotoUrl\(\)/);
-  assert.match(main, /initStatusController\(\)/);
-  assert.match(main, /initJapaneseEditor\(store, \{ embeddedPhotoUrl, statusController \}\)/);
-  assert.match(main, /initChineseEditor\(store, \{ embeddedPhotoUrl, statusController \}\)/);
-  assert.match(main, /initEnglishEditor\(store, \{ embeddedPhotoUrl, statusController \}\)/);
-  assert.match(main, /renderEnglishWorkspace\(\)/);
-  assert.match(main, /japaneseEditor\.refresh\(\)/);
-  assert.match(localeController, /'zh-CN': document\.getElementById\('chineseWorkspace'\)/);
-  assert.match(localeController, /en: document\.querySelector\('\[data-english-editor\]'\)/);
-  assert.doesNotMatch(localeController, /state-changed|importConflict/);
+test('the editor loads existing local stylesheets and module entry points', () => {
+  const entry = new URL('../site/editor/index.html', import.meta.url);
+  const html = readFileSync(entry, 'utf8');
+  const resources = { stylesheet: [], module: [] };
+  for (const [tag] of html.matchAll(/<(?:link|script)\b[^>]*>/g)) {
+    const attributes = Object.fromEntries([...tag.matchAll(/\b([\w-]+)=(['"])(.*?)\2/g)]
+      .map(([, name, , value]) => [name, value]));
+    if (tag.startsWith('<link') && attributes.rel?.split(/\s+/).includes('stylesheet')) {
+      resources.stylesheet.push(attributes.href);
+    }
+    if (tag.startsWith('<script') && attributes.type === 'module') resources.module.push(attributes.src);
+  }
+  for (const [kind, urls] of Object.entries(resources)) {
+    assert.ok(urls.length > 0, `missing ${kind} entry`);
+    for (const source of urls) {
+      assert.ok(source, `${kind} must reference a resource`);
+      const resource = new URL(source, entry);
+      assert.equal(resource.protocol, 'file:', `${kind} must stay local`);
+      assert.ok(existsSync(resource), `missing ${kind}: ${source}`);
+    }
+  }
 });

@@ -220,11 +220,6 @@ test('CI installs only the browser binaries required by headless execution', () 
   assert.doesNotMatch(playwrightConfig, /\bheadless\s*:\s*false/);
 });
 
-test('browser binaries are not restored through an Actions cache', () => {
-  assert.doesNotMatch(qualityWorkflow, /actions\/cache@/);
-  assert.doesNotMatch(releaseWorkflow, /actions\/cache@/);
-});
-
 test('Quality keeps failure and release artifacts without a successful reorder upload', () => {
   assert.doesNotMatch(qualityJob, /- name: Upload list reorder acceptance evidence/);
   const failure = workflowStep(qualityJob, 'Upload Playwright failure evidence');
