@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "generator": {
     "command": "node scripts/generate-doc-assets.mjs --output-dir <temporary-directory> --source-sha <full-SHA> --quality-run-id <run-ID> --producer-kind <quality|release-candidate> --producer-workflow <workflow-path> --producer-run-attempt <attempt> --producer-control-sha <full-SHA>",
-    "inputHash": "f5558e78fc11ee9797b7bef57966fa14d3ee524e28fc80d7d0b36c37928c7e8d",
+    "inputHash": "350f625ef18b8f0f74fc499526ab2cf07a97194dcb2773230e174128937c4f08",
     "inputHashAlgorithm": "sha256(relative-path + NUL + content + NUL)",
     "inputs": [
       "package-lock.json",
@@ -14,19 +14,19 @@
     "version": "1.5.0"
   },
   "source": {
-    "appVersion": "0.4.2",
-    "checkoutCommit": "7dc55fbbb9a0966e52bbf9e392b4b66fa48971f3",
+    "appVersion": "0.4.3",
+    "checkoutCommit": "8fe981539aa6a609bb36aa217bcd1d60d8037b1f",
     "fixedDate": "2026-09-01",
     "markerHashLength": 12,
     "markerPrefix": "RESUME-STUDIO-SAMPLE",
     "producer": {
-      "controlSha": "33c3ab39c7a08346615bc1b4fd0f413d074aad98",
+      "controlSha": "2044d0c46570e1df0e0af477e6a0316135d0c9bf",
       "kind": "release-candidate",
       "runAttempt": "1",
-      "runId": "35978077466",
+      "runId": "37113961255",
       "workflow": ".github/workflows/release-candidate-assets.yml"
     },
-    "siteHash": "d4d8bd6efaf32d157da5edee01dd33a6147089e6839de14c69e84585c6b96ed4",
+    "siteHash": "6620f3d664186f895507abe7caeb4d3f38c189865939e910455928215af05e4a",
     "siteHashAlgorithm": "sha256(relative-path + NUL + content + NUL)"
   },
   "browser": {
@@ -41,60 +41,60 @@
     {
       "browserLocale": "ja-JP",
       "firstText": "RESUME-STUDIO-FIRST-JA",
-      "lastText": "RESUME-STUDIO-SAMPLE-JA-D4D8BD6EFAF3",
+      "lastText": "RESUME-STUDIO-SAMPLE-JA-6620F3D66418",
       "locale": "ja",
-      "marker": "RESUME-STUDIO-SAMPLE-JA-D4D8BD6EFAF3",
+      "marker": "RESUME-STUDIO-SAMPLE-JA-6620F3D66418",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/ja-a4.pdf",
-        "sha256": "9659b7d127a4f299877ad05ceea1f2cbeae1360fce3ad859cf1ce1aa1fa29871"
+        "sha256": "2a3e261517f731f1bfb156b81875815cb0272747ff034c6b1cd8ca750c18eed6"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/ja.png",
-        "sha256": "ef8abf57a2e90bf2ecd5c8fb926d18c27b6f16bca173d406509e85449f96b25a",
+        "sha256": "03946b262ae3971ee1b87cf9dacbad5af9046c15f23c778c37ee221d0c8ca401",
         "width": 1440
       }
     },
     {
       "browserLocale": "zh-CN",
       "firstText": "RESUME-STUDIO-FIRST-ZH-CN",
-      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-D4D8BD6EFAF3",
+      "lastText": "RESUME-STUDIO-SAMPLE-ZH-CN-6620F3D66418",
       "locale": "zh-CN",
-      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-D4D8BD6EFAF3",
+      "marker": "RESUME-STUDIO-SAMPLE-ZH-CN-6620F3D66418",
       "paper": "A4",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/zh-CN-a4.pdf",
-        "sha256": "c353500164f57b04b0e4eb63688b1c08312b85d405531c09920275dad255c0c9"
+        "sha256": "f6ba1b7db4e7ae117210928cfb689d2bac6aa4f3e58d832c9c29fbe459e5b3b1"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/zh-CN.png",
-        "sha256": "1ee504d3dbfeaca8cec47f53db171dfbe5aaa41df50cbd1ff4cb7a4f3e8d769c",
+        "sha256": "239bd01293c763a33013007e5c3c8145decb6ab1a864b3aa0337744c7d6d8817",
         "width": 1440
       }
     },
     {
       "browserLocale": "en-US",
       "firstText": "RESUME-STUDIO-FIRST-EN",
-      "lastText": "RESUME-STUDIO-SAMPLE-EN-D4D8BD6EFAF3",
+      "lastText": "RESUME-STUDIO-SAMPLE-EN-6620F3D66418",
       "locale": "en",
-      "marker": "RESUME-STUDIO-SAMPLE-EN-D4D8BD6EFAF3",
+      "marker": "RESUME-STUDIO-SAMPLE-EN-6620F3D66418",
       "paper": "LETTER",
       "pdf": {
         "fixture": "deterministic-print-example",
         "path": "output/pdf/en-letter.pdf",
-        "sha256": "a7cbbb88dce502dcc59fee514359f59ca3f7a03f9b776adcd2d6f127d9261d1a"
+        "sha256": "1f253d73b65aea490089360a0d02acd0fa3eb3f4228caae374d40bda315430be"
       },
       "screenshot": {
         "fixture": "fictional-documentation-example",
         "height": 1000,
         "path": "docs/screenshots/en.png",
-        "sha256": "3d77e11946519c63ce30dd06b391eef105ab32608a932ffdfdb4b5ec99dcff74",
+        "sha256": "ee3bc689e47f4663bcd19ba391aa696a1f3ad248fb6a35eb288adb8f87690fe8",
         "width": 1440
       }
     }
