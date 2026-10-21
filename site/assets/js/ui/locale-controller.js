@@ -1,5 +1,6 @@
 import { SUPPORTED_LOCALES } from '../config.js';
 import { getMessages } from '../i18n/index.js';
+import { exportMarkdown } from '../utils/markdown-export.js';
 import { saveLocalePreference } from '../state/locale-preference.js';
 import { confirmAction } from './confirmation-dialog.js';
 import { messageForDraftStorageError } from './draft-storage-error.js';
@@ -51,6 +52,7 @@ export function initLocaleController(store, {
   const dataMenuLabel = document.getElementById('dataMenuLabel');
   const dataMenuShortLabel = document.getElementById('dataMenuShortLabel');
   const exportButton = document.getElementById('exportDataButton');
+  const markdownButton = document.getElementById('exportMarkdownButton');
   const importButton = document.getElementById('importDataButton');
   const clearDraftButton = document.getElementById('clearDraftButton');
   const importInput = document.getElementById('importDataInput');
@@ -82,6 +84,8 @@ export function initLocaleController(store, {
     document.getElementById('appNoticeDismiss').textContent = copy.dismissNotice;
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
+    markdownButton.textContent = copy.exportMarkdown;
+    document.getElementById('markdownExportHelp').textContent = copy.markdownExportHelp;
     clearDraftButton.textContent = copy.clearDraft;
     document.getElementById('printButtonLabel').textContent = copy.printDocument;
     document.getElementById('pendingTitle').textContent = copy.pendingTitle;
@@ -129,6 +133,24 @@ export function initLocaleController(store, {
     } catch {
       dataMenu.open = false;
       showMessage(copy.exportError, { persistent: true, source: 'export', tone: 'error' });
+    }
+  });
+
+  markdownButton.addEventListener('click', () => {
+    const copy = getMessages(locale);
+    try {
+      const result = exportMarkdown(store.getState(), locale);
+      const url = URL.createObjectURL(new Blob([result.text], { type: 'text/markdown;charset=utf-8' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = result.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showMessage(copy.markdownExportSuccess, { source: 'export' });
+    } catch {
+      showMessage(copy.markdownExportError, { persistent: true, source: 'export', tone: 'error' });
+    } finally {
+      dataMenu.open = false;
     }
   });
 
