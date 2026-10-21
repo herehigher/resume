@@ -1,6 +1,12 @@
-# Explicit use preferences remain compatible with existing MIT permissions.
+# Cloudflare Pages response headers, applied when site/ is deployed.
+# Unindented paths select responses; indented lines set HTTP headers.
+# Ordinary local static servers do not apply this file.
+
+# Allow search indexing, AI input, and AI training for all published responses.
+# These preferences do not change existing MIT permissions.
 /*
   Content-Signal: search=yes, ai-input=yes, ai-train=yes
 
+# Keep the editor out of search indexes, including converted Markdown responses.
 /editor/*
   X-Robots-Tag: noindex,follow
