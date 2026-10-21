@@ -1,4 +1,5 @@
 import { escapeHTML } from './html.js';
+import { markdownCode, markdownIndent, markdownLink, markdownText } from './markdown-text.js';
 
 const ESCAPABLE = new Set(['\\', '-', '+', '*', '[', ']', '(', ')', '`']);
 
@@ -10,15 +11,15 @@ function isWhitespace(character) {
   return character !== undefined && /\s/u.test(character);
 }
 
-function escapeLiteral(source) {
+function escapeLiteral(source, encode = escapeHTML) {
   let output = '';
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
     if (character === '\\' && index + 1 < source.length && isEscapable(source[index + 1])) {
-      output += escapeHTML(source[index + 1]);
+      output += encode(source[index + 1]);
       index += 1;
     } else {
-      output += escapeHTML(character);
+      output += encode(character);
     }
   }
   return output;
@@ -232,17 +233,21 @@ function readBracketMarkup(line, start, index, isImage) {
     type: 'link',
     end,
     html: `<a href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">${decodeLinkLabel(label)}</a>`,
-    source
+    source,
+    label,
+    href
   };
 }
 
-function renderInline(line) {
+function renderInline(line, markdown = false) {
+  const encode = markdown ? markdownText : escapeHTML;
+  const literal = (value) => escapeLiteral(value, encode);
   const index = createInlineIndex(line);
   let output = '';
   for (let position = 0; position < line.length;) {
     const character = line[position];
     if (character === '\\' && position + 1 < line.length && isEscapable(line[position + 1])) {
-      output += escapeHTML(line[position + 1]);
+      output += encode(line[position + 1]);
       position += 2;
       continue;
     }
@@ -250,17 +255,18 @@ function renderInline(line) {
     if (character === '`') {
       const runLength = index.backtickRunLength[position];
       if (runLength > 1) {
-        output += escapeHTML(line.slice(position, position + runLength));
+        output += encode(line.slice(position, position + runLength));
         position += runLength;
         continue;
       }
       const close = index.nextSingleBacktick[position + 1];
       if (close > position + 1) {
-        output += `<code>${escapeHTML(line.slice(position + 1, close))}</code>`;
+        const content = line.slice(position + 1, close);
+        output += markdown ? markdownCode(content) : `<code>${encode(content)}</code>`;
         position = close + 1;
         continue;
       }
-      output += '`';
+      output += encode('`');
       position += 1;
       continue;
     }
@@ -268,7 +274,7 @@ function renderInline(line) {
     if (character === '!' && line[position + 1] === '[') {
       const image = readBracketMarkup(line, position, index, true);
       if (image) {
-        output += escapeLiteral(line.slice(position, image.end));
+        output += literal(line.slice(position, image.end));
         position = image.end;
         continue;
       }
@@ -276,7 +282,9 @@ function renderInline(line) {
     if (character === '[') {
       const link = readBracketMarkup(line, position, index, false);
       if (link) {
-        output += link.type === 'link' ? link.html : escapeLiteral(line.slice(position, link.end));
+        output += link.type === 'link'
+          ? markdown ? markdownLink(escapeLiteral(link.label, (value) => value), link.href) : link.html
+          : literal(line.slice(position, link.end));
         position = link.end;
         continue;
       }
@@ -289,12 +297,12 @@ function renderInline(line) {
         if (close > position + 2) {
           const content = line.slice(position + 2, close);
           if (!isWhitespace(content[0]) && !isWhitespace(content[content.length - 1])) {
-            output += `<strong>${escapeLiteral(content)}</strong>`;
+            output += markdown ? `**${literal(content)}**` : `<strong>${literal(content)}</strong>`;
             position = close + 2;
             continue;
           }
         }
-        output += '**';
+        output += encode('**');
         position += 2;
         continue;
       }
@@ -303,18 +311,18 @@ function renderInline(line) {
         if (close > position + 1) {
           const content = line.slice(position + 1, close);
           if (!isWhitespace(content[0]) && !isWhitespace(content[content.length - 1])) {
-            output += `<em>${escapeLiteral(content)}</em>`;
+            output += markdown ? `*${literal(content)}*` : `<em>${literal(content)}</em>`;
             position = close + 1;
             continue;
           }
         }
       }
-      output += escapeHTML(line.slice(position, position + runLength));
+      output += encode(line.slice(position, position + runLength));
       position += runLength;
       continue;
     }
 
-    output += escapeHTML(character);
+    output += encode(character);
     position += 1;
   }
   return output;
@@ -333,7 +341,22 @@ function renderList(list) {
 export function renderLimitedMarkdown(source) {
   const blocks = parseBlocks(source);
   return blocks.map((block) => {
-    if (block.type === 'paragraph') return `<p>${block.lines.map(renderInline).join('<br>')}</p>`;
+    if (block.type === 'paragraph') return `<p>${block.lines.map((line) => renderInline(line)).join('<br>')}</p>`;
     return renderList(block);
   }).join('');
+}
+
+// Reuse exactly the preview grammar; unsupported Markdown stays literal.
+export function exportLimitedMarkdown(source) {
+  function list(block, indent = '') {
+    return block.items.map((item, index) => {
+      const marker = block.type === 'ol' ? `${block.start + index}.` : '-';
+      const prefix = `${indent}${marker} `;
+      const nested = item.children.map((child) => list(child, `${indent}${' '.repeat(marker.length + 1)}`)).join('\n');
+      return `${prefix}${renderInline(item.text, true)}${nested ? `\n${nested}` : ''}`;
+    }).join('\n');
+  }
+  return parseBlocks(source).map((block) => block.type === 'paragraph'
+    ? block.lines.map((line) => markdownIndent(renderInline(line, true))).join('  \n')
+    : list(block)).join('\n\n');
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="無料・オープンソースの履歴書・職務経歴書 editor。入力内容を端末内で処理し、PDFまたはJSONへ書き出せます。">
+  <meta name="description" content="無料・オープンソースの履歴書・職務経歴書 editor。入力内容を端末内で処理し、PDF・Markdown・JSONへ書き出せます。">
   <meta name="keywords" content="無料オンライン履歴書作成, オープンソース履歴書作成, ローカル処理, プライバシー重視, PDF履歴書作成, 免费在线简历制作, 开源简历生成器, 本地处理, 隐私安全, PDF简历生成, free online resume builder, open source resume builder, local processing, privacy-first resume editor, PDF resume generator">
   <meta name="robots" content="noindex,follow">
   <title>Resume Studio — 履歴書・職務経歴書</title>
@@ -53,6 +53,8 @@
           <svg class="data-menu-chevron" aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
         </summary>
         <div class="data-menu-panel">
+          <button class="secondary-button" id="exportMarkdownButton" type="button" aria-describedby="markdownExportHelp">Markdownを書き出す</button>
+          <small id="markdownExportHelp">Markdown は現在の文書の推敲用です。再読み込み・復元には JSON を使います。</small>
           <button class="secondary-button" id="exportDataButton" type="button">データを書き出す</button>
           <button class="secondary-button" id="importDataButton" type="button">データを読み込む</button>
           <button class="danger-button" id="clearDraftButton" type="button">この端末の下書きを消去</button>
