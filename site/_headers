@@ -10,3 +10,29 @@
 # Keep the editor out of search indexes, including converted Markdown responses.
 /editor/*
   X-Robots-Tag: noindex,follow
+
+# Discovery is limited to the matching public HTML and static Markdown resources.
+/
+  Link: </index.md>; rel="alternate"; type="text/markdown"; hreflang="ja", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/index.html
+  Link: </index.md>; rel="alternate"; type="text/markdown"; hreflang="ja", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/zh-cn/
+  Link: </zh-cn/index.md>; rel="alternate"; type="text/markdown"; hreflang="zh-CN", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/zh-cn/index.html
+  Link: </zh-cn/index.md>; rel="alternate"; type="text/markdown"; hreflang="zh-CN", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/en/
+  Link: </en/index.md>; rel="alternate"; type="text/markdown"; hreflang="en", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/en/index.html
+  Link: </en/index.md>; rel="alternate"; type="text/markdown"; hreflang="en", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/index.md
+  Content-Type: text/markdown; charset=utf-8
+  Content-Language: ja
+  Link: </>; rel="alternate"; type="text/html"; hreflang="ja", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/zh-cn/index.md
+  Content-Type: text/markdown; charset=utf-8
+  Content-Language: zh-CN
+  Link: </zh-cn/>; rel="alternate"; type="text/html"; hreflang="zh-CN", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"
+/en/index.md
+  Content-Type: text/markdown; charset=utf-8
+  Content-Language: en
+  Link: </en/>; rel="alternate"; type="text/html"; hreflang="en", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"

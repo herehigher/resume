@@ -1,3 +1,4 @@
+import { pagesDiscoveryHeaders } from './markdown-discovery-contract.mjs';
 import { DEPLOYMENT_ORIGIN } from './deployment-path-contract.mjs';
 
 export const CONTENT_SIGNAL = 'search=yes, ai-input=yes, ai-train=yes';
@@ -18,8 +19,8 @@ export function assertRobotsPolicy(content) {
 export function assertPagesContentHeaders(content) {
   const directives = content.split(/\r?\n/).filter((line) => line.trim() && !line.trimStart().startsWith('#'))
     .map((line) => line.trimEnd());
-  const expected = `/*\n  Content-Signal: ${CONTENT_SIGNAL}\n/editor/*\n  X-Robots-Tag: noindex,follow`;
+  const expected = `/*\n  Content-Signal: ${CONTENT_SIGNAL}\n/editor/*\n  X-Robots-Tag: noindex,follow\n${pagesDiscoveryHeaders()}`;
   if (directives.join('\n') !== expected) {
-    throw new Error('Pages headers must declare the approved content signals globally and preserve editor noindex');
+    throw new Error('Pages headers must declare the approved content signals globally, preserve editor noindex, and match discovery routes');
   }
 }

@@ -3,8 +3,10 @@ import { appendFile, cp, lstat, mkdir, mkdtemp, realpath, readFile, readdir, ren
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { htmlDocumentContracts } from './deployment-path-contract.mjs';
+import { DEPLOYMENT_PATH_CONTRACTS, htmlDocumentContracts } from './deployment-path-contract.mjs';
 import { assertPagesContentHeaders, assertRobotsPolicy } from './content-policy-contract.mjs';
+
+import { assertHtmlDiscovery, assertStaticMarkdown } from './markdown-discovery-contract.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const htmlPaths = Object.freeze(htmlDocumentContracts().map(({ artifactPath }) => artifactPath).sort(compareUtf8));
@@ -104,6 +106,14 @@ async function validateSourceSite(sourceDirectory) {
       fail(`Source privacy notice is missing or duplicated: ${relativePath}`);
     }
     if ((html.match(/<\/body>/gi) || []).length !== 1) fail(`Source page has no unique closing body: ${relativePath}`);
+  }
+  for (const contract of DEPLOYMENT_PATH_CONTRACTS) {
+    if (contract.semantic === 'public-document') {
+      assertHtmlDiscovery(await readFile(path.join(sourceDirectory, contract.artifactPath), 'utf8'), contract);
+    }
+    if (contract.semantic === 'static-markdown') {
+      assertStaticMarkdown(await readFile(path.join(sourceDirectory, contract.artifactPath), 'utf8'), contract);
+    }
   }
   assertRobotsPolicy(await readFile(path.join(sourceDirectory, 'robots.txt'), 'utf8'));
   assertPagesContentHeaders(await readFile(path.join(sourceDirectory, '_headers'), 'utf8'));

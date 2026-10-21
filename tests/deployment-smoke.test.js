@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { discoveryLinkHeader } from '../scripts/markdown-discovery-contract.mjs';
 import { CONTENT_SIGNAL } from '../scripts/content-policy-contract.mjs';
 import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
 import { prepareArtifact } from '../scripts/prepare-site-artifact.mjs';
@@ -29,12 +30,18 @@ async function prepare(sourceDirectory, outputDirectory) {
 }
 
 function contentTypeFor(kind) {
+  if (kind === 'markdown') return 'text/markdown; charset=utf-8';
   if (kind === 'html') return 'text/html; charset=utf-8';
   if (kind === 'xml') return 'application/xml; charset=utf-8';
   if (kind === 'javascript') return 'text/javascript; charset=utf-8';
   if (kind === 'text') return 'text/plain; charset=utf-8';
   if (kind === 'css') return 'text/css; charset=utf-8';
   return 'application/json; charset=utf-8';
+}
+
+function discoveryHeaders(contract) {
+  return { ...(discoveryLinkHeader(contract) ? { link: discoveryLinkHeader(contract) } : {}),
+    ...(contract.semantic === 'static-markdown' ? { 'content-language': contract.lang } : {}) };
 }
 
 function contractAtPath(pathname) {
@@ -55,7 +62,7 @@ function publishedFixture(directory, { mutateHtml = (html) => html, version = ro
     if (contract.semantic === 'version-config') content = content.replace(`APP_VERSION = '${packageVersion}'`, `APP_VERSION = '${version}'`);
     if (contract.kind === 'html') content = mutateHtml(content);
     return new Response(content, {
-      headers: { 'content-type': contentTypeFor(contract.kind), 'content-signal': CONTENT_SIGNAL,
+      headers: { 'content-type': contentTypeFor(contract.kind), 'content-signal': CONTENT_SIGNAL, ...discoveryHeaders(contract),
         ...(contract.semantic === 'editor-document' ? { 'x-robots-tag': 'noindex,follow' } : {}) },
       status: 200
     });
@@ -173,6 +180,7 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
 
   const malformedContentTypes = [
     ['assets/css/not-found.css', 'text/html; charset=utf-8', /unexpected content type for css/],
+    ['index.md', 'text/html; charset=utf-8', /unexpected content type for markdown/],
     ['robots.txt', 'text/html; charset=utf-8', /unexpected content type for text/],
     ['index.html', 'text/htmlx; charset=utf-8', /unexpected content type for html/],
     ['sitemap.xml', 'application/xmlp', /unexpected content type for xml/],
@@ -186,7 +194,7 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
         .replace(`APP_VERSION = '${packageVersion}'`, `APP_VERSION = '${routingVersion}'`);
       return new Response(content, {
         headers: { 'content-type': contract.artifactPath === artifactPath ? contentType : contentTypeFor(contract.kind),
-          'content-signal': CONTENT_SIGNAL, ...(contract.semantic === 'editor-document' ? { 'x-robots-tag': 'noindex,follow' } : {}) },
+          'content-signal': CONTENT_SIGNAL, ...discoveryHeaders(contract), ...(contract.semantic === 'editor-document' ? { 'x-robots-tag': 'noindex,follow' } : {}) },
         status: 200
       });
     };
@@ -204,7 +212,7 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
     attempts: 1,
     baseUrl,
     fetchImpl: async () => new Response(validHtml.replace('lang="ja"', 'lang="en"'), {
-      headers: { 'content-type': 'text/html', 'content-signal': CONTENT_SIGNAL }
+      headers: { 'content-type': 'text/html', 'content-signal': CONTENT_SIGNAL, ...discoveryHeaders(htmlContract) }
     }),
     packageVersion: routingVersion
   }), /language is invalid/);
@@ -311,8 +319,12 @@ test('trusted rollback and reconciliation keep the original contract for accepte
   for (const version of ['0.4.1', '0.4.2', '0.4.3']) {
     const directory = path.join(temporaryDirectory(t), 'historical');
     cpSync(source, directory, { recursive: true });
-    for (const artifactPath of ['_headers', 'robots.txt', '404.html', 'assets/css/not-found.css']) {
+    for (const artifactPath of ['_headers', 'robots.txt', '404.html', 'assets/css/not-found.css', 'index.md', 'zh-cn/index.md', 'en/index.md']) {
       rmSync(path.join(directory, artifactPath));
+    }
+    for (const contract of DEPLOYMENT_PATH_CONTRACTS.filter((candidate) => candidate.semantic === 'public-document')) {
+      const target = path.join(directory, contract.artifactPath);
+      writeFileSync(target, readFileSync(target, 'utf8').replace(/^.*<link rel="(?:alternate" type="text\/markdown|describedby|sitemap)[^\n]*\n/gm, ''));
     }
     const requests = [];
     await validatePublishedDeployment({ attempts: 1, baseUrl: 'https://accepted.pages.dev/', packageVersion: version,

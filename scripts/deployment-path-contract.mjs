@@ -20,6 +20,15 @@ export const DEPLOYMENT_PATH_CONTRACTS = Object.freeze([
     artifactPath: '404.html', kind: 'html', marker: 'id="not-found-title"', semantic: 'not-found-document', urlPath: '404'
   }),
   Object.freeze({
+    artifactPath: 'index.md', kind: 'markdown', lang: 'ja', marker: '# Resume Studio — 日本語の利用案内', semantic: 'static-markdown', urlPath: 'index.md'
+  }),
+  Object.freeze({
+    artifactPath: 'zh-cn/index.md', kind: 'markdown', lang: 'zh-CN', marker: '# Resume Studio — 简体中文使用指南', semantic: 'static-markdown', urlPath: 'zh-cn/index.md'
+  }),
+  Object.freeze({
+    artifactPath: 'en/index.md', kind: 'markdown', lang: 'en', marker: '# Resume Studio — English usage guide', semantic: 'static-markdown', urlPath: 'en/index.md'
+  }),
+  Object.freeze({
     artifactPath: 'robots.txt', kind: 'text', marker: 'User-agent: *', semantic: 'robots', urlPath: 'robots.txt'
   }),
   Object.freeze({
