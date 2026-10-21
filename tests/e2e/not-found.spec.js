@@ -30,7 +30,9 @@ for (const mode of ['desktop', '[mobile]']) {
       await page.keyboard.press('Tab');
       await expect(page.locator(`.entry-button[hreflang="${locale}"]`)).toBeFocused();
     }
-    await page.screenshot({ path: testInfo.outputPath('404.png'), fullPage: true });
+    const screenshot = testInfo.outputPath('404.png');
+    await page.screenshot({ path: screenshot, fullPage: true });
+    await testInfo.attach('404 guidance', { path: screenshot, contentType: 'image/png' });
     for (const [locale, href] of [['ja', '/'], ['zh-CN', '/zh-cn/'], ['en', '/en/']]) {
       await page.goto('/missing/nested/page');
       await page.locator(`.entry-button[hreflang="${locale}"]`).click();
