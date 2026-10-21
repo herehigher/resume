@@ -20,7 +20,7 @@ python3 -m http.server 8000 --directory site
 | `.github/workflows/` | Quality と公開 workflow |
 | `docs/`、`output/pdf/` | 開発資料と長期参照する展示 sample |
 
-Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口です。`/ja/` は canonical を root に統合した互換入口です。Editor は `/editor/` にあり `noindex,follow`。Sitemap / hreflang は3公開入口だけを対象にします。
+Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口です。`/ja/` は canonical を root に統合した互換入口です。Editor は `/editor/` にあり `noindex,follow`。Sitemap / hreflang は3公開入口だけを対象にします。`robots.txt` はクロールを許可し、正式な sitemap を参照します。`404.html` は三言語の公開入口を案内します。
 
 表示 locale の決定順は URL query、`resume-studio-locale-v1` の保存 preference、`navigator.languages`、`ja`。Import 内の locale は文書 data で、表示 preference を変更しません。`zh-TW` / `zh-Hant` を简体中文へ自動変換しません。
 
@@ -161,3 +161,13 @@ Documentation asset manifest の current schema は v4 です。Producer kind、
 手元で一時出力だけが必要な場合は `npm run generate:doc-assets -- --output-dir EMPTY_DIRECTORY --source-sha HEAD_SHA --quality-run-id LOCAL_POSITIVE_ID` で source 外の空 directory に生成し、`npm run verify:doc-assets -- --asset-root OUTPUT_DIRECTORY --source-root CHECKOUT --source-sha HEAD_SHA` で検証します。Local の ID と既定 producer 情報は検証用の情報値にすぎず、その出力を公開 PR へ promote しません。公開用 manifest には候補生成または Quality の実 workflow、control/source SHA、run、attempt を設定します。PDF correctness は対象 source の E2E と一時出力で検証し、展示 asset の version 同期とは分けて扱います。
 
 `scripts/prepare-site-artifact.mjs validate --source SITE_DIRECTORY` は source tree を単独で検査する CLI です。Release workflow は `prepare --source SITE_DIRECTORY --output EMPTY_OUTPUT_DIRECTORY` を実行し、この command 内で source を検査してから source 外の新規 directory へ exact copy します。CLI は symlink、非 canonical relative path、unsupported file type、HTML path 不一致、source と重なる output、既存 output を拒否し、source / artifact の SHA-256 tree digest を `GITHUB_OUTPUT` へ記録します。公開 evidence は authorized source SHA、package version、source digest、artifact digest だけを持ちます。
+
+## 配信応答の回帰確認
+
+`node scripts/validate-deployment-smoke.mjs --directory ARTIFACT_DIRECTORY --package-version VERSION` は公開前の artifact の本文を確認します。HTTP 応答や Pages の routing の検証にはなりません。
+
+公開環境では既存の release workflow が `--base-url HTTPS_ORIGIN_ROOT --release-sha SOURCE_SHA --package-version VERSION` で同じ CLI を実行します。公開入口・互換入口・三言語 editor・sitemap・robots・Schema・example・version asset の HTTP 200、Content-Type、本文を検査し、ランダムな未存在 path、nested path、未実装の `llms.txt` / `.well-known/ai-plugin.json`、存在しない Schema / asset は HTTP 404 と三言語の案内を要求します。発見用 path を実装する際は、その成功契約へ移します。
+
+現在の trusted tooling から過去版へ rollback / reconciliation する際、受入済み `0.4.1`・`0.4.2`・`0.4.3` の online smoke は当時の配信契約を維持し、未提供の robots / 404 / stylesheet 契約を要求しません。それ以外の version と、準備中の source / artifact には新しい契約を適用します。任意の skip option はありません。
+
+通常の local static server は 404 ページの表示確認にだけ使い、Cloudflare Pages preview の確認済みとは扱いません。Preview、正式公開後の custom domain と Pages.dev、Agent Readiness の再診断は実行した環境・source SHA・結果を記録し、未実施なら未確認と明記します。Preview と本番公開の実行権限は[リリース手順](release-playbook.md)に従います。

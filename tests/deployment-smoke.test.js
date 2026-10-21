@@ -13,6 +13,7 @@ import { validatePreparedDeployment, validatePublishedDeployment } from '../scri
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = path.join(root, 'site');
 const packageVersion = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const routingVersion = '0.4.4';
 const smokeScript = fileURLToPath(new URL('../scripts/validate-deployment-smoke.mjs', import.meta.url));
 
 function temporaryDirectory(t) {
@@ -30,6 +31,8 @@ function contentTypeFor(kind) {
   if (kind === 'html') return 'text/html; charset=utf-8';
   if (kind === 'xml') return 'application/xml; charset=utf-8';
   if (kind === 'javascript') return 'text/javascript; charset=utf-8';
+  if (kind === 'text') return 'text/plain; charset=utf-8';
+  if (kind === 'css') return 'text/css; charset=utf-8';
   return 'application/json; charset=utf-8';
 }
 
@@ -40,12 +43,15 @@ function contractAtPath(pathname) {
   return DEPLOYMENT_PATH_CONTRACTS.find((candidate) => candidate.artifactPath === artifactPath);
 }
 
-function publishedFixture(directory, { mutateHtml = (html) => html } = {}) {
+function publishedFixture(directory, { mutateHtml = (html) => html, version = routingVersion } = {}) {
   return async (url) => {
     const request = new URL(url);
     const contract = contractAtPath(request.pathname);
-    if (!contract) return new Response('not found', { status: 404 });
+    if (!contract) return new Response(readFileSync(path.join(directory, '404.html'), 'utf8'), {
+      headers: { 'content-type': 'text/html; charset=utf-8' }, status: 404
+    });
     let content = readFileSync(path.join(directory, contract.artifactPath), 'utf8');
+    if (contract.semantic === 'version-config') content = content.replace(`APP_VERSION = '${packageVersion}'`, `APP_VERSION = '${version}'`);
     if (contract.kind === 'html') content = mutateHtml(content);
     return new Response(content, {
       headers: { 'content-type': contentTypeFor(contract.kind) },
@@ -87,6 +93,11 @@ test('prepared deployment smoke detects locale, URL, indexability, sitemap, Sche
     ['compatibility hreflang', 'ja/index.html', (content) => content.replace(
       '</head>', '<link rel="alternate" hreflang="ja" href="https://rs.herehigher.com/ja/">\n</head>'
     ), /must not join the public hreflang cluster/],
+    ['robots blocks editor', 'robots.txt', (content) => content.replace('Allow: /', 'Disallow: /editor/'), /robots rules must allow crawling/],
+    ['robots sitemap', 'robots.txt', (content) => content.replace('https://rs.herehigher.com/', 'https://example.invalid/'), /robots rules must allow crawling/],
+    ['implicit AI policy', 'robots.txt', (content) => `${content}Content-Signal: ai-train=no\n`, /robots rules must allow crawling/],
+    ['error page home link', '404.html', (content) => content.replace('href="/en/"', 'href="../en/"'), /en home link is missing/],
+    ['error page homepage fallback', '404.html', () => readFileSync(path.join(source, 'index.html'), 'utf8'), /required marker was not found/],
     ['editor indexability', 'editor/index.html', (content) => content.replace('noindex,follow', 'index,follow'), /must be noindex,follow/],
     ['sitemap canonical URLs', 'sitemap.xml', (content) => content.replace(
       '<loc>https://rs.herehigher.com/en/</loc>', '<loc>https://example.invalid/en/</loc>'
@@ -130,11 +141,18 @@ test('prepared and published deployment use the same semantic contract on custom
         mutateHtml: (html) => html.replace('</head>', '<meta name="host-generated" content="edge-adjusted"></head>')
       })(url);
     };
-    await validatePublishedDeployment({ baseUrl, fetchImpl, packageVersion, releaseSha: 'a'.repeat(40) });
-    assert.deepEqual(requests, DEPLOYMENT_PATH_CONTRACTS.map((contract) => {
+    await validatePublishedDeployment({ baseUrl, fetchImpl, packageVersion: routingVersion, releaseSha: 'a'.repeat(40) });
+    const successContracts = DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract.semantic !== 'not-found-document');
+    assert.deepEqual(requests.slice(0, successContracts.length), successContracts.map((contract) => {
       const url = new URL(contract.urlPath, baseUrl);
       return `${url.origin}${url.pathname}`;
     }));
+    const missingRequests = requests.slice(successContracts.length + 3);
+    assert.equal(missingRequests.length, 6);
+    assert.match(missingRequests[0], /\/__not-found-[a-f0-9-]+$/);
+    assert.match(missingRequests[1], /\/missing-[a-f0-9-]+\/nested\/page$/);
+    assert.deepEqual(missingRequests.slice(2), ['llms.txt', '.well-known/ai-plugin.json',
+      'schema/__not-found.schema.json', 'assets/__not-found.js'].map((pathname) => new URL(pathname, baseUrl).href));
   }
 });
 
@@ -147,10 +165,12 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
     attempts: 1,
     baseUrl,
     fetchImpl: async () => new Response('missing', { status: 404, headers: { 'content-type': 'text/html' } }),
-    packageVersion
-  }), /HTTP response was not successful/);
+    packageVersion: routingVersion
+  }), /HTTP response must be 200/);
 
   const malformedContentTypes = [
+    ['assets/css/not-found.css', 'text/html; charset=utf-8', /unexpected content type for css/],
+    ['robots.txt', 'text/html; charset=utf-8', /unexpected content type for text/],
     ['index.html', 'text/htmlx; charset=utf-8', /unexpected content type for html/],
     ['sitemap.xml', 'application/xmlp', /unexpected content type for xml/],
     ['assets/js/config.js', 'text/javascript-malformed', /unexpected content type for javascript/],
@@ -159,20 +179,21 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
   for (const [artifactPath, contentType, expected] of malformedContentTypes) {
     const fetchImpl = async (url) => {
       const contract = contractAtPath(new URL(url).pathname);
-      const content = readFileSync(path.join(source, contract.artifactPath), 'utf8');
+      const content = readFileSync(path.join(source, contract.artifactPath), 'utf8')
+        .replace(`APP_VERSION = '${packageVersion}'`, `APP_VERSION = '${routingVersion}'`);
       return new Response(content, {
         headers: { 'content-type': contract.artifactPath === artifactPath ? contentType : contentTypeFor(contract.kind) },
         status: 200
       });
     };
-    await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl, fetchImpl, packageVersion }), expected);
+    await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl, fetchImpl, packageVersion: routingVersion }), expected);
   }
 
   await assert.rejects(validatePublishedDeployment({
     attempts: 1,
     baseUrl,
     fetchImpl: async () => new Response('not the expected page', { headers: { 'content-type': 'text/html' } }),
-    packageVersion
+    packageVersion: routingVersion
   }), /required marker was not found/);
 
   await assert.rejects(validatePublishedDeployment({
@@ -181,7 +202,7 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
     fetchImpl: async () => new Response(validHtml.replace('lang="ja"', 'lang="en"'), {
       headers: { 'content-type': 'text/html' }
     }),
-    packageVersion
+    packageVersion: routingVersion
   }), /language is invalid/);
 });
 
@@ -202,14 +223,14 @@ test('published smoke rejects redirects and mounted base URLs', async () => {
         url: `${requestedUrl}redirected/`
       };
     },
-    packageVersion
+    packageVersion: routingVersion
   }), /response was redirected/);
 
   await assert.rejects(validatePublishedDeployment({
     attempts: 1,
     baseUrl: 'https://preview.example.test/resume/',
     fetchImpl: async () => { throw new Error('fetch must not run for a mounted base URL'); },
-    packageVersion
+    packageVersion: routingVersion
   }), /https origin root/);
 });
 
@@ -226,9 +247,97 @@ test('published smoke bounds requests with an injectable timeout signal', async 
       assert.equal(signal.aborted, true);
       throw signal.reason;
     },
-    packageVersion,
+    packageVersion: routingVersion,
     requestTimeoutMs: 25,
     timeoutSignal
   }), /status=timeout/);
   assert.deepEqual(timeoutCalls, [25]);
+});
+
+test('published smoke rejects soft 404s, wrong error bodies/types, and non-200 successful responses', async () => {
+  const baseUrl = 'https://resume-staging.pages.dev/';
+  const fixture = publishedFixture(source);
+  const errorHtml = readFileSync(path.join(source, '404.html'), 'utf8');
+  const homeHtml = readFileSync(path.join(source, 'index.html'), 'utf8');
+  const cases = [
+    ['homepage soft 404', 200, 'text/html', homeHtml, /HTTP response must be 404/],
+    ['error page soft 404', 200, 'text/html', errorHtml, /HTTP response must be 404/],
+    ['homepage with 404 status', 404, 'text/html', homeHtml, /required marker was not found/],
+    ['plain text error', 404, 'text/plain', errorHtml, /unexpected content type for html/],
+    ['missing error body', 404, 'text/html', 'Not found', /required marker was not found/]
+  ];
+  // Each negative route is checked independently, so a single passing route cannot hide another soft 404.
+  for (const target of ['random', 'nested', 'llms.txt', '.well-known/ai-plugin.json',
+    'schema/__not-found.schema.json', 'assets/__not-found.js']) {
+    for (const [name, status, contentType, content, expected] of cases) {
+      let reachedTarget = false;
+      const fetchImpl = async (url) => {
+        const pathname = new URL(url).pathname.slice(1);
+        const matches = target === 'random' ? pathname.startsWith('__not-found-')
+          : target === 'nested' ? pathname.startsWith('missing-') : pathname === target;
+        if (!matches) return fixture(url);
+        reachedTarget = true;
+        return new Response(content, { status, headers: { 'content-type': contentType } });
+      };
+      await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl, fetchImpl, packageVersion: routingVersion }), expected, `${target}: ${name}`);
+      assert.equal(reachedTarget, true);
+    }
+  }
+  await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl, packageVersion: routingVersion,
+    fetchImpl: async () => new Response(homeHtml, { status: 201, headers: { 'content-type': 'text/html' } })
+  }), /HTTP response must be 200/);
+});
+
+test('published smoke preserves the editor locale queries and cache-busting identity', async () => {
+  const locales = [];
+  const releaseSha = 'b'.repeat(40);
+  await validatePublishedDeployment({ attempts: 1, baseUrl: 'https://resume-staging.pages.dev/', packageVersion: routingVersion, releaseSha,
+    fetchImpl: async (url) => {
+      const request = new URL(url);
+      assert.equal(request.searchParams.get('release'), releaseSha);
+      assert.equal(request.searchParams.get('attempt'), '1');
+      if (request.pathname === '/editor/' && request.searchParams.has('lang')) locales.push(request.searchParams.get('lang'));
+      return publishedFixture(source)(url);
+    }
+  });
+  assert.deepEqual(locales, ['ja', 'zh-CN', 'en']);
+});
+
+test('trusted rollback and reconciliation keep the original contract for accepted historical versions', async (t) => {
+  for (const version of ['0.4.1', '0.4.2', '0.4.3']) {
+    const directory = path.join(temporaryDirectory(t), 'historical');
+    cpSync(source, directory, { recursive: true });
+    for (const artifactPath of ['robots.txt', '404.html', 'assets/css/not-found.css']) {
+      rmSync(path.join(directory, artifactPath));
+    }
+    const requests = [];
+    await validatePublishedDeployment({ attempts: 1, baseUrl: 'https://accepted.pages.dev/', packageVersion: version,
+      fetchImpl: async (url) => {
+        const pathname = new URL(url).pathname;
+        requests.push(pathname);
+        assert.ok(contractAtPath(pathname), 'historical smoke must not probe unsupported missing routes');
+        return publishedFixture(directory, { version })(url);
+      }
+    });
+    assert.equal(requests.length, 9);
+    assert.equal(requests.includes('/robots.txt'), false);
+    assert.equal(requests.includes('/404'), false);
+  }
+});
+
+test('future releases cannot inherit the historical routing exemption', async () => {
+  for (const version of ['0.4.4', '0.5.0', '1.0.0']) {
+    for (const missing of ['robots', 'not-found-document', 'stylesheet']) {
+      const fetchImpl = async (url) => {
+        const contract = contractAtPath(new URL(url).pathname);
+        if (contract?.semantic === missing || (!contract && missing === 'not-found-document')) {
+          return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain' } });
+        }
+        return publishedFixture(source, { version })(url);
+      };
+      await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl: 'https://future.pages.dev/',
+        fetchImpl, packageVersion: version
+      }), /HTTP response must be 200|unexpected content type for html/);
+    }
+  }
 });

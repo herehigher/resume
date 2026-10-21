@@ -87,7 +87,7 @@ async function validateSourceSite(sourceDirectory) {
     .map(({ relativePath }) => relativePath)
     .filter((relativePath) => relativePath.endsWith('.html'));
   if (actualHtml.length !== htmlPaths.length || actualHtml.some((value, index) => value !== htmlPaths[index])) {
-    fail('Source site must contain exactly the public and editor HTML paths');
+    fail('Source site must contain exactly the public, editor, and 404 HTML paths');
   }
   for (const relativePath of htmlPaths) {
     const html = await readFile(path.join(sourceDirectory, relativePath), 'utf8');
