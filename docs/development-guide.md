@@ -62,6 +62,14 @@ Cloudflare 設定を変更する際は[公開手順](release-playbook.md)に従�
 
 正規公開後に Pages.dev と custom domain の HTML / Markdown / robots・404・editor の応答、管理された宣言の重複や矛盾、用途別 crawler の診断結果を確認します。対象 SHA・host・実行日時・判定と実際の応答、未確認事項は Issue のコメントへ記録し、自動 test の成功と公開後の受入を区別します。
 
+## 静的 Markdown と発見リンク
+
+三言語の利用案内は `/index.md`、`/zh-cn/index.md`、`/en/index.md` です。対応する公開 HTML の `alternate` と Pages の `Link` から同じ言語の案内へ進めます。Schema は `describedby`、sitemap は `sitemap` として参照し、他の HTML・editor・assets に Markdown alternate を付けません。Markdown からは公開 HTML・対象言語 editor・v4 Schema・架空 example へ進めます。
+
+`site/_headers` は各 Markdown に `text/markdown; charset=utf-8` と対応する `Content-Language`、HTML への alternate を明示します。HTML と Markdown の Content-Signal は既存の全体方針を共有します。静的 Markdown の提供は同一 URL の Accept 内容協商ではなく、`Vary: Accept` を必要としません。既存 smoke の HTML に対する `Accept: text/markdown` 検査は独立して保持し、静的文書があるだけで Markdown Negotiation の成功とは報告しません。
+
+`scripts/markdown-discovery-contract.mjs` と `tests/markdown-discovery.test.js` は内容、言語、リンク先、header の適用範囲を検査します。公開 artifact の準備・smoke は3文書を必須にし、online smoke は HTTP 200、Content-Type、Content-Language、Link、Content-Signal を確認します。通常の static server は `_headers` を適用しないため、Pages の実応答確認は既存の公開手順で行い、preview / custom domain / Pages.dev の未確認を区別します。
+
 ## Data version と移行
 
 JSON payload の `version` は、端末内草稿を復号した state と JSON import/export が共有する唯一の data format version です。現在の新規 state、公開 export、公開 JSON Schema は `version: 4` を使い、`schemaRevision` は持ちません。暗号化 envelope の format version は暗号化した bytes の格納方法を表す別契約で、履歴書 data の version とは独立して維持します。利用実績のない旧 `version: 1` は対応 list に含めず、import でも端末内草稿でも非対応として扱います。

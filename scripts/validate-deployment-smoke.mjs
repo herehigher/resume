@@ -9,6 +9,7 @@ import {
   publicDocumentContracts
 } from './deployment-path-contract.mjs';
 import { assertPagesContentHeaders, assertRobotsPolicy, hasApprovedContentSignal } from './content-policy-contract.mjs';
+import { assertDiscoveryLinkHeader, assertHtmlDiscovery, assertStaticMarkdown } from './markdown-discovery-contract.mjs';
 // Rollback/reconciliation use trusted current tooling against these accepted historical versions.
 const legacyRoutingVersions = new Set(['0.4.1', '0.4.2', '0.4.3']);
 const legacyRoutingPaths = new Set([
@@ -52,7 +53,7 @@ function assertCanonicalLinks(html, contract, metadata) {
   if (canonical.length !== 1 || canonical[0].get('href') !== contract.canonical) {
     failure(contract, metadata, 'canonical URL is invalid');
   }
-  const alternates = links.filter((item) => item.get('rel') === 'alternate');
+  const alternates = links.filter((item) => item.get('rel') === 'alternate' && item.get('type') !== 'text/markdown');
   if (alternates.length !== publicHreflangAlternates.length) {
     failure(contract, metadata, 'alternate URL set is invalid');
   }
@@ -64,6 +65,7 @@ function assertCanonicalLinks(html, contract, metadata) {
 }
 
 function expectedContentType(kind) {
+  if (kind === 'markdown') return 'text/markdown';
   if (kind === 'html') return 'text/html';
   if (kind === 'xml') return 'application/xml';
   if (kind === 'javascript') return 'text/javascript';
@@ -99,6 +101,25 @@ function assertSemanticContract(contract, content, metadata, options) {
     if (contract.semantic === 'editor-document' && metadata.robotsTag !== 'noindex,follow') {
       failure(contract, metadata, 'editor X-Robots-Tag must be noindex,follow');
     }
+  }
+  if (metadata.link !== undefined && ['public-document', 'static-markdown'].includes(contract.semantic)) {
+    try {
+      assertDiscoveryLinkHeader(metadata.link, contract);
+    } catch (error) {
+      failure(contract, metadata, error.message);
+    }
+  }
+  if (contract.semantic === 'static-markdown') {
+    if (!hasExpectedContentType('markdown', metadata.contentType)) failure(contract, metadata, 'unexpected content type for markdown');
+    if (metadata.contentLanguage !== undefined && metadata.contentLanguage !== contract.lang) {
+      failure(contract, metadata, 'static Markdown Content-Language is invalid');
+    }
+    try {
+      assertStaticMarkdown(content, contract);
+    } catch (error) {
+      failure(contract, metadata, error.message);
+    }
+    return;
   }
   if (contract.markdown && hasExpectedContentType('markdown', metadata.contentType)) {
     if (!metadata.vary.split(',').some((value) => value.trim().toLowerCase() === 'accept')) {
@@ -137,6 +158,13 @@ function assertSemanticContract(contract, content, metadata, options) {
     const htmlAttributes = openingHtml(content, contract, metadata);
     if (htmlAttributes.get('lang') !== contract.lang) failure(contract, metadata, 'language is invalid');
     assertCanonicalLinks(content, contract, metadata);
+    if (metadata.status === 'local' || metadata.link !== undefined) {
+      try {
+        assertHtmlDiscovery(content, contract);
+      } catch (error) {
+        failure(contract, metadata, error.message);
+      }
+    }
     return;
   }
   if (contract.semantic === 'compatibility-document') {
@@ -284,7 +312,9 @@ export async function validatePublishedDeployment({
             ...(!historical ? {
               contentSignal: response.headers.get('content-signal') || '',
               robotsTag: response.headers.get('x-robots-tag') || '',
-              vary: response.headers.get('vary') || ''
+              vary: response.headers.get('vary') || '',
+              link: response.headers.get('link') || '',
+              contentLanguage: response.headers.get('content-language') || ''
             } : {})
           };
           if (response.status !== (contract.status || 200)) {
