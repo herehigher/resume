@@ -24,6 +24,44 @@ Root は日本語の公開入口、`/zh-cn/` と `/en/` は対応言語の入口
 
 表示 locale の決定順は URL query、`resume-studio-locale-v1` の保存 preference、`navigator.languages`、`ja`。Import 内の locale は文書 data で、表示 preference を変更しません。`zh-TW` / `zh-Hant` を简体中文へ自動変換しません。
 
+## 公開コンテンツの用途方針と Content Signals
+
+公開コンテンツの用途方針は `search=yes, ai-input=yes, ai-train=yes` です。
+
+| 用途 | 意味・期待する扱い | 代表的なアクセス |
+| --- | --- | --- |
+| `search=yes` | 検索 index の作成、リンク・短い抜粋による発見を許容 | 一般検索の Googlebot / Bingbot、AI 検索の OAI-SearchBot / PerplexityBot |
+| `ai-input=yes` | AI 回答時の取得・引用・grounding を許容 | ChatGPT-User 等の利用者操作の agent、生成 AI 検索の回答用取得 |
+| `ai-train=yes` | モデルの学習・fine-tuning のための取得を許容 | GPTBot / ClaudeBot 等の学習クローラー |
+
+Crawler 名は用途を確認する代表例です。同じ事業者の検索・学習・ユーザー操作を同一視せず、提供者の最新仕様と Cloudflare の検出分類を確認します。特定の User-Agent 文字列だけでは送信元を認証できません。`ai-input=yes` は利用者の編集内容を外部へ送る機能の追加ではありません。
+
+### 宣言の管理元と適用範囲
+
+Repository の `site/robots.txt` と `site/_headers` を宣言の管理元とし、`scripts/content-policy-contract.mjs` で相互の一致を検査します。Robots は全 crawler に `Allow: /` と三用途の yes、正式 sitemap を宣言します。訓練 bot の個別 `Disallow` は設けません。Pages の `/*` response header は HTML 入口・互換入口・editor・実際の404応答だけでなく、Schema / code / assets にも同じ三用途の yes を明示します。Directory URL、拡張子なし URL、`index.html` 別名を含め、ルートごとの宣言漏れを防ぎます。Pages の redirect は header より先に適用されるため、転送先の最終応答を照合します。
+
+この意思表示は公開配信するコンテンツの取得後の用途に関する preference です。Software、関連文書、公開 Schema、架空 example、assets に適用される [MIT License](../LICENSE) や既に付与した権利を変更・撤回せず、追加のライセンス制限を設けません。Robots / Content Signals は私的データのアクセス制御でも、完全な学習防止を保証する仕組みでもありません。端末内の履歴書入力・写真・JSON・草稿は公開コンテンツに含まず、既存どおり network request へ含めません。Editor の `noindex,follow` は HTML meta と `/editor/*` の `X-Robots-Tag` で保持し、三言語の公開入口だけを sitemap / hreflang の対象にします。
+
+[Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) は origin の `Content-Signal` を変換後も優先します。Origin に header がない場合の既定値も三用途すべて yes ですが、既定値に依存せず Pages 側で明示します。将来有効化する際も HTML と `Accept: text/markdown` の応答で同じ三用途・editor の noindex、変換時の `Vary: Accept` を確認します。
+
+### Cloudflare 設定の確認・変更と復元
+
+Cloudflare 設定を変更する際は[公開手順](release-playbook.md)に従い、次の対象範囲・差分・復元方法を review・承認してから適用します。
+
+- 対象 host は `rs.herehigher.com`。宣言の Pages artifact は同じ project の preview / Pages.dev にも適用しますが、Cloudflare zone 全体や他の subdomain の方針を変更しません。
+- 逐 crawler の期待値は検索・利用者操作・学習のすべて「この方針を理由に block しない」です。現在も全オフなら差分はありません。既存の特定 bot / block-all AI ルールがあれば、元の rule ID・expression・action・順序・有効状態を記録し、`http.host eq "rs.herehigher.com"` の範囲だけでその用途制限を除く案を作ります。他 host の元の block は保持します。全 AI の一括ブロックを追加せず、検索を通すために他の安全規則を一括 Skip しません。
+- [AI Crawl Control と WAF](https://developers.cloudflare.com/ai-crawl-control/configuration/ai-crawl-control-with-waf/)では block が zone の custom rule として通常末尾に追加されます。先行する Skip / Redirect / Transform や既存の block-all、他の WAF / Bot / rate limit rule との実行順・影響を確認します。Crawler switch の許可は他の安全ルールを上書きする allow ではありません。検出済み bot の実ログ・診断と最終 HTTP 応答で扱いを確認し、単なる User-Agent の偽装試験を実 crawler の到達確認とは扱いません。
+- [Bot Preference Sync / managed robots](https://developers.cloudflare.com/bots/additional-configurations/managed-robots-txt/)はオフを維持します。将来使う際は repository と edge のどちらが宣言を生成するか先に決め、重複・矛盾した Content Signals や crawler block の注入を防ぎます。
+- 復元時は変更した host 限定 rule だけを保存済みの ID・expression・action・順序・有効状態へ戻します。Pages 内容の復旧は既存の rollback / reconciliation を使い、zone 全体の設定を推測で復元しません。
+
+### 検証と公開後の受入
+
+`node --test tests/deployment-smoke.test.js tests/site-artifact.test.js tests/documentation.test.js` で、source / artifact の robots と `_headers` の一致、宣言の欠落・矛盾・重複、変換の有無と header 保持を検査します。`npm test` では network / storage の既存 privacy 契約も検査します。公開 smoke は HTML と404だけでなく robots / Schema / assets の Content-Signal も検査し、三言語の入口・日本語互換入口・editor に `Accept: text/markdown` を送り、HTML のままなら既存 HTML 契約、Markdown なら明示 policy と `Vary: Accept` を要求します。サービスは test から有効化しません。
+
+受入済み `0.4.1`・`0.4.2`・`0.4.3` の online rollback / reconciliation は元の九経路のままで、当時なかった Content-Signal や editor response header を要求しません。将来版の online smoke と準備中の source / artifact には省略を許さず、現行 package version のままでも新しい宣言を検査します。
+
+正規公開後に Pages.dev と custom domain の HTML / Markdown / robots・404・editor の応答、管理された宣言の重複や矛盾、用途別 crawler の診断結果を確認します。対象 SHA・host・実行日時・判定と実際の応答、未確認事項は Issue のコメントへ記録し、自動 test の成功と公開後の受入を区別します。
+
 ## Data version と移行
 
 JSON payload の `version` は、端末内草稿を復号した state と JSON import/export が共有する唯一の data format version です。現在の新規 state、公開 export、公開 JSON Schema は `version: 4` を使い、`schemaRevision` は持ちません。暗号化 envelope の format version は暗号化した bytes の格納方法を表す別契約で、履歴書 data の version とは独立して維持します。利用実績のない旧 `version: 1` は対応 list に含めず、import でも端末内草稿でも非対応として扱います。

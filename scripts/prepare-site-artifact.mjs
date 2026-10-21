@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { htmlDocumentContracts } from './deployment-path-contract.mjs';
+import { assertPagesContentHeaders, assertRobotsPolicy } from './content-policy-contract.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const htmlPaths = Object.freeze(htmlDocumentContracts().map(({ artifactPath }) => artifactPath).sort(compareUtf8));
@@ -104,6 +105,8 @@ async function validateSourceSite(sourceDirectory) {
     }
     if ((html.match(/<\/body>/gi) || []).length !== 1) fail(`Source page has no unique closing body: ${relativePath}`);
   }
+  assertRobotsPolicy(await readFile(path.join(sourceDirectory, 'robots.txt'), 'utf8'));
+  assertPagesContentHeaders(await readFile(path.join(sourceDirectory, '_headers'), 'utf8'));
   return files;
 }
 
