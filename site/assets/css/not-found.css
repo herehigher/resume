@@ -1,0 +1,12 @@
+.not-found-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.not-found-grid h2 { font-size: 20px; line-height: 1.5; margin: 0; }
+.not-found-grid p { color: #354250; margin: 16px 0 24px; }
+.not-found-grid .entry-card { display: flex; flex-direction: column; }
+.not-found-grid .entry-button { align-self: flex-start; margin-top: auto; }
+#not-found-title { font-size: 48px; line-height: 1.2; margin: 24px 0 0; }
+.not-found-privacy { color: #687386; font-size: 12px; margin-top: 24px; }
+.not-found-privacy p { margin: 8px 0; }
+
+@media (max-width: 760px) {
+  .not-found-grid { grid-template-columns: 1fr; }
+}

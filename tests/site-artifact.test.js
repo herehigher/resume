@@ -59,7 +59,7 @@ test('validate CLI checks the complete source site and reports its digest', asyn
   writeFileSync(path.join(invalidSite, 'extra.html'), '<html></html>');
   const invalidResult = spawnSync(process.execPath, [scriptPath, 'validate', '--source', invalidSite], { encoding: 'utf8' });
   assert.notEqual(invalidResult.status, 0);
-  assert.match(invalidResult.stderr, /exactly the public and editor HTML paths/);
+  assert.match(invalidResult.stderr, /exactly the public, editor, and 404 HTML paths/);
 });
 
 test('prepared site artifact is byte-identical to the validated source', async (t) => {

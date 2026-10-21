@@ -17,6 +17,12 @@ export const DEPLOYMENT_PATH_CONTRACTS = Object.freeze([
     artifactPath: 'editor/index.html', canonical: `${DEPLOYMENT_ORIGIN}editor/`, kind: 'html', lang: 'ja', marker: '<title>', semantic: 'editor-document', urlPath: 'editor/'
   }),
   Object.freeze({
+    artifactPath: '404.html', kind: 'html', marker: 'id="not-found-title"', semantic: 'not-found-document', urlPath: '404'
+  }),
+  Object.freeze({
+    artifactPath: 'robots.txt', kind: 'text', marker: 'User-agent: *', semantic: 'robots', urlPath: 'robots.txt'
+  }),
+  Object.freeze({
     artifactPath: 'sitemap.xml', kind: 'xml', marker: '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', semantic: 'sitemap', urlPath: 'sitemap.xml'
   }),
   Object.freeze({
@@ -24,6 +30,12 @@ export const DEPLOYMENT_PATH_CONTRACTS = Object.freeze([
   }),
   Object.freeze({
     artifactPath: 'schema/resume-studio-web-v4.example.json', kind: 'json', marker: '"documents":', semantic: 'import-example', urlPath: 'schema/resume-studio-web-v4.example.json'
+  }),
+  Object.freeze({
+    artifactPath: 'assets/css/public-entry.css', kind: 'css', marker: '.entry-shell {', semantic: 'stylesheet', urlPath: 'assets/css/public-entry.css'
+  }),
+  Object.freeze({
+    artifactPath: 'assets/css/not-found.css', kind: 'css', marker: '.not-found-grid {', semantic: 'stylesheet', urlPath: 'assets/css/not-found.css'
   }),
   Object.freeze({
     artifactPath: 'assets/js/config.js', kind: 'javascript', marker: 'export const APP_VERSION = ', semantic: 'version-config', urlPath: 'assets/js/config.js'
@@ -70,6 +82,7 @@ export function htmlDocumentContracts() {
 export function documentUrlPaths() {
   return new Set(htmlDocumentContracts().flatMap((contract) => {
     if (!contract.urlPath) return ['/', '/index.html'];
+    if (contract.semantic === 'not-found-document') return ['/404', '/404.html'];
     const directoryPath = `/${contract.urlPath}`;
     return [directoryPath, `${directoryPath}index.html`];
   }));

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +59,8 @@ function expectedContentType(kind) {
   if (kind === 'html') return 'text/html';
   if (kind === 'xml') return 'application/xml';
   if (kind === 'javascript') return 'text/javascript';
+  if (kind === 'text') return 'text/plain';
+  if (kind === 'css') return 'text/css';
   return 'application/json';
 }
 
@@ -66,7 +69,9 @@ function hasExpectedContentType(kind, contentType) {
     html: ['text/html'],
     xml: ['application/xml', 'text/xml'],
     javascript: ['text/javascript', 'application/javascript'],
-    json: ['application/json']
+    json: ['application/json'],
+    text: ['text/plain'],
+    css: ['text/css']
   }[kind];
   if (!expectedEssences) return false;
 
@@ -83,6 +88,27 @@ function assertSemanticContract(contract, content, metadata, options) {
   if (!content.includes(contract.marker)) failure(contract, metadata, 'required marker was not found');
   if (!hasExpectedContentType(contract.kind, metadata.contentType)) {
     failure(contract, metadata, `unexpected content type for ${contract.kind}`);
+  }
+  if (contract.semantic === 'robots') {
+    const directives = content.split(/\r?\n/).map((line) => line.replace(/#.*$/, '').trim()).filter(Boolean);
+    if (directives.join('\n') !== `User-agent: *\nAllow: /\nSitemap: ${DEPLOYMENT_ORIGIN}sitemap.xml`) {
+      failure(contract, metadata, 'robots rules must allow crawling and reference the canonical sitemap without additional policies');
+    }
+    return;
+  }
+  if (contract.semantic === 'not-found-document') {
+    openingHtml(content, contract, metadata);
+    if (!/<meta\s+name="robots"\s+content="noindex,follow">/i.test(content)) failure(contract, metadata, 'must be noindex,follow');
+    if (/<link\b[^>]*\brel=["'](?:canonical|alternate)["']/i.test(content)) {
+      failure(contract, metadata, 'error page must not join public canonical or hreflang URLs');
+    }
+    const links = [...content.matchAll(/<a\b[^>]*>/gi)].map((match) => attributes(match[0]));
+    for (const { lang, urlPath } of publicDocumentContracts()) {
+      if (!links.some((link) => link.get('href') === `/${urlPath}` && link.get('hreflang') === lang)) {
+        failure(contract, metadata, `${lang} home link is missing`);
+      }
+    }
+    return;
   }
   if (contract.semantic === 'public-document') {
     const htmlAttributes = openingHtml(content, contract, metadata);
@@ -152,9 +178,9 @@ function validateOptions({ packageVersion }) {
   if (!/^\d+\.\d+\.\d+$/.test(packageVersion || '')) fail('invalid package version');
 }
 
-async function validateWithReader(options, readArtifact) {
+async function validateWithReader(options, readArtifact, contracts = DEPLOYMENT_PATH_CONTRACTS) {
   validateOptions(options);
-  for (const contract of DEPLOYMENT_PATH_CONTRACTS) {
+  for (const contract of contracts) {
     const { content, metadata } = await readArtifact(contract);
     assertSemanticContract(contract, content, metadata, options);
   }
@@ -198,6 +224,15 @@ export async function validatePublishedDeployment({
     fail('published deployment request timeout must be between 1 and 30000 milliseconds');
   }
   if (typeof timeoutSignal !== 'function') fail('published deployment timeout signal must be a function');
+  // Only a published response can prove Pages routing and status behavior.
+  const errorDocument = DEPLOYMENT_PATH_CONTRACTS.find((contract) => contract.semantic === 'not-found-document');
+  const editorDocument = DEPLOYMENT_PATH_CONTRACTS.find((contract) => contract.semantic === 'editor-document');
+  const contracts = [
+    ...DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract !== errorDocument),
+    ...['ja', 'zh-CN', 'en'].map((locale) => ({ ...editorDocument, urlPath: `editor/?lang=${locale}` })),
+    ...[`__not-found-${randomUUID()}`, `missing-${randomUUID()}/nested/page`, 'llms.txt', '.well-known/ai-plugin.json',
+      'schema/__not-found.schema.json', 'assets/__not-found.js'].map((urlPath) => ({ ...errorDocument, status: 404, urlPath }))
+  ];
   return validateWithReader(options, async (contract) => {
     let metadata = { contentType: 'unknown', status: 'unavailable' };
     let lastFailure = 'response did not satisfy the required marker and content type';
@@ -217,8 +252,8 @@ export async function validatePublishedDeployment({
             contentType: response.headers.get('content-type') || 'unknown',
             status: String(response.status)
           };
-          if (!response.ok) {
-            lastFailure = 'HTTP response was not successful';
+          if (response.status !== (contract.status || 200)) {
+            lastFailure = `HTTP response must be ${contract.status || 200}`;
           } else if (!hasExpectedContentType(contract.kind, metadata.contentType)) {
             lastFailure = `unexpected content type for ${contract.kind}`;
           } else {
@@ -234,7 +269,7 @@ export async function validatePublishedDeployment({
       if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 3000));
     }
     failure(contract, metadata, lastFailure);
-  });
+  }, contracts);
 }
 
 function parseArguments(args) {
