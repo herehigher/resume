@@ -8,6 +8,13 @@ import {
   DEPLOYMENT_PATH_CONTRACTS,
   publicDocumentContracts
 } from './deployment-path-contract.mjs';
+// Rollback/reconciliation use trusted current tooling against these accepted historical versions.
+const legacyRoutingVersions = new Set(['0.4.1', '0.4.2', '0.4.3']);
+const legacyRoutingPaths = new Set([
+  'index.html', 'ja/index.html', 'zh-cn/index.html', 'en/index.html', 'editor/index.html', 'sitemap.xml',
+  'schema/resume-studio-web-v4.schema.json', 'schema/resume-studio-web-v4.example.json', 'assets/js/config.js'
+]);
+
 const publicHreflangAlternates = Object.freeze([
   Object.freeze({ hreflang: 'ja', href: DEPLOYMENT_ORIGIN }),
   Object.freeze({ hreflang: 'zh-CN', href: `${DEPLOYMENT_ORIGIN}zh-cn/` }),
@@ -227,12 +234,14 @@ export async function validatePublishedDeployment({
   // Only a published response can prove Pages routing and status behavior.
   const errorDocument = DEPLOYMENT_PATH_CONTRACTS.find((contract) => contract.semantic === 'not-found-document');
   const editorDocument = DEPLOYMENT_PATH_CONTRACTS.find((contract) => contract.semantic === 'editor-document');
-  const contracts = [
-    ...DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract !== errorDocument),
-    ...['ja', 'zh-CN', 'en'].map((locale) => ({ ...editorDocument, urlPath: `editor/?lang=${locale}` })),
-    ...[`__not-found-${randomUUID()}`, `missing-${randomUUID()}/nested/page`, 'llms.txt', '.well-known/ai-plugin.json',
-      'schema/__not-found.schema.json', 'assets/__not-found.js'].map((urlPath) => ({ ...errorDocument, status: 404, urlPath }))
-  ];
+  const contracts = legacyRoutingVersions.has(options.packageVersion)
+    ? DEPLOYMENT_PATH_CONTRACTS.filter((contract) => legacyRoutingPaths.has(contract.artifactPath))
+    : [
+      ...DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract !== errorDocument),
+      ...['ja', 'zh-CN', 'en'].map((locale) => ({ ...editorDocument, urlPath: `editor/?lang=${locale}` })),
+      ...[`__not-found-${randomUUID()}`, `missing-${randomUUID()}/nested/page`, 'llms.txt', '.well-known/ai-plugin.json',
+        'schema/__not-found.schema.json', 'assets/__not-found.js'].map((urlPath) => ({ ...errorDocument, status: 404, urlPath }))
+    ];
   return validateWithReader(options, async (contract) => {
     let metadata = { contentType: 'unknown', status: 'unavailable' };
     let lastFailure = 'response did not satisfy the required marker and content type';

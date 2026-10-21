@@ -168,4 +168,6 @@ Documentation asset manifest の current schema は v4 です。Producer kind、
 
 公開環境では既存の release workflow が `--base-url HTTPS_ORIGIN_ROOT --release-sha SOURCE_SHA --package-version VERSION` で同じ CLI を実行します。公開入口・互換入口・三言語 editor・sitemap・robots・Schema・example・version asset の HTTP 200、Content-Type、本文を検査し、ランダムな未存在 path、nested path、未実装の `llms.txt` / `.well-known/ai-plugin.json`、存在しない Schema / asset は HTTP 404 と三言語の案内を要求します。発見用 path を実装する際は、その成功契約へ移します。
 
+現在の trusted tooling から過去版へ rollback / reconciliation する際、受入済み `0.4.1`・`0.4.2`・`0.4.3` の online smoke は当時の配信契約を維持し、未提供の robots / 404 / stylesheet 契約を要求しません。それ以外の version と、準備中の source / artifact には新しい契約を適用します。任意の skip option はありません。
+
 通常の local static server は 404 ページの表示確認にだけ使い、Cloudflare Pages preview の確認済みとは扱いません。Preview、正式公開後の custom domain と Pages.dev、Agent Readiness の再診断は実行した環境・source SHA・結果を記録し、未実施なら未確認と明記します。Preview と本番公開の実行権限は[リリース手順](release-playbook.md)に従います。
