@@ -8,6 +8,7 @@ import {
   DEPLOYMENT_PATH_CONTRACTS,
   publicDocumentContracts
 } from './deployment-path-contract.mjs';
+import { assertPagesContentHeaders, assertRobotsPolicy, hasApprovedContentSignal } from './content-policy-contract.mjs';
 // Rollback/reconciliation use trusted current tooling against these accepted historical versions.
 const legacyRoutingVersions = new Set(['0.4.1', '0.4.2', '0.4.3']);
 const legacyRoutingPaths = new Set([
@@ -78,7 +79,8 @@ function hasExpectedContentType(kind, contentType) {
     javascript: ['text/javascript', 'application/javascript'],
     json: ['application/json'],
     text: ['text/plain'],
-    css: ['text/css']
+    css: ['text/css'],
+    markdown: ['text/markdown']
   }[kind];
   if (!expectedEssences) return false;
 
@@ -92,14 +94,28 @@ function hasExpectedContentType(kind, contentType) {
 }
 
 function assertSemanticContract(contract, content, metadata, options) {
+  if (metadata.contentSignal !== undefined) {
+    if (!hasApprovedContentSignal(metadata.contentSignal)) failure(contract, metadata, 'Content-Signal must match the approved policy');
+    if (contract.semantic === 'editor-document' && metadata.robotsTag !== 'noindex,follow') {
+      failure(contract, metadata, 'editor X-Robots-Tag must be noindex,follow');
+    }
+  }
+  if (contract.markdown && hasExpectedContentType('markdown', metadata.contentType)) {
+    if (!metadata.vary.split(',').some((value) => value.trim().toLowerCase() === 'accept')) {
+      failure(contract, metadata, 'converted Markdown must vary on Accept');
+    }
+    if (!content.trim() || /<html\b/i.test(content)) failure(contract, metadata, 'converted Markdown body is invalid');
+    return;
+  }
   if (!content.includes(contract.marker)) failure(contract, metadata, 'required marker was not found');
   if (!hasExpectedContentType(contract.kind, metadata.contentType)) {
     failure(contract, metadata, `unexpected content type for ${contract.kind}`);
   }
   if (contract.semantic === 'robots') {
-    const directives = content.split(/\r?\n/).map((line) => line.replace(/#.*$/, '').trim()).filter(Boolean);
-    if (directives.join('\n') !== `User-agent: *\nAllow: /\nSitemap: ${DEPLOYMENT_ORIGIN}sitemap.xml`) {
-      failure(contract, metadata, 'robots rules must allow crawling and reference the canonical sitemap without additional policies');
+    try {
+      assertRobotsPolicy(content);
+    } catch (error) {
+      failure(contract, metadata, error.message);
     }
     return;
   }
@@ -197,6 +213,7 @@ async function validateWithReader(options, readArtifact, contracts = DEPLOYMENT_
 }
 
 export async function validatePreparedDeployment({ directory, ...options }) {
+  assertPagesContentHeaders(await readFile(path.join(directory, '_headers'), 'utf8'));
   return validateWithReader(options, async (contract) => {
     try {
       return {
@@ -234,11 +251,14 @@ export async function validatePublishedDeployment({
   // Only a published response can prove Pages routing and status behavior.
   const errorDocument = DEPLOYMENT_PATH_CONTRACTS.find((contract) => contract.semantic === 'not-found-document');
   const editorDocument = DEPLOYMENT_PATH_CONTRACTS.find((contract) => contract.semantic === 'editor-document');
-  const contracts = legacyRoutingVersions.has(options.packageVersion)
+  const historical = legacyRoutingVersions.has(options.packageVersion);
+  const contracts = historical
     ? DEPLOYMENT_PATH_CONTRACTS.filter((contract) => legacyRoutingPaths.has(contract.artifactPath))
     : [
       ...DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract !== errorDocument),
       ...['ja', 'zh-CN', 'en'].map((locale) => ({ ...editorDocument, urlPath: `editor/?lang=${locale}` })),
+      ...DEPLOYMENT_PATH_CONTRACTS.filter((contract) => contract.kind === 'html' && contract !== errorDocument)
+        .map((contract) => ({ ...contract, markdown: true })),
       ...[`__not-found-${randomUUID()}`, `missing-${randomUUID()}/nested/page`, 'llms.txt', '.well-known/ai-plugin.json',
         'schema/__not-found.schema.json', 'assets/__not-found.js'].map((urlPath) => ({ ...errorDocument, status: 404, urlPath }))
     ];
@@ -252,22 +272,31 @@ export async function validatePublishedDeployment({
         if (releaseSha) url.searchParams.set('release', releaseSha);
         url.searchParams.set('attempt', String(attempt));
         signal = timeoutSignal(requestTimeoutMs);
-        const response = await fetchImpl(url, { redirect: 'error', signal });
+        const response = await fetchImpl(url, { redirect: 'error', signal,
+          headers: { Accept: contract.markdown ? 'text/markdown' : '*/*' } });
         if (response.redirected || (response.url && new URL(response.url).href !== url.href)) {
           metadata = { contentType: response.headers.get('content-type') || 'unknown', status: 'redirected' };
           lastFailure = 'response was redirected';
         } else {
           metadata = {
             contentType: response.headers.get('content-type') || 'unknown',
-            status: String(response.status)
+            status: String(response.status),
+            ...(!historical ? {
+              contentSignal: response.headers.get('content-signal') || '',
+              robotsTag: response.headers.get('x-robots-tag') || '',
+              vary: response.headers.get('vary') || ''
+            } : {})
           };
           if (response.status !== (contract.status || 200)) {
             lastFailure = `HTTP response must be ${contract.status || 200}`;
-          } else if (!hasExpectedContentType(contract.kind, metadata.contentType)) {
+          } else if (!hasExpectedContentType(contract.kind, metadata.contentType)
+            && !(contract.markdown && hasExpectedContentType('markdown', metadata.contentType))) {
             lastFailure = `unexpected content type for ${contract.kind}`;
           } else {
             const content = await response.text();
-            if (content.includes(contract.marker)) return { content, metadata };
+            if (content.includes(contract.marker) || (contract.markdown && hasExpectedContentType('markdown', metadata.contentType))) {
+              return { content, metadata };
+            }
             lastFailure = 'required marker was not found';
           }
         }

@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { CONTENT_SIGNAL } from '../scripts/content-policy-contract.mjs';
 import { DEPLOYMENT_PATH_CONTRACTS } from '../scripts/deployment-path-contract.mjs';
 import { prepareArtifact } from '../scripts/prepare-site-artifact.mjs';
 import { validatePreparedDeployment, validatePublishedDeployment } from '../scripts/validate-deployment-smoke.mjs';
@@ -48,13 +49,14 @@ function publishedFixture(directory, { mutateHtml = (html) => html, version = ro
     const request = new URL(url);
     const contract = contractAtPath(request.pathname);
     if (!contract) return new Response(readFileSync(path.join(directory, '404.html'), 'utf8'), {
-      headers: { 'content-type': 'text/html; charset=utf-8' }, status: 404
+      headers: { 'content-type': 'text/html; charset=utf-8', 'content-signal': CONTENT_SIGNAL }, status: 404
     });
     let content = readFileSync(path.join(directory, contract.artifactPath), 'utf8');
     if (contract.semantic === 'version-config') content = content.replace(`APP_VERSION = '${packageVersion}'`, `APP_VERSION = '${version}'`);
     if (contract.kind === 'html') content = mutateHtml(content);
     return new Response(content, {
-      headers: { 'content-type': contentTypeFor(contract.kind) },
+      headers: { 'content-type': contentTypeFor(contract.kind), 'content-signal': CONTENT_SIGNAL,
+        ...(contract.semantic === 'editor-document' ? { 'x-robots-tag': 'noindex,follow' } : {}) },
       status: 200
     });
   };
@@ -95,7 +97,8 @@ test('prepared deployment smoke detects locale, URL, indexability, sitemap, Sche
     ), /must not join the public hreflang cluster/],
     ['robots blocks editor', 'robots.txt', (content) => content.replace('Allow: /', 'Disallow: /editor/'), /robots rules must allow crawling/],
     ['robots sitemap', 'robots.txt', (content) => content.replace('https://rs.herehigher.com/', 'https://example.invalid/'), /robots rules must allow crawling/],
-    ['implicit AI policy', 'robots.txt', (content) => `${content}Content-Signal: ai-train=no\n`, /robots rules must allow crawling/],
+    ['conflicting AI policy', 'robots.txt', (content) => content.replace('ai-train=yes', 'ai-train=no'), /robots rules must allow crawling/],
+    ['duplicate AI policy', 'robots.txt', (content) => `${content}Content-Signal: ai-train=yes\n`, /robots rules must allow crawling/],
     ['error page home link', '404.html', (content) => content.replace('href="/en/"', 'href="../en/"'), /en home link is missing/],
     ['error page homepage fallback', '404.html', () => readFileSync(path.join(source, 'index.html'), 'utf8'), /required marker was not found/],
     ['editor indexability', 'editor/index.html', (content) => content.replace('noindex,follow', 'index,follow'), /must be noindex,follow/],
@@ -147,7 +150,7 @@ test('prepared and published deployment use the same semantic contract on custom
       const url = new URL(contract.urlPath, baseUrl);
       return `${url.origin}${url.pathname}`;
     }));
-    const missingRequests = requests.slice(successContracts.length + 3);
+    const missingRequests = requests.slice(successContracts.length + 3 + 5);
     assert.equal(missingRequests.length, 6);
     assert.match(missingRequests[0], /\/__not-found-[a-f0-9-]+$/);
     assert.match(missingRequests[1], /\/missing-[a-f0-9-]+\/nested\/page$/);
@@ -182,7 +185,8 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
       const content = readFileSync(path.join(source, contract.artifactPath), 'utf8')
         .replace(`APP_VERSION = '${packageVersion}'`, `APP_VERSION = '${routingVersion}'`);
       return new Response(content, {
-        headers: { 'content-type': contract.artifactPath === artifactPath ? contentType : contentTypeFor(contract.kind) },
+        headers: { 'content-type': contract.artifactPath === artifactPath ? contentType : contentTypeFor(contract.kind),
+          'content-signal': CONTENT_SIGNAL, ...(contract.semantic === 'editor-document' ? { 'x-robots-tag': 'noindex,follow' } : {}) },
         status: 200
       });
     };
@@ -200,7 +204,7 @@ test('published smoke fails closed on HTTP errors, content type, marker, and met
     attempts: 1,
     baseUrl,
     fetchImpl: async () => new Response(validHtml.replace('lang="ja"', 'lang="en"'), {
-      headers: { 'content-type': 'text/html' }
+      headers: { 'content-type': 'text/html', 'content-signal': CONTENT_SIGNAL }
     }),
     packageVersion: routingVersion
   }), /language is invalid/);
@@ -277,7 +281,7 @@ test('published smoke rejects soft 404s, wrong error bodies/types, and non-200 s
           : target === 'nested' ? pathname.startsWith('missing-') : pathname === target;
         if (!matches) return fixture(url);
         reachedTarget = true;
-        return new Response(content, { status, headers: { 'content-type': contentType } });
+        return new Response(content, { status, headers: { 'content-type': contentType, 'content-signal': CONTENT_SIGNAL } });
       };
       await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl, fetchImpl, packageVersion: routingVersion }), expected, `${target}: ${name}`);
       assert.equal(reachedTarget, true);
@@ -307,7 +311,7 @@ test('trusted rollback and reconciliation keep the original contract for accepte
   for (const version of ['0.4.1', '0.4.2', '0.4.3']) {
     const directory = path.join(temporaryDirectory(t), 'historical');
     cpSync(source, directory, { recursive: true });
-    for (const artifactPath of ['robots.txt', '404.html', 'assets/css/not-found.css']) {
+    for (const artifactPath of ['_headers', 'robots.txt', '404.html', 'assets/css/not-found.css']) {
       rmSync(path.join(directory, artifactPath));
     }
     const requests = [];
@@ -316,7 +320,10 @@ test('trusted rollback and reconciliation keep the original contract for accepte
         const pathname = new URL(url).pathname;
         requests.push(pathname);
         assert.ok(contractAtPath(pathname), 'historical smoke must not probe unsupported missing routes');
-        return publishedFixture(directory, { version })(url);
+        const response = await publishedFixture(directory, { version })(url);
+        response.headers.delete('content-signal');
+        response.headers.delete('x-robots-tag');
+        return response;
       }
     });
     assert.equal(requests.length, 9);
@@ -338,6 +345,71 @@ test('future releases cannot inherit the historical routing exemption', async ()
       await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl: 'https://future.pages.dev/',
         fetchImpl, packageVersion: version
       }), /HTTP response must be 200|unexpected content type for html/);
+    }
+  }
+});
+
+
+test('prepared policy rejects missing or conflicting headers even for historical package versions', async (t) => {
+  for (const defect of ['missing', 'conflicting', 'scope', 'editor', 'unindented-header', 'indented-path']) {
+    const directory = path.join(temporaryDirectory(t), 'candidate');
+    cpSync(source, directory, { recursive: true });
+    const target = path.join(directory, '_headers');
+    if (defect === 'missing') rmSync(target);
+    else {
+      const mutations = {
+        conflicting: ['ai-input=yes', 'ai-input=no'],
+        scope: ['/*', '/en/*'],
+        editor: ['noindex,follow', 'index,follow'],
+        'unindented-header': ['  Content-Signal:', 'Content-Signal:'],
+        'indented-path': ['\n/editor/*', '\n  /editor/*']
+      };
+      writeFileSync(target, readFileSync(target, 'utf8').replace(...mutations[defect]));
+    }
+    await assert.rejects(validatePreparedDeployment({ directory, packageVersion }), /Pages headers|ENOENT/);
+    await assert.rejects(prepareArtifact({ sourceDirectory: directory,
+      outputDirectory: path.join(temporaryDirectory(t), 'artifact') }), /Pages headers|ENOENT/);
+  }
+});
+
+test('published policy fails closed on missing, conflicting, or duplicate content signals', async () => {
+  for (const signal of ['', 'search=yes, ai-input=yes, ai-train=no', `${CONTENT_SIGNAL}, ai-train=yes`]) {
+    for (const target of ['/', '/en/', '/editor/', 'missing']) {
+      await assert.rejects(validatePublishedDeployment({ attempts: 1, baseUrl: 'https://candidate.pages.dev/',
+        packageVersion: routingVersion, fetchImpl: async (url) => {
+          const response = await publishedFixture(source)(url);
+          const pathname = new URL(url).pathname;
+          if (pathname === target || (target === 'missing' && pathname.startsWith('/__not-found-'))) {
+            response.headers.set('content-signal', signal);
+          }
+          return response;
+        }
+      }), /Content-Signal must match/);
+    }
+  }
+});
+
+test('Markdown negotiation accepts disabled conversion and preserves explicit policy on converted responses', async () => {
+  for (const defect of ['', 'signal', 'vary', 'empty', 'editor']) {
+    const requests = [];
+    const promise = validatePublishedDeployment({ attempts: 1, baseUrl: 'https://candidate.pages.dev/',
+      packageVersion: routingVersion, fetchImpl: async (url, options) => {
+        const response = await publishedFixture(source)(url);
+        if (options.headers.Accept !== 'text/markdown') return response;
+        requests.push(new URL(url).pathname);
+        const headers = new Headers(response.headers);
+        headers.set('content-type', 'text/markdown; charset=utf-8');
+        headers.set('vary', defect === 'vary' ? 'Accept-Encoding' : 'Accept-Encoding, Accept');
+        // Different header ordering and case preserve the same three approved purposes.
+        headers.set('content-signal', defect === 'signal' ? 'ai-train=no' : 'AI-TRAIN=yes, search=yes, ai-input=yes');
+        if (defect === 'editor') headers.delete('x-robots-tag');
+        return new Response(defect === 'empty' ? '' : '# Resume Studio\nPublic application documentation.', { headers });
+      }
+    });
+    if (defect) await assert.rejects(promise, /Content-Signal|vary on Accept|Markdown body|X-Robots-Tag/);
+    else {
+      await promise;
+      assert.deepEqual(requests, ['/', '/ja/', '/zh-cn/', '/en/', '/editor/']);
     }
   }
 });

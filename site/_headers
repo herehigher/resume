@@ -1,0 +1,6 @@
+# Explicit use preferences remain compatible with existing MIT permissions.
+/*
+  Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+/editor/*
+  X-Robots-Tag: noindex,follow

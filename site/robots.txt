@@ -1,4 +1,6 @@
+# Content-use preferences for published pages; existing MIT permissions remain unchanged.
 User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
 Allow: /
 
 Sitemap: https://rs.herehigher.com/sitemap.xml
