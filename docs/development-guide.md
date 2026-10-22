@@ -152,6 +152,8 @@ node scripts/render-open-graph-cards.mjs --locale zh-CN --output-dir /tmp/resume
 
 ## 変更に応じた検証
 
+CSS と ES Modules の参照は `?v=APP_VERSION` を固定値として付けます。`set-release-version.mjs` が HTML の runtime 入口と module import をまとめて更新し、`npm run check` が package version との一致を確認します。`site/` はそのまま static server で動き、build は不要です。Pages の CSS / JavaScript 応答は再検証を要求し、版ごとの URL は古いキャッシュ方針で保存済みの browser entry も回避します。Runtime の変更では、全新規 context だけでなく旧 runtime を cache した同一 browser context の通常再読込と暗号化草稿の保持を `tests/e2e/runtime-cache-upgrade.spec.js` で確認します。
+
 変更に近い focused test から始め、PR の必要な CI が成功してから merge します。成功済みの同じ内容に local / CI の full gate を反復要求せず、変更・失敗・証拠不足がある場合に追加確認します。
 
 | 変更 | 必要な確認 |

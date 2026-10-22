@@ -1,4 +1,4 @@
-import { MAX_PROFILE_LINKS, profileLinkIcon, profileLinkMeta } from '../utils/profile-links.js';
+import { MAX_PROFILE_LINKS, profileLinkIcon, profileLinkMeta } from '../utils/profile-links.js?v=0.4.6';
 
 export function renderProfileLinksEditor(container, links, {
   placeholder = 'https://example.com',

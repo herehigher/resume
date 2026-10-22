@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { setReleaseVersion } from '../scripts/set-release-version.mjs';
+import { assertRuntimeAssetVersions } from '../scripts/runtime-asset-contract.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
@@ -18,6 +19,8 @@ function fixture(t) {
   writeFileSync(path.join(directory, 'package.json'), JSON.stringify(metadata));
   writeFileSync(path.join(directory, 'package-lock.json'), JSON.stringify({ ...metadata, packages: { '': metadata } }));
   writeFileSync(path.join(directory, 'site/assets/js/config.js'), "export const APP_VERSION = '7.4.1';\n");
+  writeFileSync(path.join(directory, 'site/index.html'), '<link rel="stylesheet" href="./assets/css/base.css?v=7.4.1"><script type="module" src="./assets/js/main.js"></script>');
+  writeFileSync(path.join(directory, 'site/assets/js/main.js'), "import { APP_VERSION } from './config.js?v=7.4.1';\n");
   writeFileSync(path.join(directory, 'CHANGELOG.md'), '# Changelog\n\n## [Unreleased]\n\n- Fictional change.\n');
   return directory;
 }
@@ -29,6 +32,9 @@ test('one version operation synchronizes package, lock, application, and changel
   assert.equal(JSON.parse(readFileSync(path.join(directory, 'package-lock.json'))).version, '7.4.2');
   assert.match(readFileSync(path.join(directory, 'site/assets/js/config.js'), 'utf8'), /APP_VERSION = '7\.4\.2'/);
   assert.match(readFileSync(path.join(directory, 'CHANGELOG.md'), 'utf8'), /## \[7\.4\.2\] - 2001-02-03/);
+  assert.match(readFileSync(path.join(directory, 'site/index.html'), 'utf8'), /base\.css\?v=7\.4\.2/);
+  assert.match(readFileSync(path.join(directory, 'site/index.html'), 'utf8'), /main\.js\?v=7\.4\.2/);
+  assert.match(readFileSync(path.join(directory, 'site/assets/js/main.js'), 'utf8'), /config\.js\?v=7\.4\.2/);
   await assert.rejects(setReleaseVersion({ date: '2001-02-03', rootDirectory: directory, version: '7.4.2' }), /already contains/);
 });
 
@@ -38,6 +44,16 @@ test('version operation rejects prereleases and malformed dates', async (t) => {
   await assert.rejects(setReleaseVersion({ date: '2001-02-03', rootDirectory: directory, version: '7.4.2-rc.1' }), /SemVer/);
   await assert.rejects(setReleaseVersion({ date: '2001-02-30', rootDirectory: directory, version: '7.4.2' }), /real/);
   await assert.rejects(setReleaseVersion({ date: '2001-02-03', rootDirectory: 'relative', version: '7.4.2' }), /absolute/);
+});
+
+test('runtime gate rejects stale nested module references and unexpected query values', async (t) => {
+  const directory = fixture(t);
+  await setReleaseVersion({ date: '2001-02-03', rootDirectory: directory, version: '7.4.2' });
+  await assertRuntimeAssetVersions(path.join(directory, 'site'), '7.4.2');
+  for (const query of ['?v=7.4.1', '?name=fictional', '']) {
+    writeFileSync(path.join(directory, 'site/assets/js/main.js'), `import { APP_VERSION } from './config.js${query}';\n`);
+    await assert.rejects(assertRuntimeAssetVersions(path.join(directory, 'site'), '7.4.2'), /Runtime asset version/);
+  }
 });
 
 test('the actual version CLI updates a separate checkout and rejects duplicate release entries', (t) => {

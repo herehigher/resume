@@ -6,6 +6,12 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-10-22
+
+### Fixed / 修正
+
+- CSS と ES Modules の参照を公開版ごとの URL に統一し、旧ブラウザーキャッシュと新 HTML の混在による PDF ボタン・ヘッダー・プレビューツールバーの表示崩れを修正。更新時に草稿の削除や強制再読込を必要としないようにする。
+
 ## [0.4.5] - 2026-10-22
 
 ### Fixed / 修正

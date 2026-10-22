@@ -1,14 +1,14 @@
-import { createEditorLists } from './editor-lists.js';
-import { addJapaneseDocumentEnding } from './japanese-document-ending.js';
-import { createJapaneseCareer, createJapaneseSampleState, cloneData } from '../state/defaults.js';
-import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js';
-import { addProfileLink, removeProfileLink } from '../utils/profile-links.js';
-import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js';
-import { draftStatusMessageForError } from './draft-storage-error.js';
-import { confirmAction, confirmSampleAdoption } from './confirmation-dialog.js';
-import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js';
-import { announceStatus } from './status-controller.js';
-import { createProfilePhotoDataUrl } from '../utils/profile-photo.js';
+import { createEditorLists } from './editor-lists.js?v=0.4.6';
+import { addJapaneseDocumentEnding } from './japanese-document-ending.js?v=0.4.6';
+import { createJapaneseCareer, createJapaneseSampleState, cloneData } from '../state/defaults.js?v=0.4.6';
+import { getJapaneseFields, renderJapaneseDocument } from '../templates/ja.js?v=0.4.6';
+import { addProfileLink, removeProfileLink } from '../utils/profile-links.js?v=0.4.6';
+import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js?v=0.4.6';
+import { draftStatusMessageForError } from './draft-storage-error.js?v=0.4.6';
+import { confirmAction, confirmSampleAdoption } from './confirmation-dialog.js?v=0.4.6';
+import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js?v=0.4.6';
+import { announceStatus } from './status-controller.js?v=0.4.6';
+import { createProfilePhotoDataUrl } from '../utils/profile-photo.js?v=0.4.6';
 
 const PROFILE_FIELD_NAMES = new Set([
   'fullName',

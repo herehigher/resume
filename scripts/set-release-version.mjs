@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runtimeAssetUpdates } from './runtime-asset-contract.mjs';
 
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,7 +41,9 @@ export async function setReleaseVersion({ date, rootDirectory, version }) {
     fail('lock root package metadata does not match package.json');
   }
   lockJson.packages[''].version = version;
-  const nextConfig = replaceOnce(configText, /APP_VERSION = '[^']+'/, `APP_VERSION = '${version}'`, 'APP_VERSION');
+  const runtimeUpdates = await runtimeAssetUpdates(path.join(rootDirectory, 'site'), version);
+  const runtimeConfig = runtimeUpdates.find(({ file }) => file === configPath)?.contents || configText;
+  const nextConfig = replaceOnce(runtimeConfig, /APP_VERSION = '[^']+'/, `APP_VERSION = '${version}'`, 'APP_VERSION');
   const unreleased = '## [Unreleased]\n';
   if (!changelogText.includes(unreleased)) fail('CHANGELOG must contain an Unreleased section');
   if (new RegExp(`^## \\[${version.replaceAll('.', '\\.')}\\] - `, 'm').test(changelogText)) {
@@ -51,7 +54,8 @@ export async function setReleaseVersion({ date, rootDirectory, version }) {
     writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`),
     writeFile(lockPath, `${JSON.stringify(lockJson, null, 2)}\n`),
     writeFile(configPath, nextConfig),
-    writeFile(changelogPath, nextChangelog)
+    writeFile(changelogPath, nextChangelog),
+    ...runtimeUpdates.filter(({ file }) => file !== configPath).map(({ file, contents }) => writeFile(file, contents))
   ]);
 }
 

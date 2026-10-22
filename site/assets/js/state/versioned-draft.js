@@ -1,5 +1,5 @@
-import { COMPATIBLE_DRAFT_STORAGE_KEYS, STORAGE_KEY } from '../config.js';
-import { createDraftStorage } from './storage.js';
+import { COMPATIBLE_DRAFT_STORAGE_KEYS, STORAGE_KEY } from '../config.js?v=0.4.6';
+import { createDraftStorage } from './storage.js?v=0.4.6';
 
 function createPersistenceForKey(storage, storageKey) {
   return createDraftStorage(storage, {

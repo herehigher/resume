@@ -1,6 +1,6 @@
-import { DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
-import { createEmptyPageBreaks } from '../page-breaks.js';
-import { createRecordId } from './record-ids.js';
+import { DEFAULT_LOCALE, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js?v=0.4.6';
+import { createEmptyPageBreaks } from '../page-breaks.js?v=0.4.6';
+import { createRecordId } from './record-ids.js?v=0.4.6';
 
 function today() {
   const now = new Date();

@@ -1,7 +1,7 @@
-import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js';
-import { createDefaultState } from './defaults.js';
-import { validatePageBreaks } from '../page-breaks.js';
-import { hasUniqueRecordIds, isRecordId } from './record-ids.js';
+import { PAGE_SIZES, STATE_VERSION, SUPPORTED_LOCALES } from '../config.js?v=0.4.6';
+import { createDefaultState } from './defaults.js?v=0.4.6';
+import { validatePageBreaks } from '../page-breaks.js?v=0.4.6';
+import { hasUniqueRecordIds, isRecordId } from './record-ids.js?v=0.4.6';
 
 const OPTIONAL_CURRENT_STATE_PATHS = new Set([
   'state.documents.ja.fields.residenceStatus',
