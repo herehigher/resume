@@ -1,6 +1,6 @@
-import { escapeHTML, isClickableUrl } from '../utils/html.js';
-import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js';
-import { genderLabel } from '../utils/personal-details.js';
+import { escapeHTML, isClickableUrl } from '../utils/html.js?v=0.4.6';
+import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js?v=0.4.6';
+import { genderLabel } from '../utils/personal-details.js?v=0.4.6';
 
 const MONTH_NAMES = Object.freeze([
   'January',

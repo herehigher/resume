@@ -1,10 +1,10 @@
-import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from './date.js';
-import { exportLimitedMarkdown } from './limited-markdown.js';
-import { markdownLink, markdownParagraph, markdownText } from './markdown-text.js';
-import { genderLabel } from './personal-details.js';
-import { getProfileLinks } from './profile-links.js';
-import { formatEnglishDateRange, formatEnglishMonth } from '../templates/en.js';
-import { formatChineseDate, formatChineseMonth, formatChineseRange } from '../templates/zh-CN.js';
+import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from './date.js?v=0.4.6';
+import { exportLimitedMarkdown } from './limited-markdown.js?v=0.4.6';
+import { markdownLink, markdownParagraph, markdownText } from './markdown-text.js?v=0.4.6';
+import { genderLabel } from './personal-details.js?v=0.4.6';
+import { getProfileLinks } from './profile-links.js?v=0.4.6';
+import { formatEnglishDateRange, formatEnglishMonth } from '../templates/en.js?v=0.4.6';
+import { formatChineseDate, formatChineseMonth, formatChineseRange } from '../templates/zh-CN.js?v=0.4.6';
 
 const has = (value) => Boolean(String(value ?? '').trim());
 const join = (parts) => parts.filter(has).join('\n\n');

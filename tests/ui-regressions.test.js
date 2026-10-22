@@ -6,8 +6,10 @@ import en from '../site/assets/js/i18n/en.js';
 import ja from '../site/assets/js/i18n/ja.js';
 import zhCN from '../site/assets/js/i18n/zh-CN.js';
 import { APP_VERSION, REPOSITORY_URL, STATE_VERSION } from '../site/assets/js/config.js';
-import { DraftStorageError, getDraftStorageCapabilityError } from '../site/assets/js/state/storage.js';
 import { messageForDraftStorageError } from '../site/assets/js/ui/draft-storage-error.js';
+
+// Keep class identity aligned with the versioned imports used in the browser.
+const { DraftStorageError, getDraftStorageCapabilityError } = await import(`../site/assets/js/state/storage.js?v=${APP_VERSION}`);
 
 const packageJson = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')

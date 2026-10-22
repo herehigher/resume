@@ -48,6 +48,17 @@ export async function checkOnlineEditor(baseUrl) {
       assert.equal(result.status(), 200, `${locale}: editor response`);
       await expect(page.locator('#localeSelect')).toHaveValue(locale);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      if (await page.locator('#exportMenuSummary').count()) {
+        await expect(page.locator('.print-short-label')).toBeHidden();
+        await expect(page.locator('#exportMenuSummary svg')).toHaveCSS('width', '12px');
+        await expect(page.locator('#exportMenuSummary svg')).toHaveCSS('height', '12px');
+        const header = await page.locator('.app-header').boundingBox();
+        const actions = await page.locator('.header-actions').boundingBox();
+        const toolbar = await page.locator('.workspace:not([hidden]) .preview-toolbar').boundingBox();
+        assert.ok(actions.y >= header.y && actions.y + actions.height <= header.y + header.height,
+          `${locale}: header actions must remain inside the header`);
+        assert.ok(toolbar.y >= header.y + header.height, `${locale}: preview toolbar must stay below the header`);
+      }
       await page.locator('#importDataInput').setInputFiles({
         name: 'fictional-online-check.json', mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(example))

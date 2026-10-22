@@ -1,7 +1,7 @@
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../config.js';
-import en from './en.js';
-import ja from './ja.js';
-import zhCN from './zh-CN.js';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../config.js?v=0.4.6';
+import en from './en.js?v=0.4.6';
+import ja from './ja.js?v=0.4.6';
+import zhCN from './zh-CN.js?v=0.4.6';
 
 export const messages = Object.freeze({ ja, 'zh-CN': zhCN, en });
 

@@ -1,7 +1,7 @@
-import { createDefaultState, cloneData } from './defaults.js';
-import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js';
-import { assertValidState } from './schema.js';
-import { applyListReorder } from './list-order.js';
+import { createDefaultState, cloneData } from './defaults.js?v=0.4.6';
+import { createDraftStorage, parseImportedState, prepareImportedState, serializeState } from './storage.js?v=0.4.6';
+import { assertValidState } from './schema.js?v=0.4.6';
+import { applyListReorder } from './list-order.js?v=0.4.6';
 
 export function createStore({ storage, initialState, persistence = createDraftStorage(storage), hasStoredState = false }) {
   let state = cloneData(assertValidState(initialState));

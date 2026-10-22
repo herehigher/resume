@@ -1,5 +1,5 @@
-import { cloneData } from './defaults.js';
-import { createRecordId } from './record-ids.js';
+import { cloneData } from './defaults.js?v=0.4.6';
+import { createRecordId } from './record-ids.js?v=0.4.6';
 
 export function createChineseSampleState(sourceState) {
   const state = cloneData(sourceState);

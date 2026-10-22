@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test as base } from '@playwright/test';
 
 import { documentUrlPaths } from '../../scripts/deployment-path-contract.mjs';
+import { hasRuntimeAssetQuery } from '../../scripts/runtime-asset-contract.mjs';
 import { LOCALE_PREFERENCE_KEY, STORAGE_KEY } from '../../site/assets/js/config.js';
 
 const siteRoot = fileURLToPath(new URL('../../site/', import.meta.url));
@@ -50,7 +51,7 @@ export async function installNetworkGuard(context, baseURL) {
       ));
     const isStaticAsset = ['font', 'image', 'script', 'stylesheet'].includes(resourceType)
       && staticPaths.has(url.pathname)
-      && !url.search;
+      && hasRuntimeAssetQuery(url);
     const isAllowedSameOrigin = url.origin === expectedOrigin
       && request.method() === 'GET'
       && (isDocument || isStaticAsset);

@@ -1,4 +1,4 @@
-import { escapeHTML, isClickableUrl } from './html.js';
+import { escapeHTML, isClickableUrl } from './html.js?v=0.4.6';
 
 export const MAX_PROFILE_LINKS = 3;
 

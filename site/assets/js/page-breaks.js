@@ -1,4 +1,4 @@
-import { announceStatus } from './ui/status-controller.js';
+import { announceStatus } from './ui/status-controller.js?v=0.4.6';
 
 export const PAGE_BREAK_LABELS = Object.freeze({
   ja: {

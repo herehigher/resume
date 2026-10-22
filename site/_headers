@@ -11,6 +11,13 @@
 /editor/*
   X-Robots-Tag: noindex,follow
 
+# Mutable runtime paths must revalidate; versioned references also bypass older
+# browser entries that were cached before this policy was introduced.
+/assets/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 # Discovery is limited to the matching public HTML and static Markdown resources.
 /
   Link: </index.md>; rel="alternate"; type="text/markdown"; hreflang="ja", </schema/resume-studio-web-v4.schema.json>; rel="describedby"; type="application/json", </sitemap.xml>; rel="sitemap"; type="application/xml"

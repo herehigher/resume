@@ -1,5 +1,5 @@
-import { APP_VERSION, REPOSITORY_URL } from '../config.js';
-import { getMessages } from '../i18n/index.js';
+import { APP_VERSION, REPOSITORY_URL } from '../config.js?v=0.4.6';
+import { getMessages } from '../i18n/index.js?v=0.4.6';
 
 const PRIVACY_ANCHORS = Object.freeze({
   ja: 'privacy-ja',

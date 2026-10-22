@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { assertRuntimeAssetVersions } from './runtime-asset-contract.mjs';
 
 const root = resolve('site');
 const failures = [];
@@ -39,10 +40,10 @@ const indexPath = join(root, 'editor/index.html');
 const html = readFileSync(indexPath, 'utf8');
 if (/<style(?:\s|>)/i.test(html)) failures.push('site/editor/index.html must not contain inline style blocks');
 if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html)) failures.push('site/editor/index.html must not contain inline scripts');
-if (!html.includes('type="module" src="../assets/js/main.js"')) failures.push('site/editor/index.html must load the main ES Module');
+if (!/type="module" src="\.\.\/assets\/js\/main\.js\?v=\d+\.\d+\.\d+"/.test(html)) failures.push('site/editor/index.html must load the versioned main ES Module');
 
 const referencedAssets = [...html.matchAll(/(?:href|src)="(\.\.\/assets\/[^"]+)"/g)]
-  .map((match) => resolve(root, 'editor', match[1]));
+  .map((match) => resolve(root, 'editor', match[1].split('?')[0]));
 referencedAssets.forEach((file) => {
   if (!files.includes(file)) failures.push(`Missing referenced asset: ${file}`);
 });
@@ -56,6 +57,12 @@ files.filter((file) => extname(file) === '.html').forEach((file) => {
     failures.push(`${file}: source pages must not contain analytics state or beacon code`);
   }
 });
+
+try {
+  await assertRuntimeAssetVersions(root, JSON.parse(readFileSync('package.json', 'utf8')).version);
+} catch (error) {
+  failures.push(error.message);
+}
 
 if (failures.length) {
   console.error(failures.join('\n'));

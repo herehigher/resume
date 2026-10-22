@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { documentUrlPaths } from './deployment-path-contract.mjs';
+import { hasRuntimeAssetQuery } from './runtime-asset-contract.mjs';
 
 const siteRoot = fileURLToPath(new URL('../site/', import.meta.url));
 const documentPaths = documentUrlPaths();
@@ -55,7 +56,7 @@ export function isAllowedNetworkRequest(request, { allowBlockedThirdPartyScripts
   const pathname = mountedPath(url, base);
   if (request.method !== 'GET' || request.postData !== null || !pathname) return false;
   if (isAllowedDocument(pathname, url.searchParams)) return true;
-  return staticPaths.has(pathname) && !url.search;
+  return staticPaths.has(pathname) && hasRuntimeAssetQuery(url);
 }
 
 function requestSummary(request, baseUrl) {

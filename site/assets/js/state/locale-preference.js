@@ -1,4 +1,4 @@
-import { LOCALE_PREFERENCE_KEY, SUPPORTED_LOCALES } from '../config.js';
+import { LOCALE_PREFERENCE_KEY, SUPPORTED_LOCALES } from '../config.js?v=0.4.6';
 
 const PREFERENCE_VERSION = 1;
 

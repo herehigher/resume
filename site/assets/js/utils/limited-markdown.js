@@ -1,5 +1,5 @@
-import { escapeHTML } from './html.js';
-import { markdownCode, markdownIndent, markdownLink, markdownText } from './markdown-text.js';
+import { escapeHTML } from './html.js?v=0.4.6';
+import { markdownCode, markdownIndent, markdownLink, markdownText } from './markdown-text.js?v=0.4.6';
 
 const ESCAPABLE = new Set(['\\', '-', '+', '*', '[', ']', '(', ')', '`']);
 

@@ -56,3 +56,12 @@ test('network guard permits only known same-origin documents and static assets',
     url: `${baseUrl}assets/js/main.js?unexpected=1`
   }), { baseUrl }), false);
 });
+
+test('runtime cache versions permit only a single fixed SemVer parameter on CSS or JavaScript', () => {
+  for (const resource of ['assets/js/main.js?v=0.4.6', 'assets/css/base.css?v=0.4.6']) {
+    assert.equal(isAllowedNetworkRequest(request({ resourceType: 'script', url: `${baseUrl}${resource}` }), { baseUrl }), true);
+  }
+  for (const resource of ['assets/js/main.js?v=fictional-name', 'assets/js/main.js?v=0.4.6&name=fictional', 'assets/js/main.js?v=0.4.6&v=0.4.6', 'assets/js/main.js?v=01.4.6', 'assets/js/main.js?name=fictional', 'assets/favicon/resume-studio-marmot-16.png?v=0.4.6']) {
+    assert.equal(isAllowedNetworkRequest(request({ resourceType: 'script', url: `${baseUrl}${resource}` }), { baseUrl }), false);
+  }
+});
