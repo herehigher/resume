@@ -45,9 +45,6 @@ export function initPrivacySecurity(initialLocale, { draftStorageAvailable = tru
     ];
     document.getElementById('privacySecurityUserBody').textContent = copy.userBody;
     document.getElementById('privacySecurityTechnicalBody').textContent = copy.technicalBody;
-    document.querySelectorAll('[data-privacy-notice]').forEach((element) => {
-      element.textContent = copy.disclosure;
-    });
     button.setAttribute('aria-label', copy.badgeAria.replace('{version}', APP_VERSION));
     repositoryLink.setAttribute('aria-label', copy.sourceLinkAria);
     repositoryLink.title = copy.sourceLink;

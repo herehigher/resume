@@ -45,26 +45,36 @@
           <option value="en">English</option>
         </select>
       </label>
-      <details class="data-menu">
+      <details class="action-menu data-menu">
         <summary id="dataMenuSummary" aria-label="バックアップと復元">
           <svg class="data-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 7h10M7 7l3-3M7 7l3 3M17 17H7m10 0-3-3m3 3-3 3"/></svg>
           <span class="data-menu-label" id="dataMenuLabel">バックアップと復元</span>
           <span class="data-menu-short-label" id="dataMenuShortLabel">バックアップ</span>
           <svg class="data-menu-chevron" aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
         </summary>
-        <div class="data-menu-panel">
-          <button class="secondary-button" id="exportMarkdownButton" type="button" aria-describedby="markdownExportHelp">Markdownを書き出す</button>
-          <small id="markdownExportHelp">Markdown は現在の文書の推敲用です。再読み込み・復元には JSON を使います。</small>
-          <button class="secondary-button" id="exportDataButton" type="button">データを書き出す</button>
-          <button class="secondary-button" id="importDataButton" type="button">データを読み込む</button>
+        <div class="action-menu-panel data-menu-panel">
+          <button class="secondary-button" id="exportDataButton" type="button">JSONを書き出す</button>
+          <button class="secondary-button" id="importDataButton" type="button">JSONを読み込む</button>
           <button class="danger-button" id="clearDraftButton" type="button">この端末の下書きを消去</button>
         </div>
       </details>
       <input id="importDataInput" type="file" accept="application/json,.json" hidden>
-      <button class="primary-button" id="printButton" type="button">
-        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
-        <span id="printButtonLabel">PDF出力</span>
-      </button>
+      <div class="export-actions">
+        <button class="primary-button" id="printButton" type="button" aria-label="PDF出力">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
+          <span class="print-label" id="printButtonLabel">PDF出力</span>
+          <span class="print-short-label" aria-hidden="true">PDF</span>
+        </button>
+        <details class="action-menu export-menu">
+          <summary id="exportMenuSummary" aria-label="その他の書き出し形式">
+            <span class="sr-only" id="exportMenuLabel">その他の書き出し形式</span>
+            <svg class="export-menu-chevron" aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7 5 5 5-5"/></svg>
+          </summary>
+          <div class="action-menu-panel export-menu-panel">
+            <button class="secondary-button" id="exportMarkdownButton" type="button">Markdownを書き出す</button>
+          </div>
+        </details>
+      </div>
     </div>
   </header>
 
@@ -342,7 +352,6 @@
 
       <div class="editor-footer">
         <div class="editor-legal">
-          <p><span data-privacy-notice>source、clone、fork に beacon は含まれません。公式 hosted site では Cloudflare Pages の delivery layer が Analytics を挿入します。履歴書入力、写真、JSON、草稿は Analytics request に含まれません。</span></p>
           <p class="editor-copyright">© 2026 herehigher · <a href="https://github.com/herehigher/resume/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a> · <a class="x-contact-link" href="https://x.com/kanhigher" target="_blank" rel="noopener noreferrer" aria-label="X: @kanhigher"><svg class="x-contact-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.501 11.24h-6.657l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"></path></svg><span>@kanhigher</span></a></p>
         </div>
       </div>
@@ -394,7 +403,7 @@
       </div>
       <section class="privacy-security-section">
         <h3 id="privacySecurityUserHeading">一般の方へ</h3>
-        <p id="privacySecurityUserBody"></p>
+        <p id="privacySecurityUserBody" data-privacy-notice></p>
       </section>
       <section class="privacy-security-section">
         <h3 id="privacySecurityTechnicalHeading">技術的に確認する方へ</h3>

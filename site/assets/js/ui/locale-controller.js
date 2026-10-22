@@ -58,9 +58,10 @@ export function initLocaleController(store, {
   const importInput = document.getElementById('importDataInput');
   const brand = document.querySelector('.brand');
   const dataMenu = dataMenuSummary.closest('.data-menu');
+  const exportMenuSummary = document.getElementById('exportMenuSummary');
+  const exportMenu = exportMenuSummary.closest('.export-menu');
   let locale = initialLocale || store.getState().settings.locale;
   let renderedLocale = '';
-  let dataMenuPointerDownInside = false;
 
   function showMessage(message, { persistent = false, source = null, tone = 'success' } = {}) {
     statusController?.showAppNotice(message, { persistent, source, tone });
@@ -81,13 +82,15 @@ export function initLocaleController(store, {
     dataMenuSummary.setAttribute('aria-label', copy.backupMenuLabel);
     dataMenuLabel.textContent = copy.backupMenuLabel;
     dataMenuShortLabel.textContent = copy.backupMenuShortLabel;
+    exportMenuSummary.setAttribute('aria-label', copy.exportMenuLabel);
+    document.getElementById('exportMenuLabel').textContent = copy.exportMenuLabel;
     document.getElementById('appNoticeDismiss').textContent = copy.dismissNotice;
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
     markdownButton.textContent = copy.exportMarkdown;
-    document.getElementById('markdownExportHelp').textContent = copy.markdownExportHelp;
     clearDraftButton.textContent = copy.clearDraft;
     document.getElementById('printButtonLabel').textContent = copy.printDocument;
+    printButton.setAttribute('aria-label', copy.printDocument);
     document.getElementById('pendingTitle').textContent = copy.pendingTitle;
     document.getElementById('pendingBody').textContent = copy.pendingBody;
     select.value = locale;
@@ -150,8 +153,14 @@ export function initLocaleController(store, {
     } catch {
       showMessage(copy.markdownExportError, { persistent: true, source: 'export', tone: 'error' });
     } finally {
-      dataMenu.open = false;
+      exportMenu.open = false;
+      exportMenuSummary.focus();
     }
+  });
+
+  printButton.addEventListener('click', () => {
+    exportMenu.open = false;
+    window.print();
   });
 
   importButton.addEventListener('click', () => importInput.click());
@@ -186,32 +195,39 @@ export function initLocaleController(store, {
     }
   });
 
-  dataMenu.addEventListener('focusout', () => {
-    window.queueMicrotask(() => {
-      const activeModal = document.activeElement?.closest?.('dialog[open]');
-      if (dataMenu.open && !dataMenuPointerDownInside && !activeModal && !dataMenu.contains(document.activeElement)) dataMenu.open = false;
+  function setupMenuDismissal(menu, summary) {
+    let pointerDownInside = false;
+    menu.addEventListener('focusout', (event) => {
+      if (menu.contains(event.relatedTarget)) return;
+      window.queueMicrotask(() => {
+        const activeModal = document.activeElement?.closest?.('dialog[open]');
+        if (menu.open && !pointerDownInside && !activeModal && !menu.contains(document.activeElement)) menu.open = false;
+      });
     });
-  });
-  dataMenu.addEventListener('pointerdown', () => {
-    dataMenuPointerDownInside = true;
-  });
-  document.addEventListener('pointerdown', (event) => {
-    const activeModal = event.target.closest?.('dialog[open]');
-    if (!dataMenu.contains(event.target)) dataMenuPointerDownInside = false;
-    if (dataMenu.open && !activeModal && !dataMenu.contains(event.target)) dataMenu.open = false;
-  });
-  document.addEventListener('pointerup', () => {
-    dataMenuPointerDownInside = false;
-  });
-  document.addEventListener('pointercancel', () => {
-    dataMenuPointerDownInside = false;
-  });
-  dataMenu.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || !dataMenu.open) return;
-    event.preventDefault();
-    dataMenu.open = false;
-    dataMenuSummary.focus();
-  });
+    menu.addEventListener('pointerdown', () => {
+      pointerDownInside = true;
+    });
+    document.addEventListener('pointerdown', (event) => {
+      const activeModal = event.target.closest?.('dialog[open]');
+      if (!menu.contains(event.target)) pointerDownInside = false;
+      if (menu.open && !activeModal && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener('pointerup', () => {
+      pointerDownInside = false;
+    });
+    document.addEventListener('pointercancel', () => {
+      pointerDownInside = false;
+    });
+    menu.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !menu.open) return;
+      event.preventDefault();
+      menu.open = false;
+      summary.focus();
+    });
+  }
+
+  setupMenuDismissal(dataMenu, dataMenuSummary);
+  setupMenuDismissal(exportMenu, exportMenuSummary);
 
   store.subscribe((_state, event) => {
     if (['locale', 'reset', 'reload'].includes(event.type)) applyLocale(true);

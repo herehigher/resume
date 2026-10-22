@@ -4,11 +4,12 @@ import { createDefaultState } from '../../site/assets/js/state/defaults.js';
 import { expect, expectNoPageOverflow, openLocale, readPersistedState, test, waitForPersistedState } from './fixtures.js';
 
 async function download(page, button) {
-  await page.locator('#dataMenuSummary').click();
+  await page.locator(button === '#exportDataButton' ? '#dataMenuSummary' : '#exportMenuSummary').click();
   const promise = page.waitForEvent('download');
   await page.locator(button).click();
   const result = await promise;
-  await expect(page.locator('.data-menu')).not.toHaveAttribute('open', '');
+  await expect(page.locator('.action-menu[open]')).toHaveCount(0);
+  if (button === '#exportMarkdownButton') await expect(page.locator('#exportMenuSummary')).toBeFocused();
   return { filename: result.suggestedFilename(), text: await readFile(await result.path(), 'utf8') };
 }
 
@@ -42,9 +43,9 @@ for (const [locale, type, selector, marker, label] of variants) {
     const before = await readPersistedState(page);
     const rawBefore = await page.evaluate(() => JSON.stringify(Object.entries(localStorage)));
     const jsonBefore = JSON.parse((await download(page, '#exportDataButton')).text);
-    await page.locator('#dataMenuSummary').click();
+    await page.locator('#exportMenuSummary').click();
     await expect(page.locator('#exportMarkdownButton')).toHaveText(label);
-    await expect(page.locator('#markdownExportHelp')).toContainText('JSON');
+    await expect(page.locator('#markdownExportHelp')).toHaveCount(0);
     const promise = page.waitForEvent('download');
     await page.locator('#exportMarkdownButton').click();
     const result = await promise;
@@ -57,7 +58,8 @@ for (const [locale, type, selector, marker, label] of variants) {
     for (const excluded of ['OTHER_JAPANESE_RESUME', 'OTHER_JAPANESE_CAREER', 'OTHER_CHINESE', 'OTHER_ENGLISH', 'pageBreaks', 'pageSize']) expect(text).not.toContain(excluded.replaceAll('_', '\\_'));
     if (locale === 'en' || type === 'career') expect(text).not.toContain('Hidden Fictional Address');
     if (type === 'career') expect(text).not.toContain('0000000000');
-    await expect(page.locator('.data-menu')).not.toHaveAttribute('open', '');
+    await expect(page.locator('.action-menu[open]')).toHaveCount(0);
+    await expect(page.locator('#exportMenuSummary')).toBeFocused();
     expect(await readPersistedState(page)).toEqual(before);
     expect(await page.evaluate(() => JSON.stringify(Object.entries(localStorage)))).toBe(rawBefore);
     expect(JSON.parse((await download(page, '#exportDataButton')).text)).toEqual(jsonBefore);
@@ -76,8 +78,8 @@ for (const locale of ['ja', 'zh-CN', 'en']) {
     expect(result.text).toContain('架空 Fictional Mobile');
     await expect(name).toHaveValue('架空 Fictional Mobile');
     await expectNoPageOverflow(page);
-    await page.locator('#dataMenuSummary').click();
-    const menu = await page.locator('.data-menu-panel').boundingBox();
+    await page.locator('#exportMenuSummary').click();
+    const menu = await page.locator('.export-menu-panel').boundingBox();
     const viewport = page.viewportSize();
     expect(menu.x).toBeGreaterThanOrEqual(0);
     expect(menu.x + menu.width).toBeLessThanOrEqual(viewport.width);

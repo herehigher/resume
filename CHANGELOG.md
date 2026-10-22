@@ -6,6 +6,13 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-22
+
+### Fixed / 修正
+
+- 三言語の PDF ボタンに別形式の書き出しメニューを併設し、Markdown をバックアップと復元から移動。PDF の直接出力を維持し、Markdown ボタン下の説明文を削除。
+- エディターのフッターから重複するプライバシー説明を削除し、専用ダイアログに集約。
+
 ## [0.4.4] - 2026-10-22
 
 ### Added / 追加
