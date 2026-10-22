@@ -10,7 +10,6 @@ export default {
   privacyNotice: 'The repository source, clones, and forks contain no Analytics beacon. Cloudflare Pages injects Cloudflare Web Analytics at the delivery layer on the official hosted site. The app never includes resume input, photos, JSON, or drafts in Analytics requests.',
   exportData: 'Export data',
   exportMarkdown: 'Export Markdown',
-  markdownExportHelp: 'Use Markdown to edit the current document’s wording. Use JSON to import and restore your data.',
   markdownExportSuccess: 'Your Markdown was exported.',
   markdownExportError: 'Your Markdown could not be exported.',
   importData: 'Import data',

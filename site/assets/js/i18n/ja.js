@@ -9,7 +9,6 @@ export default {
   brandEntry: 'Resume Studio の紹介ページを開く',
   exportData: 'データを書き出す',
   exportMarkdown: 'Markdownを書き出す',
-  markdownExportHelp: 'Markdown は現在の文書の推敲用です。再読み込み・復元には JSON を使います。',
   markdownExportSuccess: 'Markdownを書き出しました。',
   markdownExportError: 'Markdownを書き出せませんでした。',
   importData: 'データを読み込む',

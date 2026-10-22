@@ -85,7 +85,6 @@ export function initLocaleController(store, {
     document.getElementById('exportDataButton').textContent = copy.exportData;
     document.getElementById('importDataButton').textContent = copy.importData;
     markdownButton.textContent = copy.exportMarkdown;
-    document.getElementById('markdownExportHelp').textContent = copy.markdownExportHelp;
     clearDraftButton.textContent = copy.clearDraft;
     document.getElementById('printButtonLabel').textContent = copy.printDocument;
     document.getElementById('pendingTitle').textContent = copy.pendingTitle;

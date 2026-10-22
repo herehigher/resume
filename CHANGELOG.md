@@ -6,6 +6,12 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-22
+
+### Fixed / 修正
+
+- 三言語のバックアップメニューで Markdown 書き出しボタン下の説明文を削除。
+
 ## [0.4.4] - 2026-10-22
 
 ### Added / 追加

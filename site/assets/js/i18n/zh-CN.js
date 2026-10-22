@@ -9,7 +9,6 @@ export default {
   brandEntry: '打开 Resume Studio 简介页',
   exportData: '导出数据',
   exportMarkdown: '导出 Markdown',
-  markdownExportHelp: 'Markdown 用于修改当前文书的文案。重新导入与恢复请使用 JSON。',
   markdownExportSuccess: 'Markdown 已导出。',
   markdownExportError: '无法导出 Markdown。',
   importData: '导入数据',

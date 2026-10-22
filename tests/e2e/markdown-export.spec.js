@@ -44,7 +44,7 @@ for (const [locale, type, selector, marker, label] of variants) {
     const jsonBefore = JSON.parse((await download(page, '#exportDataButton')).text);
     await page.locator('#dataMenuSummary').click();
     await expect(page.locator('#exportMarkdownButton')).toHaveText(label);
-    await expect(page.locator('#markdownExportHelp')).toContainText('JSON');
+    await expect(page.locator('#markdownExportHelp')).toHaveCount(0);
     const promise = page.waitForEvent('download');
     await page.locator('#exportMarkdownButton').click();
     const result = await promise;
