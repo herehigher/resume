@@ -745,7 +745,6 @@ export function initJapaneseEditor(store, { embeddedPhotoUrl, statusController }
       setDraftStatus('下書きデータを削除できませんでした', 'error');
     }
   });
-  document.getElementById('printButton').addEventListener('click', () => window.print());
   document.getElementById('zoomOutButton').addEventListener('click', () => {
     zoom = Math.max(.4, zoom - .1);
     applyZoom();

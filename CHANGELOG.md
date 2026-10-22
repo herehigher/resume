@@ -10,7 +10,7 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ### Fixed / 修正
 
-- 三言語のバックアップメニューで Markdown 書き出しボタン下の説明文を削除。
+- 三言語の PDF ボタンに別形式の書き出しメニューを併設し、Markdown をバックアップと復元から移動。PDF の直接出力を維持し、Markdown ボタン下の説明文を削除。
 
 ## [0.4.4] - 2026-10-22
 

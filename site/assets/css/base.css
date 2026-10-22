@@ -140,8 +140,8 @@ button { cursor: pointer; }
   padding: 0 8px;
 }
 
-.data-menu { position: relative; }
-.data-menu summary {
+.action-menu { position: relative; }
+.action-menu summary {
   align-items: center;
   background: #fff;
   border: 1px solid #ced5df;
@@ -159,14 +159,16 @@ button { cursor: pointer; }
   padding: 0 11px;
   white-space: nowrap;
 }
-.data-menu summary svg { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.action-menu summary svg { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 .data-menu-short-label,
 .data-menu-icon { display: none; }
-.data-menu-chevron { height: 12px; transition: transform .16s ease; width: 12px; }
+.data-menu-chevron,
+.export-menu-chevron { height: 12px; transition: transform .16s ease; width: 12px; }
 .data-menu-icon { height: 16px; width: 16px; }
-.data-menu[open] .data-menu-chevron { transform: rotate(180deg); }
-.data-menu summary::-webkit-details-marker { display: none; }
-.data-menu-panel {
+.action-menu[open] .data-menu-chevron,
+.action-menu[open] .export-menu-chevron { transform: rotate(180deg); }
+.action-menu summary::-webkit-details-marker { display: none; }
+.action-menu-panel {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -176,11 +178,16 @@ button { cursor: pointer; }
   padding: 9px;
   position: absolute;
   right: 0;
-  top: 42px;
+  top: calc(100% + 6px);
   width: 172px;
   z-index: 30;
 }
-.data-menu-panel .secondary-button { width: 100%; }
+.action-menu-panel .secondary-button { width: 100%; }
+.export-actions { display: inline-flex; }
+.export-actions > .primary-button { border-radius: 7px 0 0 7px; white-space: nowrap; }
+.print-short-label { display: none; }
+.export-menu summary { background: var(--blue); border-color: var(--blue); border-left-color: rgba(255, 255, 255, .35); border-radius: 0 7px 7px 0; color: #fff; min-width: 30px; padding: 0; width: 30px; }
+.export-menu summary:hover { background: var(--blue-dark); }
 
 .app-notice {
   align-items: flex-start;

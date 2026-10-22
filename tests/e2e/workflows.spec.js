@@ -907,7 +907,7 @@ test('三言語で暗号化保存の状態を表示し、削除をバックア�
 
     const layout = await page.locator('.header-actions').evaluate((header) => {
       const headerBox = header.getBoundingClientRect();
-      const printBox = header.querySelector('#printButton').getBoundingClientRect();
+      const printBox = header.querySelector('.export-actions').getBoundingClientRect();
       return {
         headerRight: headerBox.right,
         printRight: printBox.right,
