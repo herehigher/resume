@@ -39,7 +39,6 @@ export default {
     badgeAria: 'プライバシーとセキュリティを開く。ローカル処理、バージョン {version}',
     sourceLink: 'GitHub ソースコード',
     sourceLinkAria: 'GitHub で Resume Studio のソースコードを開く（新しいタブ）',
-    disclosure: 'source、clone、fork に Analytics beacon は含まれません。公式 hosted site では Cloudflare Pages の delivery layer が Cloudflare Web Analytics を挿入します。履歴書入力、写真、JSON、草稿は Analytics request に含まれません。',
     title: 'プライバシーとセキュリティ',
     summary: 'Resume Studio でのデータ処理と、利用者自身で確認する方法を説明します。',
     userHeading: '一般の方へ',

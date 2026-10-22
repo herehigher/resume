@@ -549,7 +549,7 @@ for (const scenario of [
   }
 }
 
-test('三言語エディターはプライバシー説明の下に著作権、MIT License、X 連絡先を常設する', async ({ page }) => {
+test('三言語エディターのフッターは重複するプライバシー説明を省き、著作権、MIT License、X 連絡先を常設する', async ({ page }) => {
   for (const [locale, workspace] of [
     ['ja', '#japaneseWorkspace'],
     ['zh-CN', '#chineseWorkspace'],
@@ -561,7 +561,7 @@ test('三言語エディターはプライバシー説明の下に著作権、MI
     const xContact = legal.locator('.x-contact-link');
     await expect(page.locator(`${workspace} .editor-footer .editor-legal`)).toHaveCount(1);
     await expect(page.locator(`${workspace} .editor-footer #clearDraftButton`)).toHaveCount(0);
-    await expect(legal.locator('[data-privacy-notice]')).toBeVisible();
+    await expect(legal.locator('[data-privacy-notice]')).toHaveCount(0);
     await expect(license).toHaveText('MIT License');
     await expect(license).toHaveAttribute('href', 'https://github.com/herehigher/resume/blob/main/LICENSE');
     await expect(license).toHaveAttribute('target', '_blank');

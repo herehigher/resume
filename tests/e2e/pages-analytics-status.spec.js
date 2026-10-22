@@ -86,18 +86,19 @@ test('source entry and editor explain the hosting boundary in all locales withou
       await page.setViewportSize({ width: 1440, height: 1000 });
 
       await page.goto(`${sourceBaseURL}/editor/?lang=${encodeURIComponent(locale)}`);
-      const editorNotice = page.locator('[data-privacy-notice]:visible');
+      const editorNotice = page.locator('#privacySecurityUserBody[data-privacy-notice]');
       await expect(editorNotice).toHaveCount(1);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
-      await expect(editorNotice).toContainText('Cloudflare Pages');
+      await expect(editorNotice).toBeHidden();
       await page.locator('#privacySecurityButton').click();
+      await expect(editorNotice).toBeVisible();
       await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Pages');
       await expect(page.locator('#privacySecurityTechnicalBody')).toContainText(/delivery layer/i);
       await page.locator('#privacySecurityCloseButton').click();
 
       for (const width of [390, 320]) {
         await page.setViewportSize({ width, height: 844 });
-        await expect(editorNotice).toBeVisible();
+        await expect(editorNotice).toBeHidden();
         await expectNoHorizontalOverflow(page);
         await page.locator('#privacySecurityButton').click();
         await expect(page.locator('#privacySecurityUserBody')).toContainText('Cloudflare Pages');
