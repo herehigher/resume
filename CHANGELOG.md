@@ -6,6 +6,22 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-22
+
+### Added / 追加
+
+- 現在選択中の一文書を Markdown で書き出す機能を三言語に追加。表示設定と保存済みの項目順序を反映し、ブラウザー内で文案編集用のファイルを生成する。
+- 日本語・简体中文・English の静的 Markdown 利用案内を追加し、公開 HTML と配信 header から案内・JSON Schema・sitemap を発見できるようにする。
+
+### Changed / 変更
+
+- 公開コンテンツの検索・AI 回答への利用・AI 学習を許可する方針を robots.txt と Content-Signal header に明示。Editor の noindex と端末内の履歴書データを送信しない契約を維持する。
+- 公開 smoke に robots、404、静的 Markdown、発見リンク、Content-Signal の配信契約を追加。受入済み旧版の rollback / reconciliation は当時の契約を維持する。
+
+### Fixed / 修正
+
+- 存在しない URL がトップページを HTTP 200 で返す構成を修正し、三言語の公開入口へ戻れる 404 ページと正式な robots.txt を追加。
+
 ## [0.4.3] - 2026-10-03
 
 ### Added / 追加
