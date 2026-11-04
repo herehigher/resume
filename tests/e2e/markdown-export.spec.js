@@ -35,7 +35,8 @@ for (const [locale, type, selector, marker, label] of variants) {
     await expect(page.locator('#globalMessage')).toHaveText(getMessages(locale).importSuccess);
     const input = page.locator(selector);
     await input.evaluate((element) => { const details = element.closest('details'); if (details) details.open = true; });
-    const editedText = `${marker}\n# Literal heading\n===\nhttps://example.com\nfictional@example.com`;
+    const punctuation = 'Node.js (2024-2026), C++, C#, API_v2!';
+    const editedText = `${marker}\n${punctuation}\n# Literal heading\n===\nhttps://example.com\nfictional@example.com`;
     await input.fill(editedText);
     const expected = locale === 'ja' ? { documents: { ja: { fields: { [type === 'resume' ? 'motivation' : 'careerSummary']: editedText } } } }
       : { documents: { [locale]: { resume: { summary: editedText } } } };
@@ -52,10 +53,11 @@ for (const [locale, type, selector, marker, label] of variants) {
     const text = await readFile(await result.path(), 'utf8');
     expect(result.suggestedFilename()).toBe(`resume-studio-${locale}-${type}.md`);
     expect(text).toContain(marker);
+    expect(text).toContain(punctuation);
     expect(text).toContain('\\# Literal heading');
-    expect(text).toContain('\\=\\=\\=');
-    expect(text).toContain('fictional&#64;example\\.com');
-    for (const excluded of ['OTHER_JAPANESE_RESUME', 'OTHER_JAPANESE_CAREER', 'OTHER_CHINESE', 'OTHER_ENGLISH', 'pageBreaks', 'pageSize']) expect(text).not.toContain(excluded.replaceAll('_', '\\_'));
+    expect(text).toContain('\\===');
+    expect(text).toContain('fictional&#64;example.com');
+    for (const excluded of ['OTHER_JAPANESE_RESUME', 'OTHER_JAPANESE_CAREER', 'OTHER_CHINESE', 'OTHER_ENGLISH', 'pageBreaks', 'pageSize']) expect(text).not.toContain(excluded);
     if (locale === 'en' || type === 'career') expect(text).not.toContain('Hidden Fictional Address');
     if (type === 'career') expect(text).not.toContain('0000000000');
     await expect(page.locator('.action-menu[open]')).toHaveCount(0);
