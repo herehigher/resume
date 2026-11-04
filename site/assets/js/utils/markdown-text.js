@@ -1,9 +1,26 @@
-// Escape text before placing it in Markdown, including extensions that autolink URLs.
-export function markdownText(value) {
+// Inline syntax and autolinks need protection; ordinary punctuation does not.
+export function markdownInlineText(value) {
   return String(value ?? '').replace(/\r\n?/g, '\n')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/[\\`*_{}[\]()#+.!|~=-]/g, '\\$&')
+    .replace(/[\\`*[\]|~]/g, '\\$&')
+    .replace(/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/gu, '\\$&')
+    .replace(/(?<![a-z0-9])www\./gi, (prefix) => `${prefix.slice(0, -1)}&#46;`)
     .replace(/:/g, '&#58;').replace(/@/g, '&#64;');
+}
+
+// Apply after inline serialization, including for the limited Markdown renderer.
+export function markdownBlockText(value) {
+  return value
+    .replace(/^( *)(#{1,6})(?=\s|$)/gm, '$1\\$2')
+    .replace(/^( *)([-+])(?=\s|$)/gm, '$1\\$2')
+    .replace(/^( *)(\d{1,9})([.)])(?=\s|$)/gm, '$1$2\\$3')
+    .replace(/^( *)(=+|-{2,})([ \t]*)$/gm, '$1\\$2$3')
+    // A trailing hash run could close a generated heading.
+    .replace(/(\S[ \t]+)(#+)(?=[ \t]*$)/gm, '$1\\$2');
+}
+
+export function markdownText(value) {
+  return markdownBlockText(markdownInlineText(value));
 }
 
 export function markdownLink(label, value) {
