@@ -1,5 +1,5 @@
 import { escapeHTML } from './html.js?v=0.4.6';
-import { markdownCode, markdownIndent, markdownLink, markdownText } from './markdown-text.js?v=0.4.6';
+import { markdownBlockText, markdownCode, markdownIndent, markdownInlineText, markdownLink } from './markdown-text.js?v=0.4.6';
 
 const ESCAPABLE = new Set(['\\', '-', '+', '*', '[', ']', '(', ')', '`']);
 
@@ -16,13 +16,13 @@ function escapeLiteral(source, encode = escapeHTML) {
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
     if (character === '\\' && index + 1 < source.length && isEscapable(source[index + 1])) {
-      output += encode(source[index + 1]);
+      output += source[index + 1];
       index += 1;
     } else {
-      output += encode(character);
+      output += character;
     }
   }
-  return output;
+  return encode(output);
 }
 
 function scanListMarker(line) {
@@ -240,7 +240,7 @@ function readBracketMarkup(line, start, index, isImage) {
 }
 
 function renderInline(line, markdown = false) {
-  const encode = markdown ? markdownText : escapeHTML;
+  const encode = markdown ? markdownInlineText : escapeHTML;
   const literal = (value) => escapeLiteral(value, encode);
   const index = createInlineIndex(line);
   let output = '';
@@ -322,10 +322,13 @@ function renderInline(line, markdown = false) {
       continue;
     }
 
-    output += encode(character);
-    position += 1;
+    // Keep literal runs together so escaping can see intraword underscores.
+    let end = position + 1;
+    while (end < line.length && !'\\`![*'.includes(line[end])) end += 1;
+    output += encode(line.slice(position, end));
+    position = end;
   }
-  return output;
+  return markdown ? markdownBlockText(output) : output;
 }
 
 function renderList(list) {

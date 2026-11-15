@@ -187,6 +187,8 @@ for (const target of targets) {
 
 async function beginDrag(page, handle) {
   await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  // Wait for stable geometry and pointer hit testing before reading drag coordinates.
+  await handle.hover();
   const rect = await handle.boundingBox();
   const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   expect(await handle.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), point)).toBe(true);

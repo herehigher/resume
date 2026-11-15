@@ -41,8 +41,8 @@ test('all four document exports use the current locale/document and never mutate
     const snapshot = structuredClone(state);
     const result = exportMarkdown(state);
     assert.equal(result.filename, `resume-studio-${locale}-${type}.md`);
-    assert.ok(result.text.includes(includes.replaceAll('_', '\\_')));
-    for (const excluded of [...excludes, 'PHOTO_SENTINEL', 'pageBreaks', 'pageSize', 'LETTER', 'version']) assert.ok(!result.text.includes(excluded.replaceAll('_', '\\_')));
+    assert.ok(result.text.includes(includes));
+    for (const excluded of [...excludes, 'PHOTO_SENTINEL', 'pageBreaks', 'pageSize', 'LETTER', 'version']) assert.ok(!result.text.includes(excluded));
     assert.deepEqual(state, snapshot);
     assert.ok(result.text.endsWith('\n'));
   }
@@ -54,7 +54,7 @@ test('English optional information and Japanese career contact scope match the c
   let text = exportMarkdown(state).text;
   for (const hidden of ['1990', 'Female', 'Fictionland', 'Private Fictional Address', '12345']) assert.ok(!text.includes(hidden), hidden);
   assert.ok(text.includes('Visible Fictional City'));
-  assert.ok(text.includes('fictional&#64;example\\.com'));
+  assert.ok(text.includes('fictional&#64;example.com'));
   state.documents.en.resume.showOptionalPersonalDetails = true;
   text = exportMarkdown(state).text;
   for (const visible of ['1990', 'Female', 'Fictionland', 'Private Fictional Address', '12345']) assert.ok(text.includes(visible), visible);
@@ -62,7 +62,7 @@ test('English optional information and Japanese career contact scope match the c
   Object.assign(state.documents.ja.fields, { residenceStatus: 'Fictional Status', workRestriction: 'restricted', residenceExpiryDate: '2030-02-03', nameKana: 'HIDDEN_KANA' });
   text = exportMarkdown(state, 'ja').text;
   for (const hidden of ['1990', '女性', 'Private Fictional Address', '12345', '0000000000', 'fictional&#64;', 'HIDDEN']) assert.ok(!text.includes(hidden), hidden);
-  for (const visible of ['Fictional Person', 'Fictionland', 'Fictional Status', 'あり', '2030年2月3日', 'example.com/second']) assert.ok(text.includes(visible.replaceAll('.', '\\.')), visible);
+  for (const visible of ['Fictional Person', 'Fictionland', 'Fictional Status', 'あり', '2030年2月3日', 'example.com/second']) assert.ok(text.includes(visible), visible);
 });
 
 test('Japanese resume exports filled fields and history arrays in saved order, omitting empty items and career-only text', () => {
@@ -121,16 +121,56 @@ test('empty documents omit empty sections and placeholder text', () => {
   assert.throws(() => exportMarkdown(createDefaultState(), 'xx'), /Unsupported/);
 });
 
+test('ordinary resume punctuation stays readable in every document and in link labels', () => {
+  const wording = 'Fictional Co. (2024-2026): C++, C#, Node.js! +20% / API_v2 / 中文_技能 / {team}';
+  const expected = wording.replace(':', '&#58;');
+  assert.equal(markdownText(wording), expected);
+  assert.equal(exportLimitedMarkdown(wording), expected);
+  assert.equal(exportLimitedMarkdown(`**${wording}**`), `**${expected}**`);
+  assert.equal(markdownLink('Node.js (API_v2)', 'https://example.com'), '[Node.js (API_v2)](<https://example.com/>)');
+  for (const [locale, type] of [['ja', 'resume'], ['ja', 'career'], ['zh-CN', 'resume'], ['en', 'resume']]) {
+    const state = createDefaultState(locale);
+    state.documents[locale].activeDocument = type;
+    if (locale === 'ja') state.documents.ja.fields[type === 'career' ? 'careerSummary' : 'motivation'] = wording;
+    else state.documents[locale].resume.summary = wording;
+    assert.ok(exportMarkdown(state).text.includes(expected));
+    assert.ok(!exportMarkdown(state).text.includes('\\'));
+  }
+});
+
+test('block punctuation is escaped only where it can change Markdown structure', () => {
+  for (const [source, expected] of [
+    ['# Heading', '\\# Heading'], ['## Heading', '\\## Heading'],
+    ['- item', '\\- item'], ['+ item', '\\+ item'],
+    ['1. item', '1\\. item'], ['2) item', '2\\) item'],
+    ['--', '\\--'], ['---', '\\---'], ['- - -', '\\- - -'], ['===', '\\==='],
+    ['Title ###', 'Title \\###'],
+    ['C# and #hashtag', 'C# and #hashtag'],
+    ['Version 1.2 (1) a-b a+b a=b', 'Version 1.2 (1) a-b a+b a=b'],
+    ['_emphasis_ API_v2', '\\_emphasis\\_ API_v2']
+  ]) assert.equal(markdownText(source), expected, source);
+  assert.equal(markdownText('First\n===\n\nNext'), 'First\n\\===\n\nNext');
+  assert.equal(markdownParagraph('First\n--'), 'First  \n\\--');
+  assert.equal(exportLimitedMarkdown('First\n--'), 'First  \n\\--');
+  // These list markers are unsupported by the preview grammar and must stay literal.
+  assert.equal(exportLimitedMarkdown('1000. literal\n2) literal\n---'), '1000\\. literal  \n2\\) literal  \n\\---');
+});
+
 test('plain text protects multiline headings, references, HTML, images, links, tables and autolinks', () => {
   const source = 'First\r\n===\n# Heading\n[ref]: javascript:alert(1)\n![image](https://example.com/x)\n<script>alert(1)</script>\n    indented\nhttps://example.com\nfictional@example.com\n| table |';
   const text = markdownParagraph(source);
-  assert.ok(text.includes('First  \n\\=\\=\\='));
+  assert.ok(text.includes('First  \n\\==='));
   assert.ok(text.includes('  \n\\# Heading'));
   assert.ok(text.includes('&#32;&#32;&#32;&#32;indented'));
   assert.ok(text.includes('&lt;script&gt;'));
-  assert.ok(text.includes('https&#58;//example\\.com'));
-  assert.ok(text.includes('fictional&#64;example\\.com'));
+  assert.ok(text.includes('https&#58;//example.com'));
+  assert.ok(text.includes('fictional&#64;example.com'));
   assert.ok(!text.includes('&\\#'));
+  assert.equal(markdownText('www.example.com WWW.example.com'), 'www&#46;example.com WWW&#46;example.com');
+  assert.equal(exportLimitedMarkdown('www.example.com'), 'www&#46;example.com');
+  for (const serialize of [markdownText, exportLimitedMarkdown]) {
+    assert.equal(serialize('_www.example.com foo_www.example.com'), '\\_www&#46;example.com foo_www&#46;example.com');
+  }
   assert.equal(markdownText('&amp;'), '&amp;amp;');
   assert.equal(markdownLink('entity query', 'https://example.com/?x=&copy;'), '[entity query](<https://example.com/?x=&amp;copy;>)');
 });
@@ -145,11 +185,11 @@ test('only explicit valid HTTP(S) destinations become links, preserving unsafe s
 test('limited Markdown exports exactly the supported grammar, escaping unsupported syntax and nested markup', () => {
   const source = '# literal\n===\n**bold** *italic* `a\\`b` [label](https://example.com/a?x=1&y=2)\n\n3. third\n  - child\n9. fourth\n\n![image](https://example.com/x)\n[x](javascript:alert(1))\n[ref]: https://example.com\n~~strike~~\n**outer *inner* [x](https://example.com)**';
   const text = exportLimitedMarkdown(source);
-  assert.ok(text.startsWith('\\# literal  \n\\=\\=\\='));
+  assert.ok(text.startsWith('\\# literal  \n\\==='));
   assert.ok(text.includes('**bold** *italic* `` a\\`b `` [label](<https://example.com/a?x=1&amp;y=2>)'));
   assert.ok(text.includes('3. third\n   - child\n4. fourth'));
-  assert.ok(text.includes('\\!\\[image\\]'));
-  assert.ok(text.includes('\\[x\\]\\(javascript&#58;alert\\(1\\)\\)'));
-  assert.ok(text.includes('**outer \\*inner\\* \\[x\\]\\(https&#58;//example\\.com\\)**'));
+  assert.ok(text.includes('!\\[image\\]'));
+  assert.ok(text.includes('\\[x\\](javascript&#58;alert(1))'));
+  assert.ok(text.includes('**outer \\*inner\\* \\[x\\](https&#58;//example.com)**'));
   assert.equal(renderLimitedMarkdown('one\ntwo'), '<p>one<br>two</p>');
 });
