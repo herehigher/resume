@@ -1,5 +1,5 @@
-import { cloneData } from '../state/defaults.js?v=0.4.6';
-import { createRecordId } from '../state/record-ids.js?v=0.4.6';
+import { cloneData } from '../state/defaults.js?v=0.4.7';
+import { createRecordId } from '../state/record-ids.js?v=0.4.7';
 
 export function createEnglishSampleState(sourceState) {
   const state = cloneData(sourceState);

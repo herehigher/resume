@@ -1,8 +1,8 @@
-import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../utils/date.js?v=0.4.6';
-import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js?v=0.4.6';
-import { renderLimitedMarkdown } from '../utils/limited-markdown.js?v=0.4.6';
-import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js?v=0.4.6';
-import { genderLabel } from '../utils/personal-details.js?v=0.4.6';
+import { calculateAge, formatJapaneseDate, formatJapaneseMonth } from '../utils/date.js?v=0.4.7';
+import { displayText, escapeHTML, isClickableUrl } from '../utils/html.js?v=0.4.7';
+import { renderLimitedMarkdown } from '../utils/limited-markdown.js?v=0.4.7';
+import { getProfileLinks, profileLinkIcon } from '../utils/profile-links.js?v=0.4.7';
+import { genderLabel } from '../utils/personal-details.js?v=0.4.7';
 
 function hasContent(value) {
   return String(value ?? '').trim().length > 0;

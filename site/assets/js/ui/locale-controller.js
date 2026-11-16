@@ -1,9 +1,9 @@
-import { SUPPORTED_LOCALES } from '../config.js?v=0.4.6';
-import { getMessages } from '../i18n/index.js?v=0.4.6';
-import { exportMarkdown } from '../utils/markdown-export.js?v=0.4.6';
-import { saveLocalePreference } from '../state/locale-preference.js?v=0.4.6';
-import { confirmAction } from './confirmation-dialog.js?v=0.4.6';
-import { messageForDraftStorageError } from './draft-storage-error.js?v=0.4.6';
+import { SUPPORTED_LOCALES } from '../config.js?v=0.4.7';
+import { getMessages } from '../i18n/index.js?v=0.4.7';
+import { exportMarkdown } from '../utils/markdown-export.js?v=0.4.7';
+import { saveLocalePreference } from '../state/locale-preference.js?v=0.4.7';
+import { confirmAction } from './confirmation-dialog.js?v=0.4.7';
+import { messageForDraftStorageError } from './draft-storage-error.js?v=0.4.7';
 
 const publicEntryPaths = Object.freeze({
   ja: '../',

@@ -1,4 +1,4 @@
-import { createSortableLists } from './sortable-lists.js?v=0.4.6';
+import { createSortableLists } from './sortable-lists.js?v=0.4.7';
 
 // Thin DOM adapter: existing fields, indices, actions and persistence callbacks
 // remain owned by each editor. The shared controller owns all interactions.

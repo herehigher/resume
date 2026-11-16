@@ -6,6 +6,12 @@ English: This file records notable changes. Dates mark release-candidate freeze;
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-11-16
+
+### Fixed / 修正
+
+- 履歴書の Markdown 書き出しで、通常の句読点や括弧、技術名などに付く余分なバックスラッシュを削減。見出し・リスト・自動リンクなどとして意図せず解釈される箇所は引き続き保護。
+
 ## [0.4.6] - 2026-10-22
 
 ### Fixed / 修正

@@ -1,7 +1,7 @@
-import { LIST_ORDER_REGISTRY } from '../state/list-order.js?v=0.4.6';
-import { createSortableDrag } from './sortable-drag.js?v=0.4.6';
-import { createListFoldState } from './list-fold-state.js?v=0.4.6';
-import { announceStatus } from './status-controller.js?v=0.4.6';
+import { LIST_ORDER_REGISTRY } from '../state/list-order.js?v=0.4.7';
+import { createSortableDrag } from './sortable-drag.js?v=0.4.7';
+import { createListFoldState } from './list-fold-state.js?v=0.4.7';
+import { announceStatus } from './status-controller.js?v=0.4.7';
 
 const LABELS = {
   ja: {

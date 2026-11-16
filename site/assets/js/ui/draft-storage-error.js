@@ -1,5 +1,5 @@
-import { isDraftStorageCompatibilityError } from '../state/storage.js?v=0.4.6';
-import { getMessages } from '../i18n/index.js?v=0.4.6';
+import { isDraftStorageCompatibilityError } from '../state/storage.js?v=0.4.7';
+import { getMessages } from '../i18n/index.js?v=0.4.7';
 
 export function messageForDraftStorageError(error, locale, fallback) {
   const messages = {
