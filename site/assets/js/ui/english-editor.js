@@ -1,14 +1,14 @@
-import { createEditorLists } from './editor-lists.js?v=0.4.6';
-import { createEnglishSampleState } from '../data/en-sample.js?v=0.4.6';
-import { cloneData } from '../state/defaults.js?v=0.4.6';
-import { createRecordId } from '../state/record-ids.js?v=0.4.6';
-import { renderEnglishDocument } from '../templates/en.js?v=0.4.6';
-import { addProfileLink, removeProfileLink } from '../utils/profile-links.js?v=0.4.6';
-import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js?v=0.4.6';
-import { draftStatusMessageForError } from './draft-storage-error.js?v=0.4.6';
-import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js?v=0.4.6';
-import { confirmAction } from './confirmation-dialog.js?v=0.4.6';
-import { createProfilePhotoDataUrl } from '../utils/profile-photo.js?v=0.4.6';
+import { createEditorLists } from './editor-lists.js?v=0.4.7';
+import { createEnglishSampleState } from '../data/en-sample.js?v=0.4.7';
+import { cloneData } from '../state/defaults.js?v=0.4.7';
+import { createRecordId } from '../state/record-ids.js?v=0.4.7';
+import { renderEnglishDocument } from '../templates/en.js?v=0.4.7';
+import { addProfileLink, removeProfileLink } from '../utils/profile-links.js?v=0.4.7';
+import { canAddProfileLink, renderProfileLinksEditor, updateProfileLinkRecognition } from './profile-links-editor.js?v=0.4.7';
+import { draftStatusMessageForError } from './draft-storage-error.js?v=0.4.7';
+import { initPageBreakControls, PAGE_BREAK_PREVIEW_GUTTER } from '../page-breaks.js?v=0.4.7';
+import { confirmAction } from './confirmation-dialog.js?v=0.4.7';
+import { createProfilePhotoDataUrl } from '../utils/profile-photo.js?v=0.4.7';
 
 const PROFILE_FIELDS = new Set(['fullName', 'birthDate', 'gender', 'nationality', 'postalCode', 'address', 'phone', 'email']);
 const RESUME_FIELDS = new Set(['headline', 'location', 'summary', 'skills']);

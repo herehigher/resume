@@ -1,6 +1,6 @@
-import { STATE_VERSION } from '../config.js?v=0.4.6';
-import { validateCurrentState } from './schema.js?v=0.4.6';
-import { createLegacyRecordId } from './record-ids.js?v=0.4.6';
+import { STATE_VERSION } from '../config.js?v=0.4.7';
+import { validateCurrentState } from './schema.js?v=0.4.7';
+import { createLegacyRecordId } from './record-ids.js?v=0.4.7';
 
 function isObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);

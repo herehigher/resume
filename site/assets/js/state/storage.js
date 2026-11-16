@@ -1,7 +1,7 @@
-import { STORAGE_KEY } from '../config.js?v=0.4.6';
-import { cloneData, createDefaultState } from './defaults.js?v=0.4.6';
-import { assertValidState, validateCurrentState } from './schema.js?v=0.4.6';
-import { migrateState } from './migrations.js?v=0.4.6';
+import { STORAGE_KEY } from '../config.js?v=0.4.7';
+import { cloneData, createDefaultState } from './defaults.js?v=0.4.7';
+import { assertValidState, validateCurrentState } from './schema.js?v=0.4.7';
+import { migrateState } from './migrations.js?v=0.4.7';
 
 export const ENCRYPTED_DRAFT_FORMAT = 'resume-studio-local-encrypted-v1';
 export const ENCRYPTED_DRAFT_ALGORITHM = 'AES-GCM';
